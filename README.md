@@ -52,6 +52,12 @@ source .venv/bin/activate  # On Unix/macOS
 .venv\Scripts\activate     # On Windows
 ```
 
+4. (Optional) Enable Git hooks and formatter tooling:
+
+```bash
+pre-commit install
+```
+
 ### Alternative: Traditional pip
 
 If you prefer using pip:

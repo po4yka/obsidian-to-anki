@@ -94,3 +94,20 @@ def test_model_fields_command_shows_fields(runner, test_config, monkeypatch):
     assert result.exit_code == 0
     assert "Front" in result.output
     assert "Back" in result.output
+
+
+def test_format_command_runs_subprocess(runner, test_config, monkeypatch):
+    _patch_setup(monkeypatch, test_config)
+
+    calls = []
+
+    def fake_run(cmd, check):
+        calls.append((tuple(cmd), check))
+        return MagicMock()
+
+    monkeypatch.setattr("obsidian_anki_sync.cli.subprocess.run", fake_run)
+
+    result = runner.invoke(cli, ["format", "--check"])
+    assert result.exit_code == 0
+    assert len(calls) == 2
+    assert calls[0][1] is True
