@@ -42,7 +42,7 @@ A complete, **bilingual (EN/RU)**, personal Obsidian vault for technical intervi
 > Folders encode coarse topics; use YAML/tags/links for everything else.
 
 ```
-📄 Homepage.md                # vault entry point
+Homepage.md                # vault entry point
 📁 _templates                 # note templates for Q&A, concepts, MOCs
 📁 00-Administration          # vault documentation, README, taxonomy
 📁 10-Concepts                # theory/glossary/definitions referenced across notes

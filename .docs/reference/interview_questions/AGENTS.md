@@ -261,14 +261,14 @@ SORT updated DESC
 
 ## Common Mistakes to Avoid
 
-1. ❌ Splitting EN/RU into separate notes → ✅ Keep both in one note
-2. ❌ Using Russian in tags → ✅ English-only tags, RU in `aliases` and content
-3. ❌ Multiple `topic` values → ✅ Exactly one topic
-4. ❌ Forgetting `android/<subtopic>` tags → ✅ Mirror Android subtopics to tags
-5. ❌ Setting `status: ready` → ✅ Use `status: draft` (let human review)
-6. ❌ No MOC link → ✅ Always link to relevant MOC
-7. ❌ File in wrong folder → ✅ Folder must match `topic` field
-8. ❌ Invalid topic name → ✅ Use exact values from TAXONOMY.md
+1. Splitting EN/RU into separate notes → Keep both in one note
+2. Using Russian in tags → English-only tags, RU in `aliases` and content
+3. Multiple `topic` values → Exactly one topic
+4. Forgetting `android/<subtopic>` tags → Mirror Android subtopics to tags
+5. Setting `status: ready` → Use `status: draft` (let human review)
+6. No MOC link → Always link to relevant MOC
+7. File in wrong folder → Folder must match `topic` field
+8. Invalid topic name → Use exact values from TAXONOMY.md
 
 ---
 
