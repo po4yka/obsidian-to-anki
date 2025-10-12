@@ -35,6 +35,7 @@ class TestStateDB:
             assert result['slug'] == "test-slug-en"
             assert result['anki_guid'] == 12345
             assert result['lang'] == "en"
+            assert result['card_guid'] == card.guid
 
     def test_update_card(self, temp_dir):
         """Test updating a card."""
@@ -45,11 +46,13 @@ class TestStateDB:
 
             # Update content hash
             card.content_hash = "new-hash-456"
+            card.guid = "updated-guid"
             db.update_card(card)
 
             # Verify update
             result = db.get_by_slug("test-slug-en")
             assert result['content_hash'] == "new-hash-456"
+            assert result['card_guid'] == "updated-guid"
 
     def test_get_by_guid(self, temp_dir):
         """Test retrieving card by Anki GUID."""
@@ -128,6 +131,7 @@ class TestStateDB:
             note_id="test-001",
             note_title="Test Note",
             card_index=card_index,
+            guid=f"guid-{slug}",
         )
 
         return Card(
@@ -138,5 +142,5 @@ class TestStateDB:
             content_hash="hash-123",
             note_type="APF::Simple",
             tags=["python", "testing"],
+            guid=f"guid-{slug}",
         )
-

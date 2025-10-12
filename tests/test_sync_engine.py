@@ -25,6 +25,7 @@ def test_update_card_updates_fields_and_tags(test_config):
         note_id="test-001",
         note_title="Sample Title",
         card_index=1,
+        guid="guid-sample",
     )
 
     card = Card(
@@ -35,6 +36,7 @@ def test_update_card_updates_fields_and_tags(test_config):
         content_hash="hash",
         note_type="APF::Simple",
         tags=["en", "testing"],
+        guid="guid-sample",
     )
 
     with patch("obsidian_anki_sync.sync.engine.map_apf_to_anki_fields", return_value={"Front": "Q", "Back": "A"}):

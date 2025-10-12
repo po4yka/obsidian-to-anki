@@ -15,6 +15,7 @@ from ..obsidian.parser import discover_notes, parse_note, ParserError
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
 from ..utils.logging import get_logger
+from ..utils.guid import deterministic_guid
 
 logger = get_logger(__name__)
 
@@ -198,10 +199,18 @@ class SyncEngine:
             existing_slugs
         )
 
+        # Compute deterministic GUID for the note
+        guid = deterministic_guid([
+            metadata.id,
+            relative_path,
+            str(qa_pair.card_index),
+            lang
+        ])
+
         # Create manifest
         manifest = create_manifest(
             slug, slug_base, lang, relative_path,
-            qa_pair.card_index, metadata, hash6
+            qa_pair.card_index, metadata, guid, hash6
         )
 
         # Generate APF card via LLM
@@ -353,8 +362,22 @@ class SyncEngine:
                         note_id=db_card['note_id'],
                         note_title=db_card['note_title'],
                         card_index=db_card['card_index'],
+                        guid=db_card.get('card_guid') or deterministic_guid([
+                            db_card.get('note_id', ''),
+                            db_card['source_path'],
+                            str(db_card['card_index']),
+                            db_card['lang']
+                        ]),
                     ),
-                    content_hash=db_card['content_hash']
+                    content_hash=db_card['content_hash'],
+                    note_type=db_card.get('note_type', 'APF::Simple'),
+                    tags=[],
+                    guid=db_card.get('card_guid') or deterministic_guid([
+                        db_card.get('note_id', ''),
+                        db_card['source_path'],
+                        str(db_card['card_index']),
+                        db_card['lang']
+                    ]),
                 )
 
                 self.changes.append(SyncAction(
@@ -456,7 +479,8 @@ class SyncEngine:
             deck=self.config.anki_deck_name,
             note_type=card.note_type,
             fields=fields,
-            tags=card.tags
+            tags=card.tags,
+            guid=card.guid
         )
 
         # Save to database

@@ -57,6 +57,7 @@ class Manifest:
     note_id: str
     note_title: str
     card_index: int
+    guid: str
     hash6: Optional[str] = None
 
 
@@ -71,6 +72,7 @@ class Card:
     content_hash: str
     note_type: str = "APF::Simple"
     tags: list[str] = field(default_factory=list)
+    guid: str = ""
 
 
 @dataclass
@@ -94,4 +96,3 @@ class SyncAction:
     card: Card
     anki_guid: Optional[int] = None
     reason: Optional[str] = None
-

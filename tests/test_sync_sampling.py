@@ -29,6 +29,7 @@ def _make_fake_card(relative_path: str, lang: str, qa_pair_index: int, note_id: 
         note_id=note_id,
         note_title=note_title,
         card_index=qa_pair_index,
+        guid=f"guid-{counter}-{lang}",
         hash6=None,
     )
     return Card(
@@ -39,6 +40,7 @@ def _make_fake_card(relative_path: str, lang: str, qa_pair_index: int, note_id: 
         content_hash=f"hash-{counter}",
         note_type="APF::Simple",
         tags=[],
+        guid=f"guid-{counter}-{lang}",
     )
 
 
