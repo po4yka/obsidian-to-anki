@@ -1,5 +1,6 @@
 """Command-line interface for the sync service."""
 
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -281,6 +282,32 @@ def show_model_fields(ctx: click.Context, model_name: str) -> None:
         logger.error("model_fields_failed", model=model_name, error=str(e))
         click.echo(f"\nError: {e}", err=True)
         raise click.Abort()
+
+
+@cli.command()
+@click.option('--check/--fix', default=False, help='Run formatters in check mode (no modifications).')
+@click.pass_context
+def format(ctx: click.Context, check: bool) -> None:
+    """Run code formatters (ruff + black)."""
+    logger = ctx.obj['logger']
+    logger.info("format_started", check=check)
+
+    paths = ["src", "tests"]
+    commands = [
+        (["ruff", "check"], ["--fix"] if not check else [], paths),
+        (["black"], ["--check"] if check else [], paths),
+    ]
+
+    try:
+        for base, extra, target_paths in commands:
+            cmd = base + extra + target_paths
+            logger.debug("format_command", command=cmd)
+            subprocess.run(cmd, check=True)
+
+        logger.info("format_completed", check=check)
+    except subprocess.CalledProcessError as exc:
+        logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
+        raise click.ClickException(f"Formatter failed: {exc.cmd}")
 
 
 if __name__ == '__main__':
