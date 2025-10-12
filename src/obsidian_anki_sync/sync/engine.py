@@ -461,6 +461,7 @@ class SyncEngine:
 
         # Update note in Anki
         self.anki.update_note_fields(anki_guid, fields)
+        self.anki.update_note_tags(anki_guid, card.tags)
 
         # Update database
         self.db.update_card(card)
