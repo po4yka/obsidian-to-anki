@@ -1,0 +1,116 @@
+"""Tests for APF generator helper behaviour."""
+
+from pathlib import Path
+from datetime import datetime
+
+import pytest
+
+from obsidian_anki_sync.apf.generator import APFGenerator
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import NoteMetadata, QAPair, Manifest
+
+
+@pytest.fixture
+def dummy_config(tmp_path):
+    """Create a minimal config for APFGenerator."""
+    return Config(
+        vault_path=tmp_path,
+        source_dir=Path("interview_questions/InterviewQuestions"),
+        anki_connect_url="http://localhost:8765",
+        anki_deck_name="Test Deck",
+        anki_note_type="APF::Simple",
+        openrouter_api_key="dummy",
+        openrouter_model="mock-model",
+        llm_temperature=0.1,
+        llm_top_p=0.2,
+        run_mode="dry-run",
+        delete_mode="delete",
+        db_path=tmp_path / "test.db",
+        log_level="INFO",
+    )
+
+
+@pytest.fixture
+def sample_metadata_for_code():
+    return NoteMetadata(
+        id="test",
+        title="Sample",
+        topic="kotlin",
+        language_tags=["en"],
+        created=datetime.utcnow(),
+        updated=datetime.utcnow(),
+        tags=["kotlin", "testing"],
+    )
+
+
+@pytest.fixture
+def plain_metadata():
+    return NoteMetadata(
+        id="plain",
+        title="Plain",
+        topic="general",
+        language_tags=["en"],
+        created=datetime.utcnow(),
+        updated=datetime.utcnow(),
+        tags=[],
+    )
+
+
+@pytest.fixture
+def sample_manifest():
+    return Manifest(
+        slug="sample-slug-en",
+        slug_base="sample-slug",
+        lang="en",
+        source_path="relative/path.md",
+        source_anchor="p01",
+        note_id="test",
+        note_title="Sample",
+        card_index=1,
+    )
+
+
+@pytest.fixture
+def sample_qa_pair_for_prompt():
+    return QAPair(
+        card_index=1,
+        question_en="What is code?",
+        question_ru="Что такое код?",
+        answer_en="```
+kotlin code
+```",
+        answer_ru="код",
+    )
+
+
+def test_code_language_hint_detects_known_language(dummy_config, sample_metadata_for_code):
+    gen = APFGenerator(dummy_config)
+    assert gen._code_language_hint(sample_metadata_for_code) == "kotlin"
+
+
+def test_code_language_hint_falls_back_to_plaintext(dummy_config, plain_metadata):
+    gen = APFGenerator(dummy_config)
+    assert gen._code_language_hint(plain_metadata) == "plaintext"
+
+
+def test_prompt_includes_code_language_instruction(dummy_config, sample_metadata_for_code, sample_qa_pair_for_prompt, sample_manifest):
+    gen = APFGenerator(dummy_config)
+    prompt = gen._build_user_prompt(
+        question=sample_qa_pair_for_prompt.question_en,
+        answer=sample_qa_pair_for_prompt.answer_en,
+        qa_pair=sample_qa_pair_for_prompt,
+        metadata=sample_metadata_for_code,
+        manifest=sample_manifest,
+        lang="en"
+    )
+    assert "<pre><code class=\"language-kotlin\"" in prompt
+@pytest.fixture(autouse=True)
+def patch_openai(monkeypatch):
+    """Prevent real OpenAI client instantiation."""
+    class DummyClient:
+        pass
+
+    monkeypatch.setattr(
+        "obsidian_anki_sync.apf.generator.OpenAI",
+        lambda *args, **kwargs: DummyClient()
+    )
