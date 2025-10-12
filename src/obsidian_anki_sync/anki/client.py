@@ -174,16 +174,12 @@ class AnkiClient:
             note_id: Note ID
             tags: New tags
         """
-        # Remove all tags first
-        self.invoke("clearUnusedTags")
-
-        # Add new tags
-        self.invoke("updateNoteTags", {
-            "note": note_id,
-            "tags": " ".join(tags)
+        self.invoke("notesTags", {
+            "notes": [note_id],
+            "tags": tags
         })
 
-        logger.info("note_tags_updated", note_id=note_id, tags=tags)
+        logger.info("note_tags_replaced", note_id=note_id, tags=tags)
 
     def delete_notes(self, note_ids: list[int]) -> None:
         """
@@ -234,4 +230,3 @@ class AnkiClient:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()
-
