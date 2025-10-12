@@ -7,6 +7,7 @@ import yaml  # type: ignore
 from ..anki.client import AnkiClient
 from ..anki.field_mapper import map_apf_to_anki_fields
 from ..apf.generator import APFGenerator
+from ..apf.html_validator import validate_card_html
 from ..apf.linter import validate_apf
 from ..config import Config
 from ..models import Card, NoteMetadata, QAPair, SyncAction
@@ -220,6 +221,15 @@ class SyncEngine:
                 slug=slug,
                 warnings=validation.warnings
             )
+
+        html_errors = validate_card_html(card.apf_html)
+        if html_errors:
+            logger.error(
+                "apf_html_invalid",
+                slug=slug,
+                errors=html_errors
+            )
+            raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
 
         return card
 
