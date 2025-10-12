@@ -205,6 +205,7 @@ Requirements:
 - Tags: Derive from topic/subtopics, 3-6 snake_case tags, include primary language/tech
 - Primary language tag: {lang}
 - Topic-based tags: {metadata.topic.lower().replace(' ', '_')}
+- Preserve every code block using <pre><code class="language-{self._code_language_hint(metadata)}"> ... </code></pre> with original indentation; do NOT fall back to Markdown fences.
 - Include manifest at end with slug "{manifest.slug}"
 - Add "Ref: {ref_link}" in Other notes section
 - Follow APF v2.1 format strictly
@@ -249,3 +250,21 @@ Requirements:
         tags.update(metadata.tags)
 
         return sorted(list(tags))
+
+    def _code_language_hint(self, metadata: NoteMetadata) -> str:
+        """Derive a language hint for code blocks."""
+        candidates = list(metadata.tags) + metadata.subtopics + [metadata.topic]
+        known_languages = {
+            "kotlin", "java", "python", "swift", "cpp", "c",
+            "csharp", "go", "rust", "javascript", "typescript",
+            "sql", "bash", "shell", "yaml", "json", "html",
+            "css", "gradle", "groovy"
+        }
+        for raw in candidates:
+            if not raw:
+                continue
+            normalized = raw.lower().replace('language/', '').replace('lang/', '').replace('topic/', '')
+            normalized = normalized.replace('/', '_')
+            if normalized in known_languages:
+                return normalized
+        return "plaintext"
