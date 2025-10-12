@@ -120,7 +120,8 @@ class AnkiClient:
         deck: str,
         note_type: str,
         fields: dict[str, str],
-        tags: list[str]
+        tags: list[str],
+        guid: str | None = None,
     ) -> int:
         """
         Add a new note.
@@ -134,16 +135,20 @@ class AnkiClient:
         Returns:
             Note ID
         """
-        result = self.invoke("addNote", {
-            "note": {
-                "deckName": deck,
-                "modelName": note_type,
-                "fields": fields,
-                "tags": tags,
-                "options": {
-                    "allowDuplicate": False
-                }
+        note_payload = {
+            "deckName": deck,
+            "modelName": note_type,
+            "fields": fields,
+            "tags": tags,
+            "options": {
+                "allowDuplicate": False
             }
+        }
+        if guid:
+            note_payload["guid"] = guid
+
+        result = self.invoke("addNote", {
+            "note": note_payload
         })
 
         logger.info("note_added", note_id=result, deck=deck, note_type=note_type)

@@ -192,5 +192,96 @@ LOG_LEVEL=INFO
     logger.info("init_completed")
 
 
+@cli.command(name="decks")
+@click.pass_context
+def list_decks(ctx: click.Context) -> None:
+    """List deck names available via AnkiConnect."""
+    logger = ctx.obj['logger']
+    config = ctx.obj['config']
+
+    logger.info("list_decks_started")
+
+    from .anki.client import AnkiClient
+
+    try:
+        with AnkiClient(config.anki_connect_url) as anki:
+            decks = sorted(anki.get_deck_names())
+
+        if not decks:
+            click.echo("No decks available.")
+        else:
+            click.echo("\nDecks:")
+            for deck in decks:
+                click.echo(f"  - {deck}")
+
+        logger.info("list_decks_completed", count=len(decks))
+
+    except Exception as e:
+        logger.error("list_decks_failed", error=str(e))
+        click.echo(f"\nError: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command(name="models")
+@click.pass_context
+def list_models(ctx: click.Context) -> None:
+    """List note models (types) available in Anki."""
+    logger = ctx.obj['logger']
+    config = ctx.obj['config']
+
+    logger.info("list_models_started")
+
+    from .anki.client import AnkiClient
+
+    try:
+        with AnkiClient(config.anki_connect_url) as anki:
+            models = sorted(anki.get_model_names())
+
+        if not models:
+            click.echo("No models available.")
+        else:
+            click.echo("\nModels:")
+            for model in models:
+                click.echo(f"  - {model}")
+
+        logger.info("list_models_completed", count=len(models))
+
+    except Exception as e:
+        logger.error("list_models_failed", error=str(e))
+        click.echo(f"\nError: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command(name="model-fields")
+@click.option('--model', 'model_name', required=True, help='Model name to inspect')
+@click.pass_context
+def show_model_fields(ctx: click.Context, model_name: str) -> None:
+    """Show field names for a specific Anki model."""
+    logger = ctx.obj['logger']
+    config = ctx.obj['config']
+
+    logger.info("model_fields_started", model=model_name)
+
+    from .anki.client import AnkiClient
+
+    try:
+        with AnkiClient(config.anki_connect_url) as anki:
+            fields = anki.get_model_field_names(model_name)
+
+        if not fields:
+            click.echo(f"Model '{model_name}' has no fields or does not exist.")
+        else:
+            click.echo(f"\nFields for model '{model_name}':")
+            for field in fields:
+                click.echo(f"  - {field}")
+
+        logger.info("model_fields_completed", model=model_name, count=len(fields))
+
+    except Exception as e:
+        logger.error("model_fields_failed", model=model_name, error=str(e))
+        click.echo(f"\nError: {e}", err=True)
+        raise click.Abort()
+
+
 if __name__ == '__main__':
     cli()

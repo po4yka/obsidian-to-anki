@@ -89,7 +89,8 @@ class TestAnkiClient:
     @respx.mock
     def test_add_note(self, mock_anki_url):
         """Test adding a note (INT-crud-01)."""
-        respx.post(mock_anki_url).mock(
+        route = respx.post(mock_anki_url)
+        route.mock(
             return_value=httpx.Response(
                 200,
                 json={"result": 12345, "error": None}
@@ -101,10 +102,14 @@ class TestAnkiClient:
             deck="Test Deck",
             note_type="Basic",
             fields={"Front": "Q", "Back": "A"},
-            tags=["test"]
+            tags=["test"],
+            guid="guid-123"
         )
 
         assert note_id == 12345
+        assert route.called
+        payload = route.calls[-1].request.json()
+        assert payload["note"]["guid"] == "guid-123"
 
     @respx.mock
     def test_update_note_fields(self, mock_anki_url):
@@ -150,4 +155,3 @@ class TestAnkiClient:
 
         with pytest.raises(AnkiConnectError, match="HTTP error"):
             client.invoke("testAction")
-

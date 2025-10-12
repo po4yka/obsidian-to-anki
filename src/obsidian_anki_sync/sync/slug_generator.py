@@ -101,6 +101,7 @@ def create_manifest(
     source_path: str,
     card_index: int,
     metadata: NoteMetadata,
+    guid: str,
     hash6: str | None = None
 ) -> Manifest:
     """
@@ -127,5 +128,6 @@ def create_manifest(
         note_id=metadata.id,
         note_title=metadata.title,
         card_index=card_index,
+        guid=guid,
         hash6=hash6,
     )

@@ -1,6 +1,8 @@
 """APF card generation via OpenRouter LLM."""
 
 import hashlib
+import json
+import re
 from pathlib import Path
 
 from openai import OpenAI  # type: ignore
@@ -146,6 +148,9 @@ class APFGenerator:
         # Extract tags from metadata
         tags = self._extract_tags(metadata, lang)
 
+        # Ensure manifest comment is accurate
+        apf_html = self._ensure_manifest(apf_html, manifest, tags, note_type)
+
         return Card(
             slug=manifest.slug,
             lang=lang,
@@ -154,6 +159,7 @@ class APFGenerator:
             content_hash=content_hash,
             note_type=note_type,
             tags=tags,
+            guid=manifest.guid,
         )
 
     def _build_user_prompt(
@@ -230,6 +236,37 @@ Requirements:
 
         # Default
         return 'APF::Simple'
+
+    def _ensure_manifest(
+        self,
+        apf_html: str,
+        manifest: Manifest,
+        tags: list[str],
+        note_type: str,
+    ) -> str:
+        """Ensure manifest comment exists and contains required fields."""
+        pattern = re.compile(r'<!--\s*manifest:\s*({.*?})\s*-->')
+        match = pattern.search(apf_html)
+        if not match:
+            raise ValueError("APF output missing manifest comment")
+
+        try:
+            manifest_data = json.loads(match.group(1))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid manifest JSON: {exc}") from exc
+
+        manifest_data.update({
+            "slug": manifest.slug,
+            "slug_base": manifest.slug_base,
+            "lang": manifest.lang,
+            "guid": manifest.guid,
+            "type": note_type,
+            "tags": tags,
+        })
+
+        new_comment = f"<!-- manifest: {json.dumps(manifest_data, ensure_ascii=False, separators=(',', ':'))} -->"
+        start, end = match.span()
+        return apf_html[:start] + new_comment + apf_html[end:]
 
     def _extract_tags(self, metadata: NoteMetadata, lang: str) -> list[str]:
         """Extract tags from metadata."""

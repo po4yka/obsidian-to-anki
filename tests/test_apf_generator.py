@@ -10,6 +10,19 @@ from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.models import NoteMetadata, QAPair, Manifest
 
 
+@pytest.fixture(autouse=True)
+def patch_openai(monkeypatch):
+    """Prevent real OpenAI client instantiation."""
+
+    class DummyClient:
+        pass
+
+    monkeypatch.setattr(
+        "obsidian_anki_sync.apf.generator.OpenAI",
+        lambda *args, **kwargs: DummyClient()
+    )
+
+
 @pytest.fixture
 def dummy_config(tmp_path):
     """Create a minimal config for APFGenerator."""
@@ -67,6 +80,7 @@ def sample_manifest():
         note_id="test",
         note_title="Sample",
         card_index=1,
+        guid="guid-sample",
     )
 
 
@@ -104,6 +118,15 @@ def test_prompt_includes_code_language_instruction(dummy_config, sample_metadata
         lang="en"
     )
     assert "<pre><code class=\"language-kotlin\"" in prompt
+
+
+def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
+    gen = APFGenerator(dummy_config)
+    html = "<!-- manifest: {\"slug\":\"old\",\"guid\":\"bad\",\"tags\":[]} -->"
+    updated = gen._ensure_manifest(html, sample_manifest, ["en", "testing"], "APF::Simple")
+    assert '"guid":"guid-sample"' in updated
+    assert '"slug":"sample-slug-en"' in updated
+    assert '"tags":["en","testing"]' in updated
 @pytest.fixture(autouse=True)
 def patch_openai(monkeypatch):
     """Prevent real OpenAI client instantiation."""

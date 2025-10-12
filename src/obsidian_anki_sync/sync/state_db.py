@@ -37,16 +37,27 @@ class StateDB:
                 note_id TEXT,
                 note_title TEXT,
                 note_type TEXT DEFAULT 'APF::Simple',
+                card_guid TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(source_path, card_index, lang)
             )
         """)
+        # Ensure card_guid column exists for legacy databases
+        cursor.execute("""
+            PRAGMA table_info(cards)
+        """)
+        columns = {row[1] for row in cursor.fetchall()}
+        if 'card_guid' not in columns:
+            cursor.execute("ALTER TABLE cards ADD COLUMN card_guid TEXT")
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_source ON cards(source_path)
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_guid ON cards(anki_guid)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_card_guid ON cards(card_guid)
         """)
         self.conn.commit()
 
@@ -56,8 +67,9 @@ class StateDB:
         cursor.execute("""
             INSERT INTO cards (
                 slug, slug_base, lang, source_path, source_anchor,
-                card_index, anki_guid, content_hash, note_id, note_title, note_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                card_index, anki_guid, content_hash, note_id, note_title, note_type,
+                card_guid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             card.slug,
             card.manifest.slug_base,
@@ -70,6 +82,7 @@ class StateDB:
             card.manifest.note_id,
             card.manifest.note_title,
             card.note_type,
+            card.guid,
         ))
         self.conn.commit()
 
@@ -81,12 +94,14 @@ class StateDB:
             SET content_hash = ?,
                 note_title = ?,
                 note_type = ?,
+                card_guid = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE slug = ?
         """, (
             card.content_hash,
             card.manifest.note_title,
             card.note_type,
+            card.guid,
             card.slug,
         ))
         self.conn.commit()
@@ -134,4 +149,3 @@ class StateDB:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()
-
