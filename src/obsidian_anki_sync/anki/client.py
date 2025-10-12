@@ -171,20 +171,52 @@ class AnkiClient:
 
         logger.info("note_updated", note_id=note_id)
 
-    def update_note_tags(self, note_id: int, tags: list[str]) -> None:
+    def add_tags(self, note_ids: list[int], tags: str) -> None:
         """
-        Replace note tags.
+        Add tags to notes.
 
         Args:
-            note_id: Note ID
-            tags: New tags
+            note_ids: List of note IDs
+            tags: Space-separated tags to add
         """
-        self.invoke("notesTags", {
-            "notes": [note_id],
+        self.invoke("addTags", {
+            "notes": note_ids,
             "tags": tags
         })
 
-        logger.info("note_tags_replaced", note_id=note_id, tags=tags)
+        logger.info("tags_added", note_ids=note_ids, tags=tags)
+
+    def remove_tags(self, note_ids: list[int], tags: str) -> None:
+        """
+        Remove tags from notes.
+
+        Args:
+            note_ids: List of note IDs
+            tags: Space-separated tags to remove
+        """
+        self.invoke("removeTags", {
+            "notes": note_ids,
+            "tags": tags
+        })
+
+        logger.info("tags_removed", note_ids=note_ids, tags=tags)
+
+    def replace_tags(self, note_ids: list[int], tag_to_replace: str, replace_with: str) -> None:
+        """
+        Replace tags in notes.
+
+        Args:
+            note_ids: List of note IDs
+            tag_to_replace: Tag to replace
+            replace_with: New tag
+        """
+        self.invoke("replaceTags", {
+            "notes": note_ids,
+            "tag_to_replace": tag_to_replace,
+            "replace_with": replace_with
+        })
+
+        logger.info("tags_replaced", note_ids=note_ids, old=tag_to_replace, new=replace_with)
 
     def delete_notes(self, note_ids: list[int]) -> None:
         """
@@ -218,6 +250,46 @@ class AnkiClient:
             List of field names
         """
         return self.invoke("modelFieldNames", {"modelName": model_name})
+
+    def can_add_notes(self, notes: list[dict]) -> list[bool]:
+        """
+        Check if notes can be added (no duplicates).
+
+        Args:
+            notes: List of note objects to check
+
+        Returns:
+            List of booleans indicating if each note can be added
+        """
+        return self.invoke("canAddNotes", {"notes": notes})
+
+    def store_media_file(self, filename: str, data: str) -> str:
+        """
+        Store a media file in Anki's media folder.
+
+        Args:
+            filename: Filename to store as
+            data: Base64-encoded file data
+
+        Returns:
+            Stored filename
+        """
+        return self.invoke("storeMediaFile", {
+            "filename": filename,
+            "data": data
+        })
+
+    def gui_browse(self, query: str) -> list[int]:
+        """
+        Open browser with search query.
+
+        Args:
+            query: Search query
+
+        Returns:
+            List of note IDs shown in browser
+        """
+        return self.invoke("guiBrowse", {"query": query})
 
     def sync(self) -> None:
         """Trigger Anki sync."""
