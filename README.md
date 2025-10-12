@@ -87,6 +87,14 @@ Or preview changes without applying:
 obsidian-anki-sync sync --dry-run
 ```
 
+Inspect decks/models via diagnostics:
+
+```bash
+obsidian-anki-sync decks
+obsidian-anki-sync models
+obsidian-anki-sync model-fields --model "APF::Simple"
+```
+
 Run a sample dry-run on a random subset (default 10 notes):
 
 ```bash
