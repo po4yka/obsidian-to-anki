@@ -1,0 +1,35 @@
+# macOS artifacts
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Tooling caches
+.mypy_cache/
+.pytest_cache/
+ruff_cache/
+coverage.xml
+htmlcov/
+.coverage*
+
+# IDE/editor settings
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Node/npm (if used for tooling)
+node_modules/
