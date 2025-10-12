@@ -9,7 +9,7 @@
 
 **ALL note files MUST be named in English**, regardless of the content language.
 
-### ✅ Correct Examples
+### Correct Examples
 
 ```
 q-what-is-viewmodel--android--medium.md
@@ -17,7 +17,7 @@ q-how-to-create-coroutine--programming-languages--easy.md
 q-sealed-vs-enum-classes--programming-languages--medium.md
 ```
 
-### ❌ Incorrect Examples
+### Incorrect Examples
 
 ```
 q-что-такое-viewmodel--android--medium.md              # Russian characters
@@ -113,10 +113,10 @@ q-how-to-optimize-recyclerview-performance--android--medium.md # Too long
 
 **Examples:**
 ```
-✅ q-viewmodel-vs-savedstate--android--medium.md
-❌ q-ViewModel-vs-SavedState--android--medium.md    # Uppercase
-❌ q-viewmodel_vs_savedstate--android--medium.md    # Underscores
-❌ q-viewmodel vs savedstate--android--medium.md    # Spaces
+q-viewmodel-vs-savedstate--android--medium.md
+q-ViewModel-vs-SavedState--android--medium.md    # Uppercase
+q-viewmodel_vs_savedstate--android--medium.md    # Underscores
+q-viewmodel vs savedstate--android--medium.md    # Spaces
 ```
 
 ### 4. Be Descriptive
@@ -125,11 +125,11 @@ q-how-to-optimize-recyclerview-performance--android--medium.md # Too long
 
 **Examples:**
 ```
-✅ q-kotlin-null-safety-operators--programming-languages--easy.md
-❌ q-kotlin-operators--programming-languages--easy.md  # Too generic
+q-kotlin-null-safety-operators--programming-languages--easy.md
+q-kotlin-operators--programming-languages--easy.md  # Too generic
 
-✅ q-recyclerview-diffutil-usage--android--medium.md
-❌ q-list-optimization--android--medium.md  # Too vague
+q-recyclerview-diffutil-usage--android--medium.md
+q-list-optimization--android--medium.md  # Too vague
 ```
 
 ---
