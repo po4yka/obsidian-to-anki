@@ -1,7 +1,8 @@
 """Integration tests for sync determinism (INT-02, REGR-det-01)."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from obsidian_anki_sync.sync.engine import SyncEngine
 
@@ -35,8 +36,8 @@ class TestSyncFlow:
     def test_create_flow(self, test_config, temp_dir, sample_metadata, sample_qa_pair):
         """Test create card flow."""
         # Setup mocks
-        from obsidian_anki_sync.sync.state_db import StateDB
         from obsidian_anki_sync.anki.client import AnkiClient
+        from obsidian_anki_sync.sync.state_db import StateDB
 
         with StateDB(test_config.db_path) as db:
             # Mock AnkiConnect
@@ -45,7 +46,7 @@ class TestSyncFlow:
             mock_anki.add_note.return_value = 12345
 
             # Mock APF generator to avoid LLM call
-            with patch('obsidian_anki_sync.sync.engine.APFGenerator') as mock_gen:
+            with patch("obsidian_anki_sync.sync.engine.APFGenerator") as mock_gen:
                 mock_gen_instance = MagicMock()
                 mock_gen.return_value = mock_gen_instance
 
@@ -57,4 +58,3 @@ class TestSyncFlow:
                 assert engine.config == test_config
                 assert engine.db == db
                 assert engine.anki == mock_anki
-

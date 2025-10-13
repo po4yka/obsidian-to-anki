@@ -12,6 +12,7 @@ logger = get_logger(__name__)
 
 class AnkiConnectError(Exception):
     """Error from AnkiConnect API."""
+
     pass
 
 
@@ -31,17 +32,15 @@ class AnkiClient:
         self.session = httpx.Client(
             timeout=timeout,
             limits=httpx.Limits(
-                max_keepalive_connections=5,
-                max_connections=10,
-                keepalive_expiry=30.0
-            )
+                max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
+            ),
         )
         logger.info("anki_client_initialized", url=url)
 
     @retry(
         max_attempts=3,
         initial_delay=1.0,
-        exceptions=(httpx.HTTPError, httpx.TimeoutException, AnkiConnectError)
+        exceptions=(httpx.HTTPError, httpx.TimeoutException, AnkiConnectError),
     )
     def invoke(self, action: str, params: Optional[dict] = None) -> Any:
         """
@@ -57,11 +56,7 @@ class AnkiClient:
         Raises:
             AnkiConnectError: If the action fails
         """
-        payload = {
-            "action": action,
-            "version": 6,
-            "params": params or {}
-        }
+        payload = {"action": action, "version": 6, "params": params or {}}
 
         logger.debug("anki_invoke", action=action)
 
@@ -75,9 +70,7 @@ class AnkiClient:
                 f"HTTP {e.response.status_code} from AnkiConnect: {e}"
             )
         except httpx.HTTPError as e:
-            raise AnkiConnectError(
-                f"HTTP error calling AnkiConnect: {e}"
-            )
+            raise AnkiConnectError(f"HTTP error calling AnkiConnect: {e}")
 
         try:
             result = response.json()
@@ -140,16 +133,12 @@ class AnkiClient:
             "modelName": note_type,
             "fields": fields,
             "tags": tags,
-            "options": {
-                "allowDuplicate": False
-            }
+            "options": {"allowDuplicate": False},
         }
         if guid:
             note_payload["guid"] = guid
 
-        result = self.invoke("addNote", {
-            "note": note_payload
-        })
+        result = self.invoke("addNote", {"note": note_payload})
 
         logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
         return result
@@ -162,12 +151,7 @@ class AnkiClient:
             note_id: Note ID
             fields: New field values
         """
-        self.invoke("updateNoteFields", {
-            "note": {
-                "id": note_id,
-                "fields": fields
-            }
-        })
+        self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
 
@@ -179,10 +163,7 @@ class AnkiClient:
             note_ids: List of note IDs
             tags: Space-separated tags to add
         """
-        self.invoke("addTags", {
-            "notes": note_ids,
-            "tags": tags
-        })
+        self.invoke("addTags", {"notes": note_ids, "tags": tags})
 
         logger.info("tags_added", note_ids=note_ids, tags=tags)
 
@@ -194,14 +175,13 @@ class AnkiClient:
             note_ids: List of note IDs
             tags: Space-separated tags to remove
         """
-        self.invoke("removeTags", {
-            "notes": note_ids,
-            "tags": tags
-        })
+        self.invoke("removeTags", {"notes": note_ids, "tags": tags})
 
         logger.info("tags_removed", note_ids=note_ids, tags=tags)
 
-    def replace_tags(self, note_ids: list[int], tag_to_replace: str, replace_with: str) -> None:
+    def replace_tags(
+        self, note_ids: list[int], tag_to_replace: str, replace_with: str
+    ) -> None:
         """
         Replace tags in notes.
 
@@ -210,13 +190,18 @@ class AnkiClient:
             tag_to_replace: Tag to replace
             replace_with: New tag
         """
-        self.invoke("replaceTags", {
-            "notes": note_ids,
-            "tag_to_replace": tag_to_replace,
-            "replace_with": replace_with
-        })
+        self.invoke(
+            "replaceTags",
+            {
+                "notes": note_ids,
+                "tag_to_replace": tag_to_replace,
+                "replace_with": replace_with,
+            },
+        )
 
-        logger.info("tags_replaced", note_ids=note_ids, old=tag_to_replace, new=replace_with)
+        logger.info(
+            "tags_replaced", note_ids=note_ids, old=tag_to_replace, new=replace_with
+        )
 
     def delete_notes(self, note_ids: list[int]) -> None:
         """
@@ -274,10 +259,7 @@ class AnkiClient:
         Returns:
             Stored filename
         """
-        return self.invoke("storeMediaFile", {
-            "filename": filename,
-            "data": data
-        })
+        return self.invoke("storeMediaFile", {"filename": filename, "data": data})
 
     def gui_browse(self, query: str) -> list[int]:
         """
@@ -300,7 +282,7 @@ class AnkiClient:
         """Close the HTTP session."""
         self.session.close()
 
-    def __enter__(self) -> 'AnkiClient':
+    def __enter__(self) -> "AnkiClient":
         """Context manager entry."""
         return self
 

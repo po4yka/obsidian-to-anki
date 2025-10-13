@@ -41,7 +41,9 @@ def patch_logging(monkeypatch):
 
 
 def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None):
-    monkeypatch.setattr("obsidian_anki_sync.cli.load_config", lambda path=None: test_config)
+    monkeypatch.setattr(
+        "obsidian_anki_sync.cli.load_config", lambda path=None: test_config
+    )
     monkeypatch.setattr("obsidian_anki_sync.cli.set_config", lambda cfg: None)
 
     class DummyAnki:

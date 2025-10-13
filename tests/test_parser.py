@@ -1,15 +1,16 @@
 """Tests for Obsidian note parser (UNIT-parse-01, UNIT-parse-02, UNIT-yaml-01)."""
 
-import pytest
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from obsidian_anki_sync.obsidian.parser import (
-    parse_note,
-    parse_frontmatter,
-    parse_qa_pairs,
-    discover_notes,
     ParserError,
+    discover_notes,
+    parse_frontmatter,
+    parse_note,
+    parse_qa_pairs,
 )
 
 
@@ -219,4 +220,3 @@ class TestFullNoteParsing:
         """Test error on nonexistent file."""
         with pytest.raises(ParserError, match="Failed to read file"):
             parse_note(temp_dir / "nonexistent.md")
-

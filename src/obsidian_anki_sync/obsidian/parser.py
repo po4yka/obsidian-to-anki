@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 
 class ParserError(Exception):
     """Error during parsing."""
+
     pass
 
 
@@ -42,7 +43,7 @@ def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
         raise ParserError(f"Cannot resolve path {file_path}: {e}")
 
     try:
-        content = resolved_path.read_text(encoding='utf-8')
+        content = resolved_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
         raise ParserError(f"Failed to read file {resolved_path}: {e}")
     except Exception as e:
@@ -59,7 +60,7 @@ def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
         "parsed_note",
         file=str(file_path),
         pairs_count=len(qa_pairs),
-        languages=metadata.language_tags
+        languages=metadata.language_tags,
     )
 
     return metadata, qa_pairs
@@ -80,7 +81,7 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         ParserError: If frontmatter is missing or invalid
     """
     # Extract frontmatter between --- markers
-    match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
     if not match:
         raise ParserError(f"No frontmatter found in {file_path}")
 
@@ -95,58 +96,61 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         raise ParserError(f"Empty frontmatter in {file_path}")
 
     # Validate required fields
-    required_fields = ['id', 'title', 'topic', 'language_tags', 'created', 'updated']
+    required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ParserError(f"Missing required fields in {file_path}: {missing}")
 
     # Parse dates
     try:
-        created = _parse_date(data['created'])
-        updated = _parse_date(data['updated'])
+        created = _parse_date(data["created"])
+        updated = _parse_date(data["updated"])
     except (ValueError, TypeError) as e:
         raise ParserError(f"Invalid date format in {file_path}: {e}")
 
     # Check topic matches directory
     expected_topic = file_path.parent.name
-    if data['topic'] != expected_topic:
+    if data["topic"] != expected_topic:
         logger.warning(
             "topic_mismatch",
             file=str(file_path),
-            yaml_topic=data['topic'],
-            dir_topic=expected_topic
+            yaml_topic=data["topic"],
+            dir_topic=expected_topic,
         )
 
     # Build metadata object
     metadata = NoteMetadata(
-        id=str(data['id']),
-        title=str(data['title']),
-        topic=str(data['topic']),
-        language_tags=_ensure_list(data['language_tags']),
+        id=str(data["id"]),
+        title=str(data["title"]),
+        topic=str(data["topic"]),
+        language_tags=_ensure_list(data["language_tags"]),
         created=created,
         updated=updated,
-        aliases=_ensure_list(data.get('aliases', [])),
-        subtopics=_ensure_list(data.get('subtopics', [])),
-        question_kind=data.get('question_kind'),
-        difficulty=data.get('difficulty'),
-        original_language=data.get('original_language'),
-        source=data.get('source'),
-        source_note=data.get('source_note'),
-        status=data.get('status'),
-        moc=data.get('moc'),
-        related=_ensure_list(data.get('related', [])),
-        tags=_ensure_list(data.get('tags', [])),
-        anki_note_type=data.get('anki_note_type'),
-        anki_slugs=_ensure_list(data.get('anki_slugs', [])),
+        aliases=_ensure_list(data.get("aliases", [])),
+        subtopics=_ensure_list(data.get("subtopics", [])),
+        question_kind=data.get("question_kind"),
+        difficulty=data.get("difficulty"),
+        original_language=data.get("original_language"),
+        source=data.get("source"),
+        source_note=data.get("source_note"),
+        status=data.get("status"),
+        moc=data.get("moc"),
+        related=_ensure_list(data.get("related", [])),
+        tags=_ensure_list(data.get("tags", [])),
+        anki_note_type=data.get("anki_note_type"),
+        anki_slugs=_ensure_list(data.get("anki_slugs", [])),
     )
 
     # Validate original_language is in language_tags
-    if metadata.original_language and metadata.original_language not in metadata.language_tags:
+    if (
+        metadata.original_language
+        and metadata.original_language not in metadata.language_tags
+    ):
         logger.warning(
             "original_language_not_in_tags",
             file=str(file_path),
             original=metadata.original_language,
-            tags=metadata.language_tags
+            tags=metadata.language_tags,
         )
 
     return metadata
@@ -167,11 +171,11 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
         ParserError: If structure is invalid
     """
     # Strip frontmatter
-    content = re.sub(r'^---\s*\n.*?\n---\s*\n', '', content, count=1, flags=re.DOTALL)
+    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
 
     # Normalize line endings and strip BOM
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
-    if content.startswith('\ufeff'):
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+    if content.startswith("\ufeff"):
         content = content[1:]
 
     qa_pairs = []
@@ -181,7 +185,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     # Pattern: # Question (EN) ... # Вопрос (RU) ... --- ... ## Answer (EN) ... ## Ответ (RU)
 
     # Split by Question (EN) markers
-    question_pattern = r'(?=^# Question \(EN\))'
+    question_pattern = r"(?=^# Question \(EN\))"
     blocks = re.split(question_pattern, content, flags=re.MULTILINE)
 
     for block in blocks:
@@ -204,12 +208,14 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     return qa_pairs
 
 
-def _parse_single_qa_block(block: str, card_index: int, metadata: NoteMetadata) -> Optional[QAPair]:
+def _parse_single_qa_block(
+    block: str, card_index: int, metadata: NoteMetadata
+) -> Optional[QAPair]:
     """Parse a single Q/A block."""
-    lines = block.split('\n')
+    lines = block.split("\n")
 
     # State machine for parsing
-    state = 'INIT'
+    state = "INIT"
     question_en: list[str] = []
     question_ru: list[str] = []
     answer_en: list[str] = []
@@ -225,49 +231,60 @@ def _parse_single_qa_block(block: str, card_index: int, metadata: NoteMetadata) 
         stripped = line.strip()
 
         # Check for section headers
-        if stripped == '# Question (EN)':
-            state = 'QUESTION_EN'
+        if stripped == "# Question (EN)":
+            state = "QUESTION_EN"
             current_section = question_en
             continue
-        elif stripped == '# Вопрос (RU)':
-            state = 'QUESTION_RU'
+        elif stripped == "# Вопрос (RU)":
+            state = "QUESTION_RU"
             current_section = question_ru
             continue
-        elif stripped == '---' and state in ('QUESTION_RU', 'ANSWER_EN'):
+        elif stripped == "---" and state in ("QUESTION_RU", "ANSWER_EN"):
             # Separator after Russian question
-            state = 'SEPARATOR'
+            state = "SEPARATOR"
             continue
-        elif stripped == '## Answer (EN)':
-            state = 'ANSWER_EN'
+        elif stripped == "## Answer (EN)":
+            state = "ANSWER_EN"
             current_section = answer_en
             continue
-        elif stripped == '## Ответ (RU)':
-            state = 'ANSWER_RU'
+        elif stripped == "## Ответ (RU)":
+            state = "ANSWER_RU"
             current_section = answer_ru
             continue
-        elif stripped == '## Follow-ups':
-            state = 'FOLLOWUPS'
+        elif stripped == "## Follow-ups":
+            state = "FOLLOWUPS"
             current_section = followups
             continue
-        elif stripped == '## References':
-            state = 'REFERENCES'
+        elif stripped == "## References":
+            state = "REFERENCES"
             current_section = references
             continue
-        elif stripped == '## Related Questions':
-            state = 'RELATED'
+        elif stripped == "## Related Questions":
+            state = "RELATED"
             current_section = related
             continue
 
         # Accumulate content
-        if state == 'INIT' and stripped:
+        if state == "INIT" and stripped:
             context_before.append(line)
-        elif state in ('QUESTION_EN', 'QUESTION_RU', 'ANSWER_EN', 'ANSWER_RU',
-                       'FOLLOWUPS', 'REFERENCES', 'RELATED') and current_section is not None:
+        elif (
+            state
+            in (
+                "QUESTION_EN",
+                "QUESTION_RU",
+                "ANSWER_EN",
+                "ANSWER_RU",
+                "FOLLOWUPS",
+                "REFERENCES",
+                "RELATED",
+            )
+            and current_section is not None
+        ):
             current_section.append(line)
 
     # Check if we have all required sections
     if not question_en or not question_ru:
-        if state != 'INIT':  # Only warn if we started parsing
+        if state != "INIT":  # Only warn if we started parsing
             logger.warning("incomplete_qa_block", card_index=card_index, state=state)
         return None
 
@@ -277,15 +294,15 @@ def _parse_single_qa_block(block: str, card_index: int, metadata: NoteMetadata) 
         return None
 
     # Validate language tags
-    has_en = 'en' in metadata.language_tags
-    has_ru = 'ru' in metadata.language_tags
+    has_en = "en" in metadata.language_tags
+    has_ru = "ru" in metadata.language_tags
 
     if has_en and not (question_en and answer_en):
         logger.error(
             "missing_en_content",
             card_index=card_index,
             has_question=bool(question_en),
-            has_answer=bool(answer_en)
+            has_answer=bool(answer_en),
         )
         return None
 
@@ -294,21 +311,21 @@ def _parse_single_qa_block(block: str, card_index: int, metadata: NoteMetadata) 
             "missing_ru_content",
             card_index=card_index,
             has_question=bool(question_ru),
-            has_answer=bool(answer_ru)
+            has_answer=bool(answer_ru),
         )
         return None
 
     # Build QAPair
     return QAPair(
         card_index=card_index,
-        question_en='\n'.join(question_en).strip(),
-        question_ru='\n'.join(question_ru).strip(),
-        answer_en='\n'.join(answer_en).strip(),
-        answer_ru='\n'.join(answer_ru).strip(),
-        followups='\n'.join(followups).strip(),
-        references='\n'.join(references).strip(),
-        related='\n'.join(related).strip(),
-        context='\n'.join(context_before).strip(),
+        question_en="\n".join(question_en).strip(),
+        question_ru="\n".join(question_ru).strip(),
+        answer_en="\n".join(answer_en).strip(),
+        answer_ru="\n".join(answer_ru).strip(),
+        followups="\n".join(followups).strip(),
+        references="\n".join(references).strip(),
+        related="\n".join(related).strip(),
+        context="\n".join(context_before).strip(),
     )
 
 
@@ -331,9 +348,9 @@ def discover_notes(vault_path: Path, source_dir: Path) -> list[tuple[Path, str]]
 
     # Find all q-*.md files recursively
     notes = []
-    for md_file in full_source.rglob('q-*.md'):
+    for md_file in full_source.rglob("q-*.md"):
         # Ignore certain patterns
-        if any(part.startswith(('c-', 'moc-', 'template')) for part in md_file.parts):
+        if any(part.startswith(("c-", "moc-", "template")) for part in md_file.parts):
             continue
 
         # Calculate relative path from source_dir
@@ -357,7 +374,7 @@ def _parse_date(value: Any) -> datetime:
             pass
 
         # Try common formats
-        for fmt in ('%Y-%m-%d', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S'):
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
             try:
                 return datetime.strptime(value, fmt)
             except ValueError:
@@ -373,4 +390,3 @@ def _ensure_list(value: Any) -> list[Any]:
     if value is None:
         return []
     return [value]
-

@@ -1,6 +1,6 @@
 """Tests for slug generator (UNIT-slug-01)."""
 
-from obsidian_anki_sync.sync.slug_generator import generate_slug, create_manifest
+from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
 
 
 class TestSlugGeneration:
@@ -12,7 +12,7 @@ class TestSlugGeneration:
             source_path="70-Kotlin/q-coroutines-basics.md",
             card_index=1,
             lang="en",
-            existing_slugs=set()
+            existing_slugs=set(),
         )
 
         assert slug.endswith("-en")
@@ -26,7 +26,7 @@ class TestSlugGeneration:
             source_path="Test/Q&A File!@#.md",
             card_index=1,
             lang="en",
-            existing_slugs=set()
+            existing_slugs=set(),
         )
 
         # Should sanitize special chars to dashes
@@ -42,7 +42,7 @@ class TestSlugGeneration:
             source_path="40-Android/performance/q-startup.md",
             card_index=1,
             lang="en",
-            existing_slugs=set()
+            existing_slugs=set(),
         )
 
         assert "40-android" in slug_base
@@ -52,10 +52,7 @@ class TestSlugGeneration:
         existing = {"test-slug-p01-en"}
 
         slug, slug_base, hash6 = generate_slug(
-            source_path="test-slug.md",
-            card_index=1,
-            lang="en",
-            existing_slugs=existing
+            source_path="test-slug.md", card_index=1, lang="en", existing_slugs=existing
         )
 
         # Should add hash6 to resolve collision
@@ -72,14 +69,14 @@ class TestSlugGeneration:
             source_path="duplicate-note.md",
             card_index=1,
             lang="en",
-            existing_slugs=existing
+            existing_slugs=existing,
         )
         # Repeat with the same inputs (hash should be identical)
         slug2, _, hash2 = generate_slug(
             source_path="duplicate-note.md",
             card_index=1,
             lang="en",
-            existing_slugs=existing
+            existing_slugs=existing,
         )
 
         assert slug1 == slug2
@@ -87,12 +84,8 @@ class TestSlugGeneration:
 
     def test_language_suffix(self):
         """Test language suffix added to slug."""
-        slug_en, _, _ = generate_slug(
-            "test.md", 1, "en", set()
-        )
-        slug_ru, _, _ = generate_slug(
-            "test.md", 1, "ru", set()
-        )
+        slug_en, _, _ = generate_slug("test.md", 1, "en", set())
+        slug_ru, _, _ = generate_slug("test.md", 1, "ru", set())
 
         assert slug_en.endswith("-en")
         assert slug_ru.endswith("-ru")
@@ -100,15 +93,9 @@ class TestSlugGeneration:
 
     def test_card_index_formatting(self):
         """Test card index zero-padding."""
-        slug1, base1, _ = generate_slug(
-            "test.md", 1, "en", set()
-        )
-        slug9, base9, _ = generate_slug(
-            "test.md", 9, "en", set()
-        )
-        slug10, base10, _ = generate_slug(
-            "test.md", 10, "en", set()
-        )
+        slug1, base1, _ = generate_slug("test.md", 1, "en", set())
+        slug9, base9, _ = generate_slug("test.md", 9, "en", set())
+        slug10, base10, _ = generate_slug("test.md", 10, "en", set())
 
         assert "p01" in base1
         assert "p09" in base9
@@ -116,12 +103,8 @@ class TestSlugGeneration:
 
     def test_slug_determinism(self):
         """Test slug generation is deterministic."""
-        slug1, base1, hash1 = generate_slug(
-            "test.md", 1, "en", set()
-        )
-        slug2, base2, hash2 = generate_slug(
-            "test.md", 1, "en", set()
-        )
+        slug1, base1, hash1 = generate_slug("test.md", 1, "en", set())
+        slug2, base2, hash2 = generate_slug("test.md", 1, "en", set())
 
         assert slug1 == slug2
         assert base1 == base2
@@ -140,7 +123,7 @@ class TestManifestCreation:
             source_path="test.md",
             card_index=1,
             metadata=sample_metadata,
-            hash6=None
+            hash6=None,
         )
 
         assert manifest.slug == "test-p01-en"
@@ -160,7 +143,7 @@ class TestManifestCreation:
             source_path="test.md",
             card_index=1,
             metadata=sample_metadata,
-            hash6="abc123"
+            hash6="abc123",
         )
 
         assert manifest.hash6 == "abc123"

@@ -103,4 +103,3 @@ All dependencies use minimum version constraints (`>=`) to allow for compatible 
 - All dependencies are pinned to exact versions in the lock file
 - The lock file includes SHA256 hashes for security verification
 - Dependencies are automatically resolved for compatibility by uv
-

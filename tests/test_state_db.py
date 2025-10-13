@@ -1,10 +1,11 @@
 """Tests for state database."""
 
-import pytest
 from datetime import datetime
 
-from obsidian_anki_sync.sync.state_db import StateDB
+import pytest
+
 from obsidian_anki_sync.models import Card, Manifest
+from obsidian_anki_sync.sync.state_db import StateDB
 
 
 class TestStateDB:
@@ -32,10 +33,10 @@ class TestStateDB:
             # Retrieve and verify
             result = db.get_by_slug("test-slug-en")
             assert result is not None
-            assert result['slug'] == "test-slug-en"
-            assert result['anki_guid'] == 12345
-            assert result['lang'] == "en"
-            assert result['card_guid'] == card.guid
+            assert result["slug"] == "test-slug-en"
+            assert result["anki_guid"] == 12345
+            assert result["lang"] == "en"
+            assert result["card_guid"] == card.guid
 
     def test_update_card(self, temp_dir):
         """Test updating a card."""
@@ -51,8 +52,8 @@ class TestStateDB:
 
             # Verify update
             result = db.get_by_slug("test-slug-en")
-            assert result['content_hash'] == "new-hash-456"
-            assert result['card_guid'] == "updated-guid"
+            assert result["content_hash"] == "new-hash-456"
+            assert result["card_guid"] == "updated-guid"
 
     def test_get_by_guid(self, temp_dir):
         """Test retrieving card by Anki GUID."""
@@ -63,7 +64,7 @@ class TestStateDB:
 
             result = db.get_by_guid(99999)
             assert result is not None
-            assert result['slug'] == "test-slug-en"
+            assert result["slug"] == "test-slug-en"
 
     def test_get_by_source(self, temp_dir):
         """Test retrieving all cards from a source."""
@@ -115,16 +116,11 @@ class TestStateDB:
             with pytest.raises(Exception):
                 db.insert_card(card2, anki_guid=2)
 
-    def _make_test_card(
-        self,
-        slug: str,
-        card_index: int = 1,
-        lang: str = "en"
-    ) -> Card:
+    def _make_test_card(self, slug: str, card_index: int = 1, lang: str = "en") -> Card:
         """Helper to create a test card."""
         manifest = Manifest(
             slug=slug,
-            slug_base=slug.rsplit('-', 1)[0],
+            slug_base=slug.rsplit("-", 1)[0],
             lang=lang,
             source_path="test.md",
             source_anchor=f"p{card_index:02d}",

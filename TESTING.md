@@ -84,7 +84,7 @@ pytest -m "not slow"
 
 ## Test Coverage
 
-### Unit Tests 
+### Unit Tests
 
 **Parser Tests (test_parser.py)**
 - UNIT-yaml-01: YAML frontmatter validation
@@ -134,7 +134,7 @@ pytest -m "not slow"
 - Delete card
 - Unique constraints
 
-### Integration Tests 
+### Integration Tests
 
 **AnkiConnect Client Tests (test_anki_client.py)**
 - INT-01: API communication
@@ -152,7 +152,7 @@ pytest -m "not slow"
 - INT-02: Sync flow (stub only, needs full implementation)
 - REGR-det-01: Determinism test (stub only)
 
-### E2E Tests 
+### E2E Tests
 
 **Missing (Deferred to Phase 9):**
 - E2E-01: Process ≥5 notes with ≥2 multi-pair
@@ -295,4 +295,3 @@ pytest tests/test_parser.py --profile
 ```
 
 Target: Tests should complete in <30 seconds (excluding E2E).
-

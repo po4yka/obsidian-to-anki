@@ -119,7 +119,9 @@ class TestTagValidation:
         assert result.is_valid
 
         # Valid: 6 tags
-        apf_html = self._make_card_html("python testing unit_testing pytest mocking fixtures")
+        apf_html = self._make_card_html(
+            "python testing unit_testing pytest mocking fixtures"
+        )
         result = validate_apf(apf_html)
         assert result.is_valid
 
@@ -280,4 +282,3 @@ END_OF_CARDS"""
 
         assert not result.is_valid
         assert any("slug mismatch" in e.lower() for e in result.errors)
-

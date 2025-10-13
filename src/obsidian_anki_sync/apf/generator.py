@@ -5,8 +5,8 @@ import json
 import re
 from pathlib import Path
 
-from openai import OpenAI  # type: ignore
 import httpx  # type: ignore
+from openai import OpenAI  # type: ignore
 
 from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
@@ -16,11 +16,7 @@ from ..utils.retry import retry
 logger = get_logger(__name__)
 
 
-def compute_content_hash(
-    qa_pair: QAPair,
-    metadata: NoteMetadata,
-    lang: str
-) -> str:
+def compute_content_hash(qa_pair: QAPair, metadata: NoteMetadata, lang: str) -> str:
     """
     Compute a content hash that captures all card-relevant sections.
 
@@ -32,8 +28,8 @@ def compute_content_hash(
     Returns:
         SHA256 hash string
     """
-    question = qa_pair.question_en if lang == 'en' else qa_pair.question_ru
-    answer = qa_pair.answer_en if lang == 'en' else qa_pair.answer_ru
+    question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
+    answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
 
     components = [
         f"lang:{lang}",
@@ -50,7 +46,7 @@ def compute_content_hash(
     ]
 
     payload = "\n".join(components)
-    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class APFGenerator:
@@ -67,7 +63,7 @@ class APFGenerator:
         # Load CARDS_PROMPT template
         prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
         if prompt_path.exists():
-            self.system_prompt = prompt_path.read_text(encoding='utf-8')
+            self.system_prompt = prompt_path.read_text(encoding="utf-8")
         else:
             logger.warning("cards_prompt_not_found", path=str(prompt_path))
             self.system_prompt = "Generate APF cards following strict APF format."
@@ -75,7 +71,7 @@ class APFGenerator:
     @retry(
         max_attempts=3,
         initial_delay=2.0,
-        exceptions=(httpx.HTTPError, TimeoutError, ConnectionError)
+        exceptions=(httpx.HTTPError, TimeoutError, ConnectionError),
     )
     def generate_card(
         self,
@@ -97,8 +93,8 @@ class APFGenerator:
             Generated card
         """
         # Select language-specific content
-        question = qa_pair.question_en if lang == 'en' else qa_pair.question_ru
-        answer = qa_pair.answer_en if lang == 'en' else qa_pair.answer_ru
+        question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
+        answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
 
         # Build user prompt
         user_prompt = self._build_user_prompt(
@@ -110,7 +106,7 @@ class APFGenerator:
             "calling_llm",
             model=self.config.openrouter_model,
             temp=self.config.llm_temperature,
-            slug=manifest.slug
+            slug=manifest.slug,
         )
 
         try:
@@ -120,8 +116,8 @@ class APFGenerator:
                 top_p=self.config.llm_top_p,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
+                    {"role": "user", "content": user_prompt},
+                ],
             )
 
             apf_html = response.choices[0].message.content
@@ -130,9 +126,7 @@ class APFGenerator:
                 raise ValueError("LLM returned empty response")
 
             logger.debug(
-                "llm_response_received",
-                slug=manifest.slug,
-                length=len(apf_html)
+                "llm_response_received", slug=manifest.slug, length=len(apf_html)
             )
 
         except Exception as e:
@@ -169,7 +163,7 @@ class APFGenerator:
         qa_pair: QAPair,
         metadata: NoteMetadata,
         manifest: Manifest,
-        lang: str
+        lang: str,
     ) -> str:
         """Build user prompt for LLM."""
         # Build reference link
@@ -227,15 +221,15 @@ Requirements:
             return metadata.anki_note_type
 
         # Check for cloze markers in HTML
-        if '{{c' in apf_html:
-            return 'APF::Missing (Cloze)'
+        if "{{c" in apf_html:
+            return "APF::Missing (Cloze)"
 
         # Check for draw marker
-        if '<!-- DRAW_CARD -->' in apf_html or 'CardType: Draw' in apf_html:
-            return 'APF::Draw'
+        if "<!-- DRAW_CARD -->" in apf_html or "CardType: Draw" in apf_html:
+            return "APF::Draw"
 
         # Default
-        return 'APF::Simple'
+        return "APF::Simple"
 
     def _ensure_manifest(
         self,
@@ -245,7 +239,7 @@ Requirements:
         note_type: str,
     ) -> str:
         """Ensure manifest comment exists and contains required fields."""
-        pattern = re.compile(r'<!--\s*manifest:\s*({.*?})\s*-->')
+        pattern = re.compile(r"<!--\s*manifest:\s*({.*?})\s*-->")
         match = pattern.search(apf_html)
         if not match:
             raise ValueError("APF output missing manifest comment")
@@ -255,14 +249,16 @@ Requirements:
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid manifest JSON: {exc}") from exc
 
-        manifest_data.update({
-            "slug": manifest.slug,
-            "slug_base": manifest.slug_base,
-            "lang": manifest.lang,
-            "guid": manifest.guid,
-            "type": note_type,
-            "tags": tags,
-        })
+        manifest_data.update(
+            {
+                "slug": manifest.slug,
+                "slug_base": manifest.slug_base,
+                "lang": manifest.lang,
+                "guid": manifest.guid,
+                "type": note_type,
+                "tags": tags,
+            }
+        )
 
         new_comment = f"<!-- manifest: {json.dumps(manifest_data, ensure_ascii=False, separators=(',', ':'))} -->"
         start, end = match.span()
@@ -277,11 +273,11 @@ Requirements:
 
         # Add topic
         if metadata.topic:
-            tags.add(metadata.topic.lower().replace(' ', '_'))
+            tags.add(metadata.topic.lower().replace(" ", "_"))
 
         # Add subtopics
         for subtopic in metadata.subtopics:
-            tags.add(subtopic.lower().replace(' ', '_'))
+            tags.add(subtopic.lower().replace(" ", "_"))
 
         # Add metadata tags
         tags.update(metadata.tags)
@@ -292,16 +288,37 @@ Requirements:
         """Derive a language hint for code blocks."""
         candidates = list(metadata.tags) + metadata.subtopics + [metadata.topic]
         known_languages = {
-            "kotlin", "java", "python", "swift", "cpp", "c",
-            "csharp", "go", "rust", "javascript", "typescript",
-            "sql", "bash", "shell", "yaml", "json", "html",
-            "css", "gradle", "groovy"
+            "kotlin",
+            "java",
+            "python",
+            "swift",
+            "cpp",
+            "c",
+            "csharp",
+            "go",
+            "rust",
+            "javascript",
+            "typescript",
+            "sql",
+            "bash",
+            "shell",
+            "yaml",
+            "json",
+            "html",
+            "css",
+            "gradle",
+            "groovy",
         }
         for raw in candidates:
             if not raw:
                 continue
-            normalized = raw.lower().replace('language/', '').replace('lang/', '').replace('topic/', '')
-            normalized = normalized.replace('/', '_')
+            normalized = (
+                raw.lower()
+                .replace("language/", "")
+                .replace("lang/", "")
+                .replace("topic/", "")
+            )
+            normalized = normalized.replace("/", "_")
             if normalized in known_languages:
                 return normalized
         return "plaintext"

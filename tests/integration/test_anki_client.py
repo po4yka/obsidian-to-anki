@@ -1,8 +1,8 @@
 """Integration tests for AnkiConnect client (INT-01, INT-crud-01)."""
 
+import httpx
 import pytest
 import respx
-import httpx
 
 from obsidian_anki_sync.anki.client import AnkiClient, AnkiConnectError
 
@@ -20,10 +20,7 @@ class TestAnkiClient:
     def test_successful_invoke(self, mock_anki_url):
         """Test successful API call."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"result": "success", "error": None}
-            )
+            return_value=httpx.Response(200, json={"result": "success", "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -36,8 +33,7 @@ class TestAnkiClient:
         """Test error handling."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(
-                200,
-                json={"result": None, "error": "Test error"}
+                200, json={"result": None, "error": "Test error"}
             )
         )
 
@@ -50,10 +46,7 @@ class TestAnkiClient:
     def test_find_notes(self, mock_anki_url):
         """Test finding notes."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"result": [1, 2, 3], "error": None}
-            )
+            return_value=httpx.Response(200, json={"result": [1, 2, 3], "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -72,11 +65,11 @@ class TestAnkiClient:
                         {
                             "noteId": 1,
                             "fields": {"Front": {"value": "Question"}},
-                            "tags": ["test"]
+                            "tags": ["test"],
                         }
                     ],
-                    "error": None
-                }
+                    "error": None,
+                },
             )
         )
 
@@ -91,10 +84,7 @@ class TestAnkiClient:
         """Test adding a note (INT-crud-01)."""
         route = respx.post(mock_anki_url)
         route.mock(
-            return_value=httpx.Response(
-                200,
-                json={"result": 12345, "error": None}
-            )
+            return_value=httpx.Response(200, json={"result": 12345, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -103,7 +93,7 @@ class TestAnkiClient:
             note_type="Basic",
             fields={"Front": "Q", "Back": "A"},
             tags=["test"],
-            guid="guid-123"
+            guid="guid-123",
         )
 
         assert note_id == 12345
@@ -115,17 +105,11 @@ class TestAnkiClient:
     def test_update_note_fields(self, mock_anki_url):
         """Test updating note fields (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"result": None, "error": None}
-            )
+            return_value=httpx.Response(200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
-        client.update_note_fields(
-            note_id=12345,
-            fields={"Front": "Updated Q"}
-        )
+        client.update_note_fields(note_id=12345, fields={"Front": "Updated Q"})
 
         # Should not raise
 
@@ -133,10 +117,7 @@ class TestAnkiClient:
     def test_delete_notes(self, mock_anki_url):
         """Test deleting notes (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(
-                200,
-                json={"result": None, "error": None}
-            )
+            return_value=httpx.Response(200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -147,9 +128,7 @@ class TestAnkiClient:
     @respx.mock
     def test_http_error(self, mock_anki_url):
         """Test HTTP error handling."""
-        respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(500)
-        )
+        respx.post(mock_anki_url).mock(return_value=httpx.Response(500))
 
         client = AnkiClient(mock_anki_url)
 
