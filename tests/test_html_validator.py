@@ -1,7 +1,5 @@
 """Tests for HTML validator ensures APF formatting correctness."""
 
-import pytest
-
 from obsidian_anki_sync.apf.html_validator import validate_card_html
 
 

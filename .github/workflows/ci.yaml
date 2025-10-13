@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    name: Formatting & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          python-version: "3.14"
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Check formatting (Black)
+        run: uv run black --check .
+
+      - name: Check imports (isort)
+        run: uv run isort --check-only .
+
+      - name: Run unit tests
+        run: uv run pytest

@@ -132,7 +132,6 @@ class SyncEngine:
                 continue
 
             try:
-
                 logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
                 # Generate cards for each Q/A pair and language

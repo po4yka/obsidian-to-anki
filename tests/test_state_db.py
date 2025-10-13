@@ -1,7 +1,5 @@
 """Tests for state database."""
 
-from datetime import datetime
-
 import pytest
 
 from obsidian_anki_sync.models import Card, Manifest

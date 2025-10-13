@@ -2,7 +2,6 @@
 
 import json
 import re
-from typing import Optional
 
 from ..models import ValidationResult
 from ..utils.logging import get_logger
@@ -66,7 +65,7 @@ ALLOWED_LANGUAGES = {
 }
 
 
-def validate_apf(apf_html: str, slug: Optional[str] = None) -> ValidationResult:
+def validate_apf(apf_html: str, slug: str | None = None) -> ValidationResult:
     """
     Validate APF card format against specification.
 
@@ -148,7 +147,7 @@ def _extract_card_blocks(apf_html: str) -> list[str]:
 
 
 def _validate_card_block(
-    block: str, card_num: int, expected_slug: Optional[str], result: ValidationResult
+    block: str, card_num: int, expected_slug: str | None, result: ValidationResult
 ) -> None:
     """Validate a single card block."""
     lines = block.strip().split("\n")
@@ -282,7 +281,7 @@ def _validate_cloze_density(
         result.warnings.append(f"Card {card_num}: Missing card has no cloze deletions")
         return
 
-    indices = sorted(set(int(m) for m in cloze_matches))
+    indices = sorted({int(m) for m in cloze_matches})
 
     # Check density
     expected = list(range(1, len(indices) + 1))

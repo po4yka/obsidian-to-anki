@@ -18,8 +18,7 @@ def patch_openai(monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "obsidian_anki_sync.apf.generator.OpenAI",
-        lambda *args, **kwargs: DummyClient()
+        "obsidian_anki_sync.apf.generator.OpenAI", lambda *args, **kwargs: DummyClient()
     )
 
 
@@ -90,14 +89,14 @@ def sample_qa_pair_for_prompt():
         card_index=1,
         question_en="What is code?",
         question_ru="Что такое код?",
-        answer_en="```
-kotlin code
-```",
+        answer_en="```\nkotlin code\n```",
         answer_ru="код",
     )
 
 
-def test_code_language_hint_detects_known_language(dummy_config, sample_metadata_for_code):
+def test_code_language_hint_detects_known_language(
+    dummy_config, sample_metadata_for_code
+):
     gen = APFGenerator(dummy_config)
     assert gen._code_language_hint(sample_metadata_for_code) == "kotlin"
 
@@ -107,7 +106,9 @@ def test_code_language_hint_falls_back_to_plaintext(dummy_config, plain_metadata
     assert gen._code_language_hint(plain_metadata) == "plaintext"
 
 
-def test_prompt_includes_code_language_instruction(dummy_config, sample_metadata_for_code, sample_qa_pair_for_prompt, sample_manifest):
+def test_prompt_includes_code_language_instruction(
+    dummy_config, sample_metadata_for_code, sample_qa_pair_for_prompt, sample_manifest
+):
     gen = APFGenerator(dummy_config)
     prompt = gen._build_user_prompt(
         question=sample_qa_pair_for_prompt.question_en,
@@ -115,25 +116,17 @@ def test_prompt_includes_code_language_instruction(dummy_config, sample_metadata
         qa_pair=sample_qa_pair_for_prompt,
         metadata=sample_metadata_for_code,
         manifest=sample_manifest,
-        lang="en"
+        lang="en",
     )
-    assert "<pre><code class=\"language-kotlin\"" in prompt
+    assert '<pre><code class="language-kotlin"' in prompt
 
 
 def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
     gen = APFGenerator(dummy_config)
-    html = "<!-- manifest: {\"slug\":\"old\",\"guid\":\"bad\",\"tags\":[]} -->"
-    updated = gen._ensure_manifest(html, sample_manifest, ["en", "testing"], "APF::Simple")
+    html = '<!-- manifest: {"slug":"old","guid":"bad","tags":[]} -->'
+    updated = gen._ensure_manifest(
+        html, sample_manifest, ["en", "testing"], "APF::Simple"
+    )
     assert '"guid":"guid-sample"' in updated
     assert '"slug":"sample-slug-en"' in updated
     assert '"tags":["en","testing"]' in updated
-@pytest.fixture(autouse=True)
-def patch_openai(monkeypatch):
-    """Prevent real OpenAI client instantiation."""
-    class DummyClient:
-        pass
-
-    monkeypatch.setattr(
-        "obsidian_anki_sync.apf.generator.OpenAI",
-        lambda *args, **kwargs: DummyClient()
-    )

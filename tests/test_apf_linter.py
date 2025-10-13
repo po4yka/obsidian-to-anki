@@ -1,7 +1,5 @@
 """Tests for APF linter (UNIT-apf-a, UNIT-tag-01, LINT-cloze)."""
 
-import pytest
-
 from obsidian_anki_sync.apf.linter import validate_apf
 
 

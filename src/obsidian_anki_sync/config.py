@@ -3,7 +3,6 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from dotenv import load_dotenv
@@ -63,10 +62,10 @@ class Config:
             raise ValueError(f"LLM top_p must be 0-1: {self.llm_top_p}")
 
 
-_config: Optional[Config] = None
+_config: Config | None = None
 
 
-def load_config(config_path: Optional[Path] = None) -> Config:
+def load_config(config_path: Path | None = None) -> Config:
     """Load configuration from .env and config.yaml files."""
     # Load .env
     load_dotenv()
@@ -74,7 +73,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
     # Load config.yaml if exists
     config_data = {}
     if config_path and config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
 
     # Build config from environment and file

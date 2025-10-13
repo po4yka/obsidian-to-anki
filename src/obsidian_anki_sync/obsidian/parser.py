@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -210,7 +210,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
 
 def _parse_single_qa_block(
     block: str, card_index: int, metadata: NoteMetadata
-) -> Optional[QAPair]:
+) -> QAPair | None:
     """Parse a single Q/A block."""
     lines = block.split("\n")
 
@@ -225,7 +225,7 @@ def _parse_single_qa_block(
     related: list[str] = []
     context_before: list[str] = []
 
-    current_section: Optional[list[str]] = None
+    current_section: list[str] | None = None
 
     for line in lines:
         stripped = line.strip()

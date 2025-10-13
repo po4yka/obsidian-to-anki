@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def deterministic_guid(parts: Iterable[str], length: int = 16) -> str:
