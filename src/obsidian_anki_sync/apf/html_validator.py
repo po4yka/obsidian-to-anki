@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import List
-
 from bs4 import BeautifulSoup
 
 
-def validate_card_html(apf_html: str) -> List[str]:
+def validate_card_html(apf_html: str) -> list[str]:
     """Validate HTML structure used in APF cards.
 
     Args:
@@ -16,7 +14,7 @@ def validate_card_html(apf_html: str) -> List[str]:
     Returns:
         List of validation error messages (empty if valid enough).
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     try:
         soup = BeautifulSoup(apf_html, "html5lib")

@@ -2,7 +2,6 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 from ..models import Card
 
@@ -122,14 +121,14 @@ class StateDB:
         )
         self.conn.commit()
 
-    def get_by_slug(self, slug: str) -> Optional[dict]:
+    def get_by_slug(self, slug: str) -> dict | None:
         """Get card by slug."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM cards WHERE slug = ?", (slug,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
-    def get_by_guid(self, anki_guid: int) -> Optional[dict]:
+    def get_by_guid(self, anki_guid: int) -> dict | None:
         """Get card by Anki GUID."""
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM cards WHERE anki_guid = ?", (anki_guid,))

@@ -2,7 +2,6 @@
 
 import json
 import re
-from typing import Optional
 
 from ..utils.logging import get_logger
 

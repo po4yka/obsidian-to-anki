@@ -2,11 +2,10 @@
 
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import click
 
-from .config import get_config, load_config, set_config
+from .config import load_config, set_config
 from .utils.logging import configure_logging, get_logger
 
 
@@ -16,7 +15,7 @@ from .utils.logging import configure_logging, get_logger
     "--log-level", default="INFO", help="Log level (DEBUG, INFO, WARN, ERROR)"
 )
 @click.pass_context
-def cli(ctx: click.Context, config: Optional[str], log_level: str) -> None:
+def cli(ctx: click.Context, config: str | None, log_level: str) -> None:
     """Obsidian to Anki APF sync service."""
     # Load configuration
     config_path = Path(config) if config else None
@@ -107,7 +106,6 @@ def test_run(ctx: click.Context, count: int) -> None:
 def validate(ctx: click.Context, note_path: str) -> None:
     """Validate note structure and APF compliance."""
     logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
 
     logger.info("validate_started", note_path=note_path)
 

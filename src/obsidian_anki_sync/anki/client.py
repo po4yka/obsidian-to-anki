@@ -1,6 +1,6 @@
 """AnkiConnect HTTP API client."""
 
-from typing import Any, Optional
+from typing import Any
 
 import httpx  # type: ignore
 
@@ -42,7 +42,7 @@ class AnkiClient:
         initial_delay=1.0,
         exceptions=(httpx.HTTPError, httpx.TimeoutException, AnkiConnectError),
     )
-    def invoke(self, action: str, params: Optional[dict] = None) -> Any:
+    def invoke(self, action: str, params: dict | None = None) -> Any:
         """
         Invoke AnkiConnect action.
 

@@ -7,7 +7,7 @@ name = "obsidian-anki-sync"
 version = "0.1.0"
 description = "Synchronize Obsidian Q&A notes to Anki APF cards via LLM"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Obsidian Anki Sync Contributors"}
@@ -45,7 +45,7 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py314"]
+target-version = ["py313"]
 
 [tool.isort]
 profile = "black"
@@ -54,10 +54,10 @@ src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py314"
+target-version = "py313"
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

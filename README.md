@@ -69,6 +69,10 @@ uv run isort .
 
 These tools are also available via the pre-commit hook chain for consistent formatting on commit.
 
+## Continuous Integration
+
+Every push and pull request runs Black, isort, and pytest in GitHub Actions to keep formatting and tests consistent.
+
 ### Alternative: Traditional pip
 
 If you prefer using pip:

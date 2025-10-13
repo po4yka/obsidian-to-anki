@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass
@@ -17,16 +16,16 @@ class NoteMetadata:
     updated: datetime
     aliases: list[str] = field(default_factory=list)
     subtopics: list[str] = field(default_factory=list)
-    question_kind: Optional[str] = None
-    difficulty: Optional[str] = None
-    original_language: Optional[str] = None
-    source: Optional[str] = None
-    source_note: Optional[str] = None
-    status: Optional[str] = None
-    moc: Optional[str] = None
+    question_kind: str | None = None
+    difficulty: str | None = None
+    original_language: str | None = None
+    source: str | None = None
+    source_note: str | None = None
+    status: str | None = None
+    moc: str | None = None
     related: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
-    anki_note_type: Optional[str] = None
+    anki_note_type: str | None = None
     anki_slugs: list[str] = field(default_factory=list)
 
 
@@ -58,7 +57,7 @@ class Manifest:
     note_title: str
     card_index: int
     guid: str
-    hash6: Optional[str] = None
+    hash6: str | None = None
 
 
 @dataclass
@@ -94,5 +93,5 @@ class SyncAction:
 
     type: str  # 'create', 'update', 'delete', 'restore', 'skip'
     card: Card
-    anki_guid: Optional[int] = None
-    reason: Optional[str] = None
+    anki_guid: int | None = None
+    reason: str | None = None

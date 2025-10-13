@@ -73,7 +73,6 @@ def test_scan_sampling_limits_number_of_notes(
             return_value=(sample_metadata, [sample_qa_pair]),
         ) as mock_parse,
     ):
-
         counter = {"value": 0}
 
         def fake_generate(qa_pair, metadata, relative_path, lang, existing_slugs):
