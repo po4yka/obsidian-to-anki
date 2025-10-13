@@ -24,7 +24,8 @@ class StateDB:
         self.conn.execute("PRAGMA synchronous=NORMAL")
 
         cursor = self.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS cards (
                 slug TEXT PRIMARY KEY,
                 slug_base TEXT NOT NULL,
@@ -42,54 +43,67 @@ class StateDB:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(source_path, card_index, lang)
             )
-        """)
+        """
+        )
         # Ensure card_guid column exists for legacy databases
-        cursor.execute("""
+        cursor.execute(
+            """
             PRAGMA table_info(cards)
-        """)
+        """
+        )
         columns = {row[1] for row in cursor.fetchall()}
-        if 'card_guid' not in columns:
+        if "card_guid" not in columns:
             cursor.execute("ALTER TABLE cards ADD COLUMN card_guid TEXT")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_source ON cards(source_path)
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_guid ON cards(anki_guid)
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_card_guid ON cards(card_guid)
-        """)
+        """
+        )
         self.conn.commit()
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
         """Insert a new card record."""
         cursor = self.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO cards (
                 slug, slug_base, lang, source_path, source_anchor,
                 card_index, anki_guid, content_hash, note_id, note_title, note_type,
                 card_guid
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            card.slug,
-            card.manifest.slug_base,
-            card.lang,
-            card.manifest.source_path,
-            card.manifest.source_anchor,
-            card.manifest.card_index,
-            anki_guid,
-            card.content_hash,
-            card.manifest.note_id,
-            card.manifest.note_title,
-            card.note_type,
-            card.guid,
-        ))
+        """,
+            (
+                card.slug,
+                card.manifest.slug_base,
+                card.lang,
+                card.manifest.source_path,
+                card.manifest.source_anchor,
+                card.manifest.card_index,
+                anki_guid,
+                card.content_hash,
+                card.manifest.note_id,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+            ),
+        )
         self.conn.commit()
 
     def update_card(self, card: Card) -> None:
         """Update existing card record."""
         cursor = self.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE cards
             SET content_hash = ?,
                 note_title = ?,
@@ -97,13 +111,15 @@ class StateDB:
                 card_guid = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE slug = ?
-        """, (
-            card.content_hash,
-            card.manifest.note_title,
-            card.note_type,
-            card.guid,
-            card.slug,
-        ))
+        """,
+            (
+                card.content_hash,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+                card.slug,
+            ),
+        )
         self.conn.commit()
 
     def get_by_slug(self, slug: str) -> Optional[dict]:
@@ -142,7 +158,7 @@ class StateDB:
         """Close database connection."""
         self.conn.close()
 
-    def __enter__(self) -> 'StateDB':
+    def __enter__(self) -> "StateDB":
         """Context manager entry."""
         return self
 

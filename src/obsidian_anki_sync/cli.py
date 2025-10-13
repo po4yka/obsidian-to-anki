@@ -11,8 +11,10 @@ from .utils.logging import configure_logging, get_logger
 
 
 @click.group()
-@click.option('--config', type=click.Path(exists=True), help='Path to config.yaml')
-@click.option('--log-level', default='INFO', help='Log level (DEBUG, INFO, WARN, ERROR)')
+@click.option("--config", type=click.Path(exists=True), help="Path to config.yaml")
+@click.option(
+    "--log-level", default="INFO", help="Log level (DEBUG, INFO, WARN, ERROR)"
+)
 @click.pass_context
 def cli(ctx: click.Context, config: Optional[str], log_level: str) -> None:
     """Obsidian to Anki APF sync service."""
@@ -26,23 +28,23 @@ def cli(ctx: click.Context, config: Optional[str], log_level: str) -> None:
 
     # Store in context
     ctx.ensure_object(dict)
-    ctx.obj['config'] = cfg
-    ctx.obj['logger'] = get_logger('cli')
+    ctx.obj["config"] = cfg
+    ctx.obj["logger"] = get_logger("cli")
 
 
 @cli.command()
-@click.option('--dry-run', is_flag=True, help='Preview changes without applying')
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
 @click.pass_context
 def sync(ctx: click.Context, dry_run: bool) -> None:
     """Synchronize Obsidian notes to Anki cards."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("sync_started", dry_run=dry_run, vault=str(config.vault_path))
 
     from .anki.client import AnkiClient
-    from .sync.state_db import StateDB
     from .sync.engine import SyncEngine
+    from .sync.state_db import StateDB
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
@@ -63,23 +65,23 @@ def sync(ctx: click.Context, dry_run: bool) -> None:
 
 @cli.command(name="test-run")
 @click.option(
-    '--count',
+    "--count",
     default=10,
     show_default=True,
     type=click.IntRange(1, None, clamp=True),
-    help='Number of random notes to process (dry-run)'
+    help="Number of random notes to process (dry-run)",
 )
 @click.pass_context
 def test_run(ctx: click.Context, count: int) -> None:
     """Run a sample dry-run by processing N random notes."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("test_run_started", sample_count=count)
 
     from .anki.client import AnkiClient
-    from .sync.state_db import StateDB
     from .sync.engine import SyncEngine
+    from .sync.state_db import StateDB
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
@@ -100,12 +102,12 @@ def test_run(ctx: click.Context, count: int) -> None:
 
 
 @cli.command()
-@click.argument('note_path', type=click.Path(exists=True))
+@click.argument("note_path", type=click.Path(exists=True))
 @click.pass_context
 def validate(ctx: click.Context, note_path: str) -> None:
     """Validate note structure and APF compliance."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("validate_started", note_path=note_path)
 
@@ -146,13 +148,13 @@ def validate(ctx: click.Context, note_path: str) -> None:
 @click.pass_context
 def init(ctx: click.Context) -> None:
     """Initialize configuration and database."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("init_started")
 
     # Create .env template if it doesn't exist
-    env_path = Path('.env')
+    env_path = Path(".env")
     if not env_path.exists():
         env_template = """# Obsidian configuration
 VAULT_PATH=/path/to/your/vault
@@ -197,8 +199,8 @@ LOG_LEVEL=INFO
 @click.pass_context
 def list_decks(ctx: click.Context) -> None:
     """List deck names available via AnkiConnect."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("list_decks_started")
 
@@ -227,8 +229,8 @@ def list_decks(ctx: click.Context) -> None:
 @click.pass_context
 def list_models(ctx: click.Context) -> None:
     """List note models (types) available in Anki."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("list_models_started")
 
@@ -254,12 +256,12 @@ def list_models(ctx: click.Context) -> None:
 
 
 @cli.command(name="model-fields")
-@click.option('--model', 'model_name', required=True, help='Model name to inspect')
+@click.option("--model", "model_name", required=True, help="Model name to inspect")
 @click.pass_context
 def show_model_fields(ctx: click.Context, model_name: str) -> None:
     """Show field names for a specific Anki model."""
-    logger = ctx.obj['logger']
-    config = ctx.obj['config']
+    logger = ctx.obj["logger"]
+    config = ctx.obj["config"]
 
     logger.info("model_fields_started", model=model_name)
 
@@ -285,11 +287,15 @@ def show_model_fields(ctx: click.Context, model_name: str) -> None:
 
 
 @cli.command()
-@click.option('--check/--fix', default=False, help='Run formatters in check mode (no modifications).')
+@click.option(
+    "--check/--fix",
+    default=False,
+    help="Run formatters in check mode (no modifications).",
+)
 @click.pass_context
 def format(ctx: click.Context, check: bool) -> None:
     """Run code formatters (ruff + black)."""
-    logger = ctx.obj['logger']
+    logger = ctx.obj["logger"]
     logger.info("format_started", check=check)
 
     paths = ["src", "tests"]
@@ -310,5 +316,5 @@ def format(ctx: click.Context, check: bool) -> None:
         raise click.ClickException(f"Formatter failed: {exc.cmd}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

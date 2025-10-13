@@ -17,10 +17,10 @@ status: draft
 **Источник**: Amit Shekhar Android Interview Questions
 
 # Question (EN)
-> 
+>
 
 # Вопрос (RU)
-> 
+>
 
 ---
 

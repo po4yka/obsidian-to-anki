@@ -459,4 +459,3 @@ AnkiConnectError: model was not found: APF::Simple
 - Added `guiBrowse` for UI integration
 - Implemented retry logic and connection pooling
 - Added comprehensive error handling
-

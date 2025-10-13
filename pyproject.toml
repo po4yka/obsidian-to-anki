@@ -31,6 +31,7 @@ dev = [
     "pytest-mock>=3.15.1",
     "respx>=0.22.0",
     "black>=25.9.0",
+    "isort>=5.13.2",
     "ruff>=0.14.0",
     "mypy>=1.18.2",
     "pre-commit>=3.7.0",
@@ -45,6 +46,11 @@ where = ["src"]
 [tool.black]
 line-length = 88
 target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 88

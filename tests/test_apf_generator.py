@@ -1,13 +1,13 @@
 """Tests for APF generator helper behaviour."""
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.models import NoteMetadata, QAPair, Manifest
+from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
 
 
 @pytest.fixture(autouse=True)

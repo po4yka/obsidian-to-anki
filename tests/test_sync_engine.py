@@ -8,8 +8,8 @@ from obsidian_anki_sync.sync.engine import SyncEngine
 
 def test_update_card_updates_fields_and_tags(test_config):
     """_update_card should refresh fields, tags, and database state."""
-    from obsidian_anki_sync.sync.state_db import StateDB
     from obsidian_anki_sync.anki.client import AnkiClient
+    from obsidian_anki_sync.sync.state_db import StateDB
 
     db = MagicMock(spec=StateDB)
     anki = MagicMock(spec=AnkiClient)
@@ -39,7 +39,10 @@ def test_update_card_updates_fields_and_tags(test_config):
         guid="guid-sample",
     )
 
-    with patch("obsidian_anki_sync.sync.engine.map_apf_to_anki_fields", return_value={"Front": "Q", "Back": "A"}):
+    with patch(
+        "obsidian_anki_sync.sync.engine.map_apf_to_anki_fields",
+        return_value={"Front": "Q", "Back": "A"},
+    ):
         engine._update_card(card, anki_guid=12345)
 
     anki.update_note_fields.assert_called_once_with(12345, {"Front": "Q", "Back": "A"})

@@ -42,6 +42,8 @@ def validate_card_html(apf_html: str) -> List[str]:
     # Check for bare <code> elements outside <pre>
     for code in soup.find_all("code"):
         if code.parent.name != "pre":
-            errors.append("Inline <code> elements are not allowed; wrap in <pre><code>.")
+            errors.append(
+                "Inline <code> elements are not allowed; wrap in <pre><code>."
+            )
 
     return errors

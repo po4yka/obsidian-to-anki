@@ -2,20 +2,20 @@
 
 import time
 from functools import wraps
-from typing import Callable, TypeVar, Any
+from typing import Any, Callable, TypeVar
 
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def retry(
     max_attempts: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
-    exceptions: tuple = (Exception,)
+    exceptions: tuple = (Exception,),
 ) -> Callable:
     """
     Retry decorator with exponential backoff.
@@ -29,6 +29,7 @@ def retry(
     Returns:
         Decorator function
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> T:
@@ -46,7 +47,7 @@ def retry(
                             "retry_exhausted",
                             func=func.__name__,
                             attempts=attempt,
-                            error=str(e)
+                            error=str(e),
                         )
                         raise
 
@@ -56,7 +57,7 @@ def retry(
                         attempt=attempt,
                         max_attempts=max_attempts,
                         delay=delay,
-                        error=str(e)
+                        error=str(e),
                     )
 
                     time.sleep(delay)
@@ -68,5 +69,5 @@ def retry(
             return func(*args, **kwargs)
 
         return wrapper
-    return decorator
 
+    return decorator

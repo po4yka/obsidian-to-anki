@@ -58,6 +58,17 @@ source .venv/bin/activate  # On Unix/macOS
 pre-commit install
 ```
 
+## Code Style
+
+The project uses Black and isort for formatting and import sorting. Run them with uv:
+
+```bash
+uv run black .
+uv run isort .
+```
+
+These tools are also available via the pre-commit hook chain for consistent formatting on commit.
+
 ### Alternative: Traditional pip
 
 If you prefer using pip:

@@ -12,13 +12,17 @@ from obsidian_anki_sync.sync.engine import SyncEngine
 @pytest.fixture
 def sample_note_list():
     """Create a list of fake note paths."""
-    return [
-        (Path(f"/tmp/note{i}.md"), f"relative/note{i}.md")
-        for i in range(20)
-    ]
+    return [(Path(f"/tmp/note{i}.md"), f"relative/note{i}.md") for i in range(20)]
 
 
-def _make_fake_card(relative_path: str, lang: str, qa_pair_index: int, note_id: str, note_title: str, counter: int) -> Card:
+def _make_fake_card(
+    relative_path: str,
+    lang: str,
+    qa_pair_index: int,
+    note_id: str,
+    note_title: str,
+    counter: int,
+) -> Card:
     slug = f"{relative_path.replace('/', '-')}-{lang}-{counter}"
     manifest = Manifest(
         slug=slug,
@@ -44,27 +48,47 @@ def _make_fake_card(relative_path: str, lang: str, qa_pair_index: int, note_id: 
     )
 
 
-def test_scan_sampling_limits_number_of_notes(sample_note_list, sample_metadata, sample_qa_pair, test_config):
+def test_scan_sampling_limits_number_of_notes(
+    sample_note_list, sample_metadata, sample_qa_pair, test_config
+):
     """Ensure only the requested number of notes are parsed when sampling."""
-    from obsidian_anki_sync.sync.state_db import StateDB
     from obsidian_anki_sync.anki.client import AnkiClient
+    from obsidian_anki_sync.sync.state_db import StateDB
 
     db = MagicMock(spec=StateDB)
     anki = MagicMock(spec=AnkiClient)
     engine = SyncEngine(test_config, db, anki)
 
-    with patch('obsidian_anki_sync.sync.engine.discover_notes', return_value=sample_note_list), \
-         patch('obsidian_anki_sync.sync.engine.random.sample', side_effect=lambda seq, k: seq[:k]), \
-         patch('obsidian_anki_sync.sync.engine.parse_note', return_value=(sample_metadata, [sample_qa_pair])) as mock_parse:
+    with (
+        patch(
+            "obsidian_anki_sync.sync.engine.discover_notes",
+            return_value=sample_note_list,
+        ),
+        patch(
+            "obsidian_anki_sync.sync.engine.random.sample",
+            side_effect=lambda seq, k: seq[:k],
+        ),
+        patch(
+            "obsidian_anki_sync.sync.engine.parse_note",
+            return_value=(sample_metadata, [sample_qa_pair]),
+        ) as mock_parse,
+    ):
 
-        counter = {'value': 0}
+        counter = {"value": 0}
 
         def fake_generate(qa_pair, metadata, relative_path, lang, existing_slugs):
-            card = _make_fake_card(relative_path, lang, qa_pair.card_index, metadata.id, metadata.title, counter['value'])
-            counter['value'] += 1
+            card = _make_fake_card(
+                relative_path,
+                lang,
+                qa_pair.card_index,
+                metadata.id,
+                metadata.title,
+                counter["value"],
+            )
+            counter["value"] += 1
             return card
 
-        with patch.object(SyncEngine, '_generate_card', side_effect=fake_generate):
+        with patch.object(SyncEngine, "_generate_card", side_effect=fake_generate):
             cards = engine._scan_obsidian_notes(sample_size=5)
 
     # parse_note should be called exactly 5 times (once per sampled note)
