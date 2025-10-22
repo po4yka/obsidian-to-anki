@@ -1,6 +1,7 @@
 """APF card generation via OpenRouter LLM."""
 
 import hashlib
+import html
 import json
 import re
 from pathlib import Path
@@ -132,6 +133,10 @@ class APFGenerator:
         except Exception as e:
             logger.error("llm_call_failed", slug=manifest.slug, error=str(e))
             raise
+
+        # Normalize Markdown code fences (if any) into HTML blocks
+        default_lang = self._code_language_hint(metadata)
+        apf_html = self._normalize_code_blocks(apf_html, default_lang)
 
         # Compute content hash
         content_hash = compute_content_hash(qa_pair, metadata, lang)
@@ -266,23 +271,31 @@ Requirements:
 
     def _extract_tags(self, metadata: NoteMetadata, lang: str) -> list[str]:
         """Extract tags from metadata."""
-        tags = set()
+        tags: set[str] = set()
 
         # Add language
-        tags.add(lang)
+        lang_tag = self._sanitize_tag(lang, lowercase=True)
+        if lang_tag:
+            tags.add(lang_tag)
 
         # Add topic
-        if metadata.topic:
-            tags.add(metadata.topic.lower().replace(" ", "_"))
+        topic_tag = self._sanitize_tag(metadata.topic, lowercase=True)
+        if topic_tag:
+            tags.add(topic_tag)
 
         # Add subtopics
         for subtopic in metadata.subtopics:
-            tags.add(subtopic.lower().replace(" ", "_"))
+            subtopic_tag = self._sanitize_tag(subtopic, lowercase=True)
+            if subtopic_tag:
+                tags.add(subtopic_tag)
 
         # Add metadata tags
-        tags.update(metadata.tags)
+        for tag in metadata.tags:
+            meta_tag = self._sanitize_tag(tag)
+            if meta_tag:
+                tags.add(meta_tag)
 
-        return sorted(list(tags))
+        return sorted(tags)
 
     def _code_language_hint(self, metadata: NoteMetadata) -> str:
         """Derive a language hint for code blocks."""
@@ -322,3 +335,83 @@ Requirements:
             if normalized in known_languages:
                 return normalized
         return "plaintext"
+
+    def _normalize_code_blocks(self, apf_html: str, default_lang: str) -> str:
+        """Convert Markdown code fences to <pre><code> blocks if present."""
+        if "```" not in apf_html:
+            return apf_html
+
+        normalized_parts: list[str] = []
+        cursor = 0
+        default_class = self._format_code_language(default_lang)
+
+        while True:
+            start = apf_html.find("```", cursor)
+            if start == -1:
+                normalized_parts.append(apf_html[cursor:])
+                break
+
+            end = apf_html.find("```", start + 3)
+            if end == -1:
+                # No closing fence; leave the rest untouched
+                normalized_parts.append(apf_html[cursor:])
+                break
+
+            fence_content = apf_html[start + 3 : end]
+            if "\n" in fence_content:
+                lang_spec, code_body = fence_content.split("\n", 1)
+            else:
+                lang_spec, code_body = fence_content, ""
+
+            lang = lang_spec.strip()
+            lang_class = self._format_code_language(lang or default_class)
+
+            # Preserve text before the fence
+            normalized_parts.append(apf_html[cursor:start])
+
+            code_text = code_body.replace("\r\n", "\n")
+            code_text = code_text.rstrip("\n")
+            escaped_code = html.escape(code_text, quote=False)
+
+            normalized_parts.append(
+                f'<pre><code class="language-{lang_class}">{escaped_code}'
+                "\n</code></pre>"
+            )
+
+            cursor = end + 3
+
+        return "".join(normalized_parts)
+
+    def _format_code_language(self, lang: str) -> str:
+        """Normalize language identifiers for code block classes."""
+        if not lang:
+            return "plaintext"
+        normalized = (
+            lang.strip()
+            .lower()
+            .replace(" ", "-")
+            .replace("/", "-")
+        )
+        normalized = re.sub(r"[^a-z0-9_\-+.]", "", normalized)
+        if normalized.startswith("language-"):
+            normalized = normalized[len("language-") :]
+        return normalized or "plaintext"
+
+    def _sanitize_tag(self, tag: str | None, lowercase: bool = False) -> str:
+        """Normalize tag strings for Anki compatibility."""
+        if not tag:
+            return ""
+
+        text = str(tag).strip()
+        if not text:
+            return ""
+
+        if lowercase:
+            text = text.lower()
+
+        text = text.replace(" ", "_").replace("/", "_")
+        text = re.sub(r"[^A-Za-z0-9:_-]", "_", text)
+
+        # Collapse consecutive underscores
+        text = re.sub(r"_+", "_", text).strip("_")
+        return text

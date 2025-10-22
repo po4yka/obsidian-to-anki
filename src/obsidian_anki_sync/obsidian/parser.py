@@ -119,6 +119,13 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         )
 
     # Build metadata object
+    moc = _normalize_wikilink(data.get("moc"))
+    related = _normalize_link_list(data.get("related"))
+    tags = _normalize_string_list(data.get("tags"))
+    aliases = _normalize_string_list(data.get("aliases"))
+    subtopics = _normalize_string_list(data.get("subtopics"))
+    sources = _normalize_sources(data.get("sources"))
+
     metadata = NoteMetadata(
         id=str(data["id"]),
         title=str(data["title"]),
@@ -126,17 +133,18 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         language_tags=_ensure_list(data["language_tags"]),
         created=created,
         updated=updated,
-        aliases=_ensure_list(data.get("aliases", [])),
-        subtopics=_ensure_list(data.get("subtopics", [])),
+        aliases=aliases,
+        subtopics=subtopics,
         question_kind=data.get("question_kind"),
         difficulty=data.get("difficulty"),
         original_language=data.get("original_language"),
         source=data.get("source"),
         source_note=data.get("source_note"),
         status=data.get("status"),
-        moc=data.get("moc"),
-        related=_ensure_list(data.get("related", [])),
-        tags=_ensure_list(data.get("tags", [])),
+        moc=moc,
+        related=related,
+        tags=tags,
+        sources=sources,
         anki_note_type=data.get("anki_note_type"),
         anki_slugs=_ensure_list(data.get("anki_slugs", [])),
     )
@@ -182,10 +190,10 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     card_index = 1
 
     # Find all Q/A blocks
-    # Pattern: # Question (EN) ... # Вопрос (RU) ... --- ... ## Answer (EN) ... ## Ответ (RU)
+    # Pattern supports both EN→RU and RU→EN ordering for questions/answers.
 
-    # Split by Question (EN) markers
-    question_pattern = r"(?=^# Question \(EN\))"
+    # Split by either Question (EN) or Вопрос (RU) markers
+    question_pattern = r"(?=^# (?:Question \(EN\)|Вопрос \(RU\)))"
     blocks = re.split(question_pattern, content, flags=re.MULTILINE)
 
     for block in blocks:
@@ -239,7 +247,7 @@ def _parse_single_qa_block(
             state = "QUESTION_RU"
             current_section = question_ru
             continue
-        elif stripped == "---" and state in ("QUESTION_RU", "ANSWER_EN"):
+        elif stripped == "---" and state in ("QUESTION_RU", "QUESTION_EN", "ANSWER_EN"):
             # Separator after Russian question
             state = "SEPARATOR"
             continue
@@ -390,3 +398,99 @@ def _ensure_list(value: Any) -> list[Any]:
     if value is None:
         return []
     return [value]
+
+
+def _normalize_string_list(value: Any) -> list[str]:
+    """Normalize a value into a list of strings."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        items = value
+    else:
+        items = [value]
+
+    normalized: list[str] = []
+    for item in items:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text:
+            continue
+        normalized.append(text)
+    return normalized
+
+
+def _normalize_wikilink(value: Any) -> str | None:
+    """Strip Obsidian wikilink syntax from a single value."""
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        # Prefer first non-empty entry
+        for item in value:
+            cleaned = _normalize_wikilink(item)
+            if cleaned:
+                return cleaned
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    if text.startswith("[[") and text.endswith("]]"):
+        text = text[2:-2].strip()
+    return text or None
+
+
+def _normalize_link_list(value: Any) -> list[str]:
+    """Normalize related/moc entries that may include wikilinks or bullet formatting."""
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        items = value
+    else:
+        # Support multi-line scalar formats or comma-separated strings
+        if isinstance(value, str):
+            items = re.split(r"[\n,]+", value)
+        else:
+            items = [value]
+
+    normalized: list[str] = []
+    for item in items:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if not text:
+            continue
+        if text.startswith("- "):
+            text = text[2:].strip()
+        if text.startswith("[[") and text.endswith("]]"):
+            text = text[2:-2].strip()
+        if text:
+            normalized.append(text)
+    return normalized
+
+
+def _normalize_sources(value: Any) -> list[dict[str, str]]:
+    """Normalize sources into a list of dictionaries with string values."""
+    if value is None:
+        return []
+
+    items: list[Any]
+    if isinstance(value, list):
+        items = value
+    else:
+        items = [value]
+
+    normalized: list[dict[str, str]] = []
+    for item in items:
+        if item is None:
+            continue
+        if isinstance(item, dict):
+            normalized.append({k: str(v) for k, v in item.items() if v is not None})
+        else:
+            text = str(item).strip()
+            if text:
+                normalized.append({"url": text})
+    return normalized

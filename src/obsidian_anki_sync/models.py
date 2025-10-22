@@ -25,6 +25,7 @@ class NoteMetadata:
     moc: str | None = None
     related: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    sources: list[dict[str, str]] = field(default_factory=list)
     anki_note_type: str | None = None
     anki_slugs: list[str] = field(default_factory=list)
 

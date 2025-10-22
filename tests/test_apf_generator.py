@@ -130,3 +130,47 @@ def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
     assert '"guid":"guid-sample"' in updated
     assert '"slug":"sample-slug-en"' in updated
     assert '"tags":["en","testing"]' in updated
+
+
+def test_normalize_code_blocks_converts_markdown(dummy_config, sample_metadata_for_code):
+    gen = APFGenerator(dummy_config)
+    html = "Intro\n```kotlin\nprintln(\"hi\")\n```\nOutro"
+    normalized = gen._normalize_code_blocks(html, gen._code_language_hint(sample_metadata_for_code))
+    assert "```" not in normalized
+    assert '<pre><code class="language-kotlin">' in normalized
+    assert "println(&quot;hi&quot;)" in normalized
+
+
+def test_normalize_code_blocks_uses_default_when_missing_lang(dummy_config, plain_metadata):
+    gen = APFGenerator(dummy_config)
+    html = """```
+val x = 1
+```"""
+    normalized = gen._normalize_code_blocks(html, gen._code_language_hint(plain_metadata))
+    assert "```" not in normalized
+    assert '<pre><code class="language-plaintext">' in normalized
+    assert "val x = 1" in normalized
+
+
+def test_extract_tags_sanitizes_slashes(dummy_config):
+    metadata = NoteMetadata(
+        id="t-1",
+        title="Tagged",
+        topic="Android",
+        language_tags=["en"],
+        created=datetime.utcnow(),
+        updated=datetime.utcnow(),
+        subtopics=["ui-compose"],
+        tags=["difficulty/easy", "android/ui-compose", "lang/ru"],
+    )
+
+    gen = APFGenerator(dummy_config)
+    tags = gen._extract_tags(metadata, "en")
+
+    assert "en" in tags
+    assert "android" in tags
+    assert "ui-compose" in tags
+    assert "difficulty_easy" in tags
+    assert "android_ui-compose" in tags
+    assert "lang_ru" in tags
+    assert all("/" not in tag for tag in tags)
