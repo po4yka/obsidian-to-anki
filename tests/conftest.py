@@ -89,6 +89,14 @@ created: 2024-01-01
 updated: 2024-01-02
 subtopics: [unit_testing]
 difficulty: medium
+moc: [[moc-testing]]
+related:
+  - [[c-testing-concept]]
+  - external-resource
+sources:
+  - url: https://example.com/unit-tests
+    note: Example overview
+  - https://docs.pytest.org
 tags: [python, testing]
 ---
 

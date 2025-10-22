@@ -155,6 +155,38 @@ class AnkiClient:
 
         logger.info("note_updated", note_id=note_id)
 
+    def update_note_tags(self, note_id: int, tags: list[str]) -> None:
+        """
+        Synchronize tags for a single note by applying minimal add/remove operations.
+
+        Args:
+            note_id: Note ID
+            tags: Desired set of tags
+        """
+        desired_tags = sorted({tag for tag in tags if tag})
+
+        note_info = self.notes_info([note_id])
+        if not note_info:
+            raise AnkiConnectError(f"Note not found for tag update: {note_id}")
+
+        current_tags = set(note_info[0].get("tags", []))
+        desired_set = set(desired_tags)
+
+        to_add = sorted(desired_set - current_tags)
+        to_remove = sorted(current_tags - desired_set)
+
+        if to_add:
+            self.add_tags([note_id], " ".join(to_add))
+        if to_remove:
+            self.remove_tags([note_id], " ".join(to_remove))
+
+        logger.info(
+            "note_tags_updated",
+            note_id=note_id,
+            added=to_add,
+            removed=to_remove,
+        )
+
     def add_tags(self, note_ids: list[int], tags: str) -> None:
         """
         Add tags to notes.

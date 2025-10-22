@@ -31,6 +31,12 @@ class TestYAMLParsing:
         assert metadata.created == datetime(2024, 1, 1)
         assert metadata.updated == datetime(2024, 1, 2)
         assert "unit_testing" in metadata.subtopics
+        assert metadata.moc == "moc-testing"
+        assert metadata.related == ["c-testing-concept", "external-resource"]
+        assert metadata.sources == [
+            {"url": "https://example.com/unit-tests", "note": "Example overview"},
+            {"url": "https://docs.pytest.org"},
+        ]
 
     def test_missing_frontmatter(self, temp_dir):
         """Test error when frontmatter is missing."""
@@ -129,6 +135,40 @@ Second answer.
         assert qa_pairs[1].card_index == 2
         assert "First question" in qa_pairs[0].question_en
         assert "Second question" in qa_pairs[1].question_en
+
+    def test_parse_ru_first_order(self, sample_metadata):
+        """Test parsing when Russian sections precede English sections."""
+        content = """---
+id: test-ru-first
+title: RU First Question
+---
+
+# Вопрос (RU)
+
+> Что такое тест?
+
+# Question (EN)
+
+> What is a test?
+
+---
+
+## Ответ (RU)
+
+Это проверка системы.
+
+## Answer (EN)
+
+It is a system check.
+"""
+        qa_pairs = parse_qa_pairs(content, sample_metadata)
+
+        assert len(qa_pairs) == 1
+        pair = qa_pairs[0]
+        assert pair.question_ru.startswith("Что такое тест")
+        assert pair.question_en.startswith("What is a test")
+        assert pair.answer_ru.startswith("Это проверка системы")
+        assert pair.answer_en.startswith("It is a system check")
 
     def test_parse_with_followups(self, sample_note_content, sample_metadata):
         """Test parsing Q/A with follow-ups and references."""

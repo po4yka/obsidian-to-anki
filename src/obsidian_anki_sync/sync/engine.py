@@ -203,7 +203,12 @@ class SyncEngine:
         # Validate APF format
         validation = validate_apf(card.apf_html, slug)
         if validation.errors:
-            logger.warning("apf_validation_errors", slug=slug, errors=validation.errors)
+            logger.error(
+                "apf_validation_errors", slug=slug, errors=validation.errors
+            )
+            raise ValueError(
+                f"APF validation failed for {slug}: {validation.errors[0]}"
+            )
         if validation.warnings:
             logger.debug(
                 "apf_validation_warnings", slug=slug, warnings=validation.warnings
