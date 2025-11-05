@@ -2,6 +2,10 @@
 
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..anki.client import AnkiClient
 
 from ..config import Config
 from ..obsidian.parser import ParserError, discover_notes, parse_note
@@ -144,7 +148,7 @@ class VaultIndexer:
 class AnkiIndexer:
     """Index Anki cards."""
 
-    def __init__(self, db: StateDB, anki_client):
+    def __init__(self, db: StateDB, anki_client: "AnkiClient"):
         """
         Initialize Anki indexer.
 
@@ -351,8 +355,8 @@ class SyncIndexer:
 
 
 def build_full_index(
-    config: Config, db: StateDB, anki_client, incremental: bool = False
-) -> dict:
+    config: Config, db: StateDB, anki_client: "AnkiClient", incremental: bool = False
+) -> dict[str, Any]:
     """
     Build full index of vault, Anki, and database.
 
@@ -367,7 +371,7 @@ def build_full_index(
     """
     logger.info("building_full_index", incremental=incremental)
 
-    combined_stats = {
+    combined_stats: dict[str, Any] = {
         "vault": {},
         "anki": {},
         "database": {},

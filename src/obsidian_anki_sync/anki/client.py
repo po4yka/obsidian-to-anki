@@ -1,19 +1,14 @@
 """AnkiConnect HTTP API client."""
 
-from typing import Any
+from typing import Any, cast
 
 import httpx  # type: ignore
 
+from ..exceptions import AnkiConnectError
 from ..utils.logging import get_logger
 from ..utils.retry import retry
 
 logger = get_logger(__name__)
-
-
-class AnkiConnectError(Exception):
-    """Error from AnkiConnect API."""
-
-    pass
 
 
 class AnkiClient:
@@ -92,7 +87,7 @@ class AnkiClient:
         Returns:
             List of note IDs
         """
-        return self.invoke("findNotes", {"query": query})
+        return cast(list[int], self.invoke("findNotes", {"query": query}))
 
     def notes_info(self, note_ids: list[int]) -> list[dict]:
         """
@@ -106,7 +101,7 @@ class AnkiClient:
         """
         if not note_ids:
             return []
-        return self.invoke("notesInfo", {"notes": note_ids})
+        return cast(list[dict[Any, Any]], self.invoke("notesInfo", {"notes": note_ids}))
 
     def add_note(
         self,
@@ -138,7 +133,7 @@ class AnkiClient:
         if guid:
             note_payload["guid"] = guid
 
-        result = self.invoke("addNote", {"note": note_payload})
+        result = cast(int, self.invoke("addNote", {"note": note_payload}))
 
         logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
         return result
@@ -226,11 +221,11 @@ class AnkiClient:
 
     def get_deck_names(self) -> list[str]:
         """Get all deck names."""
-        return self.invoke("deckNames")
+        return cast(list[str], self.invoke("deckNames"))
 
     def get_model_names(self) -> list[str]:
         """Get all note type (model) names."""
-        return self.invoke("modelNames")
+        return cast(list[str], self.invoke("modelNames"))
 
     def get_model_field_names(self, model_name: str) -> list[str]:
         """
@@ -242,7 +237,9 @@ class AnkiClient:
         Returns:
             List of field names
         """
-        return self.invoke("modelFieldNames", {"modelName": model_name})
+        return cast(
+            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
+        )
 
     def sync(self) -> None:
         """Trigger Anki sync."""
@@ -257,6 +254,6 @@ class AnkiClient:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         self.close()

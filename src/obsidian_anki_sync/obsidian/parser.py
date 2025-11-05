@@ -7,16 +7,11 @@ from typing import Any
 
 import yaml
 
+from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class ParserError(Exception):
-    """Error during parsing."""
-
-    pass
 
 
 def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
@@ -196,7 +191,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     # A question marker starts a new block if it comes after a separator or at the start
     parts = []
     lines = content.split("\n")
-    current_block_lines = []
+    current_block_lines: list[str] = []
     in_answer_section = False
 
     for line in lines:

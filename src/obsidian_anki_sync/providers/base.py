@@ -2,7 +2,7 @@
 
 import json
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, cast
 
 from ..utils.logging import get_logger
 
@@ -103,7 +103,7 @@ class BaseLLMProvider(ABC):
 
         response_text = result.get("response", "{}")
         try:
-            return json.loads(response_text)
+            return cast(dict[str, Any], json.loads(response_text))
         except json.JSONDecodeError as e:
             logger.error(
                 "json_parse_error",

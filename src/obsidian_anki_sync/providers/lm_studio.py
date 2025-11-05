@@ -1,7 +1,7 @@
 """LM Studio provider implementation."""
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -233,7 +233,7 @@ class LMStudioProvider(BaseLLMProvider):
 
         response_text = result.get("response", "{}")
         try:
-            return json.loads(response_text)
+            return cast(dict[str, Any], json.loads(response_text))
         except json.JSONDecodeError as e:
             logger.error(
                 "lm_studio_json_parse_error",

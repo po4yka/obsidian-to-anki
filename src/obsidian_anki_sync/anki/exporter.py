@@ -5,17 +5,12 @@ from pathlib import Path
 
 import genanki
 
+from ..exceptions import DeckExportError
 from ..models import Card
 from ..utils.logging import get_logger
 from .field_mapper import map_apf_to_anki_fields
 
 logger = get_logger(__name__)
-
-
-class DeckExportError(Exception):
-    """Error during deck export."""
-
-    pass
 
 
 # Define APF note types as genanki Models
