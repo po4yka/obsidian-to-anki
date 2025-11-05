@@ -26,9 +26,7 @@ class ProviderFactory:
     }
 
     @classmethod
-    def create_provider(
-        cls, provider_type: str, **kwargs: Any
-    ) -> BaseLLMProvider:
+    def create_provider(cls, provider_type: str, **kwargs: Any) -> BaseLLMProvider:
         """Create a provider instance based on type.
 
         Args:

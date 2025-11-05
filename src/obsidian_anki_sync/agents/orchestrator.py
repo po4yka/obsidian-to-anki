@@ -15,7 +15,6 @@ from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..providers.factory import ProviderFactory
-from ..utils.guid import generate_guid
 from ..utils.logging import get_logger
 from .generator import GeneratorAgent
 from .models import AgentPipelineResult, GeneratedCard
@@ -59,7 +58,9 @@ class AgentOrchestrator:
                     error=str(e),
                     llm_provider=getattr(config, "llm_provider", "ollama"),
                 )
-                ollama_base_url = getattr(config, "ollama_base_url", "http://localhost:11434")
+                ollama_base_url = getattr(
+                    config, "ollama_base_url", "http://localhost:11434"
+                )
                 self.provider = OllamaClient(base_url=ollama_base_url)
 
         # Check provider connection
@@ -308,7 +309,6 @@ class AgentOrchestrator:
         Returns:
             List of Card instances ready for Anki sync
         """
-        from ..apf.generator import compute_content_hash
 
         cards = []
 

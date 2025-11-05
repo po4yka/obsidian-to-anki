@@ -39,9 +39,7 @@ class OllamaProvider(BaseLLMProvider):
             timeout: Request timeout in seconds
             **kwargs: Additional configuration options
         """
-        super().__init__(
-            base_url=base_url, api_key=api_key, timeout=timeout, **kwargs
-        )
+        super().__init__(base_url=base_url, api_key=api_key, timeout=timeout, **kwargs)
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
