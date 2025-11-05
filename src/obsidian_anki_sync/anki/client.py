@@ -4,16 +4,11 @@ from typing import Any
 
 import httpx  # type: ignore
 
+from ..exceptions import AnkiConnectError
 from ..utils.logging import get_logger
 from ..utils.retry import retry
 
 logger = get_logger(__name__)
-
-
-class AnkiConnectError(Exception):
-    """Error from AnkiConnect API."""
-
-    pass
 
 
 class AnkiClient:

@@ -7,16 +7,11 @@ from typing import Any
 
 import yaml
 
+from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class ParserError(Exception):
-    """Error during parsing."""
-
-    pass
 
 
 def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
