@@ -71,7 +71,9 @@ class Config:
 
         # OpenRouter API key only required if NOT using agent system
         if not self.use_agent_system and not self.openrouter_api_key:
-            raise ValueError("OPENROUTER_API_KEY is required when not using agent system")
+            raise ValueError(
+                "OPENROUTER_API_KEY is required when not using agent system"
+            )
 
         if self.run_mode not in ("apply", "dry-run"):
             raise ValueError(f"Invalid run_mode: {self.run_mode}")

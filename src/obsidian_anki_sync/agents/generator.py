@@ -47,9 +47,7 @@ class GeneratorAgent:
             self.system_prompt = prompt_path.read_text(encoding="utf-8")
         else:
             logger.warning("cards_prompt_not_found", path=str(prompt_path))
-            self.system_prompt = (
-                "Generate APF cards following strict APF v2.1 format."
-            )
+            self.system_prompt = "Generate APF cards following strict APF v2.1 format."
 
         logger.info("generator_agent_initialized", model=model)
 

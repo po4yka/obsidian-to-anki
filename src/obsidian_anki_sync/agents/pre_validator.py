@@ -232,9 +232,7 @@ Be strict but helpful - suggest fixes when possible."""
 
         return errors
 
-    def _attempt_auto_fix(
-        self, note_content: str, errors: list[str]
-    ) -> str | None:
+    def _attempt_auto_fix(self, note_content: str, errors: list[str]) -> str | None:
         """Attempt to auto-fix simple structural errors.
 
         Args:

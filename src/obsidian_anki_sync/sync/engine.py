@@ -147,7 +147,11 @@ class SyncEngine:
                     try:
                         note_content = file_path.read_text(encoding="utf-8")
                     except Exception as e:
-                        logger.warning("failed_to_read_note_content", file=relative_path, error=str(e))
+                        logger.warning(
+                            "failed_to_read_note_content",
+                            file=relative_path,
+                            error=str(e),
+                        )
 
             except (
                 ParserError,
@@ -253,7 +257,11 @@ class SyncEngine:
         )
 
         if not result.success or not result.generation:
-            error_msg = result.post_validation.error_details if result.post_validation else "Unknown error"
+            error_msg = (
+                result.post_validation.error_details
+                if result.post_validation
+                else "Unknown error"
+            )
             raise ValueError(f"Agent pipeline failed: {error_msg}")
 
         # Convert GeneratedCard to Card instances

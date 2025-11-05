@@ -111,9 +111,7 @@ class AgentOrchestrator:
         )
 
         # Stage 1: Pre-validation
-        pre_validation_enabled = getattr(
-            self.config, "pre_validation_enabled", True
-        )
+        pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
 
         if pre_validation_enabled:
             pre_result = self.pre_validator.validate(
@@ -227,7 +225,9 @@ class AgentOrchestrator:
 
             # Try auto-fix if enabled
             if auto_fix and post_result.corrected_cards:
-                logger.info("applying_auto_fix", cards_count=len(post_result.corrected_cards))
+                logger.info(
+                    "applying_auto_fix", cards_count=len(post_result.corrected_cards)
+                )
                 current_cards = post_result.corrected_cards
                 retry_count = attempt + 1
             elif auto_fix:
