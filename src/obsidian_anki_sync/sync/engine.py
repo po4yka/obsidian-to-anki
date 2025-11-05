@@ -249,6 +249,16 @@ class SyncEngine:
         from pathlib import Path
 
         file_path = self.config.vault_path / relative_path
+
+        # Validate file path exists before processing
+        if not file_path.exists():
+            logger.warning(
+                "file_path_not_found_for_agent_processing",
+                relative_path=relative_path,
+                computed_path=str(file_path),
+            )
+            # Continue with None file_path, agent can handle it
+
         result = self.agent_orchestrator.process_note(
             note_content=note_content,
             metadata=metadata,

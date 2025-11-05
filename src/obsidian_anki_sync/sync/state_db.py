@@ -1,4 +1,16 @@
-"""SQLite database for tracking sync state."""
+"""SQLite database for tracking sync state.
+
+Security Note:
+    All SQL queries in this module use parameterized statements (? placeholders)
+    to prevent SQL injection vulnerabilities. Never use string formatting or
+    concatenation to build SQL queries. Always use parameter binding.
+
+    Example of correct usage:
+        cursor.execute("SELECT * FROM cards WHERE slug = ?", (slug,))
+
+    Example of INCORRECT usage (vulnerable to SQL injection):
+        cursor.execute(f"SELECT * FROM cards WHERE slug = '{slug}'")
+"""
 
 import sqlite3
 from pathlib import Path
