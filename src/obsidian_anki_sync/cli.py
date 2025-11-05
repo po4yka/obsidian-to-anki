@@ -69,6 +69,13 @@ def sync(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview changes without applying")
     ] = False,
+    incremental: Annotated[
+        bool,
+        typer.Option(
+            "--incremental",
+            help="Only process new notes not yet synced (skip existing notes)",
+        ),
+    ] = False,
     resume: Annotated[
         str | None,
         typer.Option("--resume", help="Resume a previous interrupted sync by session ID"),
@@ -101,7 +108,12 @@ def sync(
         config.use_agent_system = use_agents
         logger.info("agent_system_override", use_agents=use_agents)
 
-    logger.info("sync_started", dry_run=dry_run, vault=str(config.vault_path))
+    logger.info(
+        "sync_started",
+        dry_run=dry_run,
+        incremental=incremental,
+        vault=str(config.vault_path),
+    )
 
     from .anki.client import AnkiClient
     from .sync.engine import SyncEngine
@@ -154,8 +166,15 @@ def sync(
                         f"\n[cyan]Starting new sync session: {progress_tracker.progress.session_id}[/cyan]\n"
                     )
 
+            # Show incremental mode info
+            if incremental:
+                processed_count = len(db.get_processed_note_paths())
+                console.print(
+                    f"\n[cyan]Incremental mode: Skipping {processed_count} already processed notes[/cyan]\n"
+                )
+
             engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
-            stats = engine.sync(dry_run=dry_run)
+            stats = engine.sync(dry_run=dry_run, incremental=incremental)
 
             # Create a Rich table for results
             table = Table(

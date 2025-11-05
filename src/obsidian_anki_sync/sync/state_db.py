@@ -194,6 +194,16 @@ class StateDB:
         cursor.execute("SELECT * FROM cards")
         return [dict(row) for row in cursor.fetchall()]
 
+    def get_processed_note_paths(self) -> set[str]:
+        """Get set of all note paths that have been processed.
+
+        Returns:
+            Set of source_path values from cards that have been synced
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT source_path FROM cards")
+        return {row["source_path"] for row in cursor.fetchall()}
+
     def delete_card(self, slug: str) -> None:
         """Delete a card record."""
         cursor = self.conn.cursor()
