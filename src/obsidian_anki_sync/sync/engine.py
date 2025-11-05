@@ -1,6 +1,7 @@
 """Synchronization engine for Obsidian to Anki sync."""
 
 import random
+from typing import TYPE_CHECKING, Any, cast
 
 import yaml  # type: ignore
 
@@ -18,6 +19,9 @@ from ..sync.state_db import StateDB
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
 
+if TYPE_CHECKING:
+    from ..sync.progress import ProgressTracker
+
 logger = get_logger(__name__)
 
 # Import agent orchestrator (optional dependency)
@@ -27,6 +31,7 @@ try:
     AGENTS_AVAILABLE = True
 except ImportError:
     AGENTS_AVAILABLE = False
+    AgentOrchestrator = None  # type: ignore
     logger.warning("agent_system_not_available", reason="Import failed")
 
 
@@ -38,7 +43,7 @@ class SyncEngine:
         config: Config,
         state_db: StateDB,
         anki_client: AnkiClient,
-        progress_tracker=None,
+        progress_tracker: "ProgressTracker | None" = None,
     ):
         """
         Initialize sync engine.
@@ -62,12 +67,12 @@ class SyncEngine:
                     "Please ensure agent dependencies are installed."
                 )
             logger.info("initializing_agent_orchestrator")
-            self.agent_orchestrator = AgentOrchestrator(config)
+            self.agent_orchestrator: AgentOrchestrator | None = AgentOrchestrator(config)  # type: ignore
             self.apf_gen = APFGenerator(config)  # Still keep for backward compat
             self.use_agents = True
         else:
             self.apf_gen = APFGenerator(config)
-            self.agent_orchestrator = None
+            self.agent_orchestrator: AgentOrchestrator | None = None  # type: ignore
             self.use_agents = False
 
         self.changes: list[SyncAction] = []
@@ -146,7 +151,7 @@ class SyncEngine:
 
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
-                return self.progress.get_stats()
+                return cast(dict[Any, Any], self.progress.get_stats())
 
             # Step 2: Fetch Anki state
             if self.progress:
@@ -161,7 +166,7 @@ class SyncEngine:
 
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
-                return self.progress.get_stats()
+                return cast(dict[Any, Any], self.progress.get_stats())
 
             # Step 4: Apply or preview
             if dry_run:
@@ -504,7 +509,7 @@ class SyncEngine:
         )
 
         # Generate APF card via LLM
-        card = self.apf_gen.generate_card(qa_pair, metadata, manifest, lang)
+        card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
 
         # Validate APF format
         validation = validate_apf(card.apf_html, slug)

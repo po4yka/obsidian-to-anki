@@ -191,7 +191,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     # A question marker starts a new block if it comes after a separator or at the start
     parts = []
     lines = content.split("\n")
-    current_block_lines = []
+    current_block_lines: list[str] = []
     in_answer_section = False
 
     for line in lines:
