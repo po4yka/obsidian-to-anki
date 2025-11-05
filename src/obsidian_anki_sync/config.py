@@ -37,6 +37,11 @@ class Config:
     # Logging
     log_level: str
 
+    # Deck export settings (for .apkg generation) - optional with defaults
+    export_deck_name: str | None = None
+    export_deck_description: str = ""
+    export_output_path: Path | None = None
+
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
     agent_execution_mode: str = "parallel"  # 'parallel' or 'sequential'
@@ -122,6 +127,10 @@ def load_config(config_path: Path | None = None) -> Config:
         return float(val) if val is not None else default
 
     # Build config from environment and file
+    deck_name = config_data.get("anki_deck_name") or os.getenv(
+        "ANKI_DECK_NAME", "Interview Questions"
+    )
+
     config = Config(
         vault_path=Path(config_data.get("vault_path") or os.getenv("VAULT_PATH", ""))
         .expanduser()
@@ -132,10 +141,23 @@ def load_config(config_path: Path | None = None) -> Config:
         ),
         anki_connect_url=config_data.get("anki_connect_url")
         or os.getenv("ANKI_CONNECT_URL", "http://127.0.0.1:8765"),
-        anki_deck_name=config_data.get("anki_deck_name")
-        or os.getenv("ANKI_DECK_NAME", "Interview Questions"),
+        anki_deck_name=deck_name,
         anki_note_type=config_data.get("anki_note_type")
         or os.getenv("ANKI_NOTE_TYPE", "APF::Simple"),
+        # Deck export settings
+        export_deck_name=config_data.get("export_deck_name")
+        or os.getenv("EXPORT_DECK_NAME")
+        or deck_name,
+        export_deck_description=config_data.get("export_deck_description")
+        or os.getenv("EXPORT_DECK_DESCRIPTION", ""),
+        export_output_path=(
+            Path(
+                config_data.get("export_output_path")
+                or os.getenv("EXPORT_OUTPUT_PATH", "output.apkg")
+            )
+            if config_data.get("export_output_path") or os.getenv("EXPORT_OUTPUT_PATH")
+            else None
+        ),
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
         openrouter_model=config_data.get("openrouter_model")
         or os.getenv("OPENROUTER_MODEL", "openai/gpt-4"),
