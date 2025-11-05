@@ -99,6 +99,7 @@ class TestAnkiClient:
         assert note_id == 12345
         assert route.called
         import json
+
         payload = json.loads(route.calls[-1].request.content)
         assert payload["params"]["note"]["guid"] == "guid-123"
 
