@@ -386,12 +386,7 @@ Requirements:
         """Normalize language identifiers for code block classes."""
         if not lang:
             return "plaintext"
-        normalized = (
-            lang.strip()
-            .lower()
-            .replace(" ", "-")
-            .replace("/", "-")
-        )
+        normalized = lang.strip().lower().replace(" ", "-").replace("/", "-")
         normalized = re.sub(r"[^a-z0-9_\-+.]", "", normalized)
         if normalized.startswith("language-"):
             normalized = normalized[len("language-") :]
