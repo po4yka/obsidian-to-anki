@@ -1,7 +1,7 @@
 """Obsidian note parser for YAML frontmatter and Q/A pairs."""
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -192,9 +192,37 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     # Find all Q/A blocks
     # Pattern supports both EN→RU and RU→EN ordering for questions/answers.
 
-    # Split by either Question (EN) or Вопрос (RU) markers
-    question_pattern = r"(?=^# (?:Question \(EN\)|Вопрос \(RU\)))"
-    blocks = re.split(question_pattern, content, flags=re.MULTILINE)
+    # Find positions of question markers that start new blocks
+    # A question marker starts a new block if it comes after a separator or at the start
+    parts = []
+    lines = content.split("\n")
+    current_block_lines = []
+    in_answer_section = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Check if this is a question marker
+        is_question_marker = stripped in ("# Question (EN)", "# Вопрос (RU)")
+
+        # Start new block if: (1) question marker AND (2) we've seen answers or this is the first block
+        if is_question_marker and (in_answer_section or not current_block_lines):
+            if current_block_lines:
+                parts.append("\n".join(current_block_lines))
+                current_block_lines = []
+            in_answer_section = False
+
+        # Check if we're entering answer section
+        if stripped.startswith("## "):
+            in_answer_section = True
+
+        current_block_lines.append(line)
+
+    # Add the last block
+    if current_block_lines:
+        parts.append("\n".join(current_block_lines))
+
+    blocks = parts
 
     for block in blocks:
         if not block.strip():
@@ -323,11 +351,27 @@ def _parse_single_qa_block(
         )
         return None
 
+    # Helper to clean blockquote markers from text
+    def clean_blockquote(text: str) -> str:
+        """Remove leading > markers from each line."""
+        lines = text.split("\n")
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("> "):
+                stripped = stripped[2:]
+            elif stripped == ">":
+                stripped = ""
+            else:
+                stripped = line.rstrip()  # Keep indentation but strip trailing spaces
+            cleaned.append(stripped)
+        return "\n".join(cleaned).strip()
+
     # Build QAPair
     return QAPair(
         card_index=card_index,
-        question_en="\n".join(question_en).strip(),
-        question_ru="\n".join(question_ru).strip(),
+        question_en=clean_blockquote("\n".join(question_en)),
+        question_ru=clean_blockquote("\n".join(question_ru)),
         answer_en="\n".join(answer_en).strip(),
         answer_ru="\n".join(answer_ru).strip(),
         followups="\n".join(followups).strip(),
@@ -373,6 +417,10 @@ def _parse_date(value: Any) -> datetime:
     """Parse date from various formats."""
     if isinstance(value, datetime):
         return value
+
+    # Handle datetime.date objects from YAML parsing
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
 
     if isinstance(value, str):
         # Try ISO format first
@@ -460,11 +508,21 @@ def _normalize_link_list(value: Any) -> list[str]:
     for item in items:
         if item is None:
             continue
+
+        # Handle nested lists (YAML interprets [[link]] as nested list structure)
+        if isinstance(item, list):
+            # Flatten nested lists - extract the innermost string value
+            while isinstance(item, list) and len(item) > 0:
+                item = item[0]
+            if item is None:
+                continue
+
         text = str(item).strip()
         if not text:
             continue
         if text.startswith("- "):
             text = text[2:].strip()
+        # Only strip [[ ]] if it's a string representation, not a nested list
         if text.startswith("[[") and text.endswith("]]"):
             text = text[2:-2].strip()
         if text:

@@ -166,7 +166,7 @@ Test
 <pre><code>answer</code></pre>
 <!-- Key point notes -->
 <ul><li>Note</li></ul>
-<!-- manifest: {{"slug":"test","lang":"python","type":"Simple","tags":[{','.join(f'"{t}"' for t in tags.split())}]}} -->
+<!-- manifest: {{"slug":"test","lang":"python","type":"Simple","tags":[{",".join(f'"{t}"' for t in tags.split())}]}} -->
 <!-- END_CARDS -->
 END_OF_CARDS"""
 

@@ -40,7 +40,7 @@ uv sync --all-extras
 ```
 
 This will:
-- Create a `.venv` directory with Python 3.14
+- Create a `.venv` directory with Python 3.11+
 - Install all dependencies with locked versions from `uv.lock`
 - Install the project in editable mode
 

@@ -4,9 +4,9 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from click.testing import CliRunner
+from typer.testing import CliRunner
 
-from obsidian_anki_sync.cli import cli
+from obsidian_anki_sync.cli import app
 from obsidian_anki_sync.config import Config
 
 
@@ -71,12 +71,12 @@ def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None)
                 return []
             return fields.get(model_name, [])
 
-    monkeypatch.setattr("obsidian_anki_sync.cli.AnkiClient", DummyAnki)
+    monkeypatch.setattr("obsidian_anki_sync.anki.client.AnkiClient", DummyAnki)
 
 
 def test_decks_command_lists_names(runner, test_config, monkeypatch):
     _patch_setup(monkeypatch, test_config, decks=["Deck B", "Deck A"])
-    result = runner.invoke(cli, ["decks"])
+    result = runner.invoke(app, ["decks"])
     assert result.exit_code == 0
     assert "Deck A" in result.output
     assert "Deck B" in result.output
@@ -84,7 +84,7 @@ def test_decks_command_lists_names(runner, test_config, monkeypatch):
 
 def test_models_command_lists_names(runner, test_config, monkeypatch):
     _patch_setup(monkeypatch, test_config, models=["ModelB", "ModelA"])
-    result = runner.invoke(cli, ["models"])
+    result = runner.invoke(app, ["models"])
     assert result.exit_code == 0
     assert "ModelA" in result.output
     assert "ModelB" in result.output
@@ -92,7 +92,7 @@ def test_models_command_lists_names(runner, test_config, monkeypatch):
 
 def test_model_fields_command_shows_fields(runner, test_config, monkeypatch):
     _patch_setup(monkeypatch, test_config, fields={"Basic": ["Front", "Back"]})
-    result = runner.invoke(cli, ["model-fields", "--model", "Basic"])
+    result = runner.invoke(app, ["model-fields", "--model", "Basic"])
     assert result.exit_code == 0
     assert "Front" in result.output
     assert "Back" in result.output
@@ -109,7 +109,7 @@ def test_format_command_runs_subprocess(runner, test_config, monkeypatch):
 
     monkeypatch.setattr("obsidian_anki_sync.cli.subprocess.run", fake_run)
 
-    result = runner.invoke(cli, ["format", "--check"])
+    result = runner.invoke(app, ["format", "--check"])
     assert result.exit_code == 0
     assert len(calls) == 2
     assert calls[0][1] is True

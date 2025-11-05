@@ -2,42 +2,66 @@
 
 import subprocess
 from pathlib import Path
+from typing import Annotated
 
-import click
+import typer
+from rich.console import Console
+from rich.table import Table
 
-from .config import load_config, set_config
+from .config import Config, load_config, set_config
 from .utils.logging import configure_logging, get_logger
 
-
-@click.group()
-@click.option("--config", type=click.Path(exists=True), help="Path to config.yaml")
-@click.option(
-    "--log-level", default="INFO", help="Log level (DEBUG, INFO, WARN, ERROR)"
+app = typer.Typer(
+    name="obsidian-anki-sync",
+    help="Obsidian to Anki APF sync service.",
+    no_args_is_help=True,
 )
-@click.pass_context
-def cli(ctx: click.Context, config: str | None, log_level: str) -> None:
-    """Obsidian to Anki APF sync service."""
-    # Load configuration
-    config_path = Path(config) if config else None
-    cfg = load_config(config_path)
-    set_config(cfg)
 
-    # Configure logging
-    configure_logging(log_level or cfg.log_level)
+console = Console()
 
-    # Store in context
-    ctx.ensure_object(dict)
-    ctx.obj["config"] = cfg
-    ctx.obj["logger"] = get_logger("cli")
+# Global state for config and logger
+_config: Config | None = None
+_logger = None
 
 
-@cli.command()
-@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
-@click.pass_context
-def sync(ctx: click.Context, dry_run: bool) -> None:
+def get_config_and_logger(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> tuple[Config, object]:
+    """Load configuration and logger (dependency injection helper)."""
+    global _config, _logger
+
+    if _config is None:
+        _config = load_config(config_path)
+        set_config(_config)
+        configure_logging(log_level or _config.log_level)
+        _logger = get_logger("cli")
+
+    return _config, _logger
+
+
+@app.command()
+def sync(
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview changes without applying")
+    ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Synchronize Obsidian notes to Anki cards."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("sync_started", dry_run=dry_run, vault=str(config.vault_path))
 
@@ -50,31 +74,48 @@ def sync(ctx: click.Context, dry_run: bool) -> None:
             engine = SyncEngine(config, db, anki)
             stats = engine.sync(dry_run=dry_run)
 
-            click.echo("\n=== Sync Results ===")
+            # Create a Rich table for results
+            table = Table(
+                title="Sync Results", show_header=True, header_style="bold magenta"
+            )
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", style="green")
+
             for key, value in stats.items():
-                click.echo(f"{key}: {value}")
+                table.add_row(key, str(value))
+
+            console.print()
+            console.print(table)
 
             logger.info("sync_completed", stats=stats)
 
     except Exception as e:
         logger.error("sync_failed", error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
-@cli.command(name="test-run")
-@click.option(
-    "--count",
-    default=10,
-    show_default=True,
-    type=click.IntRange(1, None, clamp=True),
-    help="Number of random notes to process (dry-run)",
-)
-@click.pass_context
-def test_run(ctx: click.Context, count: int) -> None:
+@app.command(name="test-run")
+def test_run(
+    count: Annotated[
+        int,
+        typer.Option(
+            "--count",
+            min=1,
+            help="Number of random notes to process (dry-run)",
+        ),
+    ] = 10,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Run a sample dry-run by processing N random notes."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("test_run_started", sample_count=count)
 
@@ -87,67 +128,94 @@ def test_run(ctx: click.Context, count: int) -> None:
             engine = SyncEngine(config, db, anki)
             stats = engine.sync(dry_run=True, sample_size=count)
 
-            click.echo(f"\nProcessed sample of {count} notes (dry-run).")
-            click.echo("=== Sample Results ===")
+            console.print(
+                f"\n[cyan]Processed sample of {count} notes (dry-run).[/cyan]"
+            )
+
+            # Create a Rich table for results
+            table = Table(
+                title="Sample Results", show_header=True, header_style="bold magenta"
+            )
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", style="green")
+
             for key, value in stats.items():
-                click.echo(f"{key}: {value}")
+                table.add_row(key, str(value))
+
+            console.print(table)
 
             logger.info("test_run_completed", stats=stats)
 
     except Exception as e:
         logger.error("test_run_failed", error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
-@cli.command()
-@click.argument("note_path", type=click.Path(exists=True))
-@click.pass_context
-def validate(ctx: click.Context, note_path: str) -> None:
+@app.command()
+def validate(
+    note_path: Annotated[Path, typer.Argument(help="Path to note file", exists=True)],
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Validate note structure and APF compliance."""
-    logger = ctx.obj["logger"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("validate_started", note_path=note_path)
+    logger.info("validate_started", note_path=str(note_path))
 
     from .obsidian.parser import parse_note
     from .obsidian.validator import validate_note
 
     try:
-        note_path_obj = Path(note_path)
-        metadata, qa_pairs = parse_note(note_path_obj)
+        metadata, qa_pairs = parse_note(note_path)
 
-        click.echo(f"\nParsed: {note_path}")
-        click.echo(f"  Title: {metadata.title}")
-        click.echo(f"  Topic: {metadata.topic}")
-        click.echo(f"  Languages: {', '.join(metadata.language_tags)}")
-        click.echo(f"  Q/A pairs: {len(qa_pairs)}")
+        # Display parsed information
+        console.print()
+        console.print(f"[bold]Parsed:[/bold] {note_path}")
+        console.print(f"  [cyan]Title:[/cyan] {metadata.title}")
+        console.print(f"  [cyan]Topic:[/cyan] {metadata.topic}")
+        console.print(f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
+        console.print(f"  [cyan]Q/A pairs:[/cyan] {len(qa_pairs)}")
 
         # Validate
-        errors = validate_note(metadata, qa_pairs, note_path_obj)
+        errors = validate_note(metadata, qa_pairs, note_path)
 
         if errors:
-            click.echo("\nValidation errors:")
+            console.print("\n[bold red]Validation errors:[/bold red]")
             for error in errors:
-                click.echo(f"  - {error}")
+                console.print(f"  [red]- {error}[/red]")
             logger.error("validation_failed", errors=errors)
         else:
-            click.echo("\nValidation passed!")
+            console.print("\n[bold green]✓ Validation passed![/bold green]")
             logger.info("validation_passed")
 
     except Exception as e:
         logger.error("validation_error", error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
     logger.info("validate_completed")
 
 
-@cli.command()
-@click.pass_context
-def init(ctx: click.Context) -> None:
+@app.command()
+def init(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Initialize configuration and database."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("init_started")
 
@@ -176,10 +244,10 @@ DB_PATH=.sync_state.db
 LOG_LEVEL=INFO
 """
         env_path.write_text(env_template)
-        click.echo(f"Created .env template at {env_path}")
+        console.print(f"[green]✓ Created .env template at {env_path}[/green]")
         logger.info("env_template_created", path=str(env_path))
     else:
-        click.echo(f".env already exists at {env_path}")
+        console.print(f"[yellow].env already exists at {env_path}[/yellow]")
 
     # Initialize database
     from .sync.state_db import StateDB
@@ -187,18 +255,25 @@ LOG_LEVEL=INFO
     db = StateDB(config.db_path)
     db.close()
 
-    click.echo(f"Initialized database at {config.db_path}")
+    console.print(f"[green]✓ Initialized database at {config.db_path}[/green]")
     logger.info("database_initialized", path=str(config.db_path))
 
     logger.info("init_completed")
 
 
-@cli.command(name="decks")
-@click.pass_context
-def list_decks(ctx: click.Context) -> None:
+@app.command(name="decks")
+def list_decks(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """List deck names available via AnkiConnect."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("list_decks_started")
 
@@ -209,26 +284,33 @@ def list_decks(ctx: click.Context) -> None:
             decks = sorted(anki.get_deck_names())
 
         if not decks:
-            click.echo("No decks available.")
+            console.print("[yellow]No decks available.[/yellow]")
         else:
-            click.echo("\nDecks:")
+            console.print("\n[bold]Decks:[/bold]")
             for deck in decks:
-                click.echo(f"  - {deck}")
+                console.print(f"  [cyan]• {deck}[/cyan]")
 
         logger.info("list_decks_completed", count=len(decks))
 
     except Exception as e:
         logger.error("list_decks_failed", error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
-@cli.command(name="models")
-@click.pass_context
-def list_models(ctx: click.Context) -> None:
+@app.command(name="models")
+def list_models(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """List note models (types) available in Anki."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("list_models_started")
 
@@ -239,27 +321,34 @@ def list_models(ctx: click.Context) -> None:
             models = sorted(anki.get_model_names())
 
         if not models:
-            click.echo("No models available.")
+            console.print("[yellow]No models available.[/yellow]")
         else:
-            click.echo("\nModels:")
+            console.print("\n[bold]Models:[/bold]")
             for model in models:
-                click.echo(f"  - {model}")
+                console.print(f"  [cyan]• {model}[/cyan]")
 
         logger.info("list_models_completed", count=len(models))
 
     except Exception as e:
         logger.error("list_models_failed", error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
-@cli.command(name="model-fields")
-@click.option("--model", "model_name", required=True, help="Model name to inspect")
-@click.pass_context
-def show_model_fields(ctx: click.Context, model_name: str) -> None:
+@app.command(name="model-fields")
+def show_model_fields(
+    model_name: Annotated[str, typer.Option("--model", help="Model name to inspect")],
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Show field names for a specific Anki model."""
-    logger = ctx.obj["logger"]
-    config = ctx.obj["config"]
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("model_fields_started", model=model_name)
 
@@ -270,30 +359,39 @@ def show_model_fields(ctx: click.Context, model_name: str) -> None:
             fields = anki.get_model_field_names(model_name)
 
         if not fields:
-            click.echo(f"Model '{model_name}' has no fields or does not exist.")
+            console.print(
+                f"[yellow]Model '{model_name}' has no fields or does not exist.[/yellow]"
+            )
         else:
-            click.echo(f"\nFields for model '{model_name}':")
+            console.print(f"\n[bold]Fields for model '{model_name}':[/bold]")
             for field in fields:
-                click.echo(f"  - {field}")
+                console.print(f"  [cyan]• {field}[/cyan]")
 
         logger.info("model_fields_completed", model=model_name, count=len(fields))
 
     except Exception as e:
         logger.error("model_fields_failed", model=model_name, error=str(e))
-        click.echo(f"\nError: {e}", err=True)
-        raise click.Abort()
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
 
 
-@cli.command()
-@click.option(
-    "--check/--fix",
-    default=False,
-    help="Run formatters in check mode (no modifications).",
-)
-@click.pass_context
-def format(ctx: click.Context, check: bool) -> None:
+@app.command()
+def format(
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="Run formatters in check mode (no modifications)"),
+    ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
     """Run code formatters (ruff + black)."""
-    logger = ctx.obj["logger"]
+    config, logger = get_config_and_logger(config_path, log_level)
     logger.info("format_started", check=check)
 
     paths = ["src", "tests"]
@@ -306,12 +404,25 @@ def format(ctx: click.Context, check: bool) -> None:
         for base, extra, target_paths in commands:
             cmd = base + extra + target_paths
             logger.debug("format_command", command=cmd)
+
+            # Display what we're running
+            mode = "Checking" if check else "Formatting"
+            tool = base[0]
+            console.print(f"[cyan]{mode} with {tool}...[/cyan]")
+
             subprocess.run(cmd, check=True)
 
+        console.print("[green]✓ Format completed successfully[/green]")
         logger.info("format_completed", check=check)
     except subprocess.CalledProcessError as exc:
         logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
-        raise click.ClickException(f"Formatter failed: {exc.cmd}")
+        console.print(f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
+        raise typer.Exit(code=1)
+
+
+def cli() -> None:
+    """Entry point for the CLI."""
+    app()
 
 
 if __name__ == "__main__":
