@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 class Config:
     """Service configuration."""
 
+    # Required fields (no defaults) - MUST come first in dataclasses
     # Obsidian paths
     vault_path: Path
     source_dir: Path
@@ -20,12 +21,6 @@ class Config:
     anki_connect_url: str
     anki_deck_name: str
     anki_note_type: str
-
-    # LLM settings (OpenRouter - legacy/fallback)
-    openrouter_api_key: str
-    openrouter_model: str
-    llm_temperature: float
-    llm_top_p: float
 
     # Runtime settings
     run_mode: str  # 'apply' or 'dry-run'
@@ -37,6 +32,33 @@ class Config:
     # Logging
     log_level: str
 
+    # Optional fields (with defaults) - MUST come after required fields
+    # LLM Provider Configuration
+    # Unified provider system - choose one: 'ollama', 'lm_studio', 'openrouter'
+    llm_provider: str = "ollama"
+
+    # Common LLM settings
+    llm_temperature: float = 0.2
+    llm_top_p: float = 0.3
+    llm_timeout: float = 120.0
+    llm_max_tokens: int = 2048
+
+    # Ollama provider settings (local or cloud)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_api_key: str | None = None  # Only for Ollama Cloud
+
+    # LM Studio provider settings
+    lm_studio_base_url: str = "http://localhost:1234/v1"
+
+    # OpenRouter provider settings
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_site_url: str | None = None
+    openrouter_site_name: str | None = None
+
+    # Legacy OpenRouter settings (for backward compatibility)
+    openrouter_model: str = "openai/gpt-4"
+
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
     export_deck_description: str = ""
@@ -45,9 +67,6 @@ class Config:
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
     agent_execution_mode: str = "parallel"  # 'parallel' or 'sequential'
-
-    # Ollama settings
-    ollama_base_url: str = "http://localhost:11434"
 
     # Pre-Validator Agent
     pre_validator_model: str = "qwen3:8b"
@@ -74,8 +93,27 @@ class Config:
         if not full_source.exists():
             raise ValueError(f"Source directory does not exist: {full_source}")
 
-        # OpenRouter API key only required if NOT using agent system
-        if not self.use_agent_system and not self.openrouter_api_key:
+        # Validate LLM provider
+        valid_providers = ["ollama", "lm_studio", "lmstudio", "openrouter"]
+        if self.llm_provider.lower() not in valid_providers:
+            raise ValueError(
+                f"Invalid llm_provider: {self.llm_provider}. "
+                f"Must be one of: {', '.join(valid_providers)}"
+            )
+
+        # Provider-specific validation
+        if self.llm_provider.lower() == "openrouter" and not self.openrouter_api_key:
+            raise ValueError(
+                "OpenRouter API key is required when using OpenRouter provider. "
+                "Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config."
+            )
+
+        # Legacy: OpenRouter API key only required if NOT using agent system (for backward compatibility)
+        if (
+            not self.use_agent_system
+            and self.llm_provider.lower() == "openrouter"
+            and not self.openrouter_api_key
+        ):
             raise ValueError(
                 "OPENROUTER_API_KEY is required when not using agent system"
             )
@@ -158,11 +196,31 @@ def load_config(config_path: Path | None = None) -> Config:
             if config_data.get("export_output_path") or os.getenv("EXPORT_OUTPUT_PATH")
             else None
         ),
-        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
-        openrouter_model=config_data.get("openrouter_model")
-        or os.getenv("OPENROUTER_MODEL", "openai/gpt-4"),
+        # LLM Provider Configuration
+        llm_provider=config_data.get("llm_provider")
+        or os.getenv("LLM_PROVIDER", "ollama"),
+        # Common LLM settings
         llm_temperature=get_float("llm_temperature", 0.2),
         llm_top_p=get_float("llm_top_p", 0.3),
+        llm_timeout=get_float("llm_timeout", 120.0),
+        llm_max_tokens=get_int("llm_max_tokens", 2048),
+        # Ollama settings
+        ollama_base_url=config_data.get("ollama_base_url")
+        or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        ollama_api_key=config_data.get("ollama_api_key") or os.getenv("OLLAMA_API_KEY"),
+        # LM Studio settings
+        lm_studio_base_url=config_data.get("lm_studio_base_url")
+        or os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1"),
+        # OpenRouter settings
+        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        openrouter_base_url=config_data.get("openrouter_base_url")
+        or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        openrouter_site_url=config_data.get("openrouter_site_url")
+        or os.getenv("OPENROUTER_SITE_URL"),
+        openrouter_site_name=config_data.get("openrouter_site_name")
+        or os.getenv("OPENROUTER_SITE_NAME"),
+        openrouter_model=config_data.get("openrouter_model")
+        or os.getenv("OPENROUTER_MODEL", "openai/gpt-4"),
         run_mode=config_data.get("run_mode") or os.getenv("RUN_MODE", "apply"),
         delete_mode=config_data.get("delete_mode")
         or os.getenv("DELETE_MODE", "delete"),
@@ -174,8 +232,6 @@ def load_config(config_path: Path | None = None) -> Config:
         use_agent_system=get_bool("use_agent_system", False),
         agent_execution_mode=config_data.get("agent_execution_mode")
         or os.getenv("AGENT_EXECUTION_MODE", "parallel"),
-        ollama_base_url=config_data.get("ollama_base_url")
-        or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         pre_validator_model=config_data.get("pre_validator_model")
         or os.getenv("PRE_VALIDATOR_MODEL", "qwen3:8b"),
         pre_validator_temperature=get_float("pre_validator_temperature", 0.0),

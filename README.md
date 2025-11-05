@@ -9,7 +9,7 @@ Synchronize Obsidian Q&A notes to Anki APF cards using LLM-powered generation wi
 ## ✨ Features
 
 - 📝 Parse Obsidian markdown notes with Q&A pairs
-- 🤖 Generate APF-compliant Anki cards via **OpenRouter LLM** or **local multi-agent AI system**
+- 🤖 **Multi-Provider LLM Support**: Choose from **Ollama** (local/cloud), **LM Studio**, or **OpenRouter**
 - 🔒 **100% Privacy**: Optional fully local processing with no cloud APIs
 - 🔄 Bidirectional synchronization (create/update/delete/restore)
 - 🌍 Bilingual card support (EN/RU)
@@ -17,6 +17,7 @@ Synchronize Obsidian Q&A notes to Anki APF cards using LLM-powered generation wi
 - 💾 SQLite state management
 - 👀 Dry-run mode for previewing changes
 - ✅ Three-stage validation pipeline with auto-fix
+- 🔌 Unified provider configuration with single point of model specification
 
 ## 🆕 Multi-Agent AI System
 
@@ -174,6 +175,63 @@ obsidian-anki-sync sync --use-agents --dry-run
   - Process notes infrequently (< 50 notes)
   - Prefer cloud-based solutions
   - Don't have Apple Silicon
+
+## 🔌 Multiple LLM Provider Support
+
+The service now supports **three LLM providers** with a unified configuration system:
+
+### Supported Providers
+
+| Provider | Type | Best For | Setup Difficulty |
+|----------|------|----------|------------------|
+| **Ollama** | Local/Cloud | Privacy, offline usage | Easy (CLI) |
+| **LM Studio** | Local | GUI preference, model testing | Easy (GUI) |
+| **OpenRouter** | Cloud | Quick setup, SOTA models | Easiest (API key) |
+
+### Configuration
+
+Choose your provider in `config.yaml`:
+
+```yaml
+# Provider selection
+llm_provider: "ollama"  # or "lm_studio" or "openrouter"
+
+# Provider-specific settings
+ollama_base_url: "http://localhost:11434"
+lm_studio_base_url: "http://localhost:1234/v1"
+openrouter_api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
+
+# Model specifications (adjust for your provider)
+pre_validator_model: "qwen3:8b"
+generator_model: "qwen3:32b"
+post_validator_model: "qwen3:14b"
+```
+
+### Quick Setup Examples
+
+**Ollama (Local):**
+```bash
+brew install ollama
+ollama serve
+ollama pull qwen3:8b qwen3:14b qwen3:32b
+```
+
+**LM Studio:**
+1. Download from https://lmstudio.ai
+2. Load models through GUI
+3. Start local server
+4. Set `llm_provider: "lm_studio"`
+
+**OpenRouter:**
+1. Get API key from https://openrouter.ai
+2. Set `OPENROUTER_API_KEY` environment variable
+3. Set `llm_provider: "openrouter"`
+
+### Documentation
+
+- **Full Provider Guide:** [docs/LLM_PROVIDERS.md](docs/LLM_PROVIDERS.md)
+- **Example Config:** [config.providers.example.yaml](config.providers.example.yaml)
+- **API Reference:** [src/obsidian_anki_sync/providers/README.md](src/obsidian_anki_sync/providers/README.md)
 
 ## 📦 Installation
 

@@ -8,11 +8,10 @@ import json
 import time
 from pathlib import Path
 
-from ..apf.generator import APFGenerator
 from ..models import Manifest, NoteMetadata, QAPair
+from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .models import GeneratedCard, GenerationResult
-from .ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -26,14 +25,14 @@ class GeneratorAgent:
 
     def __init__(
         self,
-        ollama_client: OllamaClient,
+        ollama_client: BaseLLMProvider,
         model: str = "qwen3:32b",
         temperature: float = 0.3,
     ):
         """Initialize generator agent.
 
         Args:
-            ollama_client: Ollama client instance
+            ollama_client: LLM provider instance (BaseLLMProvider)
             model: Model to use for generation
             temperature: Sampling temperature
         """
