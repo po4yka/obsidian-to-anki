@@ -51,6 +51,13 @@ def sync(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview changes without applying")
     ] = False,
+    use_agents: Annotated[
+        bool | None,
+        typer.Option(
+            "--use-agents/--no-agents",
+            help="Use multi-agent system for card generation (requires Ollama)",
+        ),
+    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -62,6 +69,11 @@ def sync(
 ) -> None:
     """Synchronize Obsidian notes to Anki cards."""
     config, logger = get_config_and_logger(config_path, log_level)
+
+    # Override agent system setting if CLI flag is provided
+    if use_agents is not None:
+        config.use_agent_system = use_agents
+        logger.info("agent_system_override", use_agents=use_agents)
 
     logger.info("sync_started", dry_run=dry_run, vault=str(config.vault_path))
 
@@ -105,6 +117,13 @@ def test_run(
             help="Number of random notes to process (dry-run)",
         ),
     ] = 10,
+    use_agents: Annotated[
+        bool | None,
+        typer.Option(
+            "--use-agents/--no-agents",
+            help="Use multi-agent system for card generation (requires Ollama)",
+        ),
+    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -116,6 +135,11 @@ def test_run(
 ) -> None:
     """Run a sample dry-run by processing N random notes."""
     config, logger = get_config_and_logger(config_path, log_level)
+
+    # Override agent system setting if CLI flag is provided
+    if use_agents is not None:
+        config.use_agent_system = use_agents
+        logger.info("agent_system_override", use_agents=use_agents)
 
     logger.info("test_run_started", sample_count=count)
 

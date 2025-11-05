@@ -1,0 +1,101 @@
+# Example configuration for Obsidian-to-Anki with Multi-Agent System
+# Copy this to config.yaml and customize for your setup
+
+# Obsidian Configuration
+vault_path: "~/Documents/ObsidianVault"
+source_dir: "interview_questions/InterviewQuestions"
+
+# Anki Configuration
+anki_connect_url: "http://127.0.0.1:8765"
+anki_deck_name: "Interview Questions"
+anki_note_type: "APF::Simple"
+
+# Runtime Settings
+run_mode: "apply"  # Options: apply, dry-run
+delete_mode: "delete"  # Options: delete, archive
+
+# Database
+db_path: ".sync_state.db"
+
+# Logging
+log_level: "INFO"  # Options: DEBUG, INFO, WARN, ERROR
+
+# =============================================================================
+# AGENT SYSTEM CONFIGURATION (New!)
+# =============================================================================
+
+# Feature Flag: Enable/Disable Agent System
+# Set to true to use the multi-agent AI system for card generation
+# Set to false to use the traditional OpenRouter-based generation
+use_agent_system: true
+
+# Agent Execution Mode
+# Options: parallel, sequential
+# - parallel: Run agents simultaneously (requires 30-34GB RAM)
+# - sequential: Run agents one at a time (lower memory usage)
+agent_execution_mode: "parallel"
+
+# Ollama Configuration
+# Ollama must be running locally: ollama serve
+ollama_base_url: "http://localhost:11434"
+
+# Pre-Validator Agent Configuration
+# Performs fast structural checks before expensive card generation
+pre_validator_model: "qwen3:8b"  # Lightweight model for validation
+pre_validator_temperature: 0.0  # Deterministic validation
+pre_validation_enabled: true  # Enable/disable pre-validation
+
+# Generator Agent Configuration
+# Generates APF cards using powerful local LLM
+generator_model: "qwen3:32b"  # Powerful model for generation
+generator_temperature: 0.3  # Some creativity for card generation
+
+# Post-Validator Agent Configuration
+# Validates generated cards for quality and correctness
+post_validator_model: "qwen3:14b"  # Medium model with reasoning
+post_validator_temperature: 0.0  # Deterministic validation
+post_validation_max_retries: 3  # Retry with auto-fix if validation fails
+post_validation_auto_fix: true  # Attempt automatic corrections
+post_validation_strict_mode: true  # Strict quality requirements
+
+# =============================================================================
+# LEGACY OPENROUTER CONFIGURATION (Fallback)
+# =============================================================================
+# These settings are used when use_agent_system: false
+# Requires OPENROUTER_API_KEY environment variable
+
+openrouter_model: "openai/gpt-4"
+llm_temperature: 0.2
+llm_top_p: 0.3
+
+# =============================================================================
+# USAGE NOTES
+# =============================================================================
+#
+# 1. Installing Ollama:
+#    brew install ollama
+#    ollama serve
+#
+# 2. Downloading Models:
+#    ollama pull qwen3:8b   # Pre-validator (~5GB)
+#    ollama pull qwen3:32b  # Generator (~20GB)
+#    ollama pull qwen3:14b  # Post-validator (~8GB)
+#
+# 3. System Requirements:
+#    - Minimum: M3 or M4 Mac with 32GB RAM
+#    - Recommended: M4 Max/Ultra with 48GB+ RAM
+#
+# 4. Running with Agents:
+#    obsidian-anki-sync sync --use-agents
+#    obsidian-anki-sync test-run --count 5 --use-agents
+#
+# 5. Disabling Agents (Use OpenRouter):
+#    obsidian-anki-sync sync --no-agents
+#    Or set use_agent_system: false in this config
+#
+# 6. Performance:
+#    - Pre-validator: Rejects 15-20% of malformed notes early
+#    - Total processing: ~1200 cards/hour with tri-agent validation
+#    - Memory usage: ~30-34GB RAM (all agents parallel)
+#
+# For more information, see .docs/AGENT_INTEGRATION_PLAN.md

@@ -1,0 +1,325 @@
+"""Agent orchestrator for coordinating the three-agent pipeline.
+
+This module coordinates:
+1. Pre-Validator Agent - structure and format validation
+2. Generator Agent - card generation
+3. Post-Validator Agent - quality validation
+
+Implements retry logic and auto-fix capabilities.
+"""
+
+import time
+from pathlib import Path
+
+from ..config import Config
+from ..models import Card, Manifest, NoteMetadata, QAPair
+from ..utils.guid import generate_guid
+from ..utils.logging import get_logger
+from .generator import GeneratorAgent
+from .models import AgentPipelineResult, GeneratedCard
+from .ollama_client import OllamaClient
+from .post_validator import PostValidatorAgent
+from .pre_validator import PreValidatorAgent
+
+logger = get_logger(__name__)
+
+
+class AgentOrchestrator:
+    """Orchestrates the three-agent pipeline for card generation.
+
+    Manages:
+    - Pre-validation of note structure
+    - Card generation with powerful LLM
+    - Post-validation with retry and auto-fix
+    """
+
+    def __init__(self, config: Config):
+        """Initialize agent orchestrator.
+
+        Args:
+            config: Service configuration
+        """
+        self.config = config
+
+        # Initialize Ollama client
+        ollama_base_url = getattr(config, "ollama_base_url", "http://localhost:11434")
+        self.ollama_client = OllamaClient(base_url=ollama_base_url)
+
+        # Check Ollama connection
+        if not self.ollama_client.check_connection():
+            logger.error("ollama_connection_failed", base_url=ollama_base_url)
+            raise ConnectionError(
+                f"Cannot connect to Ollama at {ollama_base_url}. "
+                "Please ensure Ollama is running with: ollama serve"
+            )
+
+        # Initialize agents
+        pre_val_model = getattr(config, "pre_validator_model", "qwen3:8b")
+        gen_model = getattr(config, "generator_model", "qwen3:32b")
+        post_val_model = getattr(config, "post_validator_model", "qwen3:14b")
+
+        self.pre_validator = PreValidatorAgent(
+            ollama_client=self.ollama_client,
+            model=pre_val_model,
+            temperature=getattr(config, "pre_validator_temperature", 0.0),
+        )
+
+        self.generator = GeneratorAgent(
+            ollama_client=self.ollama_client,
+            model=gen_model,
+            temperature=getattr(config, "generator_temperature", 0.3),
+        )
+
+        self.post_validator = PostValidatorAgent(
+            ollama_client=self.ollama_client,
+            model=post_val_model,
+            temperature=getattr(config, "post_validator_temperature", 0.0),
+        )
+
+        logger.info(
+            "orchestrator_initialized",
+            pre_val_model=pre_val_model,
+            gen_model=gen_model,
+            post_val_model=post_val_model,
+        )
+
+    def process_note(
+        self,
+        note_content: str,
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+        file_path: Path | None = None,
+    ) -> AgentPipelineResult:
+        """Process a note through the complete agent pipeline.
+
+        Args:
+            note_content: Full note content
+            metadata: Parsed metadata
+            qa_pairs: Parsed Q/A pairs
+            file_path: Optional file path for validation
+
+        Returns:
+            AgentPipelineResult with all stages
+        """
+        start_time = time.time()
+
+        logger.info(
+            "pipeline_start",
+            title=metadata.title,
+            qa_pairs_count=len(qa_pairs),
+            languages=metadata.language_tags,
+        )
+
+        # Stage 1: Pre-validation
+        pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
+
+        if pre_validation_enabled:
+            pre_result = self.pre_validator.validate(
+                note_content=note_content,
+                metadata=metadata,
+                qa_pairs=qa_pairs,
+                file_path=file_path,
+            )
+
+            if not pre_result.is_valid and not pre_result.auto_fix_applied:
+                total_time = time.time() - start_time
+                logger.warning(
+                    "pipeline_failed_pre_validation",
+                    error_type=pre_result.error_type,
+                    time=total_time,
+                )
+
+                return AgentPipelineResult(
+                    success=False,
+                    pre_validation=pre_result,
+                    generation=None,
+                    post_validation=None,
+                    total_time=total_time,
+                    retry_count=0,
+                )
+
+            # Use fixed content if auto-fix was applied
+            if pre_result.auto_fix_applied and pre_result.fixed_content:
+                note_content = pre_result.fixed_content
+                logger.info("using_auto_fixed_content")
+        else:
+            # Skip pre-validation, create dummy result
+            from .models import PreValidationResult
+
+            pre_result = PreValidationResult(
+                is_valid=True,
+                error_type="none",
+                error_details="Pre-validation skipped",
+                auto_fix_applied=False,
+                fixed_content=None,
+                validation_time=0.0,
+            )
+
+        # Stage 2: Card Generation
+        try:
+            # Generate slug base from note title
+            slug_base = self._generate_slug_base(metadata)
+
+            gen_result = self.generator.generate_cards(
+                note_content=note_content,
+                metadata=metadata,
+                qa_pairs=qa_pairs,
+                slug_base=slug_base,
+            )
+
+        except Exception as e:
+            total_time = time.time() - start_time
+            logger.error("pipeline_failed_generation", error=str(e), time=total_time)
+
+            return AgentPipelineResult(
+                success=False,
+                pre_validation=pre_result,
+                generation=None,
+                post_validation=None,
+                total_time=total_time,
+                retry_count=0,
+            )
+
+        # Stage 3: Post-validation with retry
+        max_retries = getattr(self.config, "post_validation_max_retries", 3)
+        auto_fix = getattr(self.config, "post_validation_auto_fix", True)
+        strict_mode = getattr(self.config, "post_validation_strict_mode", True)
+
+        current_cards = gen_result.cards
+        retry_count = 0
+
+        for attempt in range(max_retries):
+            post_result = self.post_validator.validate(
+                cards=current_cards, metadata=metadata, strict_mode=strict_mode
+            )
+
+            if post_result.is_valid:
+                # Success!
+                total_time = time.time() - start_time
+                logger.info(
+                    "pipeline_success",
+                    cards_generated=len(current_cards),
+                    retry_count=retry_count,
+                    time=total_time,
+                )
+
+                # Update generation result with final cards
+                gen_result.cards = current_cards
+
+                return AgentPipelineResult(
+                    success=True,
+                    pre_validation=pre_result,
+                    generation=gen_result,
+                    post_validation=post_result,
+                    total_time=total_time,
+                    retry_count=retry_count,
+                )
+
+            # Validation failed
+            logger.warning(
+                "post_validation_failed",
+                attempt=attempt + 1,
+                error_type=post_result.error_type,
+                error_details=post_result.error_details[:200],
+            )
+
+            # Try auto-fix if enabled
+            if auto_fix and post_result.corrected_cards:
+                logger.info(
+                    "applying_auto_fix", cards_count=len(post_result.corrected_cards)
+                )
+                current_cards = post_result.corrected_cards
+                retry_count = attempt + 1
+            elif auto_fix:
+                # Attempt auto-fix manually
+                logger.info("attempting_manual_auto_fix")
+                fixed_cards = self.post_validator.attempt_auto_fix(
+                    cards=current_cards, error_details=post_result.error_details
+                )
+
+                if fixed_cards:
+                    current_cards = fixed_cards
+                    retry_count = attempt + 1
+                else:
+                    # Cannot fix, abort
+                    break
+            else:
+                # Auto-fix disabled, abort
+                break
+
+        # Failed after all retries
+        total_time = time.time() - start_time
+        logger.error(
+            "pipeline_failed_post_validation",
+            retry_count=retry_count,
+            time=total_time,
+        )
+
+        return AgentPipelineResult(
+            success=False,
+            pre_validation=pre_result,
+            generation=gen_result,
+            post_validation=post_result,
+            total_time=total_time,
+            retry_count=retry_count,
+        )
+
+    def _generate_slug_base(self, metadata: NoteMetadata) -> str:
+        """Generate base slug from note metadata.
+
+        Args:
+            metadata: Note metadata
+
+        Returns:
+            Slug base string
+        """
+        # Simplified slug generation
+        # In production, use slug_generator module
+        topic = metadata.topic.lower().replace(" ", "-")
+        title = metadata.title.lower().replace(" ", "-")[:30]  # Limit length
+
+        return f"{topic}-{title}"
+
+    def convert_to_cards(self, generated_cards: list[GeneratedCard]) -> list[Card]:
+        """Convert GeneratedCard instances to Card instances.
+
+        Args:
+            generated_cards: Generated cards from agent pipeline
+
+        Returns:
+            List of Card instances ready for Anki sync
+        """
+        from ..apf.generator import compute_content_hash
+
+        cards = []
+
+        for gen_card in generated_cards:
+            # Create manifest
+            manifest = Manifest(
+                slug=gen_card.slug,
+                slug_base=gen_card.slug.rsplit("-", 2)[0],  # Remove -index-lang
+                lang=gen_card.lang,
+                source_path="",  # Will be set by sync engine
+                source_anchor=f"qa-{gen_card.card_index}",
+                note_id="",  # Will be set by sync engine
+                note_title="",  # Will be set by sync engine
+                card_index=gen_card.card_index,
+                guid=gen_card.slug,  # Use slug as GUID for now
+                hash6=None,
+            )
+
+            # Create card
+            card = Card(
+                slug=gen_card.slug,
+                lang=gen_card.lang,
+                apf_html=gen_card.apf_html,
+                manifest=manifest,
+                content_hash="",  # Will be computed by sync engine
+                note_type="APF::Simple",  # Default, can be detected from HTML
+                tags=[],  # Extract from manifest in HTML
+                guid=gen_card.slug,
+            )
+
+            cards.append(card)
+
+        return cards
