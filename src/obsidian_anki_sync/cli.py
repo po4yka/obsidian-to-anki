@@ -69,6 +69,14 @@ def sync(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview changes without applying")
     ] = False,
+    resume: Annotated[
+        str | None,
+        typer.Option("--resume", help="Resume a previous interrupted sync by session ID"),
+    ] = None,
+    no_resume: Annotated[
+        bool,
+        typer.Option("--no-resume", help="Disable automatic resume of incomplete syncs"),
+    ] = False,
     use_agents: Annotated[
         bool | None,
         typer.Option(
@@ -97,11 +105,56 @@ def sync(
 
     from .anki.client import AnkiClient
     from .sync.engine import SyncEngine
+    from .sync.progress import ProgressTracker
     from .sync.state_db import StateDB
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
-            engine = SyncEngine(config, db, anki)
+            # Check for incomplete syncs or resume request
+            progress_tracker = None
+            session_id = resume
+
+            if not no_resume:
+                if not session_id:
+                    # Check for incomplete syncs
+                    incomplete = db.get_incomplete_progress()
+                    if incomplete:
+                        latest = incomplete[0]
+                        console.print(
+                            f"\n[yellow]Found incomplete sync from {latest['updated_at']}[/yellow]"
+                        )
+                        console.print(
+                            f"  Session: {latest['session_id']}"
+                        )
+                        console.print(
+                            f"  Progress: {latest['notes_processed']}/{latest['total_notes']} notes"
+                        )
+
+                        # Ask user if they want to resume
+                        resume_choice = typer.confirm(
+                            "Resume this sync?", default=True
+                        )
+                        if resume_choice:
+                            session_id = latest['session_id']
+
+                # Create or resume progress tracker
+                if session_id:
+                    try:
+                        progress_tracker = ProgressTracker(db, session_id=session_id)
+                        console.print(
+                            f"\n[green]Resuming sync session: {session_id}[/green]\n"
+                        )
+                    except ValueError as e:
+                        console.print(f"\n[red]Cannot resume: {e}[/red]\n")
+                        return
+                else:
+                    # Start new sync with progress tracking
+                    progress_tracker = ProgressTracker(db)
+                    console.print(
+                        f"\n[cyan]Starting new sync session: {progress_tracker.progress.session_id}[/cyan]\n"
+                    )
+
+            engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
             stats = engine.sync(dry_run=dry_run)
 
             # Create a Rich table for results
@@ -595,6 +648,148 @@ def export(
 
     except Exception as e:
         logger.error("export_failed", error=str(e))
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="progress")
+def show_progress(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
+    """Show recent sync progress and incomplete sessions."""
+    config, logger = get_config_and_logger(config_path, log_level)
+
+    logger.info("show_progress_started")
+
+    from .sync.state_db import StateDB
+
+    try:
+        with StateDB(config.db_path) as db:
+            # Get incomplete syncs
+            incomplete = db.get_incomplete_progress()
+
+            if incomplete:
+                console.print("\n[bold yellow]Incomplete Syncs:[/bold yellow]")
+                table = Table(show_header=True, header_style="bold magenta")
+                table.add_column("Session ID", style="cyan")
+                table.add_column("Phase", style="yellow")
+                table.add_column("Progress", style="green")
+                table.add_column("Updated At", style="blue")
+
+                for session in incomplete:
+                    progress_str = f"{session['notes_processed']}/{session['total_notes']} notes"
+                    table.add_row(
+                        session['session_id'][:8] + "...",
+                        session['phase'],
+                        progress_str,
+                        session['updated_at'],
+                    )
+
+                console.print(table)
+                console.print(
+                    "\n[cyan]Resume with: obsidian-anki-sync sync --resume <session-id>[/cyan]"
+                )
+            else:
+                console.print("\n[green]No incomplete syncs found.[/green]")
+
+            # Get recent syncs
+            recent = db.get_all_progress(limit=10)
+
+            if recent:
+                console.print("\n[bold]Recent Syncs:[/bold]")
+                table = Table(show_header=True, header_style="bold magenta")
+                table.add_column("Session ID", style="cyan")
+                table.add_column("Phase", style="yellow")
+                table.add_column("Progress", style="green")
+                table.add_column("Errors", style="red")
+                table.add_column("Started At", style="blue")
+
+                for session in recent:
+                    progress_str = f"{session['notes_processed']}/{session['total_notes']}"
+                    table.add_row(
+                        session['session_id'][:8] + "...",
+                        session['phase'],
+                        progress_str,
+                        str(session['errors']),
+                        session['started_at'],
+                    )
+
+                console.print(table)
+
+        logger.info("show_progress_completed")
+
+    except Exception as e:
+        logger.error("show_progress_failed", error=str(e))
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="clean-progress")
+def clean_progress(
+    session_id: Annotated[
+        str | None,
+        typer.Option("--session", help="Specific session ID to delete"),
+    ] = None,
+    all_completed: Annotated[
+        bool,
+        typer.Option("--all-completed", help="Delete all completed sessions"),
+    ] = False,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
+    """Clean up sync progress records."""
+    config, logger = get_config_and_logger(config_path, log_level)
+
+    logger.info("clean_progress_started")
+
+    from .sync.state_db import StateDB
+
+    try:
+        with StateDB(config.db_path) as db:
+            if session_id:
+                db.delete_progress(session_id)
+                console.print(
+                    f"[green]✓ Deleted progress for session: {session_id}[/green]"
+                )
+                logger.info("progress_deleted", session_id=session_id)
+
+            elif all_completed:
+                # Get all completed sessions and delete them
+                all_progress = db.get_all_progress(limit=1000)
+                deleted_count = 0
+
+                for session in all_progress:
+                    if session['phase'] in ('completed', 'failed'):
+                        db.delete_progress(session['session_id'])
+                        deleted_count += 1
+
+                console.print(
+                    f"[green]✓ Deleted {deleted_count} completed sessions[/green]"
+                )
+                logger.info("completed_progress_deleted", count=deleted_count)
+
+            else:
+                console.print(
+                    "[yellow]Please specify --session <id> or --all-completed[/yellow]"
+                )
+
+        logger.info("clean_progress_completed")
+
+    except Exception as e:
+        logger.error("clean_progress_failed", error=str(e))
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 
