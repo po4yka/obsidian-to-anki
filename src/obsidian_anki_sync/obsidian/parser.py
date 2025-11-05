@@ -192,15 +192,10 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     # Find all Q/A blocks
     # Pattern supports both EN→RU and RU→EN ordering for questions/answers.
 
-    # Split on question markers, but use a pattern that finds complete Q/A blocks
-    # Look for blocks that start with either EN or RU question marker,
-    # contain both languages, a separator, and answers
-    block_pattern = r"(?=^# (?:Question \(EN\)|Вопрос \(RU\))(?:(?!^# (?:Question \(EN\)|Вопрос \(RU\))(?:.*\n){2,}^---).)*^---)"
-
-    # Simpler approach: find positions of question markers that start new blocks
+    # Find positions of question markers that start new blocks
     # A question marker starts a new block if it comes after a separator or at the start
     parts = []
-    lines = content.split('\n')
+    lines = content.split("\n")
     current_block_lines = []
     in_answer_section = False
 
@@ -213,7 +208,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
         # Start new block if: (1) question marker AND (2) we've seen answers or this is the first block
         if is_question_marker and (in_answer_section or not current_block_lines):
             if current_block_lines:
-                parts.append('\n'.join(current_block_lines))
+                parts.append("\n".join(current_block_lines))
                 current_block_lines = []
             in_answer_section = False
 
@@ -225,7 +220,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
 
     # Add the last block
     if current_block_lines:
-        parts.append('\n'.join(current_block_lines))
+        parts.append("\n".join(current_block_lines))
 
     blocks = parts
 
