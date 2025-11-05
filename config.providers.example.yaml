@@ -1,0 +1,173 @@
+# Obsidian to Anki Sync - Provider Configuration Examples
+# This file demonstrates how to configure different LLM providers
+
+# ============================================================================
+# LLM Provider Configuration
+# ============================================================================
+# Choose your preferred provider: 'ollama', 'lm_studio', or 'openrouter'
+llm_provider: "ollama"  # Default: ollama
+
+# Common LLM settings (apply to all providers)
+llm_temperature: 0.2      # Sampling temperature (0.0-1.0)
+llm_top_p: 0.3           # Top-p sampling
+llm_timeout: 120.0       # Request timeout in seconds
+llm_max_tokens: 2048     # Maximum tokens in response
+
+# ============================================================================
+# Ollama Provider Settings (Local LLM)
+# ============================================================================
+# Default configuration for local Ollama deployment
+ollama_base_url: "http://localhost:11434"
+# ollama_api_key: null  # Not needed for local deployment
+
+# For Ollama Cloud (if using cloud deployment):
+# ollama_base_url: "https://api.ollama.com"
+# ollama_api_key: "your-ollama-cloud-api-key"  # Set via OLLAMA_API_KEY env var
+
+# ============================================================================
+# LM Studio Provider Settings (Local LLM)
+# ============================================================================
+# LM Studio provides OpenAI-compatible API for local LLMs
+lm_studio_base_url: "http://localhost:1234/v1"
+
+# To use LM Studio, change llm_provider to "lm_studio" and start LM Studio server
+
+# ============================================================================
+# OpenRouter Provider Settings (Cloud LLM)
+# ============================================================================
+# OpenRouter provides access to multiple cloud LLM providers
+openrouter_base_url: "https://openrouter.ai/api/v1"
+# openrouter_api_key: "your-api-key"  # Set via OPENROUTER_API_KEY env var
+openrouter_site_url: null    # Optional: your site URL for rankings
+openrouter_site_name: null   # Optional: your site name for rankings
+
+# Legacy OpenRouter model (for backward compatibility when not using agent system)
+openrouter_model: "openai/gpt-4"
+
+# ============================================================================
+# Agent System Configuration
+# ============================================================================
+use_agent_system: true
+agent_execution_mode: "parallel"  # 'parallel' or 'sequential'
+
+# ============================================================================
+# Model Specifications (for Agent System)
+# ============================================================================
+# These model names should match your provider's available models
+
+# Pre-Validator Agent (lightweight model for fast validation)
+pre_validator_model: "qwen3:8b"
+pre_validator_temperature: 0.0
+pre_validation_enabled: true
+
+# Generator Agent (powerful model for high-quality card generation)
+generator_model: "qwen3:32b"
+generator_temperature: 0.3
+
+# Post-Validator Agent (medium model with reasoning capability)
+post_validator_model: "qwen3:14b"
+post_validator_temperature: 0.0
+post_validation_max_retries: 3
+post_validation_auto_fix: true
+post_validation_strict_mode: true
+
+# ============================================================================
+# Example Configurations for Different Providers
+# ============================================================================
+
+# --- EXAMPLE 1: Local Ollama (Default) ---
+# llm_provider: "ollama"
+# ollama_base_url: "http://localhost:11434"
+# pre_validator_model: "qwen3:8b"
+# generator_model: "qwen3:32b"
+# post_validator_model: "qwen3:14b"
+
+# --- EXAMPLE 2: LM Studio with Local Models ---
+# llm_provider: "lm_studio"
+# lm_studio_base_url: "http://localhost:1234/v1"
+# pre_validator_model: "lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF"
+# generator_model: "lmstudio-community/Qwen2.5-32B-Instruct-GGUF"
+# post_validator_model: "lmstudio-community/Qwen2.5-14B-Instruct-GGUF"
+
+# --- EXAMPLE 3: OpenRouter with Cloud Models ---
+# llm_provider: "openrouter"
+# openrouter_api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
+# pre_validator_model: "openai/gpt-3.5-turbo"
+# generator_model: "anthropic/claude-3-opus"
+# post_validator_model: "anthropic/claude-3-sonnet"
+
+# --- EXAMPLE 4: Ollama Cloud ---
+# llm_provider: "ollama"
+# ollama_base_url: "https://api.ollama.com"
+# ollama_api_key: "your-ollama-cloud-key"  # Or set OLLAMA_API_KEY env var
+# pre_validator_model: "llama3:8b"
+# generator_model: "llama3:70b"
+# post_validator_model: "llama3:70b"
+
+# --- EXAMPLE 5: Mixed Setup (Not Recommended) ---
+# Note: All agents must use the same provider. You cannot mix providers.
+# If you need different providers, run separate sync instances.
+
+# ============================================================================
+# Other Configuration (Obsidian, Anki, etc.)
+# ============================================================================
+# See config.example.yaml for complete configuration options
+
+vault_path: "~/Documents/Obsidian"
+source_dir: "interview_questions/InterviewQuestions"
+anki_connect_url: "http://127.0.0.1:8765"
+anki_deck_name: "Interview Questions"
+anki_note_type: "APF::Simple"
+run_mode: "apply"  # 'apply' or 'dry-run'
+delete_mode: "delete"  # 'delete' or 'archive'
+db_path: ".sync_state.db"
+log_level: "INFO"
+
+# Deck export settings (optional)
+export_deck_name: "Interview Questions"
+export_deck_description: "Generated with multi-agent validation pipeline"
+export_output_path: null  # Set to generate .apkg file
+
+# ============================================================================
+# Provider Selection Guide
+# ============================================================================
+
+# Use Ollama (Local) when:
+# - You want complete privacy and offline operation
+# - You have sufficient hardware (Mac with Apple Silicon recommended)
+# - You need cost-free unlimited usage
+# - Models: qwen3:8b, qwen3:14b, qwen3:32b, llama3:70b, etc.
+
+# Use LM Studio when:
+# - You prefer a GUI for model management
+# - You want to test different local models easily
+# - You're already using LM Studio for other projects
+# - Compatible with same models as Ollama (GGUF format)
+
+# Use OpenRouter when:
+# - You need access to state-of-the-art models (GPT-4, Claude 3, etc.)
+# - You don't have local hardware capable of running large models
+# - You want consistent performance without hardware limitations
+# - You're okay with per-token pricing and cloud dependency
+
+# Use Ollama Cloud when:
+# - You want Ollama's simplicity with cloud scalability
+# - You need consistent performance across devices
+# - Your local hardware is insufficient for large models
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+# You can override any config value using environment variables:
+#
+# LLM_PROVIDER=lm_studio
+# LLM_TIMEOUT=180.0
+# LLM_MAX_TOKENS=4096
+# OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_API_KEY=your-key
+# LM_STUDIO_BASE_URL=http://localhost:1234/v1
+# OPENROUTER_API_KEY=your-key
+# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+# PRE_VALIDATOR_MODEL=qwen3:8b
+# GENERATOR_MODEL=qwen3:32b
+# POST_VALIDATOR_MODEL=qwen3:14b

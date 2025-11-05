@@ -13,6 +13,8 @@ from pathlib import Path
 
 from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
+from ..providers.base import BaseLLMProvider
+from ..providers.factory import ProviderFactory
 from ..utils.guid import generate_guid
 from ..utils.logging import get_logger
 from .generator import GeneratorAgent
@@ -33,24 +35,40 @@ class AgentOrchestrator:
     - Post-validation with retry and auto-fix
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, provider: BaseLLMProvider | None = None):
         """Initialize agent orchestrator.
 
         Args:
             config: Service configuration
+            provider: Optional LLM provider instance. If not provided, will create
+                     one using ProviderFactory based on config settings.
         """
         self.config = config
 
-        # Initialize Ollama client
-        ollama_base_url = getattr(config, "ollama_base_url", "http://localhost:11434")
-        self.ollama_client = OllamaClient(base_url=ollama_base_url)
+        # Initialize LLM provider (use provided or create from config)
+        if provider is not None:
+            self.provider = provider
+        else:
+            # Create provider based on config (supports Ollama, LM Studio, OpenRouter)
+            try:
+                self.provider = ProviderFactory.create_from_config(config)
+            except Exception as e:
+                # Fallback to OllamaClient for backward compatibility
+                logger.warning(
+                    "provider_creation_failed_fallback_to_ollama",
+                    error=str(e),
+                    llm_provider=getattr(config, "llm_provider", "ollama"),
+                )
+                ollama_base_url = getattr(config, "ollama_base_url", "http://localhost:11434")
+                self.provider = OllamaClient(base_url=ollama_base_url)
 
-        # Check Ollama connection
-        if not self.ollama_client.check_connection():
-            logger.error("ollama_connection_failed", base_url=ollama_base_url)
+        # Check provider connection
+        provider_name = self.provider.get_provider_name()
+        if not self.provider.check_connection():
+            logger.error("provider_connection_failed", provider=provider_name)
             raise ConnectionError(
-                f"Cannot connect to Ollama at {ollama_base_url}. "
-                "Please ensure Ollama is running with: ollama serve"
+                f"Cannot connect to {provider_name} provider. "
+                "Please check your provider configuration and ensure the service is running."
             )
 
         # Initialize agents
@@ -59,25 +77,26 @@ class AgentOrchestrator:
         post_val_model = getattr(config, "post_validator_model", "qwen3:14b")
 
         self.pre_validator = PreValidatorAgent(
-            ollama_client=self.ollama_client,
+            ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=pre_val_model,
             temperature=getattr(config, "pre_validator_temperature", 0.0),
         )
 
         self.generator = GeneratorAgent(
-            ollama_client=self.ollama_client,
+            ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=gen_model,
             temperature=getattr(config, "generator_temperature", 0.3),
         )
 
         self.post_validator = PostValidatorAgent(
-            ollama_client=self.ollama_client,
+            ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=post_val_model,
             temperature=getattr(config, "post_validator_temperature", 0.0),
         )
 
         logger.info(
             "orchestrator_initialized",
+            provider=provider_name,
             pre_val_model=pre_val_model,
             gen_model=gen_model,
             post_val_model=post_val_model,
