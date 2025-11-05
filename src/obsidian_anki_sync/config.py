@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 class Config:
     """Service configuration."""
 
+    # Required fields (no defaults) - MUST come first in dataclasses
     # Obsidian paths
     vault_path: Path
     source_dir: Path
@@ -21,6 +22,17 @@ class Config:
     anki_deck_name: str
     anki_note_type: str
 
+    # Runtime settings
+    run_mode: str  # 'apply' or 'dry-run'
+    delete_mode: str  # 'delete' or 'archive'
+
+    # Database
+    db_path: Path
+
+    # Logging
+    log_level: str
+
+    # Optional fields (with defaults) - MUST come after required fields
     # LLM Provider Configuration
     # Unified provider system - choose one: 'ollama', 'lm_studio', 'openrouter'
     llm_provider: str = "ollama"
@@ -46,16 +58,6 @@ class Config:
 
     # Legacy OpenRouter settings (for backward compatibility)
     openrouter_model: str = "openai/gpt-4"
-
-    # Runtime settings
-    run_mode: str  # 'apply' or 'dry-run'
-    delete_mode: str  # 'delete' or 'archive'
-
-    # Database
-    db_path: Path
-
-    # Logging
-    log_level: str
 
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
