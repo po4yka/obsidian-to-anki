@@ -76,6 +76,13 @@ def sync(
             help="Only process new notes not yet synced (skip existing notes)",
         ),
     ] = False,
+    no_index: Annotated[
+        bool,
+        typer.Option(
+            "--no-index",
+            help="Skip indexing phase (not recommended)",
+        ),
+    ] = False,
     resume: Annotated[
         str | None,
         typer.Option("--resume", help="Resume a previous interrupted sync by session ID"),
@@ -174,9 +181,50 @@ def sync(
                 )
 
             engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
-            stats = engine.sync(dry_run=dry_run, incremental=incremental)
+            stats = engine.sync(
+                dry_run=dry_run, incremental=incremental, build_index=not no_index
+            )
 
-            # Create a Rich table for results
+            # Show index results if available
+            if "index" in stats and not no_index:
+                console.print("\n[bold cyan]Index Statistics:[/bold cyan]")
+                index_table = Table(show_header=True, header_style="bold magenta")
+                index_table.add_column("Category", style="cyan")
+                index_table.add_column("Metric", style="yellow")
+                index_table.add_column("Value", style="green")
+
+                index_stats = stats["index"]
+
+                # Note statistics
+                index_table.add_row(
+                    "Notes", "Total", str(index_stats.get("total_notes", 0))
+                )
+                note_status = index_stats.get("note_status", {})
+                for status, count in note_status.items():
+                    index_table.add_row("Notes", status.capitalize(), str(count))
+
+                # Card statistics
+                index_table.add_row(
+                    "Cards", "Total", str(index_stats.get("total_cards", 0))
+                )
+                index_table.add_row(
+                    "Cards",
+                    "In Obsidian",
+                    str(index_stats.get("cards_in_obsidian", 0)),
+                )
+                index_table.add_row(
+                    "Cards", "In Anki", str(index_stats.get("cards_in_anki", 0))
+                )
+                index_table.add_row(
+                    "Cards",
+                    "In Database",
+                    str(index_stats.get("cards_in_database", 0)),
+                )
+
+                console.print(index_table)
+                console.print()
+
+            # Create a Rich table for sync results
             table = Table(
                 title="Sync Results", show_header=True, header_style="bold magenta"
             )
@@ -184,7 +232,8 @@ def sync(
             table.add_column("Value", style="green")
 
             for key, value in stats.items():
-                table.add_row(key, str(value))
+                if key != "index":  # Skip index stats (already displayed)
+                    table.add_row(key, str(value))
 
             console.print()
             console.print(table)
@@ -667,6 +716,84 @@ def export(
 
     except Exception as e:
         logger.error("export_failed", error=str(e))
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="index")
+def show_index(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
+    """Show vault and Anki card index statistics."""
+    config, logger = get_config_and_logger(config_path, log_level)
+
+    logger.info("show_index_started")
+
+    from .sync.state_db import StateDB
+
+    try:
+        with StateDB(config.db_path) as db:
+            stats = db.get_index_statistics()
+
+            if stats["total_notes"] == 0 and stats["total_cards"] == 0:
+                console.print(
+                    "\n[yellow]Index is empty. Run sync to build the index.[/yellow]"
+                )
+                return
+
+            # Display index statistics
+            console.print("\n[bold cyan]Vault & Anki Index:[/bold cyan]\n")
+
+            # Notes table
+            notes_table = Table(
+                title="Notes Index", show_header=True, header_style="bold magenta"
+            )
+            notes_table.add_column("Metric", style="cyan")
+            notes_table.add_column("Count", style="green")
+
+            notes_table.add_row("Total Notes", str(stats["total_notes"]))
+
+            note_status = stats.get("note_status", {})
+            for status, count in sorted(note_status.items()):
+                notes_table.add_row(f"  {status.capitalize()}", str(count))
+
+            console.print(notes_table)
+            console.print()
+
+            # Cards table
+            cards_table = Table(
+                title="Cards Index", show_header=True, header_style="bold magenta"
+            )
+            cards_table.add_column("Metric", style="cyan")
+            cards_table.add_column("Count", style="green")
+
+            cards_table.add_row("Total Cards", str(stats["total_cards"]))
+            cards_table.add_row("In Obsidian", str(stats["cards_in_obsidian"]))
+            cards_table.add_row("In Anki", str(stats["cards_in_anki"]))
+            cards_table.add_row("In Database", str(stats["cards_in_database"]))
+
+            console.print(cards_table)
+            console.print()
+
+            # Card status breakdown
+            card_status = stats.get("card_status", {})
+            if card_status:
+                console.print("[bold]Card Status Breakdown:[/bold]")
+                for status, count in sorted(card_status.items()):
+                    console.print(f"  [cyan]{status}:[/cyan] {count}")
+                console.print()
+
+        logger.info("show_index_completed")
+
+    except Exception as e:
+        logger.error("show_index_failed", error=str(e))
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 

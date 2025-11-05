@@ -12,6 +12,7 @@ from ..apf.linter import validate_apf
 from ..config import Config
 from ..models import Card, NoteMetadata, QAPair, SyncAction
 from ..obsidian.parser import ParserError, discover_notes, parse_note
+from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
 from ..utils.guid import deterministic_guid
@@ -88,6 +89,7 @@ class SyncEngine:
         dry_run: bool = False,
         sample_size: int | None = None,
         incremental: bool = False,
+        build_index: bool = True,
     ) -> dict:
         """
         Perform synchronization.
@@ -96,6 +98,7 @@ class SyncEngine:
             dry_run: If True, preview changes without applying
             sample_size: Optional number of notes to randomly sample
             incremental: If True, only process new notes not yet in database
+            build_index: If True, build index of vault and Anki before sync
 
         Returns:
             Statistics dict
@@ -105,6 +108,7 @@ class SyncEngine:
             dry_run=dry_run,
             sample_size=sample_size,
             incremental=incremental,
+            build_index=build_index,
         )
 
         # Install signal handlers if progress tracking is enabled
@@ -112,6 +116,24 @@ class SyncEngine:
             self.progress.install_signal_handlers()
 
         try:
+            # Step 0: Build index (if enabled)
+            index_stats = None
+            if build_index:
+                if self.progress:
+                    from .progress import SyncPhase
+
+                    self.progress.set_phase(SyncPhase.INDEXING)
+
+                logger.info("building_index")
+                index_stats = build_full_index(
+                    self.config, self.db, self.anki, incremental=incremental
+                )
+                logger.info("index_built", stats=index_stats["overall"])
+
+                # Check for interruption
+                if self.progress and self.progress.is_interrupted():
+                    return self.progress.get_stats()
+
             # Step 1: Scan Obsidian notes and generate cards
             if self.progress:
                 from .progress import SyncPhase
@@ -158,8 +180,12 @@ class SyncEngine:
 
             logger.info("sync_completed", stats=self.stats)
 
-            # Return progress stats if available, otherwise return self.stats
-            return self.progress.get_stats() if self.progress else self.stats
+            # Build result dict
+            result = self.progress.get_stats() if self.progress else self.stats
+            if index_stats:
+                result["index"] = index_stats["overall"]
+
+            return result
 
         except Exception as e:
             logger.error("sync_failed", error=str(e))
