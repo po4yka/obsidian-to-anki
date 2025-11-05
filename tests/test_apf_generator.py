@@ -142,7 +142,7 @@ def test_normalize_code_blocks_converts_markdown(
     )
     assert "```" not in normalized
     assert '<pre><code class="language-kotlin">' in normalized
-    assert "println(&quot;hi&quot;)" in normalized
+    assert 'println("hi")' in normalized
 
 
 def test_normalize_code_blocks_uses_default_when_missing_lang(
