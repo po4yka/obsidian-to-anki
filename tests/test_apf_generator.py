@@ -132,21 +132,29 @@ def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
     assert '"tags":["en","testing"]' in updated
 
 
-def test_normalize_code_blocks_converts_markdown(dummy_config, sample_metadata_for_code):
+def test_normalize_code_blocks_converts_markdown(
+    dummy_config, sample_metadata_for_code
+):
     gen = APFGenerator(dummy_config)
-    html = "Intro\n```kotlin\nprintln(\"hi\")\n```\nOutro"
-    normalized = gen._normalize_code_blocks(html, gen._code_language_hint(sample_metadata_for_code))
+    html = 'Intro\n```kotlin\nprintln("hi")\n```\nOutro'
+    normalized = gen._normalize_code_blocks(
+        html, gen._code_language_hint(sample_metadata_for_code)
+    )
     assert "```" not in normalized
     assert '<pre><code class="language-kotlin">' in normalized
-    assert "println(&quot;hi&quot;)" in normalized
+    assert 'println("hi")' in normalized
 
 
-def test_normalize_code_blocks_uses_default_when_missing_lang(dummy_config, plain_metadata):
+def test_normalize_code_blocks_uses_default_when_missing_lang(
+    dummy_config, plain_metadata
+):
     gen = APFGenerator(dummy_config)
     html = """```
 val x = 1
 ```"""
-    normalized = gen._normalize_code_blocks(html, gen._code_language_hint(plain_metadata))
+    normalized = gen._normalize_code_blocks(
+        html, gen._code_language_hint(plain_metadata)
+    )
     assert "```" not in normalized
     assert '<pre><code class="language-plaintext">' in normalized
     assert "val x = 1" in normalized

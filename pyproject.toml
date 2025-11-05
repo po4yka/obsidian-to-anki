@@ -7,20 +7,21 @@ name = "obsidian-anki-sync"
 version = "0.1.0"
 description = "Synchronize Obsidian Q&A notes to Anki APF cards via LLM"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Obsidian Anki Sync Contributors"}
 ]
 dependencies = [
-    "click>=8.3.0",
+    "typer>=0.20.0",
+    "rich>=14.2.0",
     "pyyaml>=6.0.3",
     "httpx>=0.28.1",
-    "openai>=2.3.0",
-    "python-dotenv>=1.1.1",
-    "structlog>=25.4.0",
-    "ruamel.yaml>=0.18.15",
-    "beautifulsoup4>=4.12.3",
+    "openai>=2.7.1",
+    "python-dotenv>=1.2.1",
+    "structlog>=25.5.0",
+    "ruamel.yaml>=0.18.16",
+    "beautifulsoup4>=4.14.2",
     "html5lib>=1.1",
 ]
 
@@ -32,7 +33,7 @@ dev = [
     "respx>=0.22.0",
     "black>=25.9.0",
     "isort>=5.13.2",
-    "ruff>=0.14.0",
+    "ruff>=0.14.3",
     "mypy>=1.18.2",
     "pre-commit>=3.7.0",
 ]
@@ -45,7 +46,7 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py313"]
+target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
@@ -54,10 +55,10 @@ src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py311"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

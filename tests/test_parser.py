@@ -258,5 +258,5 @@ class TestFullNoteParsing:
 
     def test_parse_nonexistent_file(self, temp_dir):
         """Test error on nonexistent file."""
-        with pytest.raises(ParserError, match="Failed to read file"):
+        with pytest.raises(ParserError, match="File does not exist"):
             parse_note(temp_dir / "nonexistent.md")
