@@ -12,6 +12,7 @@ from ..apf.linter import validate_apf
 from ..config import Config
 from ..models import Card, NoteMetadata, QAPair, SyncAction
 from ..obsidian.parser import ParserError, discover_notes, parse_note
+from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
 from ..utils.guid import deterministic_guid
@@ -32,7 +33,13 @@ except ImportError:
 class SyncEngine:
     """Orchestrate synchronization between Obsidian and Anki."""
 
-    def __init__(self, config: Config, state_db: StateDB, anki_client: AnkiClient):
+    def __init__(
+        self,
+        config: Config,
+        state_db: StateDB,
+        anki_client: AnkiClient,
+        progress_tracker=None,
+    ):
         """
         Initialize sync engine.
 
@@ -40,10 +47,12 @@ class SyncEngine:
             config: Service configuration
             state_db: State database
             anki_client: AnkiConnect client
+            progress_tracker: Optional progress tracker for resumable syncs
         """
         self.config = config
         self.db = state_db
         self.anki = anki_client
+        self.progress = progress_tracker
 
         # Initialize card generator (APFGenerator or AgentOrchestrator)
         if config.use_agent_system:
@@ -75,48 +84,124 @@ class SyncEngine:
         # Cache for agent-generated cards (note_id -> list of Card)
         self._agent_card_cache: dict[str, list[Card]] = {}
 
-    def sync(self, dry_run: bool = False, sample_size: int | None = None) -> dict:
+    def sync(
+        self,
+        dry_run: bool = False,
+        sample_size: int | None = None,
+        incremental: bool = False,
+        build_index: bool = True,
+    ) -> dict:
         """
         Perform synchronization.
 
         Args:
             dry_run: If True, preview changes without applying
             sample_size: Optional number of notes to randomly sample
+            incremental: If True, only process new notes not yet in database
+            build_index: If True, build index of vault and Anki before sync
 
         Returns:
             Statistics dict
         """
-        logger.info("sync_started", dry_run=dry_run, sample_size=sample_size)
+        logger.info(
+            "sync_started",
+            dry_run=dry_run,
+            sample_size=sample_size,
+            incremental=incremental,
+            build_index=build_index,
+        )
+
+        # Install signal handlers if progress tracking is enabled
+        if self.progress:
+            self.progress.install_signal_handlers()
 
         try:
+            # Step 0: Build index (if enabled)
+            index_stats = None
+            if build_index:
+                if self.progress:
+                    from .progress import SyncPhase
+
+                    self.progress.set_phase(SyncPhase.INDEXING)
+
+                logger.info("building_index")
+                index_stats = build_full_index(
+                    self.config, self.db, self.anki, incremental=incremental
+                )
+                logger.info("index_built", stats=index_stats["overall"])
+
+                # Check for interruption
+                if self.progress and self.progress.is_interrupted():
+                    return self.progress.get_stats()
+
             # Step 1: Scan Obsidian notes and generate cards
-            obsidian_cards = self._scan_obsidian_notes(sample_size=sample_size)
+            if self.progress:
+                from .progress import SyncPhase
+
+                self.progress.set_phase(SyncPhase.SCANNING)
+
+            obsidian_cards = self._scan_obsidian_notes(
+                sample_size=sample_size, incremental=incremental
+            )
+
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                return self.progress.get_stats()
 
             # Step 2: Fetch Anki state
+            if self.progress:
+                from .progress import SyncPhase
+
+                self.progress.set_phase(SyncPhase.DETERMINING_ACTIONS)
+
             anki_cards = self._fetch_anki_state()
 
             # Step 3: Determine sync actions
             self._determine_actions(obsidian_cards, anki_cards)
 
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                return self.progress.get_stats()
+
             # Step 4: Apply or preview
             if dry_run:
                 self._print_plan()
             else:
+                if self.progress:
+                    from .progress import SyncPhase
+
+                    self.progress.set_phase(SyncPhase.APPLYING_CHANGES)
+
                 self._apply_changes()
 
+            # Mark as completed
+            if self.progress:
+                self.progress.complete(success=True)
+
             logger.info("sync_completed", stats=self.stats)
-            return self.stats
+
+            # Build result dict
+            result = self.progress.get_stats() if self.progress else self.stats
+            if index_stats:
+                result["index"] = index_stats["overall"]
+
+            return result
 
         except Exception as e:
             logger.error("sync_failed", error=str(e))
+            if self.progress:
+                self.progress.complete(success=False)
             raise
 
-    def _scan_obsidian_notes(self, sample_size: int | None = None) -> dict[str, Card]:
+    def _scan_obsidian_notes(
+        self, sample_size: int | None = None, incremental: bool = False
+    ) -> dict[str, Card]:
         """
         Scan Obsidian vault and generate cards.
 
         Args:
             sample_size: Optional number of notes to randomly process
+            incremental: If True, only process new notes not yet in database
 
         Returns:
             Dict of slug -> Card
@@ -125,18 +210,45 @@ class SyncEngine:
             "scanning_obsidian",
             path=str(self.config.vault_path),
             sample_size=sample_size,
+            incremental=incremental,
         )
 
         note_files = discover_notes(self.config.vault_path, self.config.source_dir)
+
+        # Filter for incremental mode
+        if incremental:
+            processed_paths = self.db.get_processed_note_paths()
+            original_count = len(note_files)
+            note_files = [
+                (file_path, rel_path)
+                for file_path, rel_path in note_files
+                if rel_path not in processed_paths
+            ]
+            filtered_count = original_count - len(note_files)
+            logger.info(
+                "incremental_mode",
+                total_notes=original_count,
+                new_notes=len(note_files),
+                filtered_out=filtered_count,
+            )
 
         if sample_size and sample_size > 0 and len(note_files) > sample_size:
             note_files = random.sample(note_files, sample_size)
             logger.info("sampling_notes", count=sample_size)
 
+        # Set total notes in progress tracker
+        if self.progress:
+            # Calculate total work units (notes * qa_pairs * languages)
+            # For now we'll just count files, will update as we parse
+            self.progress.set_total_notes(len(note_files))
+
         obsidian_cards: dict[str, Card] = {}
         existing_slugs: set[str] = set()
 
         for file_path, relative_path in note_files:
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                break
             try:
                 # Parse note
                 metadata, qa_pairs = parse_note(file_path)
@@ -178,6 +290,24 @@ class SyncEngine:
                 # Generate cards for each Q/A pair and language
                 for qa_pair in qa_pairs:
                     for lang in metadata.language_tags:
+                        # Check if already processed (for resume)
+                        if self.progress and self.progress.is_note_completed(
+                            relative_path, qa_pair.card_index, lang
+                        ):
+                            logger.debug(
+                                "skipping_completed_note",
+                                file=relative_path,
+                                card_index=qa_pair.card_index,
+                                lang=lang,
+                            )
+                            continue
+
+                        # Track progress
+                        if self.progress:
+                            self.progress.start_note(
+                                relative_path, qa_pair.card_index, lang
+                            )
+
                         try:
                             card = self._generate_card(
                                 qa_pair=qa_pair,
@@ -191,6 +321,12 @@ class SyncEngine:
                             obsidian_cards[card.slug] = card
                             existing_slugs.add(card.slug)
 
+                            # Mark as completed
+                            if self.progress:
+                                self.progress.complete_note(
+                                    relative_path, qa_pair.card_index, lang, 1
+                                )
+
                         except Exception as e:
                             logger.error(
                                 "card_generation_failed",
@@ -200,6 +336,10 @@ class SyncEngine:
                                 error=str(e),
                             )
                             self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.fail_note(
+                                    relative_path, qa_pair.card_index, lang, str(e)
+                                )
 
                 self.stats["processed"] += 1
 
@@ -591,27 +731,41 @@ class SyncEngine:
         logger.info("applying_changes", count=len(self.changes))
 
         for action in self.changes:
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                break
+
             try:
                 if action.type == "create":
                     self._create_card(action.card)
                     self.stats["created"] += 1
+                    if self.progress:
+                        self.progress.increment_stat("created")
 
                 elif action.type == "update":
                     if action.anki_guid:
                         self._update_card(action.card, action.anki_guid)
                         self.stats["updated"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("updated")
 
                 elif action.type == "delete":
                     if action.anki_guid:
                         self._delete_card(action.card, action.anki_guid)
                         self.stats["deleted"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("deleted")
 
                 elif action.type == "restore":
                     self._create_card(action.card)
                     self.stats["restored"] += 1
+                    if self.progress:
+                        self.progress.increment_stat("restored")
 
                 elif action.type == "skip":
                     self.stats["skipped"] += 1
+                    if self.progress:
+                        self.progress.increment_stat("skipped")
 
             except Exception as e:
                 logger.error(
@@ -621,6 +775,8 @@ class SyncEngine:
                     error=str(e),
                 )
                 self.stats["errors"] += 1
+                if self.progress:
+                    self.progress.increment_stat("errors")
 
     def _create_card(self, card: Card) -> None:
         """Create card in Anki."""
