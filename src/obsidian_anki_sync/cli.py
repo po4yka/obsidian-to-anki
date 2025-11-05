@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -19,9 +19,11 @@ app = typer.Typer(
 
 console = Console()
 
-# Global state for config and logger
+# Global state for config and logger (cached for performance across CLI commands)
+# Note: This is a simple caching mechanism. For multi-threaded/async usage,
+# consider using a proper dependency injection framework or context manager.
 _config: Config | None = None
-_logger = None
+_logger: Any | None = None
 
 
 def get_config_and_logger(
@@ -33,8 +35,24 @@ def get_config_and_logger(
         str,
         typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
-) -> tuple[Config, object]:
-    """Load configuration and logger (dependency injection helper)."""
+) -> tuple[Config, Any]:
+    """Load configuration and logger (dependency injection helper).
+
+    This function uses module-level caching to avoid reloading config
+    for each CLI command invocation. The cache is cleared when the
+    Python process exits.
+
+    Args:
+        config_path: Optional path to config file
+        log_level: Logging level
+
+    Returns:
+        Tuple of (Config, Logger)
+
+    Note:
+        This caching mechanism is not thread-safe. For concurrent usage,
+        consider using a proper dependency injection framework.
+    """
     global _config, _logger
 
     if _config is None:
