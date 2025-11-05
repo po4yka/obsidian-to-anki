@@ -255,6 +255,11 @@ ANKI_CONNECT_URL=http://127.0.0.1:8765
 ANKI_DECK_NAME=Interview Questions
 ANKI_NOTE_TYPE=APF::Simple
 
+# Deck export configuration (for .apkg file generation)
+# EXPORT_DECK_NAME=Interview Questions  # Defaults to ANKI_DECK_NAME
+# EXPORT_DECK_DESCRIPTION=Generated from Obsidian notes
+# EXPORT_OUTPUT_PATH=output.apkg
+
 # OpenRouter LLM configuration
 OPENROUTER_API_KEY=your_api_key_here
 OPENROUTER_MODEL=openai/gpt-4
@@ -395,6 +400,188 @@ def show_model_fields(
 
     except Exception as e:
         logger.error("model_fields_failed", model=model_name, error=str(e))
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def export(
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Output .apkg file path"),
+    ] = None,
+    deck_name: Annotated[
+        str | None,
+        typer.Option("--deck-name", help="Name for the exported deck"),
+    ] = None,
+    deck_description: Annotated[
+        str,
+        typer.Option("--deck-description", help="Description for the deck"),
+    ] = "",
+    use_agents: Annotated[
+        bool | None,
+        typer.Option(
+            "--use-agents/--no-agents",
+            help="Use multi-agent system for card generation (requires Ollama)",
+        ),
+    ] = None,
+    sample_size: Annotated[
+        int | None,
+        typer.Option("--sample", help="Export only N random notes (for testing)"),
+    ] = None,
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+) -> None:
+    """Export Obsidian notes to Anki deck file (.apkg)."""
+    config, logger = get_config_and_logger(config_path, log_level)
+
+    # Override agent system setting if CLI flag is provided
+    if use_agents is not None:
+        config.use_agent_system = use_agents
+        logger.info("agent_system_override", use_agents=use_agents)
+
+    # Determine output path
+    output_path = output or config.export_output_path or Path("output.apkg")
+
+    # Determine deck name
+    final_deck_name = deck_name or config.export_deck_name or config.anki_deck_name
+
+    # Determine deck description
+    final_description = deck_description or config.export_deck_description or ""
+
+    logger.info(
+        "export_started",
+        output_path=str(output_path),
+        deck_name=final_deck_name,
+        sample_size=sample_size,
+    )
+
+    from .anki.exporter import export_cards_to_apkg
+    from .obsidian.parser import discover_notes, parse_note
+    from .sync.engine import SyncEngine
+    from .sync.state_db import StateDB
+
+    try:
+        # Generate cards by processing notes
+        console.print(f"\n[cyan]Generating cards from Obsidian notes...[/cyan]")
+
+        with StateDB(config.db_path) as db:
+            # Use a dummy Anki client (won't connect)
+            from .anki.client import AnkiClient
+
+            # We don't need AnkiConnect for export, but SyncEngine expects it
+            # We'll use the sync engine's card generation logic
+            source_path = config.vault_path / config.source_dir
+            note_paths = discover_notes(source_path)
+
+            if sample_size:
+                import random
+
+                note_paths = random.sample(
+                    note_paths, min(sample_size, len(note_paths))
+                )
+
+            console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
+
+            # Generate cards using the sync engine's generation logic
+            from .apf.generator import APFGenerator
+            from .sync.slug_generator import generate_card_slug
+
+            cards = []
+
+            if config.use_agent_system:
+                console.print("[cyan]Using multi-agent system for generation...[/cyan]")
+                from .agents.orchestrator import AgentOrchestrator
+
+                orchestrator = AgentOrchestrator(config)
+
+                for note_path in note_paths:
+                    try:
+                        metadata, qa_pairs = parse_note(note_path)
+                        result = orchestrator.process_note(
+                            metadata, qa_pairs, note_path
+                        )
+
+                        if result.success:
+                            cards.extend(result.cards)
+                            console.print(
+                                f"  [green]✓[/green] {metadata.title} "
+                                f"({len(result.cards)} cards)"
+                            )
+                        else:
+                            console.print(
+                                f"  [red]✗[/red] {metadata.title}: "
+                                f"{result.error_message}"
+                            )
+                    except Exception as e:
+                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+
+            else:
+                console.print("[cyan]Using OpenRouter for generation...[/cyan]")
+                generator = APFGenerator(
+                    api_key=config.openrouter_api_key,
+                    model=config.openrouter_model,
+                    temperature=config.llm_temperature,
+                    top_p=config.llm_top_p,
+                )
+
+                for note_path in note_paths:
+                    try:
+                        metadata, qa_pairs = parse_note(note_path)
+
+                        for qa in qa_pairs:
+                            for lang in metadata.language_tags:
+                                card = generator.generate_card(
+                                    metadata, qa, lang, note_path
+                                )
+                                cards.append(card)
+
+                        console.print(
+                            f"  [green]✓[/green] {metadata.title} "
+                            f"({len(qa_pairs) * len(metadata.language_tags)} cards)"
+                        )
+                    except Exception as e:
+                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+
+            if not cards:
+                console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
+                return
+
+            # Export to .apkg
+            console.print(
+                f"\n[cyan]Exporting {len(cards)} cards to {output_path}...[/cyan]"
+            )
+
+            export_cards_to_apkg(
+                cards=cards,
+                output_path=output_path,
+                deck_name=final_deck_name,
+                deck_description=final_description,
+            )
+
+            console.print(
+                f"\n[bold green]✓ Successfully exported {len(cards)} cards "
+                f"to {output_path}[/bold green]"
+            )
+
+            console.print(
+                f"\n[cyan]Import this file into Anki to add the cards.[/cyan]"
+            )
+
+            logger.info(
+                "export_completed",
+                output_path=str(output_path),
+                card_count=len(cards),
+            )
+
+    except Exception as e:
+        logger.error("export_failed", error=str(e))
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 
