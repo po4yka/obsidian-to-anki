@@ -21,11 +21,6 @@ class Config:
     anki_deck_name: str
     anki_note_type: str
 
-    # Deck export settings (for .apkg generation)
-    export_deck_name: str | None = None
-    export_deck_description: str = ""
-    export_output_path: Path | None = None
-
     # LLM settings (OpenRouter - legacy/fallback)
     openrouter_api_key: str
     openrouter_model: str
@@ -41,6 +36,11 @@ class Config:
 
     # Logging
     log_level: str
+
+    # Deck export settings (for .apkg generation) - optional with defaults
+    export_deck_name: str | None = None
+    export_deck_description: str = ""
+    export_output_path: Path | None = None
 
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
