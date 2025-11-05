@@ -123,6 +123,7 @@ class TestManifestCreation:
             source_path="test.md",
             card_index=1,
             metadata=sample_metadata,
+            guid="test-guid-123",
             hash6=None,
         )
 
@@ -142,6 +143,7 @@ class TestManifestCreation:
             lang="en",
             source_path="test.md",
             card_index=1,
+            guid="test-guid-456",
             metadata=sample_metadata,
             hash6="abc123",
         )
