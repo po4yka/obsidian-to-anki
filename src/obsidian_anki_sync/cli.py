@@ -567,9 +567,7 @@ def export(
                 f"to {output_path}[/bold green]"
             )
 
-            console.print(
-                "\n[cyan]Import this file into Anki to add the cards.[/cyan]"
-            )
+            console.print("\n[cyan]Import this file into Anki to add the cards.[/cyan]")
 
             logger.info(
                 "export_completed",
