@@ -17,6 +17,7 @@ class SyncPhase(Enum):
     """Phases of sync operation."""
 
     INITIALIZING = "initializing"
+    INDEXING = "indexing"
     SCANNING = "scanning"
     GENERATING = "generating"
     DETERMINING_ACTIONS = "determining_actions"

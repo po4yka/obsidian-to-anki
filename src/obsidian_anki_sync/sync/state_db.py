@@ -115,6 +115,75 @@ class StateDB:
             CREATE INDEX IF NOT EXISTS idx_progress_updated ON sync_progress(updated_at)
         """
         )
+
+        # Note index table - catalog of all Obsidian notes
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS note_index (
+                source_path TEXT PRIMARY KEY,
+                note_id TEXT,
+                note_title TEXT,
+                topic TEXT,
+                language_tags TEXT,
+                qa_pair_count INTEGER DEFAULT 0,
+                file_modified_at TIMESTAMP,
+                last_indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_synced_at TIMESTAMP,
+                sync_status TEXT DEFAULT 'pending',
+                error_message TEXT,
+                metadata_json TEXT
+            )
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_note_status ON note_index(sync_status)
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_note_id ON note_index(note_id)
+        """
+        )
+
+        # Card index table - catalog of expected and existing cards
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS card_index (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_path TEXT NOT NULL,
+                card_index INTEGER NOT NULL,
+                lang TEXT NOT NULL,
+                slug TEXT UNIQUE,
+                anki_guid INTEGER,
+                note_id TEXT,
+                note_title TEXT,
+                content_hash TEXT,
+                status TEXT DEFAULT 'expected',
+                last_indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                in_obsidian BOOLEAN DEFAULT 1,
+                in_anki BOOLEAN DEFAULT 0,
+                in_database BOOLEAN DEFAULT 0,
+                UNIQUE(source_path, card_index, lang)
+            )
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_card_source ON card_index(source_path)
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_card_status ON card_index(status)
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_card_slug ON card_index(slug)
+        """
+        )
+
         self.conn.commit()
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
@@ -413,6 +482,274 @@ class StateDB:
         """
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
+        self.conn.commit()
+
+    # Note Index Methods
+
+    def upsert_note_index(
+        self,
+        source_path: str,
+        note_id: str | None,
+        note_title: str | None,
+        topic: str | None,
+        language_tags: list[str],
+        qa_pair_count: int,
+        file_modified_at: datetime | None,
+        metadata_json: str | None = None,
+    ) -> None:
+        """Insert or update a note in the index.
+
+        Args:
+            source_path: Relative path to note file
+            note_id: Note ID from frontmatter
+            note_title: Note title
+            topic: Note topic
+            language_tags: List of language codes
+            qa_pair_count: Number of Q/A pairs in note
+            file_modified_at: File modification timestamp
+            metadata_json: JSON string of full metadata
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO note_index (
+                source_path, note_id, note_title, topic, language_tags,
+                qa_pair_count, file_modified_at, metadata_json, last_indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(source_path) DO UPDATE SET
+                note_id = excluded.note_id,
+                note_title = excluded.note_title,
+                topic = excluded.topic,
+                language_tags = excluded.language_tags,
+                qa_pair_count = excluded.qa_pair_count,
+                file_modified_at = excluded.file_modified_at,
+                metadata_json = excluded.metadata_json,
+                last_indexed_at = CURRENT_TIMESTAMP
+        """,
+            (
+                source_path,
+                note_id,
+                note_title,
+                topic,
+                ",".join(language_tags) if language_tags else "",
+                qa_pair_count,
+                file_modified_at.isoformat() if file_modified_at else None,
+                metadata_json,
+            ),
+        )
+        self.conn.commit()
+
+    def update_note_sync_status(
+        self, source_path: str, status: str, error_message: str | None = None
+    ) -> None:
+        """Update sync status for a note.
+
+        Args:
+            source_path: Relative path to note file
+            status: Sync status (pending, processing, completed, failed)
+            error_message: Optional error message if failed
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            UPDATE note_index
+            SET sync_status = ?,
+                error_message = ?,
+                last_synced_at = CURRENT_TIMESTAMP
+            WHERE source_path = ?
+        """,
+            (status, error_message, source_path),
+        )
+        self.conn.commit()
+
+    def get_note_index(self, source_path: str) -> dict | None:
+        """Get note index entry.
+
+        Args:
+            source_path: Relative path to note file
+
+        Returns:
+            Note index record or None
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_all_notes_index(self) -> list[dict]:
+        """Get all notes from index.
+
+        Returns:
+            List of note index records
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM note_index ORDER BY source_path")
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_notes_by_status(self, status: str) -> list[dict]:
+        """Get notes by sync status.
+
+        Args:
+            status: Sync status to filter by
+
+        Returns:
+            List of note index records
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM note_index WHERE sync_status = ? ORDER BY source_path",
+            (status,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    # Card Index Methods
+
+    def upsert_card_index(
+        self,
+        source_path: str,
+        card_index: int,
+        lang: str,
+        slug: str | None = None,
+        anki_guid: int | None = None,
+        note_id: str | None = None,
+        note_title: str | None = None,
+        content_hash: str | None = None,
+        status: str = "expected",
+        in_obsidian: bool = True,
+        in_anki: bool = False,
+        in_database: bool = False,
+    ) -> None:
+        """Insert or update a card in the index.
+
+        Args:
+            source_path: Relative path to source note
+            card_index: Card index within note (1-based)
+            lang: Language code
+            slug: Card slug
+            anki_guid: Anki note ID
+            note_id: Note ID from frontmatter
+            note_title: Note title
+            content_hash: Content hash
+            status: Card status (expected, new, exists, modified, deleted)
+            in_obsidian: Whether card exists in Obsidian vault
+            in_anki: Whether card exists in Anki
+            in_database: Whether card exists in sync database
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO card_index (
+                source_path, card_index, lang, slug, anki_guid, note_id,
+                note_title, content_hash, status, in_obsidian, in_anki,
+                in_database, last_indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(source_path, card_index, lang) DO UPDATE SET
+                slug = excluded.slug,
+                anki_guid = excluded.anki_guid,
+                note_id = excluded.note_id,
+                note_title = excluded.note_title,
+                content_hash = excluded.content_hash,
+                status = excluded.status,
+                in_obsidian = excluded.in_obsidian,
+                in_anki = excluded.in_anki,
+                in_database = excluded.in_database,
+                last_indexed_at = CURRENT_TIMESTAMP
+        """,
+            (
+                source_path,
+                card_index,
+                lang,
+                slug,
+                anki_guid,
+                note_id,
+                note_title,
+                content_hash,
+                status,
+                in_obsidian,
+                in_anki,
+                in_database,
+            ),
+        )
+        self.conn.commit()
+
+    def get_card_index_by_source(self, source_path: str) -> list[dict]:
+        """Get all cards for a note.
+
+        Args:
+            source_path: Relative path to note file
+
+        Returns:
+            List of card index records
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM card_index WHERE source_path = ? ORDER BY card_index, lang",
+            (source_path,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_card_index_by_slug(self, slug: str) -> dict | None:
+        """Get card index entry by slug.
+
+        Args:
+            slug: Card slug
+
+        Returns:
+            Card index record or None
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM card_index WHERE slug = ?", (slug,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_index_statistics(self) -> dict:
+        """Get statistics from the index.
+
+        Returns:
+            Dictionary with index statistics
+        """
+        cursor = self.conn.cursor()
+
+        # Note statistics
+        cursor.execute("SELECT COUNT(*) FROM note_index")
+        total_notes = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT sync_status, COUNT(*) FROM note_index GROUP BY sync_status"
+        )
+        note_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # Card statistics
+        cursor.execute("SELECT COUNT(*) FROM card_index")
+        total_cards = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_obsidian = 1")
+        cards_in_obsidian = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_anki = 1")
+        cards_in_anki = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_database = 1")
+        cards_in_database = cursor.fetchone()[0]
+
+        cursor.execute("SELECT status, COUNT(*) FROM card_index GROUP BY status")
+        card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+        return {
+            "total_notes": total_notes,
+            "note_status": note_status_counts,
+            "total_cards": total_cards,
+            "cards_in_obsidian": cards_in_obsidian,
+            "cards_in_anki": cards_in_anki,
+            "cards_in_database": cards_in_database,
+            "card_status": card_status_counts,
+        }
+
+    def clear_index(self) -> None:
+        """Clear all index data (for rebuilding)."""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM note_index")
+        cursor.execute("DELETE FROM card_index")
         self.conn.commit()
 
     def close(self) -> None:
