@@ -110,7 +110,9 @@ class PostValidatorAgent:
 
         except Exception as e:
             validation_time = time.time() - start_time
-            logger.error("post_validation_llm_error", error=str(e), time=validation_time)
+            logger.error(
+                "post_validation_llm_error", error=str(e), time=validation_time
+            )
 
             return PostValidationResult(
                 is_valid=False,

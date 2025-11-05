@@ -18,7 +18,9 @@ class OllamaClient:
     optimized for Apple Silicon with MLX models.
     """
 
-    def __init__(self, base_url: str = "http://localhost:11434", timeout: float = 120.0):
+    def __init__(
+        self, base_url: str = "http://localhost:11434", timeout: float = 120.0
+    ):
         """Initialize Ollama client.
 
         Args:
