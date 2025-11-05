@@ -15,10 +15,10 @@ from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..providers.factory import ProviderFactory
+from ..providers.ollama import OllamaProvider
 from ..utils.logging import get_logger
 from .generator import GeneratorAgent
 from .models import AgentPipelineResult, GeneratedCard
-from .ollama_client import OllamaClient
 from .post_validator import PostValidatorAgent
 from .pre_validator import PreValidatorAgent
 
@@ -52,7 +52,7 @@ class AgentOrchestrator:
             try:
                 self.provider = ProviderFactory.create_from_config(config)
             except Exception as e:
-                # Fallback to OllamaClient for backward compatibility
+                # Fallback to OllamaProvider with default settings
                 logger.warning(
                     "provider_creation_failed_fallback_to_ollama",
                     error=str(e),
@@ -61,7 +61,7 @@ class AgentOrchestrator:
                 ollama_base_url = getattr(
                     config, "ollama_base_url", "http://localhost:11434"
                 )
-                self.provider = OllamaClient(base_url=ollama_base_url)
+                self.provider = OllamaProvider(base_url=ollama_base_url)
 
         # Check provider connection
         provider_name = self.provider.get_provider_name()

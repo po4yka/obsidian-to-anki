@@ -66,7 +66,6 @@ class Config:
 
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
-    agent_execution_mode: str = "parallel"  # 'parallel' or 'sequential'
 
     # Pre-Validator Agent
     pre_validator_model: str = "qwen3:8b"
@@ -106,16 +105,6 @@ class Config:
             raise ValueError(
                 "OpenRouter API key is required when using OpenRouter provider. "
                 "Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config."
-            )
-
-        # Legacy: OpenRouter API key only required if NOT using agent system (for backward compatibility)
-        if (
-            not self.use_agent_system
-            and self.llm_provider.lower() == "openrouter"
-            and not self.openrouter_api_key
-        ):
-            raise ValueError(
-                "OPENROUTER_API_KEY is required when not using agent system"
             )
 
         if self.run_mode not in ("apply", "dry-run"):
@@ -230,8 +219,6 @@ def load_config(config_path: Path | None = None) -> Config:
         log_level=config_data.get("log_level") or os.getenv("LOG_LEVEL", "INFO"),
         # Agent system settings
         use_agent_system=get_bool("use_agent_system", False),
-        agent_execution_mode=config_data.get("agent_execution_mode")
-        or os.getenv("AGENT_EXECUTION_MODE", "parallel"),
         pre_validator_model=config_data.get("pre_validator_model")
         or os.getenv("PRE_VALIDATOR_MODEL", "qwen3:8b"),
         pre_validator_temperature=get_float("pre_validator_temperature", 0.0),
