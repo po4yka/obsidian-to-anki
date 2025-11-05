@@ -16,6 +16,10 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .progress import SyncProgress
 
 from ..models import Card
 
@@ -279,7 +283,7 @@ class StateDB:
         cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
         self.conn.commit()
 
-    def save_progress(self, progress) -> None:
+    def save_progress(self, progress: "SyncProgress") -> None:
         """Save sync progress state.
 
         Args:
@@ -336,7 +340,7 @@ class StateDB:
         )
         self.conn.commit()
 
-    def get_progress(self, session_id: str):
+    def get_progress(self, session_id: str) -> "SyncProgress | None":
         """Get sync progress by session ID.
 
         Args:
@@ -401,14 +405,14 @@ class StateDB:
             note_progress=note_progress,
         )
 
-    def get_all_progress(self, limit: int = 10):
+    def get_all_progress(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent sync progress records.
 
         Args:
             limit: Maximum number of records to return
 
         Returns:
-            List of SyncProgress instances
+            List of progress record dictionaries
         """
 
         cursor = self.conn.cursor()
@@ -440,7 +444,7 @@ class StateDB:
 
         return results
 
-    def get_incomplete_progress(self):
+    def get_incomplete_progress(self) -> list[dict[str, Any]]:
         """Get all incomplete sync sessions.
 
         Returns:
@@ -759,6 +763,6 @@ class StateDB:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         self.close()
