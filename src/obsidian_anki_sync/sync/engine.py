@@ -83,18 +83,29 @@ class SyncEngine:
         # Cache for agent-generated cards (note_id -> list of Card)
         self._agent_card_cache: dict[str, list[Card]] = {}
 
-    def sync(self, dry_run: bool = False, sample_size: int | None = None) -> dict:
+    def sync(
+        self,
+        dry_run: bool = False,
+        sample_size: int | None = None,
+        incremental: bool = False,
+    ) -> dict:
         """
         Perform synchronization.
 
         Args:
             dry_run: If True, preview changes without applying
             sample_size: Optional number of notes to randomly sample
+            incremental: If True, only process new notes not yet in database
 
         Returns:
             Statistics dict
         """
-        logger.info("sync_started", dry_run=dry_run, sample_size=sample_size)
+        logger.info(
+            "sync_started",
+            dry_run=dry_run,
+            sample_size=sample_size,
+            incremental=incremental,
+        )
 
         # Install signal handlers if progress tracking is enabled
         if self.progress:
@@ -107,7 +118,9 @@ class SyncEngine:
 
                 self.progress.set_phase(SyncPhase.SCANNING)
 
-            obsidian_cards = self._scan_obsidian_notes(sample_size=sample_size)
+            obsidian_cards = self._scan_obsidian_notes(
+                sample_size=sample_size, incremental=incremental
+            )
 
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -154,12 +167,15 @@ class SyncEngine:
                 self.progress.complete(success=False)
             raise
 
-    def _scan_obsidian_notes(self, sample_size: int | None = None) -> dict[str, Card]:
+    def _scan_obsidian_notes(
+        self, sample_size: int | None = None, incremental: bool = False
+    ) -> dict[str, Card]:
         """
         Scan Obsidian vault and generate cards.
 
         Args:
             sample_size: Optional number of notes to randomly process
+            incremental: If True, only process new notes not yet in database
 
         Returns:
             Dict of slug -> Card
@@ -168,9 +184,27 @@ class SyncEngine:
             "scanning_obsidian",
             path=str(self.config.vault_path),
             sample_size=sample_size,
+            incremental=incremental,
         )
 
         note_files = discover_notes(self.config.vault_path, self.config.source_dir)
+
+        # Filter for incremental mode
+        if incremental:
+            processed_paths = self.db.get_processed_note_paths()
+            original_count = len(note_files)
+            note_files = [
+                (file_path, rel_path)
+                for file_path, rel_path in note_files
+                if rel_path not in processed_paths
+            ]
+            filtered_count = original_count - len(note_files)
+            logger.info(
+                "incremental_mode",
+                total_notes=original_count,
+                new_notes=len(note_files),
+                filtered_out=filtered_count,
+            )
 
         if sample_size and sample_size > 0 and len(note_files) > sample_size:
             note_files = random.sample(note_files, sample_size)
