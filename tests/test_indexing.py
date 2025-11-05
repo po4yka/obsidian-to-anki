@@ -1,6 +1,5 @@
 """Tests for indexing system."""
 
-import json
 import tempfile
 from datetime import datetime
 from pathlib import Path

@@ -85,11 +85,15 @@ def sync(
     ] = False,
     resume: Annotated[
         str | None,
-        typer.Option("--resume", help="Resume a previous interrupted sync by session ID"),
+        typer.Option(
+            "--resume", help="Resume a previous interrupted sync by session ID"
+        ),
     ] = None,
     no_resume: Annotated[
         bool,
-        typer.Option("--no-resume", help="Disable automatic resume of incomplete syncs"),
+        typer.Option(
+            "--no-resume", help="Disable automatic resume of incomplete syncs"
+        ),
     ] = False,
     use_agents: Annotated[
         bool | None,
@@ -142,19 +146,15 @@ def sync(
                         console.print(
                             f"\n[yellow]Found incomplete sync from {latest['updated_at']}[/yellow]"
                         )
-                        console.print(
-                            f"  Session: {latest['session_id']}"
-                        )
+                        console.print(f"  Session: {latest['session_id']}")
                         console.print(
                             f"  Progress: {latest['notes_processed']}/{latest['total_notes']} notes"
                         )
 
                         # Ask user if they want to resume
-                        resume_choice = typer.confirm(
-                            "Resume this sync?", default=True
-                        )
+                        resume_choice = typer.confirm("Resume this sync?", default=True)
                         if resume_choice:
-                            session_id = latest['session_id']
+                            session_id = latest["session_id"]
 
                 # Create or resume progress tracker
                 if session_id:
@@ -830,12 +830,14 @@ def show_progress(
                 table.add_column("Updated At", style="blue")
 
                 for session in incomplete:
-                    progress_str = f"{session['notes_processed']}/{session['total_notes']} notes"
+                    progress_str = (
+                        f"{session['notes_processed']}/{session['total_notes']} notes"
+                    )
                     table.add_row(
-                        session['session_id'][:8] + "...",
-                        session['phase'],
+                        session["session_id"][:8] + "...",
+                        session["phase"],
                         progress_str,
-                        session['updated_at'],
+                        session["updated_at"],
                     )
 
                 console.print(table)
@@ -858,13 +860,15 @@ def show_progress(
                 table.add_column("Started At", style="blue")
 
                 for session in recent:
-                    progress_str = f"{session['notes_processed']}/{session['total_notes']}"
+                    progress_str = (
+                        f"{session['notes_processed']}/{session['total_notes']}"
+                    )
                     table.add_row(
-                        session['session_id'][:8] + "...",
-                        session['phase'],
+                        session["session_id"][:8] + "...",
+                        session["phase"],
                         progress_str,
-                        str(session['errors']),
-                        session['started_at'],
+                        str(session["errors"]),
+                        session["started_at"],
                     )
 
                 console.print(table)
@@ -918,8 +922,8 @@ def clean_progress(
                 deleted_count = 0
 
                 for session in all_progress:
-                    if session['phase'] in ('completed', 'failed'):
-                        db.delete_progress(session['session_id'])
+                    if session["phase"] in ("completed", "failed"):
+                        db.delete_progress(session["session_id"])
                         deleted_count += 1
 
                 console.print(

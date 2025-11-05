@@ -5,7 +5,6 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Callable
 
 from ..utils.logging import get_logger
@@ -162,7 +161,11 @@ class ProgressTracker:
 
     def set_phase(self, phase: SyncPhase) -> None:
         """Update current sync phase."""
-        logger.debug("sync_phase_changed", from_phase=self.progress.phase.value, to_phase=phase.value)
+        logger.debug(
+            "sync_phase_changed",
+            from_phase=self.progress.phase.value,
+            to_phase=phase.value,
+        )
         self.progress.phase = phase
         self.progress.updated_at = datetime.now()
         self.db.save_progress(self.progress)
@@ -257,7 +260,9 @@ class ProgressTracker:
             "sync_completed",
             session_id=self.progress.session_id,
             success=success,
-            duration=(self.progress.completed_at - self.progress.started_at).total_seconds(),
+            duration=(
+                self.progress.completed_at - self.progress.started_at
+            ).total_seconds(),
         )
 
     def get_stats(self) -> dict:

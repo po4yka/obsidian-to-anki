@@ -410,7 +410,6 @@ class StateDB:
         Returns:
             List of SyncProgress instances
         """
-        from .progress import SyncProgress
 
         cursor = self.conn.cursor()
         cursor.execute(

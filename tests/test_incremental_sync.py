@@ -48,9 +48,7 @@ class TestIncrementalSync:
         """Test that processed paths are distinct."""
         # Add multiple cards from same note
         for i in range(5):
-            card = self._create_test_card(
-                "notes/same-note.md", f"slug{i}", i + 1, "en"
-            )
+            card = self._create_test_card("notes/same-note.md", f"slug{i}", i + 1, "en")
             temp_db.insert_card(card, anki_guid=1000 + i)
 
         paths = temp_db.get_processed_note_paths()
@@ -245,9 +243,7 @@ class TestIncrementalSyncStatistics:
         ]
 
         processed_paths = temp_db.get_processed_note_paths()
-        new_notes = [
-            (fp, rp) for fp, rp in all_notes if rp not in processed_paths
-        ]
+        new_notes = [(fp, rp) for fp, rp in all_notes if rp not in processed_paths]
 
         total_count = len(all_notes)
         new_count = len(new_notes)
