@@ -2,16 +2,12 @@
 
 import json
 import re
+from typing import Any, cast
 
+from ..exceptions import FieldMappingError
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class FieldMappingError(Exception):
-    """Error mapping fields."""
-
-    pass
 
 
 def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
@@ -119,7 +115,7 @@ def _extract_manifest(content: str) -> dict:
         return {}
 
     try:
-        return json.loads(match.group(1))
+        return cast(dict[Any, Any], json.loads(match.group(1)))
     except json.JSONDecodeError:
         return {}
 

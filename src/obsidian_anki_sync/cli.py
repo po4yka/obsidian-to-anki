@@ -614,8 +614,7 @@ def export(
 
             # We don't need AnkiConnect for export, but SyncEngine expects it
             # We'll use the sync engine's card generation logic
-            source_path = config.vault_path / config.source_dir
-            note_paths = discover_notes(source_path)
+            note_paths = discover_notes(config.vault_path, config.source_dir)
 
             if sample_size:
                 import random
@@ -627,9 +626,13 @@ def export(
             console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
 
             # Generate cards using the sync engine's generation logic
+            from typing import Any
+
             from .apf.generator import APFGenerator
 
-            cards = []
+            cards: list[Any] = (
+                []
+            )  # Can be list[Card] or list[GeneratedCard] depending on path
 
             if config.use_agent_system:
                 console.print("[cyan]Using multi-agent system for generation...[/cyan]")
@@ -637,38 +640,40 @@ def export(
 
                 orchestrator = AgentOrchestrator(config)
 
-                for note_path in note_paths:
+                for note_path_tuple in note_paths:
                     try:
+                        note_path, note_content = note_path_tuple
                         metadata, qa_pairs = parse_note(note_path)
                         result = orchestrator.process_note(
-                            metadata, qa_pairs, note_path
+                            note_content, metadata, qa_pairs, note_path
                         )
 
-                        if result.success:
-                            cards.extend(result.cards)
+                        if result.success and result.generation:
+                            generated_cards = result.generation.cards
+                            cards.extend(generated_cards)
                             console.print(
                                 f"  [green]✓[/green] {metadata.title} "
-                                f"({len(result.cards)} cards)"
+                                f"({len(generated_cards)} cards)"
                             )
                         else:
+                            error_msg = "Pipeline failed"
+                            if result.post_validation:
+                                error_msg = (
+                                    result.post_validation.error_details or error_msg
+                                )
                             console.print(
-                                f"  [red]✗[/red] {metadata.title}: "
-                                f"{result.error_message}"
+                                f"  [red]✗[/red] {metadata.title}: {error_msg}"
                             )
                     except Exception as e:
                         console.print(f"  [red]✗[/red] {note_path.name}: {e}")
 
             else:
                 console.print("[cyan]Using OpenRouter for generation...[/cyan]")
-                generator = APFGenerator(
-                    api_key=config.openrouter_api_key,
-                    model=config.openrouter_model,
-                    temperature=config.llm_temperature,
-                    top_p=config.llm_top_p,
-                )
+                generator = APFGenerator(config)
 
-                for note_path in note_paths:
+                for note_path_tuple in note_paths:
                     try:
+                        note_path, _ = note_path_tuple
                         metadata, qa_pairs = parse_note(note_path)
 
                         for qa in qa_pairs:
@@ -695,7 +700,7 @@ def export(
             )
 
             export_cards_to_apkg(
-                cards=cards,
+                cards=cards,  # type: ignore[arg-type]
                 output_path=output_path,
                 deck_name=final_deck_name,
                 deck_description=final_description,

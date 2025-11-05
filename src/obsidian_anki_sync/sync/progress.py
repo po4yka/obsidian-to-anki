@@ -5,7 +5,10 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from .state_db import StateDB
 
 from ..utils.logging import get_logger
 
@@ -77,7 +80,7 @@ class ProgressTracker:
 
     def __init__(
         self,
-        progress_db,
+        progress_db: "StateDB",
         session_id: str | None = None,
         on_interrupt: Callable[[], None] | None = None,
     ):
@@ -127,7 +130,7 @@ class ProgressTracker:
         if self._signal_handlers_installed:
             return
 
-        def signal_handler(signum, frame):
+        def signal_handler(signum: int, frame: Any) -> None:
             signal_name = signal.Signals(signum).name
             logger.warning(
                 "sync_interrupted",
@@ -229,7 +232,8 @@ class ProgressTracker:
         """Check if a note was already processed."""
         key = f"{source_path}:{card_index}:{lang}"
         if key in self.progress.note_progress:
-            return self.progress.note_progress[key].status == "completed"
+            status: str = self.progress.note_progress[key].status
+            return status == "completed"
         return False
 
     def increment_stat(self, stat: str, count: int = 1) -> None:

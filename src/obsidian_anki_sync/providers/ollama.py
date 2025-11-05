@@ -1,6 +1,6 @@
 """Ollama provider implementation (local and cloud)."""
 
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -169,7 +169,7 @@ class OllamaProvider(BaseLLMProvider):
                 response_length=len(result.get("response", "")),
             )
 
-            return result
+            return cast(dict[str, Any], result)
 
         except httpx.HTTPStatusError as e:
             logger.error(

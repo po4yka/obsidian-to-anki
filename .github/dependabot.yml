@@ -1,0 +1,70 @@
+# Dependabot configuration for automated dependency updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Python dependencies via pip
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Group updates to reduce PR noise
+    groups:
+      development-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "isort"
+          - "ruff"
+          - "mypy"
+          - "pre-commit"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "pytest*"
+          - "black"
+          - "isort"
+          - "ruff"
+          - "mypy"
+          - "pre-commit"
+        update-types:
+          - "patch"
+    # Limit number of open PRs
+    open-pull-requests-limit: 10
+    # Add reviewers (optional - update with actual GitHub usernames)
+    # reviewers:
+    #   - "po4yka"
+    # Add assignees (optional)
+    # assignees:
+    #   - "po4yka"
+    # Add labels to PRs
+    labels:
+      - "dependencies"
+      - "python"
+    # Commit message prefix
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Allow both direct and indirect dependencies
+    allow:
+      - dependency-type: "all"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+    open-pull-requests-limit: 5
