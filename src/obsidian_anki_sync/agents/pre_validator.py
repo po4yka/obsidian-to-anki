@@ -8,14 +8,13 @@ This agent performs fast structural checks before expensive card generation:
 - Q/A pair format
 """
 
-import json
 import time
 from pathlib import Path
 
 from ..models import NoteMetadata, QAPair
+from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .models import PreValidationResult
-from .ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -28,14 +27,14 @@ class PreValidatorAgent:
 
     def __init__(
         self,
-        ollama_client: OllamaClient,
+        ollama_client: BaseLLMProvider,
         model: str = "qwen3:8b",
         temperature: float = 0.0,
     ):
         """Initialize pre-validator agent.
 
         Args:
-            ollama_client: Ollama client instance
+            ollama_client: LLM provider instance (BaseLLMProvider)
             model: Model to use for validation
             temperature: Sampling temperature (0.0 for deterministic)
         """

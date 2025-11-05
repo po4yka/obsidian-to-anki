@@ -13,9 +13,9 @@ import time
 from ..apf.html_validator import validate_card_html
 from ..apf.linter import validate_apf
 from ..models import NoteMetadata
+from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .models import GeneratedCard, PostValidationResult
-from .ollama_client import OllamaClient
 
 logger = get_logger(__name__)
 
@@ -28,14 +28,14 @@ class PostValidatorAgent:
 
     def __init__(
         self,
-        ollama_client: OllamaClient,
+        ollama_client: BaseLLMProvider,
         model: str = "qwen3:14b",
         temperature: float = 0.0,
     ):
         """Initialize post-validator agent.
 
         Args:
-            ollama_client: Ollama client instance
+            ollama_client: LLM provider instance (BaseLLMProvider)
             model: Model to use for validation
             temperature: Sampling temperature (0.0 for deterministic)
         """

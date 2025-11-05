@@ -1,50 +1,69 @@
-"""Ollama client wrapper for local LLM inference.
+"""Ollama provider implementation (local and cloud)."""
 
-DEPRECATED: This module is kept for backward compatibility.
-New code should use the provider system from ..providers package.
-"""
-
-import json
 from typing import Any
 
 import httpx
 
-from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from ..utils.retry import retry
+from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
 
 
-class OllamaClient(BaseLLMProvider):
-    """Client for Ollama API with retry logic and connection pooling.
+class OllamaProvider(BaseLLMProvider):
+    """Ollama LLM provider supporting both local and cloud deployments.
 
-    This client provides a simple interface to Ollama's local LLM inference,
-    optimized for Apple Silicon with MLX models.
+    Supports:
+    - Local Ollama: http://localhost:11434
+    - Ollama Cloud: https://api.ollama.com (requires API key)
+
+    Configuration:
+        base_url: API endpoint URL (default: http://localhost:11434)
+        api_key: API key for cloud deployments (optional, for cloud only)
+        timeout: Request timeout in seconds (default: 120.0)
     """
 
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
+        api_key: str | None = None,
         timeout: float = 120.0,
         **kwargs: Any,
     ):
-        """Initialize Ollama client.
+        """Initialize Ollama provider.
 
         Args:
-            base_url: Base URL for Ollama API
+            base_url: Base URL for Ollama API (local or cloud)
+            api_key: API key for Ollama Cloud (optional, not needed for local)
             timeout: Request timeout in seconds
-            **kwargs: Additional configuration options (for BaseLLMProvider compatibility)
+            **kwargs: Additional configuration options
         """
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        super().__init__(base_url=base_url, api_key=api_key, timeout=timeout, **kwargs)
 
         self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
         self.timeout = timeout
+
+        # Set up headers
+        headers = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        # Initialize HTTP client with connection pooling
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            headers=headers,
         )
-        logger.info("ollama_client_initialized", base_url=base_url, timeout=timeout)
+
+        deployment_type = "cloud" if self.api_key else "local"
+        logger.info(
+            "ollama_provider_initialized",
+            base_url=base_url,
+            deployment_type=deployment_type,
+            timeout=timeout,
+        )
 
     def __del__(self) -> None:
         """Clean up client resources."""
@@ -61,7 +80,11 @@ class OllamaClient(BaseLLMProvider):
             response = self.client.get(f"{self.base_url}/api/tags")
             return response.status_code == 200
         except Exception as e:
-            logger.error("ollama_connection_check_failed", error=str(e))
+            logger.error(
+                "ollama_connection_check_failed",
+                base_url=self.base_url,
+                error=str(e),
+            )
             return False
 
     def list_models(self) -> list[str]:
@@ -74,7 +97,9 @@ class OllamaClient(BaseLLMProvider):
             response = self.client.get(f"{self.base_url}/api/tags")
             response.raise_for_status()
             data = response.json()
-            return [model["name"] for model in data.get("models", [])]
+            models = [model["name"] for model in data.get("models", [])]
+            logger.info("ollama_list_models_success", model_count=len(models))
+            return models
         except Exception as e:
             logger.error("ollama_list_models_failed", error=str(e))
             return []
@@ -92,7 +117,7 @@ class OllamaClient(BaseLLMProvider):
         """Generate completion from Ollama.
 
         Args:
-            model: Model name (e.g., "qwen3:8b", "qwen3:32b")
+            model: Model name (e.g., "qwen3:8b", "llama3:70b")
             prompt: User prompt
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
@@ -103,6 +128,7 @@ class OllamaClient(BaseLLMProvider):
             Response dictionary with 'response' and 'context' keys
 
         Raises:
+            NotImplementedError: If streaming is requested
             httpx.HTTPError: If request fails after retries
         """
         if stream:
@@ -158,44 +184,6 @@ class OllamaClient(BaseLLMProvider):
             raise
         except Exception as e:
             logger.error("ollama_unexpected_error", error=str(e))
-            raise
-
-    def generate_json(
-        self, model: str, prompt: str, system: str = "", temperature: float = 0.7
-    ) -> dict[str, Any]:
-        """Generate JSON response from Ollama.
-
-        This is a convenience method that ensures JSON format and parses the result.
-
-        Args:
-            model: Model name
-            prompt: User prompt
-            system: System prompt (optional)
-            temperature: Sampling temperature
-
-        Returns:
-            Parsed JSON response
-
-        Raises:
-            json.JSONDecodeError: If response is not valid JSON
-        """
-        result = self.generate(
-            model=model,
-            prompt=prompt,
-            system=system,
-            temperature=temperature,
-            format="json",
-        )
-
-        response_text = result.get("response", "{}")
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "ollama_json_parse_error",
-                error=str(e),
-                response_text=response_text[:500],
-            )
             raise
 
     def pull_model(self, model: str) -> bool:
