@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
+from .exceptions import ConfigurationError
+
 
 @dataclass
 class Config:
@@ -87,38 +89,57 @@ class Config:
     def validate(self) -> None:
         """Validate configuration values."""
         if not self.vault_path.exists():
-            raise ValueError(f"Vault path does not exist: {self.vault_path}")
+            raise ConfigurationError(
+                f"Vault path does not exist: {self.vault_path}",
+                suggestion="Set VAULT_PATH environment variable or vault_path in config.yaml to a valid directory",
+            )
 
         full_source = self.vault_path / self.source_dir
         if not full_source.exists():
-            raise ValueError(f"Source directory does not exist: {full_source}")
+            raise ConfigurationError(
+                f"Source directory does not exist: {full_source}",
+                suggestion=f"Create the directory '{self.source_dir}' in your vault or update source_dir in config.yaml",
+            )
 
         # Validate LLM provider
         valid_providers = ["ollama", "lm_studio", "lmstudio", "openrouter"]
         if self.llm_provider.lower() not in valid_providers:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Invalid llm_provider: {self.llm_provider}. "
-                f"Must be one of: {', '.join(valid_providers)}"
+                f"Must be one of: {', '.join(valid_providers)}",
+                suggestion=f"Set llm_provider to one of: {', '.join(valid_providers)}",
             )
 
         # Provider-specific validation
         if self.llm_provider.lower() == "openrouter" and not self.openrouter_api_key:
-            raise ValueError(
-                "OpenRouter API key is required when using OpenRouter provider. "
-                "Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config."
+            raise ConfigurationError(
+                "OpenRouter API key is required when using OpenRouter provider.",
+                suggestion="Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config.yaml",
             )
 
         if self.run_mode not in ("apply", "dry-run"):
-            raise ValueError(f"Invalid run_mode: {self.run_mode}")
+            raise ConfigurationError(
+                f"Invalid run_mode: {self.run_mode}",
+                suggestion="Set run_mode to either 'apply' or 'dry-run'",
+            )
 
         if self.delete_mode not in ("delete", "archive"):
-            raise ValueError(f"Invalid delete_mode: {self.delete_mode}")
+            raise ConfigurationError(
+                f"Invalid delete_mode: {self.delete_mode}",
+                suggestion="Set delete_mode to either 'delete' or 'archive'",
+            )
 
         if not (0 <= self.llm_temperature <= 1):
-            raise ValueError(f"LLM temperature must be 0-1: {self.llm_temperature}")
+            raise ConfigurationError(
+                f"LLM temperature must be 0-1: {self.llm_temperature}",
+                suggestion="Set llm_temperature to a value between 0.0 and 1.0",
+            )
 
         if not (0 <= self.llm_top_p <= 1):
-            raise ValueError(f"LLM top_p must be 0-1: {self.llm_top_p}")
+            raise ConfigurationError(
+                f"LLM top_p must be 0-1: {self.llm_top_p}",
+                suggestion="Set llm_top_p to a value between 0.0 and 1.0",
+            )
 
 
 _config: Config | None = None
