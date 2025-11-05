@@ -19,6 +19,15 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Import agent orchestrator (optional dependency)
+try:
+    from ..agents.orchestrator import AgentOrchestrator
+
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+    logger.warning("agent_system_not_available", reason="Import failed")
+
 
 class SyncEngine:
     """Orchestrate synchronization between Obsidian and Anki."""
@@ -35,7 +44,23 @@ class SyncEngine:
         self.config = config
         self.db = state_db
         self.anki = anki_client
-        self.apf_gen = APFGenerator(config)
+
+        # Initialize card generator (APFGenerator or AgentOrchestrator)
+        if config.use_agent_system:
+            if not AGENTS_AVAILABLE:
+                raise RuntimeError(
+                    "Agent system requested but not available. "
+                    "Please ensure agent dependencies are installed."
+                )
+            logger.info("initializing_agent_orchestrator")
+            self.agent_orchestrator = AgentOrchestrator(config)
+            self.apf_gen = APFGenerator(config)  # Still keep for backward compat
+            self.use_agents = True
+        else:
+            self.apf_gen = APFGenerator(config)
+            self.agent_orchestrator = None
+            self.use_agents = False
+
         self.changes: list[SyncAction] = []
         self.stats = {
             "processed": 0,
@@ -46,6 +71,9 @@ class SyncEngine:
             "skipped": 0,
             "errors": 0,
         }
+
+        # Cache for agent-generated cards (note_id -> list of Card)
+        self._agent_card_cache: dict[str, list[Card]] = {}
 
     def sync(self, dry_run: bool = False, sample_size: int | None = None) -> dict:
         """
@@ -112,6 +140,19 @@ class SyncEngine:
             try:
                 # Parse note
                 metadata, qa_pairs = parse_note(file_path)
+
+                # Read full note content if using agent system
+                note_content = ""
+                if self.use_agents:
+                    try:
+                        note_content = file_path.read_text(encoding="utf-8")
+                    except Exception as e:
+                        logger.warning(
+                            "failed_to_read_note_content",
+                            file=relative_path,
+                            error=str(e),
+                        )
+
             except (
                 ParserError,
                 yaml.YAMLError,
@@ -139,7 +180,13 @@ class SyncEngine:
                     for lang in metadata.language_tags:
                         try:
                             card = self._generate_card(
-                                qa_pair, metadata, relative_path, lang, existing_slugs
+                                qa_pair=qa_pair,
+                                metadata=metadata,
+                                relative_path=relative_path,
+                                lang=lang,
+                                existing_slugs=existing_slugs,
+                                note_content=note_content,
+                                all_qa_pairs=qa_pairs,
                             )
                             obsidian_cards[card.slug] = card
                             existing_slugs.add(card.slug)
@@ -166,6 +213,78 @@ class SyncEngine:
 
         return obsidian_cards
 
+    def _generate_cards_with_agents(
+        self,
+        note_content: str,
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+        relative_path: str,
+    ) -> list[Card]:
+        """Generate all cards for a note using the agent system.
+
+        Args:
+            note_content: Full note content
+            metadata: Note metadata
+            qa_pairs: List of Q/A pairs
+            relative_path: Relative path to note
+
+        Returns:
+            List of generated cards
+        """
+        if not self.use_agents or not self.agent_orchestrator:
+            raise RuntimeError("Agent system not initialized")
+
+        # Check cache first
+        cache_key = f"{metadata.id}:{relative_path}"
+        if cache_key in self._agent_card_cache:
+            return self._agent_card_cache[cache_key]
+
+        logger.info(
+            "generating_cards_with_agents",
+            note=relative_path,
+            qa_pairs=len(qa_pairs),
+        )
+
+        # Run agent pipeline
+        from pathlib import Path
+
+        file_path = self.config.vault_path / relative_path
+        result = self.agent_orchestrator.process_note(
+            note_content=note_content,
+            metadata=metadata,
+            qa_pairs=qa_pairs,
+            file_path=Path(file_path) if file_path.exists() else None,
+        )
+
+        if not result.success or not result.generation:
+            error_msg = (
+                result.post_validation.error_details
+                if result.post_validation
+                else "Unknown error"
+            )
+            raise ValueError(f"Agent pipeline failed: {error_msg}")
+
+        # Convert GeneratedCard to Card instances
+        cards = self.agent_orchestrator.convert_to_cards(result.generation.cards)
+
+        # Update card metadata with proper paths and GUIDs
+        for card in cards:
+            card.manifest.source_path = relative_path
+            card.manifest.note_id = metadata.id
+            card.manifest.note_title = metadata.title
+
+        # Cache the results
+        self._agent_card_cache[cache_key] = cards
+
+        logger.info(
+            "agent_generation_success",
+            note=relative_path,
+            cards_generated=len(cards),
+            time=result.total_time,
+        )
+
+        return cards
+
     def _generate_card(
         self,
         qa_pair: QAPair,
@@ -173,8 +292,45 @@ class SyncEngine:
         relative_path: str,
         lang: str,
         existing_slugs: set[str],
+        note_content: str = "",
+        all_qa_pairs: list[QAPair] | None = None,
     ) -> Card:
-        """Generate a single card."""
+        """Generate a single card.
+
+        Args:
+            qa_pair: Q/A pair to generate card for
+            metadata: Note metadata
+            relative_path: Relative path to note
+            lang: Language code
+            existing_slugs: Set of existing slugs
+            note_content: Full note content (required for agent system)
+            all_qa_pairs: All Q/A pairs from note (required for agent system)
+
+        Returns:
+            Generated card
+        """
+        # Use agent system if enabled
+        if self.use_agents:
+            if not note_content or all_qa_pairs is None:
+                raise ValueError(
+                    "note_content and all_qa_pairs required when using agent system"
+                )
+
+            # Generate all cards for the note (cached)
+            all_cards = self._generate_cards_with_agents(
+                note_content, metadata, all_qa_pairs, relative_path
+            )
+
+            # Find the specific card for this qa_pair and lang
+            for card in all_cards:
+                if card.manifest.card_index == qa_pair.card_index and card.lang == lang:
+                    return card
+
+            raise ValueError(
+                f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
+            )
+
+        # Original APFGenerator logic
         # Generate slug
         slug, slug_base, hash6 = generate_slug(
             relative_path, qa_pair.card_index, lang, existing_slugs
