@@ -33,13 +33,17 @@ def validate_card_html(apf_html: str) -> list[str]:
             errors.append("<pre> block without nested <code> element")
             continue
 
-        classes = code.get("class") or []
+        classes_attr: str | list[str] = code.get("class") or []
+        # BeautifulSoup can return str or list[str] for class attribute
+        classes: list[str] = (
+            classes_attr if isinstance(classes_attr, list) else [classes_attr]
+        )
         if not any(cls.startswith("language-") for cls in classes):
             errors.append("<code> element missing language- class")
 
     # Check for bare <code> elements outside <pre>
     for code in soup.find_all("code"):
-        if code.parent.name != "pre":
+        if code.parent is not None and code.parent.name != "pre":
             errors.append(
                 "Inline <code> elements are not allowed; wrap in <pre><code>."
             )

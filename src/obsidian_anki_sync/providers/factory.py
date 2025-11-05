@@ -1,6 +1,6 @@
 """Provider factory for creating LLM provider instances."""
 
-from typing import Any
+from typing import Any, cast
 
 from ..utils.logging import get_logger
 from .base import BaseLLMProvider
@@ -83,7 +83,7 @@ class ProviderFactory:
         )
 
         try:
-            provider = provider_class(**kwargs)
+            provider = cast(BaseLLMProvider, provider_class(**kwargs))
             logger.info("provider_created_successfully", provider_type=provider_type)
             return provider
         except Exception as e:
