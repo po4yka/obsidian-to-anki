@@ -24,7 +24,10 @@ class OllamaClient(BaseLLMProvider):
     """
 
     def __init__(
-        self, base_url: str = "http://localhost:11434", timeout: float = 120.0, **kwargs: Any
+        self,
+        base_url: str = "http://localhost:11434",
+        timeout: float = 120.0,
+        **kwargs: Any,
     ):
         """Initialize Ollama client.
 

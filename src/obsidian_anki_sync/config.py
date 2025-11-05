@@ -107,7 +107,11 @@ class Config:
             )
 
         # Legacy: OpenRouter API key only required if NOT using agent system (for backward compatibility)
-        if not self.use_agent_system and self.llm_provider.lower() == "openrouter" and not self.openrouter_api_key:
+        if (
+            not self.use_agent_system
+            and self.llm_provider.lower() == "openrouter"
+            and not self.openrouter_api_key
+        ):
             raise ValueError(
                 "OPENROUTER_API_KEY is required when not using agent system"
             )
@@ -201,8 +205,7 @@ def load_config(config_path: Path | None = None) -> Config:
         # Ollama settings
         ollama_base_url=config_data.get("ollama_base_url")
         or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        ollama_api_key=config_data.get("ollama_api_key")
-        or os.getenv("OLLAMA_API_KEY"),
+        ollama_api_key=config_data.get("ollama_api_key") or os.getenv("OLLAMA_API_KEY"),
         # LM Studio settings
         lm_studio_base_url=config_data.get("lm_studio_base_url")
         or os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1"),

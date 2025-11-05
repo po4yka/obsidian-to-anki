@@ -39,7 +39,9 @@ class LMStudioProvider(BaseLLMProvider):
             max_tokens: Maximum tokens in response
             **kwargs: Additional configuration options
         """
-        super().__init__(base_url=base_url, timeout=timeout, max_tokens=max_tokens, **kwargs)
+        super().__init__(
+            base_url=base_url, timeout=timeout, max_tokens=max_tokens, **kwargs
+        )
 
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout

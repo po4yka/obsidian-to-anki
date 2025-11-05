@@ -464,16 +464,14 @@ def export(
 
     from .anki.exporter import export_cards_to_apkg
     from .obsidian.parser import discover_notes, parse_note
-    from .sync.engine import SyncEngine
     from .sync.state_db import StateDB
 
     try:
         # Generate cards by processing notes
-        console.print(f"\n[cyan]Generating cards from Obsidian notes...[/cyan]")
+        console.print("\n[cyan]Generating cards from Obsidian notes...[/cyan]")
 
-        with StateDB(config.db_path) as db:
+        with StateDB(config.db_path) as _:
             # Use a dummy Anki client (won't connect)
-            from .anki.client import AnkiClient
 
             # We don't need AnkiConnect for export, but SyncEngine expects it
             # We'll use the sync engine's card generation logic
@@ -491,7 +489,6 @@ def export(
 
             # Generate cards using the sync engine's generation logic
             from .apf.generator import APFGenerator
-            from .sync.slug_generator import generate_card_slug
 
             cards = []
 
@@ -571,7 +568,7 @@ def export(
             )
 
             console.print(
-                f"\n[cyan]Import this file into Anki to add the cards.[/cyan]"
+                "\n[cyan]Import this file into Anki to add the cards.[/cyan]"
             )
 
             logger.info(
