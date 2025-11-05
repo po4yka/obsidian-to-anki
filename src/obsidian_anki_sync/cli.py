@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -20,13 +20,13 @@ app = typer.Typer(
 console = Console()
 
 # Global state for config and logger
-_config: Optional[Config] = None
+_config: Config | None = None
 _logger = None
 
 
 def get_config_and_logger(
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -52,7 +52,7 @@ def sync(
         bool, typer.Option("--dry-run", help="Preview changes without applying")
     ] = False,
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -106,7 +106,7 @@ def test_run(
         ),
     ] = 10,
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -156,7 +156,7 @@ def test_run(
 def validate(
     note_path: Annotated[Path, typer.Argument(help="Path to note file", exists=True)],
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -206,7 +206,7 @@ def validate(
 @app.command()
 def init(
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -264,7 +264,7 @@ LOG_LEVEL=INFO
 @app.command(name="decks")
 def list_decks(
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -301,7 +301,7 @@ def list_decks(
 @app.command(name="models")
 def list_models(
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -339,7 +339,7 @@ def list_models(
 def show_model_fields(
     model_name: Annotated[str, typer.Option("--model", help="Model name to inspect")],
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[
@@ -382,7 +382,7 @@ def format(
         typer.Option("--check", help="Run formatters in check mode (no modifications)"),
     ] = False,
     config_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
     ] = None,
     log_level: Annotated[

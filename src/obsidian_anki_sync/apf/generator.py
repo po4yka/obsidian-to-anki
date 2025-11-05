@@ -178,8 +178,8 @@ class APFGenerator:
 
 Metadata:
 - Topic: {metadata.topic}
-- Subtopics: {', '.join(metadata.subtopics) if metadata.subtopics else 'None'}
-- Difficulty: {metadata.difficulty or 'Not specified'}
+- Subtopics: {", ".join(metadata.subtopics) if metadata.subtopics else "None"}
+- Difficulty: {metadata.difficulty or "Not specified"}
 - Language: {lang}
 - Slug: {manifest.slug}
 
@@ -209,7 +209,7 @@ Requirements:
 - CardType: Simple (or Missing if {{{{c}}}} detected in answer, or Draw if diagram marker present)
 - Tags: Derive from topic/subtopics, 3-6 snake_case tags, include primary language/tech
 - Primary language tag: {lang}
-- Topic-based tags: {metadata.topic.lower().replace(' ', '_')}
+- Topic-based tags: {metadata.topic.lower().replace(" ", "_")}
 - Preserve every code block using <pre><code class="language-{self._code_language_hint(metadata)}"> ... </code></pre> with original indentation; do NOT fall back to Markdown fences.
 - Include manifest at end with slug "{manifest.slug}"
 - Add "Ref: {ref_link}" in Other notes section
