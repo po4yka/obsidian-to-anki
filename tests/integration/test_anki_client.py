@@ -98,8 +98,9 @@ class TestAnkiClient:
 
         assert note_id == 12345
         assert route.called
-        payload = route.calls[-1].request.json()
-        assert payload["note"]["guid"] == "guid-123"
+        import json
+        payload = json.loads(route.calls[-1].request.content)
+        assert payload["params"]["note"]["guid"] == "guid-123"
 
     @respx.mock
     def test_update_note_fields(self, mock_anki_url):
@@ -132,5 +133,5 @@ class TestAnkiClient:
 
         client = AnkiClient(mock_anki_url)
 
-        with pytest.raises(AnkiConnectError, match="HTTP error"):
+        with pytest.raises(AnkiConnectError, match="HTTP 500 from AnkiConnect"):
             client.invoke("testAction")

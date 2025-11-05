@@ -96,7 +96,8 @@ class TestStateDB:
         """Test retrieving all cards."""
         with StateDB(temp_dir / "test.db") as db:
             for i in range(5):
-                card = self._make_test_card(f"card-{i}-en")
+                # Vary card_index to avoid UNIQUE constraint on (source_path, card_index, lang)
+                card = self._make_test_card(f"card-{i}-en", card_index=i + 1)
                 db.insert_card(card, anki_guid=1000 + i)
 
             all_cards = db.get_all_cards()
