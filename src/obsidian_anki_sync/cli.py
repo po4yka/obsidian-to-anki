@@ -6,7 +6,6 @@ from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from .config import Config, load_config, set_config
@@ -76,7 +75,9 @@ def sync(
             stats = engine.sync(dry_run=dry_run)
 
             # Create a Rich table for results
-            table = Table(title="Sync Results", show_header=True, header_style="bold magenta")
+            table = Table(
+                title="Sync Results", show_header=True, header_style="bold magenta"
+            )
             table.add_column("Metric", style="cyan")
             table.add_column("Value", style="green")
 
@@ -127,10 +128,14 @@ def test_run(
             engine = SyncEngine(config, db, anki)
             stats = engine.sync(dry_run=True, sample_size=count)
 
-            console.print(f"\n[cyan]Processed sample of {count} notes (dry-run).[/cyan]")
+            console.print(
+                f"\n[cyan]Processed sample of {count} notes (dry-run).[/cyan]"
+            )
 
             # Create a Rich table for results
-            table = Table(title="Sample Results", show_header=True, header_style="bold magenta")
+            table = Table(
+                title="Sample Results", show_header=True, header_style="bold magenta"
+            )
             table.add_column("Metric", style="cyan")
             table.add_column("Value", style="green")
 
