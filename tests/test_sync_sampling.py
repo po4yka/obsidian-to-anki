@@ -75,7 +75,15 @@ def test_scan_sampling_limits_number_of_notes(
     ):
         counter = {"value": 0}
 
-        def fake_generate(qa_pair, metadata, relative_path, lang, existing_slugs):
+        def fake_generate(
+            qa_pair,
+            metadata,
+            relative_path,
+            lang,
+            existing_slugs,
+            note_content="",
+            all_qa_pairs=None,
+        ):
             card = _make_fake_card(
                 relative_path,
                 lang,

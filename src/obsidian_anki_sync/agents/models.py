@@ -2,7 +2,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PreValidationResult(BaseModel):
@@ -12,17 +12,14 @@ class PreValidationResult(BaseModel):
     before expensive card generation.
     """
 
+    model_config = ConfigDict(frozen=False)
+
     is_valid: bool
     error_type: Literal["format", "structure", "frontmatter", "content", "none"]
     error_details: str = ""
     auto_fix_applied: bool = False
     fixed_content: Optional[str] = None
     validation_time: float = 0.0
-
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = False
 
 
 class GeneratedCard(BaseModel):
@@ -31,16 +28,13 @@ class GeneratedCard(BaseModel):
     This represents an APF card with metadata for tracking.
     """
 
+    model_config = ConfigDict(frozen=False)
+
     card_index: int = Field(ge=1, description="1-based card index")
     slug: str = Field(min_length=1, description="Unique card identifier")
     lang: str = Field(pattern="^(en|ru)$", description="Card language")
     apf_html: str = Field(min_length=1, description="APF HTML content")
     confidence: float = Field(ge=0.0, le=1.0, description="Generation confidence score")
-
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = False
 
 
 class GenerationResult(BaseModel):
@@ -49,15 +43,12 @@ class GenerationResult(BaseModel):
     Contains all cards generated from a single note.
     """
 
+    model_config = ConfigDict(frozen=False)
+
     cards: list[GeneratedCard]
     total_cards: int = Field(ge=0)
     generation_time: float = Field(ge=0.0)
     model_used: str
-
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = False
 
 
 class PostValidationResult(BaseModel):
@@ -66,16 +57,13 @@ class PostValidationResult(BaseModel):
     Validates generated cards for syntax, factual accuracy, and coherence.
     """
 
+    model_config = ConfigDict(frozen=False)
+
     is_valid: bool
     error_type: Literal["syntax", "factual", "semantic", "template", "none"]
     error_details: str = ""
     corrected_cards: Optional[list[GeneratedCard]] = None
     validation_time: float = 0.0
-
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = False
 
 
 class AgentPipelineResult(BaseModel):
@@ -84,14 +72,11 @@ class AgentPipelineResult(BaseModel):
     Tracks results from pre-validation, generation, and post-validation stages.
     """
 
+    model_config = ConfigDict(frozen=False)
+
     success: bool
     pre_validation: PreValidationResult
     generation: Optional[GenerationResult] = None
     post_validation: Optional[PostValidationResult] = None
     total_time: float = Field(ge=0.0)
     retry_count: int = Field(ge=0, description="Number of post-validation retries")
-
-    class Config:
-        """Pydantic configuration."""
-
-        frozen = False
