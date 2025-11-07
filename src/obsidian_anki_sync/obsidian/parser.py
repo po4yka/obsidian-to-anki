@@ -262,10 +262,14 @@ def _parse_single_qa_block(
             state = "QUESTION_RU"
             current_section = question_ru
             continue
-        elif stripped == "---" and state in ("QUESTION_RU", "QUESTION_EN", "ANSWER_EN"):
-            # Separator after Russian question
-            state = "SEPARATOR"
-            continue
+        elif stripped == "---":
+            # Separator can appear:
+            # 1. Between RU and EN questions (RU-first format)
+            # 2. After both questions before answers (standard format)
+            # 3. After EN answer in some cases
+            if state in ("QUESTION_RU", "QUESTION_EN", "ANSWER_EN"):
+                state = "SEPARATOR"
+                continue
         elif stripped == "## Answer (EN)":
             state = "ANSWER_EN"
             current_section = answer_en
@@ -311,9 +315,11 @@ def _parse_single_qa_block(
             logger.warning("incomplete_qa_block", card_index=card_index, state=state)
         return None
 
-    # Check for missing separator
+    # Check if we have at least one answer section
+    # Note: Separator (---) between questions and answers is optional
     if not answer_en and not answer_ru:
-        logger.error("missing_separator", card_index=card_index)
+        if state != "INIT":
+            logger.warning("no_answers_found", card_index=card_index, state=state)
         return None
 
     # Validate language tags
