@@ -1,6 +1,7 @@
 """Synchronization engine for Obsidian to Anki sync."""
 
 import random
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 import yaml  # type: ignore
@@ -59,6 +60,18 @@ class SyncEngine:
         self.anki = anki_client
         self.progress = progress_tracker
 
+        # Log configuration at startup
+        logger.info(
+            "sync_engine_configuration",
+            llm_provider=config.llm_provider,
+            llm_timeout=config.llm_timeout,
+            use_agent_system=config.use_agent_system,
+            vault_path=str(config.vault_path),
+            anki_deck=config.anki_deck_name,
+            run_mode=config.run_mode,
+            delete_mode=config.delete_mode,
+        )
+
         # Initialize card generator (APFGenerator or AgentOrchestrator)
         if config.use_agent_system:
             if not AGENTS_AVAILABLE:
@@ -88,6 +101,8 @@ class SyncEngine:
 
         # Cache for agent-generated cards (note_id -> list of Card)
         self._agent_card_cache: dict[str, list[Card]] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def sync(
         self,
@@ -253,6 +268,10 @@ class SyncEngine:
         # Collect topic mismatches for aggregated logging
         topic_mismatches: dict[str, int] = {}
 
+        # Progress tracking
+        batch_start_time = time.time()
+        notes_processed = 0
+
         for file_path, relative_path in note_files:
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -361,6 +380,25 @@ class SyncEngine:
                 logger.exception("card_generation_failed", file=relative_path)
                 self.stats["errors"] += 1
 
+            # Progress indicator (log every 10 notes or on completion)
+            notes_processed += 1
+            if notes_processed % 10 == 0 or notes_processed == len(note_files):
+                elapsed_time = time.time() - batch_start_time
+                avg_time_per_note = elapsed_time / notes_processed if notes_processed > 0 else 0
+                remaining_notes = len(note_files) - notes_processed
+                estimated_remaining = avg_time_per_note * remaining_notes
+
+                logger.info(
+                    "batch_progress",
+                    processed=notes_processed,
+                    total=len(note_files),
+                    percent=f"{(notes_processed / len(note_files) * 100):.1f}%",
+                    elapsed_seconds=round(elapsed_time, 1),
+                    avg_seconds_per_note=round(avg_time_per_note, 2),
+                    estimated_remaining_seconds=round(estimated_remaining, 1),
+                    cards_generated=len(obsidian_cards),
+                )
+
         # Log aggregated topic mismatch summary
         if topic_mismatches:
             total_mismatches = sum(topic_mismatches.values())
@@ -368,6 +406,22 @@ class SyncEngine:
                 "topic_mismatches_summary",
                 total=total_mismatches,
                 patterns=topic_mismatches,
+            )
+
+        # Log cache statistics (if using agent system)
+        if self.use_agents and (self._cache_hits > 0 or self._cache_misses > 0):
+            total_cache_requests = self._cache_hits + self._cache_misses
+            hit_rate = (
+                (self._cache_hits / total_cache_requests * 100)
+                if total_cache_requests > 0
+                else 0
+            )
+            logger.info(
+                "agent_cache_statistics",
+                cache_hits=self._cache_hits,
+                cache_misses=self._cache_misses,
+                hit_rate=f"{hit_rate:.1f}%",
+                cache_size=len(self._agent_card_cache),
             )
 
         logger.info(
@@ -400,12 +454,21 @@ class SyncEngine:
         # Check cache first
         cache_key = f"{metadata.id}:{relative_path}"
         if cache_key in self._agent_card_cache:
+            self._cache_hits += 1
+            logger.info(
+                "agent_cache_hit",
+                cache_key=cache_key,
+                note=relative_path,
+                cards_returned=len(self._agent_card_cache[cache_key]),
+            )
             return self._agent_card_cache[cache_key]
 
+        self._cache_misses += 1
         logger.info(
             "generating_cards_with_agents",
             note=relative_path,
             qa_pairs=len(qa_pairs),
+            cache_miss=True,
         )
 
         # Run agent pipeline

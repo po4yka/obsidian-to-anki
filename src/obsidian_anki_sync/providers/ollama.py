@@ -177,6 +177,25 @@ class OllamaProvider(BaseLLMProvider):
 
             tokens_per_sec = eval_count / eval_duration if eval_duration > 0 else 0
 
+            # Warn about slow operations
+            if request_duration > 600:  # 10 minutes
+                logger.warning(
+                    "very_slow_operation_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    threshold=600,
+                    tokens_per_second=round(tokens_per_sec, 2),
+                    recommendation="Consider using a smaller/faster model",
+                )
+            elif request_duration > 300:  # 5 minutes
+                logger.warning(
+                    "slow_operation_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    threshold=300,
+                    tokens_per_second=round(tokens_per_sec, 2),
+                )
+
             logger.info(
                 "ollama_generate_success",
                 model=model,
