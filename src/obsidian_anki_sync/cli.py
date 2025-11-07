@@ -630,9 +630,9 @@ def export(
 
             from .apf.generator import APFGenerator
 
-            cards: list[
-                Any
-            ] = []  # Can be list[Card] or list[GeneratedCard] depending on path
+            cards: list[Any] = (
+                []
+            )  # Can be list[Card] or list[GeneratedCard] depending on path
 
             if config.use_agent_system:
                 console.print("[cyan]Using multi-agent system for generation...[/cyan]")
