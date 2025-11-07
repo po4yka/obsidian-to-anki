@@ -13,6 +13,12 @@ from pathlib import Path
 from ..models import Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .llm_errors import (
+    categorize_llm_error,
+    format_llm_error_for_user,
+    log_llm_error,
+    should_retry_llm_error,
+)
 from .models import GeneratedCard, GenerationResult
 
 logger = get_logger(__name__)
@@ -210,61 +216,114 @@ class GeneratorAgent:
             system_length=len(self.system_prompt),
         )
 
-        try:
-            # Call Ollama LLM
-            llm_start_time = time.time()
-            result = self.ollama_client.generate(
-                model=self.model,
-                prompt=user_prompt,
-                system=self.system_prompt,
-                temperature=self.temperature,
-            )
-            llm_duration = time.time() - llm_start_time
+        # Retry logic for LLM calls
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Call Ollama LLM
+                llm_start_time = time.time()
 
-            apf_html = result.get("response", "")
+                logger.info(
+                    "llm_generation_attempt",
+                    slug=manifest.slug,
+                    attempt=attempt,
+                    max_attempts=max_retries,
+                    model=self.model,
+                )
 
-            if not apf_html:
-                raise ValueError("LLM returned empty response")
+                result = self.ollama_client.generate(
+                    model=self.model,
+                    prompt=user_prompt,
+                    system=self.system_prompt,
+                    temperature=self.temperature,
+                )
+                llm_duration = time.time() - llm_start_time
 
-            # Post-process APF HTML (normalize code blocks, ensure manifest)
-            post_process_start = time.time()
-            apf_html = self._post_process_apf(apf_html, metadata, manifest)
-            post_process_duration = time.time() - post_process_start
+                apf_html = result.get("response", "")
 
-            # Extract confidence from LLM response (if available)
-            # For now, use a default confidence
-            confidence = 0.9
+                if not apf_html or not apf_html.strip():
+                    raise ValueError("LLM returned empty response")
 
-            card_duration = time.time() - card_start_time
+                # Post-process APF HTML (normalize code blocks, ensure manifest)
+                post_process_start = time.time()
+                apf_html = self._post_process_apf(apf_html, metadata, manifest)
+                post_process_duration = time.time() - post_process_start
 
-            logger.info(
-                "single_card_generated",
-                slug=manifest.slug,
-                card_index=qa_pair.card_index,
-                lang=lang,
-                response_length=len(apf_html),
-                llm_duration=round(llm_duration, 2),
-                post_process_duration=round(post_process_duration, 3),
-                total_duration=round(card_duration, 2),
-            )
+                # Extract confidence from LLM response (if available)
+                # For now, use a default confidence
+                confidence = 0.9
 
-            return GeneratedCard(
-                card_index=qa_pair.card_index,
-                slug=manifest.slug,
-                lang=lang,
-                apf_html=apf_html,
-                confidence=confidence,
-            )
+                card_duration = time.time() - card_start_time
 
-        except Exception as e:
-            card_duration = time.time() - card_start_time
-            logger.error(
-                "card_generation_failed",
-                slug=manifest.slug,
-                error=str(e),
-                duration=round(card_duration, 2),
-            )
-            raise
+                logger.info(
+                    "single_card_generated",
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    response_length=len(apf_html),
+                    llm_duration=round(llm_duration, 2),
+                    post_process_duration=round(post_process_duration, 3),
+                    total_duration=round(card_duration, 2),
+                    attempts_needed=attempt,
+                )
+
+                return GeneratedCard(
+                    card_index=qa_pair.card_index,
+                    slug=manifest.slug,
+                    lang=lang,
+                    apf_html=apf_html,
+                    confidence=confidence,
+                )
+
+            except Exception as e:
+                llm_duration = time.time() - llm_start_time
+
+                # Categorize the error
+                llm_error = categorize_llm_error(
+                    error=e,
+                    model=self.model,
+                    operation=f"card generation ({manifest.slug})",
+                    duration=llm_duration,
+                )
+
+                # Log the error with context
+                log_llm_error(
+                    llm_error,
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    attempt=attempt,
+                    max_attempts=max_retries,
+                )
+
+                # Check if we should retry
+                if should_retry_llm_error(llm_error, attempt, max_retries):
+                    # Calculate exponential backoff delay
+                    delay = 2 ** (attempt - 1)  # 1s, 2s, 4s
+                    logger.info(
+                        "retrying_after_delay",
+                        slug=manifest.slug,
+                        attempt=attempt,
+                        delay_seconds=delay,
+                    )
+                    time.sleep(delay)
+                    continue
+
+                # No more retries or non-retryable error
+                card_duration = time.time() - card_start_time
+                logger.error(
+                    "card_generation_failed",
+                    slug=manifest.slug,
+                    error_type=llm_error.error_type.value,
+                    error=str(llm_error),
+                    user_message=format_llm_error_for_user(llm_error),
+                    duration=round(card_duration, 2),
+                    attempts_made=attempt,
+                )
+                raise llm_error from e
+
+        # Should never reach here, but just in case
+        raise RuntimeError(f"Failed to generate card after {max_retries} attempts")
 
     def _build_user_prompt(
         self,
