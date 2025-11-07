@@ -48,6 +48,21 @@ When unsure, pick the **simplest** type that still targets the intended recall.
 
 ### 4.1 Card block template
 
+**CRITICAL: The card header MUST follow this EXACT format with spaces around pipe separators:**
+
+```html
+<!-- Card N | slug: <lowercase-dash-slug> | CardType: <Simple|Missing|Draw> | Tags: <tag1> <tag2> <tag3> -->
+```
+
+**Format requirements:**
+- Space before and after each `|` pipe character
+- `CardType:` must have capital C and T, followed by exactly one of: `Simple`, `Missing`, or `Draw`
+- Tags are space-separated (NOT comma-separated)
+- Slug must be lowercase with only letters, numbers, and hyphens (no underscores)
+- Card number N must match the order (1, 2, 3, ...)
+
+**Complete template:**
+
 ```html
 <!-- Card N | slug: <lowercase-dash-slug> | CardType: <Simple|Missing|Draw> | Tags: <tag1> <tag2> <tag3> -->
 <!-- Title -->

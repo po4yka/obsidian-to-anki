@@ -185,10 +185,25 @@ class PostValidatorAgent:
         all_errors = []
 
         for card in cards:
+            # DEBUG: Log first 500 chars of the card for debugging
+            logger.debug(
+                "validating_card_syntax",
+                slug=card.slug,
+                apf_preview=card.apf_html[:500] if card.apf_html else "(empty)",
+                apf_length=len(card.apf_html),
+            )
+
             # Validate APF format
             apf_result = validate_apf(card.apf_html, slug=card.slug)
 
             if not apf_result.is_valid:
+                # DEBUG: Log the full card when validation fails
+                logger.warning(
+                    "card_validation_failed",
+                    slug=card.slug,
+                    apf_html=card.apf_html[:1000],  # First 1000 chars
+                    errors=apf_result.errors,
+                )
                 for error in apf_result.errors:
                     all_errors.append(f"[{card.slug}] APF format: {error}")
 
@@ -343,6 +358,122 @@ ANALYZE AND RESPOND IN JSON FORMAT:
 If you can auto-fix issues, provide corrected_cards with the fixes applied.
 Be specific about errors. If everything is valid, set error_type to "none"."""
 
+    def _rule_based_header_fix(
+        self, cards: list[GeneratedCard]
+    ) -> list[GeneratedCard] | None:
+        """Attempt to fix card headers using rule-based transformations.
+
+        Args:
+            cards: Cards with potential header format issues
+
+        Returns:
+            Fixed cards if successful, None otherwise
+        """
+        import re
+
+        fixed_cards = []
+        any_fixes = False
+
+        for card in cards:
+            lines = card.apf_html.split("\n")
+            if not lines:
+                continue
+
+            # Find the card header line (should be after BEGIN_CARDS)
+            header_line_idx = None
+            for i, line in enumerate(lines):
+                if line.strip().startswith("<!-- Card "):
+                    header_line_idx = i
+                    break
+
+            if header_line_idx is None:
+                logger.warning(
+                    "auto_fix_no_header_found",
+                    slug=card.slug,
+                )
+                continue
+
+            original_header = lines[header_line_idx].strip()
+            fixed_header = original_header
+
+            # Common fixes:
+            # 1. Normalize spacing around pipes: "Card 1|slug:" -> "Card 1 | slug:"
+            fixed_header = re.sub(r"\s*\|\s*", " | ", fixed_header)
+
+            # 2. Fix CardType spacing and capitalization
+            # Match variations like "CardType:Simple", "cardtype: Simple", "CardType :Simple"
+            fixed_header = re.sub(
+                r"[Cc]ard[Tt]ype\s*:\s*([Ss]imple|[Mm]issing|[Dd]raw)",
+                lambda m: f"CardType: {m.group(1).capitalize()}",
+                fixed_header,
+            )
+
+            # 3. Normalize Tags format: ensure it's "Tags: " not "tags:" or "Tags :"
+            fixed_header = re.sub(r"[Tt]ags\s*:", "Tags:", fixed_header)
+
+            # 4. Fix slug format: convert underscores to hyphens, lowercase
+            slug_match = re.search(r"slug:\s*([^\s|]+)", fixed_header)
+            if slug_match:
+                original_slug = slug_match.group(1)
+                fixed_slug = original_slug.lower().replace("_", "-")
+                # Remove any invalid characters
+                fixed_slug = re.sub(r"[^a-z0-9-]", "-", fixed_slug)
+                # Remove multiple consecutive hyphens
+                fixed_slug = re.sub(r"-+", "-", fixed_slug)
+                # Remove leading/trailing hyphens
+                fixed_slug = fixed_slug.strip("-")
+                fixed_header = fixed_header.replace(f"slug: {original_slug}", f"slug: {fixed_slug}")
+
+            # 5. Ensure tags are space-separated, not comma-separated
+            tags_match = re.search(r"Tags:\s*([^>]+)", fixed_header)
+            if tags_match:
+                tags_str = tags_match.group(1).strip()
+                # Replace commas with spaces
+                fixed_tags = re.sub(r"\s*,\s*", " ", tags_str)
+                # Normalize multiple spaces
+                fixed_tags = re.sub(r"\s+", " ", fixed_tags)
+                fixed_header = fixed_header.replace(f"Tags: {tags_str}", f"Tags: {fixed_tags}")
+
+            # 6. Ensure proper comment ending
+            if not fixed_header.endswith("-->"):
+                if fixed_header.endswith("->"):
+                    fixed_header += ">"
+                elif fixed_header.endswith("-"):
+                    fixed_header += "->"
+                else:
+                    fixed_header += " -->"
+
+            # 7. Ensure proper comment beginning
+            if not fixed_header.startswith("<!--"):
+                fixed_header = "<!-- " + fixed_header.lstrip("<!")
+
+            if fixed_header != original_header:
+                logger.info(
+                    "auto_fix_header_corrected",
+                    slug=card.slug,
+                    original=original_header[:100],
+                    fixed=fixed_header[:100],
+                )
+                lines[header_line_idx] = fixed_header
+                fixed_html = "\n".join(lines)
+                any_fixes = True
+
+                fixed_card = GeneratedCard(
+                    card_index=card.card_index,
+                    slug=card.slug,
+                    lang=card.lang,
+                    apf_html=fixed_html,
+                    confidence=card.confidence,
+                )
+                fixed_cards.append(fixed_card)
+            else:
+                # No fix needed or fix didn't help
+                fixed_cards.append(card)
+
+        if any_fixes:
+            return fixed_cards
+        return None
+
     def attempt_auto_fix(
         self, cards: list[GeneratedCard], error_details: str
     ) -> list[GeneratedCard] | None:
@@ -356,6 +487,16 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
             Corrected cards if successful, None otherwise
         """
         try:
+            # First, try rule-based fixes for common issues
+            if "Invalid card header format" in error_details:
+                fixed_cards = self._rule_based_header_fix(cards)
+                if fixed_cards:
+                    logger.info(
+                        "auto_fix_rule_based_success", cards_fixed=len(fixed_cards)
+                    )
+                    return fixed_cards
+
+            # Fallback to LLM-based fix for complex issues
             # Include all cards (not just first 3) to ensure comprehensive fix
             # Limit to reasonable size to avoid token limits
             cards_to_fix = cards[:10]
@@ -367,56 +508,87 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
                     skipped_cards=len(cards) - 10,
                 )
 
-            # Simplified, more directive prompt
-            card_summaries = []
+            # Build detailed card information with FULL HTML
+            card_details = []
             for i, card in enumerate(cards_to_fix, 1):
-                card_summaries.append(
-                    f"Card {i}:\n"
-                    f"  slug: {card.slug}\n"
-                    f"  lang: {card.lang}\n"
-                    f"  HTML length: {len(card.apf_html)} chars\n"
-                    f"  First 200 chars: {card.apf_html[:200]}..."
+                card_details.append(
+                    f"=== Card {i} ===\n"
+                    f"Slug: {card.slug}\n"
+                    f"Lang: {card.lang}\n"
+                    f"Card Index: {card.card_index}\n"
+                    f"Confidence: {card.confidence}\n"
+                    f"Full HTML:\n{card.apf_html}\n"
                 )
 
-            cards_summary = "\n\n".join(card_summaries)
+            cards_info = "\n\n".join(card_details)
 
-            prompt = f"""You must fix APF card validation errors and return valid JSON.
+            prompt = f"""Fix the APF card validation errors and return the corrected cards.
 
-ERRORS TO FIX:
+VALIDATION ERRORS:
 {error_details}
 
-CARDS NEEDING FIXES:
-{cards_summary}
+CARDS TO FIX (with full HTML):
+{cards_info}
 
-REQUIRED OUTPUT FORMAT (return ONLY valid JSON):
+COMMON FIXES:
+1. Card header format: Ensure "<!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->"
+2. Ensure spaces before and after pipe characters |
+3. CardType must be exactly: Simple, Missing, or Draw (case-sensitive)
+4. Tags must be space-separated, not comma-separated
+5. Slug must be lowercase with only letters, numbers, hyphens
+
+EXAMPLE VALID HEADER:
+<!-- Card 1 | slug: android-lifecycle-methods | CardType: Simple | Tags: android lifecycle architecture -->
+
+OUTPUT FORMAT (return ONLY this JSON structure):
 {{
     "corrected_cards": [
         {{
             "card_index": 1,
-            "slug": "card-slug",
+            "slug": "android-lifecycle-methods",
             "lang": "en",
-            "apf_html": "corrected HTML here",
+            "apf_html": "<!-- PROMPT_VERSION: apf-v2.1 -->\\n<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: android-lifecycle-methods | CardType: Simple | Tags: android lifecycle architecture -->\\n... rest of HTML ...",
             "confidence": 0.9
         }}
     ]
 }}
 
-CRITICAL: You MUST return valid JSON with the corrected_cards array. Do not return empty object."""
+CRITICAL INSTRUCTIONS:
+- Return the COMPLETE corrected apf_html for each card
+- Include all cards that need fixing in the corrected_cards array
+- Do NOT return an empty object {{}}
+- Do NOT omit the corrected_cards array
+- Ensure all JSON is properly escaped"""
 
-            system_prompt = """You are a card correction agent.
-Your job is to fix validation errors in APF flashcards.
-Always return valid JSON with the corrected_cards array.
-Never return an empty object or incomplete response."""
+            system_prompt = """You are an expert APF card correction agent. Your task is to fix syntax and format errors in APF flashcards.
+
+CRITICAL RULES:
+1. Always return valid JSON with a "corrected_cards" array
+2. Never return an empty object or incomplete response
+3. Include the FULL corrected HTML for each card
+4. Maintain all content, only fix format/syntax issues
+5. Be precise with card header format requirements"""
 
             # Call LLM with error handling
             try:
                 llm_start_time = time.time()
 
+                # Use slightly higher temperature for auto-fix to allow creativity
+                # but keep it low for consistency
+                auto_fix_temperature = max(0.1, self.temperature)
+
+                logger.info(
+                    "attempting_manual_auto_fix",
+                    model=self.model,
+                    temperature=auto_fix_temperature,
+                    cards_to_fix=len(cards_to_fix),
+                )
+
                 result = self.ollama_client.generate_json(
                     model=self.model,
                     prompt=prompt,
                     system=system_prompt,
-                    temperature=self.temperature,
+                    temperature=auto_fix_temperature,
                 )
 
                 llm_duration = time.time() - llm_start_time
