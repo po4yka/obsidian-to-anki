@@ -54,6 +54,9 @@ class VaultIndexer:
             "errors": 0,
         }
 
+        # Collect topic mismatches for aggregated logging
+        topic_mismatches: dict[str, int] = {}
+
         for file_path, relative_path in note_files:
             try:
                 # Check if we should skip (incremental mode)
@@ -76,6 +79,12 @@ class VaultIndexer:
 
                 # Parse the note
                 metadata, qa_pairs = parse_note(file_path)
+
+                # Check for topic mismatch and collect for summary
+                expected_topic = file_path.parent.name
+                if metadata.topic != expected_topic:
+                    key = f"{expected_topic} -> {metadata.topic}"
+                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
                 # Get file modification time
                 file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -140,6 +149,15 @@ class VaultIndexer:
                     error_type=type(e).__name__,
                 )
                 stats["errors"] += 1
+
+        # Log aggregated topic mismatch summary
+        if topic_mismatches:
+            total_mismatches = sum(topic_mismatches.values())
+            logger.info(
+                "topic_mismatches_summary",
+                total=total_mismatches,
+                patterns=topic_mismatches,
+            )
 
         logger.info("indexing_vault_completed", stats=stats)
         return stats

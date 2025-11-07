@@ -250,6 +250,9 @@ class SyncEngine:
         obsidian_cards: dict[str, Card] = {}
         existing_slugs: set[str] = set()
 
+        # Collect topic mismatches for aggregated logging
+        topic_mismatches: dict[str, int] = {}
+
         for file_path, relative_path in note_files:
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -257,6 +260,12 @@ class SyncEngine:
             try:
                 # Parse note
                 metadata, qa_pairs = parse_note(file_path)
+
+                # Check for topic mismatch and collect for summary
+                expected_topic = file_path.parent.name
+                if metadata.topic != expected_topic:
+                    key = f"{expected_topic} -> {metadata.topic}"
+                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
                 # Read full note content if using agent system
                 note_content = ""
@@ -351,6 +360,15 @@ class SyncEngine:
             except Exception:
                 logger.exception("card_generation_failed", file=relative_path)
                 self.stats["errors"] += 1
+
+        # Log aggregated topic mismatch summary
+        if topic_mismatches:
+            total_mismatches = sum(topic_mismatches.values())
+            logger.info(
+                "topic_mismatches_summary",
+                total=total_mismatches,
+                patterns=topic_mismatches,
+            )
 
         logger.info(
             "obsidian_scan_completed", notes=len(note_files), cards=len(obsidian_cards)
