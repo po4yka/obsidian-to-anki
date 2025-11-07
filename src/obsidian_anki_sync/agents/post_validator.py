@@ -73,11 +73,38 @@ class PostValidatorAgent:
 
         if syntax_errors:
             validation_time = time.time() - start_time
+
+            # Categorize errors by type for better diagnostics
+            error_by_type: dict[str, int] = {}
+            for error in syntax_errors:
+                # Extract error type from error message
+                if "APF format:" in error:
+                    error_type = error.split("APF format:")[1].strip().split()[0:3]
+                    error_key = " ".join(error_type) if error_type else "unknown"
+                elif "HTML:" in error:
+                    error_key = "HTML validation"
+                else:
+                    error_key = "other"
+                error_by_type[error_key] = error_by_type.get(error_key, 0) + 1
+
+            # Log error summary
             logger.warning(
                 "post_validation_syntax_failed",
                 errors_count=len(syntax_errors),
-                errors=syntax_errors[:3],  # Log first 3 errors
+                error_breakdown=error_by_type,
             )
+
+            # Log each error individually (up to 20 to avoid spam)
+            for i, error in enumerate(syntax_errors[:20]):
+                logger.warning("validation_error_detail", error_num=i+1, error=error)
+
+            if len(syntax_errors) > 20:
+                logger.warning(
+                    "validation_errors_truncated",
+                    shown=20,
+                    total=len(syntax_errors),
+                    additional=len(syntax_errors) - 20,
+                )
 
             return PostValidationResult(
                 is_valid=False,

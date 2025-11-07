@@ -1,6 +1,7 @@
 """Synchronization engine for Obsidian to Anki sync."""
 
 import random
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 import yaml  # type: ignore
@@ -59,6 +60,18 @@ class SyncEngine:
         self.anki = anki_client
         self.progress = progress_tracker
 
+        # Log configuration at startup
+        logger.info(
+            "sync_engine_configuration",
+            llm_provider=config.llm_provider,
+            llm_timeout=config.llm_timeout,
+            use_agent_system=config.use_agent_system,
+            vault_path=str(config.vault_path),
+            anki_deck=config.anki_deck_name,
+            run_mode=config.run_mode,
+            delete_mode=config.delete_mode,
+        )
+
         # Initialize card generator (APFGenerator or AgentOrchestrator)
         if config.use_agent_system:
             if not AGENTS_AVAILABLE:
@@ -88,6 +101,8 @@ class SyncEngine:
 
         # Cache for agent-generated cards (note_id -> list of Card)
         self._agent_card_cache: dict[str, list[Card]] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def sync(
         self,
@@ -250,6 +265,17 @@ class SyncEngine:
         obsidian_cards: dict[str, Card] = {}
         existing_slugs: set[str] = set()
 
+        # Collect topic mismatches for aggregated logging
+        topic_mismatches: dict[str, int] = {}
+
+        # Collect errors for aggregated logging
+        error_by_type: dict[str, int] = {}
+        error_samples: dict[str, list[str]] = {}
+
+        # Progress tracking
+        batch_start_time = time.time()
+        notes_processed = 0
+
         for file_path, relative_path in note_files:
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -257,6 +283,12 @@ class SyncEngine:
             try:
                 # Parse note
                 metadata, qa_pairs = parse_note(file_path)
+
+                # Check for topic mismatch and collect for summary
+                expected_topic = file_path.parent.name
+                if metadata.topic != expected_topic:
+                    key = f"{expected_topic} -> {metadata.topic}"
+                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
                 # Read full note content if using agent system
                 note_content = ""
@@ -333,13 +365,22 @@ class SyncEngine:
                                 )
 
                         except Exception as e:
-                            logger.error(
-                                "card_generation_failed",
-                                file=relative_path,
-                                pair=qa_pair.card_index,
-                                lang=lang,
-                                error=str(e),
+                            error_type_name = type(e).__name__
+                            error_message = str(e)
+
+                            # Aggregate errors
+                            error_by_type[error_type_name] = (
+                                error_by_type.get(error_type_name, 0) + 1
                             )
+
+                            # Store sample errors (up to 3 per type)
+                            if error_type_name not in error_samples:
+                                error_samples[error_type_name] = []
+                            if len(error_samples[error_type_name]) < 3:
+                                error_samples[error_type_name].append(
+                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message[:80]}"
+                                )
+
                             self.stats["errors"] += 1
                             if self.progress:
                                 self.progress.fail_note(
@@ -351,6 +392,67 @@ class SyncEngine:
             except Exception:
                 logger.exception("card_generation_failed", file=relative_path)
                 self.stats["errors"] += 1
+
+            # Progress indicator (log every 10 notes or on completion)
+            notes_processed += 1
+            if notes_processed % 10 == 0 or notes_processed == len(note_files):
+                elapsed_time = time.time() - batch_start_time
+                avg_time_per_note = elapsed_time / notes_processed if notes_processed > 0 else 0
+                remaining_notes = len(note_files) - notes_processed
+                estimated_remaining = avg_time_per_note * remaining_notes
+
+                logger.info(
+                    "batch_progress",
+                    processed=notes_processed,
+                    total=len(note_files),
+                    percent=f"{(notes_processed / len(note_files) * 100):.1f}%",
+                    elapsed_seconds=round(elapsed_time, 1),
+                    avg_seconds_per_note=round(avg_time_per_note, 2),
+                    estimated_remaining_seconds=round(estimated_remaining, 1),
+                    cards_generated=len(obsidian_cards),
+                )
+
+        # Log aggregated error summary
+        if error_by_type:
+            logger.warning(
+                "card_generation_errors_summary",
+                total_errors=self.stats["errors"],
+                error_breakdown=error_by_type,
+            )
+            # Log sample errors for each type
+            for err_type, samples in error_samples.items():
+                for i, sample in enumerate(samples):
+                    logger.warning(
+                        "error_sample",
+                        error_type=err_type,
+                        sample_num=i + 1,
+                        error=sample,
+                    )
+
+        # Log aggregated topic mismatch summary
+        if topic_mismatches:
+            total_mismatches = sum(topic_mismatches.values())
+            logger.info(
+                "topic_mismatches_summary",
+                total=total_mismatches,
+                patterns=topic_mismatches,
+            )
+
+        # Log cache statistics (if using agent system)
+        if self.use_agents and (self._cache_hits > 0 or self._cache_misses > 0):
+            total_cache_requests = self._cache_hits + self._cache_misses
+            hit_rate = (
+                (self._cache_hits / total_cache_requests * 100)
+                if total_cache_requests > 0
+                else 0
+            )
+            logger.info(
+                "agent_cache_statistics",
+                cache_hits=self._cache_hits,
+                cache_misses=self._cache_misses,
+                hit_rate=f"{hit_rate:.1f}%",
+                cache_size=len(self._agent_card_cache),
+            )
 
         logger.info(
             "obsidian_scan_completed", notes=len(note_files), cards=len(obsidian_cards)
@@ -382,12 +484,21 @@ class SyncEngine:
         # Check cache first
         cache_key = f"{metadata.id}:{relative_path}"
         if cache_key in self._agent_card_cache:
+            self._cache_hits += 1
+            logger.info(
+                "agent_cache_hit",
+                cache_key=cache_key,
+                note=relative_path,
+                cards_returned=len(self._agent_card_cache[cache_key]),
+            )
             return self._agent_card_cache[cache_key]
 
+        self._cache_misses += 1
         logger.info(
             "generating_cards_with_agents",
             note=relative_path,
             qa_pairs=len(qa_pairs),
+            cache_miss=True,
         )
 
         # Run agent pipeline
