@@ -186,6 +186,14 @@ class OllamaProvider(BaseLLMProvider):
             prompt_eval_duration = result.get("prompt_eval_duration", 0) / 1e9
 
             tokens_per_sec = eval_count / eval_duration if eval_duration > 0 else 0
+            total_tokens = prompt_eval_count + eval_count
+
+            # Store token usage in result for caller access
+            result["_token_usage"] = {
+                "prompt_tokens": prompt_eval_count,
+                "completion_tokens": eval_count,
+                "total_tokens": total_tokens,
+            }
 
             # Log model loading time if this was the first request
             if is_first_request and request_duration > 30:
@@ -220,10 +228,11 @@ class OllamaProvider(BaseLLMProvider):
                 model=model,
                 response_length=len(result.get("response", "")),
                 request_duration=round(request_duration, 2),
-                eval_tokens=eval_count,
-                eval_duration=round(eval_duration, 2),
-                prompt_eval_tokens=prompt_eval_count,
+                prompt_tokens=prompt_eval_count,
+                completion_tokens=eval_count,
+                total_tokens=total_tokens,
                 prompt_eval_duration=round(prompt_eval_duration, 2),
+                eval_duration=round(eval_duration, 2),
                 tokens_per_second=round(tokens_per_sec, 2),
             )
 
