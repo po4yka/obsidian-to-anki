@@ -150,7 +150,9 @@ class VaultIndexer:
                 error_message = str(e)
 
                 # Aggregate errors
-                error_by_type[error_type_name] = error_by_type.get(error_type_name, 0) + 1
+                error_by_type[error_type_name] = (
+                    error_by_type.get(error_type_name, 0) + 1
+                )
 
                 # Store sample errors (up to 3 per type)
                 if error_type_name not in error_samples:

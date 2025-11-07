@@ -96,7 +96,7 @@ class PostValidatorAgent:
 
             # Log each error individually (up to 20 to avoid spam)
             for i, error in enumerate(syntax_errors[:20]):
-                logger.warning("validation_error_detail", error_num=i+1, error=error)
+                logger.warning("validation_error_detail", error_num=i + 1, error=error)
 
             if len(syntax_errors) > 20:
                 logger.warning(
