@@ -62,7 +62,7 @@ llm_provider: "ollama"
 # Common LLM settings
 llm_temperature: 0.2
 llm_top_p: 0.3
-llm_timeout: 120.0
+llm_timeout: 600.0  # Increased for large models (qwen3:32b, qwen3:14b)
 llm_max_tokens: 2048
 
 # =============================================================================
