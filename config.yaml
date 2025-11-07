@@ -36,6 +36,11 @@ agent_execution_mode: "parallel"
 # Ollama Configuration
 ollama_base_url: "http://localhost:11434"
 
+# Parser-Repair Agent (Fixes malformed notes)
+parser_repair_enabled: true
+parser_repair_model: "qwen3:8b"
+parser_repair_temperature: 0.0
+
 # Pre-Validator Agent (Fast structural checks)
 pre_validator_model: "qwen3:8b"
 pre_validator_temperature: 0.0

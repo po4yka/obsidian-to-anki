@@ -66,6 +66,21 @@ class PostValidationResult(BaseModel):
     validation_time: float = 0.0
 
 
+class ParserRepairResult(BaseModel):
+    """Result from parser-repair agent.
+
+    Tracks diagnosis and repairs applied to malformed notes.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    is_repairable: bool
+    diagnosis: str = ""
+    repairs: list[dict[str, str]] = Field(default_factory=list)
+    repaired_content: Optional[str] = None
+    repair_time: float = 0.0
+
+
 class AgentPipelineResult(BaseModel):
     """Complete result from the three-agent pipeline.
 

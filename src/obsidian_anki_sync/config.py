@@ -70,6 +70,11 @@ class Config:
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
 
+    # Parser-Repair Agent
+    parser_repair_enabled: bool = True
+    parser_repair_model: str = "qwen3:8b"
+    parser_repair_temperature: float = 0.0
+
     # Pre-Validator Agent
     pre_validator_model: str = "qwen3:8b"
     pre_validator_temperature: float = 0.0

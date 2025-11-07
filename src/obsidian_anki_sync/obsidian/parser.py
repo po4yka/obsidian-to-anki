@@ -3,12 +3,13 @@
 import re
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
+from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -59,6 +60,75 @@ def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
     )
 
     return metadata, qa_pairs
+
+
+def parse_note_with_repair(
+    file_path: Path,
+    ollama_client: Optional[BaseLLMProvider] = None,
+    repair_model: str = "qwen3:8b",
+    enable_repair: bool = True,
+) -> tuple[NoteMetadata, list[QAPair]]:
+    """
+    Parse an Obsidian note with automatic repair fallback.
+
+    First attempts rule-based parsing. If that fails and repair is enabled,
+    attempts intelligent repair using LLM agent.
+
+    Args:
+        file_path: Path to the markdown file
+        ollama_client: LLM provider for repair (required if enable_repair=True)
+        repair_model: Model to use for repair
+        enable_repair: Whether to attempt repair on parse failures
+
+    Returns:
+        Tuple of (metadata, qa_pairs)
+
+    Raises:
+        ParserError: If both parsing and repair fail
+    """
+    # First try rule-based parsing
+    try:
+        return parse_note(file_path)
+    except ParserError as e:
+        # If repair is disabled or no client provided, re-raise
+        if not enable_repair or ollama_client is None:
+            raise
+
+        # Attempt repair with agent
+        logger.info(
+            "parser_attempting_repair",
+            file=str(file_path),
+            original_error=str(e),
+        )
+
+        from ..agents.parser_repair import attempt_repair
+
+        result = attempt_repair(
+            file_path=file_path,
+            original_error=e,
+            ollama_client=ollama_client,
+            model=repair_model,
+        )
+
+        if result is None:
+            # Repair failed, re-raise original error
+            logger.error(
+                "parser_repair_failed",
+                file=str(file_path),
+                original_error=str(e),
+            )
+            raise ParserError(
+                f"Parse failed and repair unsuccessful: {e}"
+            ) from e
+
+        # Repair succeeded
+        metadata, qa_pairs = result
+        logger.info(
+            "parser_repair_succeeded",
+            file=str(file_path),
+            qa_pairs_count=len(qa_pairs),
+        )
+        return metadata, qa_pairs
 
 
 def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
