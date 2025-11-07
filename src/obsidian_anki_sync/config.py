@@ -43,7 +43,7 @@ class Config:
     # Common LLM settings
     llm_temperature: float = 0.2
     llm_top_p: float = 0.3
-    llm_timeout: float = 120.0
+    llm_timeout: float = 900.0  # 15 minutes for large models
     llm_max_tokens: int = 2048
 
     # Ollama provider settings (local or cloud)

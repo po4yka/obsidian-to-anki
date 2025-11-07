@@ -1,5 +1,6 @@
 """Ollama provider implementation (local and cloud)."""
 
+import time
 from typing import Any, cast
 
 import httpx
@@ -21,14 +22,14 @@ class OllamaProvider(BaseLLMProvider):
     Configuration:
         base_url: API endpoint URL (default: http://localhost:11434)
         api_key: API key for cloud deployments (optional, for cloud only)
-        timeout: Request timeout in seconds (default: 120.0)
+        timeout: Request timeout in seconds (default: 900.0 - 15 minutes)
     """
 
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
         api_key: str | None = None,
-        timeout: float = 120.0,
+        timeout: float = 900.0,
         **kwargs: Any,
     ):
         """Initialize Ollama provider.
@@ -58,6 +59,10 @@ class OllamaProvider(BaseLLMProvider):
         )
 
         deployment_type = "cloud" if self.api_key else "local"
+
+        # Track first request per model (to measure model loading time)
+        self._model_first_request: dict[str, bool] = {}
+
         logger.info(
             "ollama_provider_initialized",
             base_url=base_url,
@@ -147,6 +152,13 @@ class OllamaProvider(BaseLLMProvider):
         if format == "json":
             payload["format"] = "json"
 
+        request_start_time = time.time()
+
+        # Check if this is the first request to this model
+        is_first_request = model not in self._model_first_request
+        if is_first_request:
+            self._model_first_request[model] = True
+
         logger.info(
             "ollama_generate_request",
             model=model,
@@ -154,6 +166,8 @@ class OllamaProvider(BaseLLMProvider):
             system_length=len(system),
             temperature=temperature,
             format=format,
+            timeout=self.timeout,
+            first_request_to_model=is_first_request,
         )
 
         try:
@@ -163,27 +177,84 @@ class OllamaProvider(BaseLLMProvider):
             response.raise_for_status()
 
             result = response.json()
+            request_duration = time.time() - request_start_time
+
+            # Extract performance metrics from Ollama response
+            eval_count = result.get("eval_count", 0)
+            eval_duration = result.get("eval_duration", 0) / 1e9  # Convert to seconds
+            prompt_eval_count = result.get("prompt_eval_count", 0)
+            prompt_eval_duration = result.get("prompt_eval_duration", 0) / 1e9
+
+            tokens_per_sec = eval_count / eval_duration if eval_duration > 0 else 0
+
+            # Log model loading time if this was the first request
+            if is_first_request and request_duration > 30:
+                logger.info(
+                    "model_loading_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    note="First request to this model may include loading time",
+                )
+
+            # Warn about slow operations
+            if request_duration > 600:  # 10 minutes
+                logger.warning(
+                    "very_slow_operation_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    threshold=600,
+                    tokens_per_second=round(tokens_per_sec, 2),
+                    recommendation="Consider using a smaller/faster model",
+                )
+            elif request_duration > 300:  # 5 minutes
+                logger.warning(
+                    "slow_operation_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    threshold=300,
+                    tokens_per_second=round(tokens_per_sec, 2),
+                )
+
             logger.info(
                 "ollama_generate_success",
                 model=model,
                 response_length=len(result.get("response", "")),
+                request_duration=round(request_duration, 2),
+                eval_tokens=eval_count,
+                eval_duration=round(eval_duration, 2),
+                prompt_eval_tokens=prompt_eval_count,
+                prompt_eval_duration=round(prompt_eval_duration, 2),
+                tokens_per_second=round(tokens_per_sec, 2),
             )
 
             return cast(dict[str, Any], result)
 
         except httpx.HTTPStatusError as e:
+            request_duration = time.time() - request_start_time
             logger.error(
                 "ollama_http_error",
                 status_code=e.response.status_code,
                 error=str(e),
                 response_text=e.response.text[:500],
+                request_duration=round(request_duration, 2),
             )
             raise
         except httpx.RequestError as e:
-            logger.error("ollama_request_error", error=str(e))
+            request_duration = time.time() - request_start_time
+            logger.error(
+                "ollama_request_error",
+                error=str(e),
+                request_duration=round(request_duration, 2),
+                timeout_configured=self.timeout,
+            )
             raise
         except Exception as e:
-            logger.error("ollama_unexpected_error", error=str(e))
+            request_duration = time.time() - request_start_time
+            logger.error(
+                "ollama_unexpected_error",
+                error=str(e),
+                request_duration=round(request_duration, 2),
+            )
             raise
 
     def pull_model(self, model: str) -> bool:

@@ -101,6 +101,12 @@ class AgentOrchestrator:
             pre_val_model=pre_val_model,
             gen_model=gen_model,
             post_val_model=post_val_model,
+            pre_val_temp=getattr(config, "pre_validator_temperature", 0.0),
+            gen_temp=getattr(config, "generator_temperature", 0.3),
+            post_val_temp=getattr(config, "post_validator_temperature", 0.0),
+            post_val_max_retries=getattr(config, "post_validation_max_retries", 3),
+            post_val_auto_fix=getattr(config, "post_validation_auto_fix", True),
+            post_val_strict=getattr(config, "post_validation_strict_mode", True),
         )
 
     def process_note(
@@ -122,6 +128,7 @@ class AgentOrchestrator:
             AgentPipelineResult with all stages
         """
         start_time = time.time()
+        stage_times: dict[str, float] = {}
 
         logger.info(
             "pipeline_start",
@@ -132,6 +139,7 @@ class AgentOrchestrator:
 
         # Stage 1: Pre-validation
         pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
+        pre_val_start = time.time()
 
         if pre_validation_enabled:
             pre_result = self.pre_validator.validate(
@@ -175,7 +183,10 @@ class AgentOrchestrator:
                 validation_time=0.0,
             )
 
+        stage_times["pre_validation"] = time.time() - pre_val_start
+
         # Stage 2: Card Generation
+        gen_start = time.time()
         try:
             # Generate slug base from note title
             slug_base = self._generate_slug_base(metadata)
@@ -186,10 +197,17 @@ class AgentOrchestrator:
                 qa_pairs=qa_pairs,
                 slug_base=slug_base,
             )
+            stage_times["generation"] = time.time() - gen_start
 
         except Exception as e:
+            stage_times["generation"] = time.time() - gen_start
             total_time = time.time() - start_time
-            logger.error("pipeline_failed_generation", error=str(e), time=total_time)
+            logger.error(
+                "pipeline_failed_generation",
+                error=str(e),
+                time=total_time,
+                stage_times=stage_times,
+            )
 
             return AgentPipelineResult(
                 success=False,
@@ -201,6 +219,7 @@ class AgentOrchestrator:
             )
 
         # Stage 3: Post-validation with retry
+        post_val_start = time.time()
         max_retries = getattr(self.config, "post_validation_max_retries", 3)
         auto_fix = getattr(self.config, "post_validation_auto_fix", True)
         strict_mode = getattr(self.config, "post_validation_strict_mode", True)
@@ -215,12 +234,14 @@ class AgentOrchestrator:
 
             if post_result.is_valid:
                 # Success!
+                stage_times["post_validation"] = time.time() - post_val_start
                 total_time = time.time() - start_time
                 logger.info(
                     "pipeline_success",
                     cards_generated=len(current_cards),
                     retry_count=retry_count,
                     time=total_time,
+                    stage_times=stage_times,
                 )
 
                 # Update generation result with final cards
@@ -268,11 +289,13 @@ class AgentOrchestrator:
                 break
 
         # Failed after all retries
+        stage_times["post_validation"] = time.time() - post_val_start
         total_time = time.time() - start_time
         logger.error(
             "pipeline_failed_post_validation",
             retry_count=retry_count,
             time=total_time,
+            stage_times=stage_times,
         )
 
         return AgentPipelineResult(

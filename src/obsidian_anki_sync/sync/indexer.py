@@ -54,6 +54,13 @@ class VaultIndexer:
             "errors": 0,
         }
 
+        # Collect topic mismatches for aggregated logging
+        topic_mismatches: dict[str, int] = {}
+
+        # Collect errors for aggregated logging
+        error_by_type: dict[str, int] = {}
+        error_samples: dict[str, list[str]] = {}  # Store sample errors per type
+
         for file_path, relative_path in note_files:
             try:
                 # Check if we should skip (incremental mode)
@@ -76,6 +83,12 @@ class VaultIndexer:
 
                 # Parse the note
                 metadata, qa_pairs = parse_note(file_path)
+
+                # Check for topic mismatch and collect for summary
+                expected_topic = file_path.parent.name
+                if metadata.topic != expected_topic:
+                    key = f"{expected_topic} -> {metadata.topic}"
+                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
                 # Get file modification time
                 file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -133,13 +146,47 @@ class VaultIndexer:
                 )
 
             except (ParserError, OSError, Exception) as e:
-                logger.error(
-                    "note_indexing_failed",
-                    path=relative_path,
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
+                error_type_name = type(e).__name__
+                error_message = str(e)
+
+                # Aggregate errors
+                error_by_type[error_type_name] = error_by_type.get(error_type_name, 0) + 1
+
+                # Store sample errors (up to 3 per type)
+                if error_type_name not in error_samples:
+                    error_samples[error_type_name] = []
+                if len(error_samples[error_type_name]) < 3:
+                    error_samples[error_type_name].append(
+                        f"{relative_path}: {error_message[:100]}"
+                    )
+
                 stats["errors"] += 1
+
+        # Log aggregated error summary
+        if error_by_type:
+            logger.warning(
+                "indexing_errors_summary",
+                total_errors=stats["errors"],
+                error_breakdown=error_by_type,
+            )
+            # Log sample errors for each type
+            for err_type, samples in error_samples.items():
+                for i, sample in enumerate(samples):
+                    logger.warning(
+                        "error_sample",
+                        error_type=err_type,
+                        sample_num=i + 1,
+                        error=sample,
+                    )
+
+        # Log aggregated topic mismatch summary
+        if topic_mismatches:
+            total_mismatches = sum(topic_mismatches.values())
+            logger.info(
+                "topic_mismatches_summary",
+                total=total_mismatches,
+                patterns=topic_mismatches,
+            )
 
         logger.info("indexing_vault_completed", stats=stats)
         return stats
