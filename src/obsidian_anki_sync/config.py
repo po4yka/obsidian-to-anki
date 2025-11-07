@@ -210,7 +210,9 @@ def load_config(config_path: Path | None = None) -> Config:
         # Common LLM settings
         llm_temperature=get_float("llm_temperature", 0.2),
         llm_top_p=get_float("llm_top_p", 0.3),
-        llm_timeout=get_float("llm_timeout", 900.0),  # 15 minutes default for large models
+        llm_timeout=get_float(
+            "llm_timeout", 900.0
+        ),  # 15 minutes default for large models
         llm_max_tokens=get_int("llm_max_tokens", 2048),
         # Ollama settings
         ollama_base_url=get_str("ollama_base_url", "http://localhost:11434"),

@@ -80,7 +80,9 @@ class SyncEngine:
                     "Please ensure agent dependencies are installed."
                 )
             logger.info("initializing_agent_orchestrator")
-            self.agent_orchestrator: AgentOrchestrator | None = AgentOrchestrator(config)  # type: ignore
+            self.agent_orchestrator: AgentOrchestrator | None = AgentOrchestrator(
+                config
+            )  # type: ignore
             self.apf_gen = APFGenerator(config)  # Still keep for backward compat
             self.use_agents = True
         else:

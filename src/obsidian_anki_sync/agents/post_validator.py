@@ -273,7 +273,7 @@ Be thorough but constructive - suggest fixes when possible."""
 NOTE METADATA:
 - Title: {metadata.title}
 - Topic: {metadata.topic}
-- Subtopics: {', '.join(metadata.subtopics)}
+- Subtopics: {", ".join(metadata.subtopics)}
 - Total Cards: {len(cards)}
 
 GENERATED CARDS SUMMARY:
