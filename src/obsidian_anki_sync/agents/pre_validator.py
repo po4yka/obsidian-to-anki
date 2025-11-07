@@ -14,6 +14,11 @@ from pathlib import Path
 from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .llm_errors import (
+    categorize_llm_error,
+    format_llm_error_for_user,
+    log_llm_error,
+)
 from .models import PreValidationResult
 
 logger = get_logger(__name__)
@@ -146,6 +151,15 @@ Your job is to check note structure, formatting, and completeness.
 Always respond in valid JSON format.
 Be strict but helpful - suggest fixes when possible."""
 
+            llm_start_time = time.time()
+
+            logger.info(
+                "pre_validation_llm_start",
+                model=self.model,
+                title=metadata.title,
+                content_length=len(note_content),
+            )
+
             result = self.ollama_client.generate_json(
                 model=self.model,
                 prompt=prompt,
@@ -153,7 +167,14 @@ Be strict but helpful - suggest fixes when possible."""
                 temperature=self.temperature,
             )
 
+            llm_duration = time.time() - llm_start_time
             validation_time = time.time() - start_time
+
+            logger.info(
+                "pre_validation_llm_complete",
+                llm_duration=round(llm_duration, 2),
+                total_duration=round(validation_time, 2),
+            )
 
             # Parse LLM response into PreValidationResult
             validation_result = PreValidationResult(
@@ -176,14 +197,37 @@ Be strict but helpful - suggest fixes when possible."""
             return validation_result
 
         except Exception as e:
+            llm_duration = time.time() - llm_start_time
             validation_time = time.time() - start_time
-            logger.error("pre_validation_llm_error", error=str(e), time=validation_time)
+
+            # Categorize and log the error
+            llm_error = categorize_llm_error(
+                error=e,
+                model=self.model,
+                operation="pre-validation",
+                duration=llm_duration,
+            )
+
+            log_llm_error(
+                llm_error,
+                title=metadata.title,
+                qa_pairs_count=len(qa_pairs),
+                content_length=len(note_content),
+            )
+
+            logger.error(
+                "pre_validation_llm_error",
+                error_type=llm_error.error_type.value,
+                error=str(llm_error),
+                user_message=format_llm_error_for_user(llm_error),
+                time=validation_time,
+            )
 
             # Fall back to basic validation result
             return PreValidationResult(
                 is_valid=False,
                 error_type="format",
-                error_details=f"LLM validation failed: {str(e)}",
+                error_details=f"LLM validation failed: {format_llm_error_for_user(llm_error)}",
                 auto_fix_applied=False,
                 fixed_content=None,
                 validation_time=validation_time,

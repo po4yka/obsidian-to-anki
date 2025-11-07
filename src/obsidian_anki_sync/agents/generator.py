@@ -13,6 +13,14 @@ from pathlib import Path
 from ..models import Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .debug_artifacts import save_failed_llm_call
+from .llm_errors import (
+    categorize_llm_error,
+    format_llm_error_for_user,
+    log_llm_error,
+    should_retry_llm_error,
+)
+from .metrics import record_operation_metric
 from .models import GeneratedCard, GenerationResult
 
 logger = get_logger(__name__)
@@ -101,10 +109,18 @@ class GeneratorAgent:
 
         generation_time = time.time() - start_time
 
+        # Calculate aggregate statistics
+        total_tokens = sum(
+            card.confidence for card in generated_cards
+        )  # Placeholder, would need to track actual tokens
+
         logger.info(
             "card_generation_complete",
             cards_generated=len(generated_cards),
             time=generation_time,
+            avg_time_per_card=round(generation_time / len(generated_cards), 2)
+            if generated_cards
+            else 0,
         )
 
         return GenerationResult(
@@ -200,6 +216,22 @@ class GeneratorAgent:
             lang=lang,
         )
 
+        # Estimate token count (rough: 4 chars per token)
+        total_input_chars = len(user_prompt) + len(self.system_prompt)
+        estimated_tokens = total_input_chars // 4
+
+        # Context window warnings for common models
+        context_limits = {
+            "qwen3:8b": 8192,
+            "qwen3:14b": 8192,
+            "qwen3:32b": 32768,
+            "llama3:8b": 8192,
+            "llama3:70b": 8192,
+        }
+
+        model_limit = context_limits.get(self.model, 8192)
+        utilization_pct = (estimated_tokens / model_limit) * 100
+
         logger.info(
             "generating_single_card",
             model=self.model,
@@ -208,63 +240,195 @@ class GeneratorAgent:
             lang=lang,
             prompt_length=len(user_prompt),
             system_length=len(self.system_prompt),
+            estimated_tokens=estimated_tokens,
+            context_limit=model_limit,
+            context_utilization_pct=round(utilization_pct, 1),
         )
 
-        try:
-            # Call Ollama LLM
-            llm_start_time = time.time()
-            result = self.ollama_client.generate(
-                model=self.model,
-                prompt=user_prompt,
-                system=self.system_prompt,
-                temperature=self.temperature,
-            )
-            llm_duration = time.time() - llm_start_time
-
-            apf_html = result.get("response", "")
-
-            if not apf_html:
-                raise ValueError("LLM returned empty response")
-
-            # Post-process APF HTML (normalize code blocks, ensure manifest)
-            post_process_start = time.time()
-            apf_html = self._post_process_apf(apf_html, metadata, manifest)
-            post_process_duration = time.time() - post_process_start
-
-            # Extract confidence from LLM response (if available)
-            # For now, use a default confidence
-            confidence = 0.9
-
-            card_duration = time.time() - card_start_time
-
-            logger.info(
-                "single_card_generated",
+        # Warn if approaching context limit
+        if utilization_pct > 80:
+            logger.warning(
+                "high_context_utilization",
                 slug=manifest.slug,
-                card_index=qa_pair.card_index,
-                lang=lang,
-                response_length=len(apf_html),
-                llm_duration=round(llm_duration, 2),
-                post_process_duration=round(post_process_duration, 3),
-                total_duration=round(card_duration, 2),
+                utilization_pct=round(utilization_pct, 1),
+                estimated_tokens=estimated_tokens,
+                context_limit=model_limit,
+                recommendation="Consider reducing prompt size or using a model with larger context window",
             )
-
-            return GeneratedCard(
-                card_index=qa_pair.card_index,
-                slug=manifest.slug,
-                lang=lang,
-                apf_html=apf_html,
-                confidence=confidence,
-            )
-
-        except Exception as e:
-            card_duration = time.time() - card_start_time
+        elif utilization_pct > 90:
             logger.error(
-                "card_generation_failed",
+                "critical_context_utilization",
                 slug=manifest.slug,
-                error=str(e),
-                duration=round(card_duration, 2),
+                utilization_pct=round(utilization_pct, 1),
+                estimated_tokens=estimated_tokens,
+                context_limit=model_limit,
+                risk="Very high risk of context truncation",
             )
-            raise
+
+        # Retry logic for LLM calls
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Call Ollama LLM
+                llm_start_time = time.time()
+
+                logger.info(
+                    "llm_generation_attempt",
+                    slug=manifest.slug,
+                    attempt=attempt,
+                    max_attempts=max_retries,
+                    model=self.model,
+                )
+
+                result = self.ollama_client.generate(
+                    model=self.model,
+                    prompt=user_prompt,
+                    system=self.system_prompt,
+                    temperature=self.temperature,
+                )
+                llm_duration = time.time() - llm_start_time
+
+                apf_html = result.get("response", "")
+
+                if not apf_html or not apf_html.strip():
+                    raise ValueError("LLM returned empty response")
+
+                # Extract token usage if available
+                token_usage = result.get("_token_usage", {})
+                prompt_tokens = token_usage.get("prompt_tokens", 0)
+                completion_tokens = token_usage.get("completion_tokens", 0)
+                total_tokens = token_usage.get("total_tokens", 0)
+
+                # Post-process APF HTML (normalize code blocks, ensure manifest)
+                post_process_start = time.time()
+                apf_html = self._post_process_apf(apf_html, metadata, manifest)
+                post_process_duration = time.time() - post_process_start
+
+                # Extract confidence from LLM response (if available)
+                # For now, use a default confidence
+                confidence = 0.9
+
+                card_duration = time.time() - card_start_time
+
+                logger.info(
+                    "single_card_generated",
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    response_length=len(apf_html),
+                    llm_duration=round(llm_duration, 2),
+                    post_process_duration=round(post_process_duration, 3),
+                    total_duration=round(card_duration, 2),
+                    attempts_needed=attempt,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+
+                # Record success metrics
+                record_operation_metric(
+                    operation="card_generation",
+                    success=True,
+                    duration=card_duration,
+                    llm_duration=llm_duration,
+                    tokens=total_tokens,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    retried=(attempt > 1),
+                )
+
+                return GeneratedCard(
+                    card_index=qa_pair.card_index,
+                    slug=manifest.slug,
+                    lang=lang,
+                    apf_html=apf_html,
+                    confidence=confidence,
+                )
+
+            except Exception as e:
+                llm_duration = time.time() - llm_start_time
+
+                # Try to extract response if available (for debug artifacts)
+                response_text = None
+                if hasattr(e, "__context__") and hasattr(e.__context__, "response"):
+                    try:
+                        response_text = getattr(e.__context__, "response", None)
+                    except Exception:
+                        pass
+
+                # Categorize the error
+                llm_error = categorize_llm_error(
+                    error=e,
+                    model=self.model,
+                    operation=f"card generation ({manifest.slug})",
+                    duration=llm_duration,
+                )
+
+                # Log the error with context
+                log_llm_error(
+                    llm_error,
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    attempt=attempt,
+                    max_attempts=max_retries,
+                )
+
+                # Check if we should retry
+                if should_retry_llm_error(llm_error, attempt, max_retries):
+                    # Calculate exponential backoff delay
+                    delay = 2 ** (attempt - 1)  # 1s, 2s, 4s
+                    logger.info(
+                        "retrying_after_delay",
+                        slug=manifest.slug,
+                        attempt=attempt,
+                        delay_seconds=delay,
+                    )
+                    time.sleep(delay)
+                    continue
+
+                # No more retries or non-retryable error - save debug artifacts
+                card_duration = time.time() - card_start_time
+
+                # Save debug artifact for this failure
+                artifact_path = save_failed_llm_call(
+                    operation=f"card_generation_{manifest.slug}",
+                    model=self.model,
+                    prompt=user_prompt,
+                    system_prompt=self.system_prompt,
+                    response=response_text,
+                    error=llm_error,
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    attempts_made=attempt,
+                )
+
+                logger.error(
+                    "card_generation_failed",
+                    slug=manifest.slug,
+                    error_type=llm_error.error_type.value,
+                    error=str(llm_error),
+                    user_message=format_llm_error_for_user(llm_error),
+                    duration=round(card_duration, 2),
+                    attempts_made=attempt,
+                    debug_artifact=str(artifact_path) if artifact_path else None,
+                )
+
+                # Record failure metrics
+                record_operation_metric(
+                    operation="card_generation",
+                    success=False,
+                    duration=card_duration,
+                    llm_duration=llm_duration,
+                    retried=(attempt > 1),
+                    error_type=llm_error.error_type.value,
+                )
+
+                raise llm_error from e
+
+        # Should never reach here, but just in case
+        raise RuntimeError(f"Failed to generate card after {max_retries} attempts")
 
     def _build_user_prompt(
         self,
@@ -723,7 +887,62 @@ Now generate the card following this structure:
 
             apf_html = "\n".join(lines)
 
-        # 9. Ensure proper formatting
+        # 9. Normalize card header to match validator expectations
+        apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
+
+        # 10. Ensure proper formatting
         apf_html = apf_html.strip()
+
+        return apf_html
+
+    def _normalize_card_header(
+        self, apf_html: str, manifest: Manifest, card_type: str, tags: list[str]
+    ) -> str:
+        """Normalize card header to match validator's expected format.
+
+        The validator expects exactly:
+        <!-- Card N | slug: slug-name | CardType: Simple | Tags: tag1 tag2 tag3 -->
+
+        Args:
+            apf_html: APF HTML content
+            manifest: Card manifest
+            card_type: Card type (Simple, Missing, Draw)
+            tags: List of tags
+
+        Returns:
+            APF HTML with normalized card header
+        """
+        # Build the correct header format
+        correct_header = f"<!-- Card {manifest.card_index} | slug: {manifest.slug} | CardType: {card_type} | Tags: {' '.join(tags)} -->"
+
+        # Find and replace existing card header
+        # Pattern matches various card header formats the LLM might produce
+        card_header_pattern = r"<!--\s*Card\s+\d+[^\]]*?-->"
+
+        match = re.search(card_header_pattern, apf_html)
+        if match:
+            apf_html = apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+            logger.debug(
+                "normalized_card_header",
+                slug=manifest.slug,
+                old_header=match.group(0)[:100],
+                new_header=correct_header,
+            )
+        else:
+            logger.warning(
+                "no_card_header_found_to_normalize",
+                slug=manifest.slug,
+                inserting_header=True,
+            )
+            # If no header found, insert it after BEGIN_CARDS
+            begin_cards_pos = apf_html.find("<!-- BEGIN_CARDS -->")
+            if begin_cards_pos >= 0:
+                insert_pos = begin_cards_pos + len("<!-- BEGIN_CARDS -->")
+                apf_html = (
+                    apf_html[:insert_pos]
+                    + "\n\n"
+                    + correct_header
+                    + apf_html[insert_pos:]
+                )
 
         return apf_html
