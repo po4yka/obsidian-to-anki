@@ -159,6 +159,8 @@ class GeneratorAgent:
         Returns:
             GeneratedCard instance
         """
+        card_start_time = time.time()
+
         # Select language-specific content
         question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
         answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
@@ -173,37 +175,53 @@ class GeneratorAgent:
             lang=lang,
         )
 
-        logger.debug(
-            "calling_llm",
+        logger.info(
+            "generating_single_card",
             model=self.model,
             slug=manifest.slug,
+            card_index=qa_pair.card_index,
+            lang=lang,
             prompt_length=len(user_prompt),
+            system_length=len(self.system_prompt),
         )
 
         try:
             # Call Ollama LLM
+            llm_start_time = time.time()
             result = self.ollama_client.generate(
                 model=self.model,
                 prompt=user_prompt,
                 system=self.system_prompt,
                 temperature=self.temperature,
             )
+            llm_duration = time.time() - llm_start_time
 
             apf_html = result.get("response", "")
 
             if not apf_html:
                 raise ValueError("LLM returned empty response")
 
-            logger.debug(
-                "llm_response_received", slug=manifest.slug, length=len(apf_html)
-            )
-
             # Post-process APF HTML (normalize code blocks, ensure manifest)
+            post_process_start = time.time()
             apf_html = self._post_process_apf(apf_html, metadata, manifest)
+            post_process_duration = time.time() - post_process_start
 
             # Extract confidence from LLM response (if available)
             # For now, use a default confidence
             confidence = 0.9
+
+            card_duration = time.time() - card_start_time
+
+            logger.info(
+                "single_card_generated",
+                slug=manifest.slug,
+                card_index=qa_pair.card_index,
+                lang=lang,
+                response_length=len(apf_html),
+                llm_duration=round(llm_duration, 2),
+                post_process_duration=round(post_process_duration, 3),
+                total_duration=round(card_duration, 2),
+            )
 
             return GeneratedCard(
                 card_index=qa_pair.card_index,
@@ -214,7 +232,13 @@ class GeneratorAgent:
             )
 
         except Exception as e:
-            logger.error("card_generation_failed", slug=manifest.slug, error=str(e))
+            card_duration = time.time() - card_start_time
+            logger.error(
+                "card_generation_failed",
+                slug=manifest.slug,
+                error=str(e),
+                duration=round(card_duration, 2),
+            )
             raise
 
     def _build_user_prompt(
