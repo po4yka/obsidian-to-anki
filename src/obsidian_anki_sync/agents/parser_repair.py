@@ -142,6 +142,7 @@ If repairable, provide the FULL repaired content including frontmatter.
         prompt = self._build_repair_prompt(content, str(original_error))
 
         # Call LLM for repair analysis
+        response_text = "N/A"  # Initialize to avoid undefined variable in error handling
         try:
             response = self.ollama_client.generate(
                 model=self.model,
@@ -163,7 +164,7 @@ If repairable, provide the FULL repaired content including frontmatter.
                 "parser_repair_invalid_json",
                 file=str(file_path),
                 error=str(e),
-                response=response_text[:500] if "response_text" in locals() else "N/A",
+                response=response_text[:500] if response_text != "N/A" else "N/A",
             )
             return None
         except Exception as e:
