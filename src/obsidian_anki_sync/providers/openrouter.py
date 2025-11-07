@@ -149,7 +149,6 @@ class OpenRouterProvider(BaseLLMProvider):
             logger.error("openrouter_list_models_failed", error=str(e))
             return []
 
-    @retry(max_attempts=3, initial_delay=2.0, backoff_factor=2.0)
     def generate(
         self,
         model: str,
