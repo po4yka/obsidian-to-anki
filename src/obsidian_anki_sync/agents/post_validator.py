@@ -15,6 +15,11 @@ from ..apf.linter import validate_apf
 from ..models import NoteMetadata
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .llm_errors import (
+    categorize_llm_error,
+    format_llm_error_for_user,
+    log_llm_error,
+)
 from .models import GeneratedCard, PostValidationResult
 
 logger = get_logger(__name__)
@@ -137,14 +142,33 @@ class PostValidatorAgent:
 
         except Exception as e:
             validation_time = time.time() - start_time
+
+            # Categorize and log the error properly
+            llm_error = categorize_llm_error(
+                error=e,
+                model=self.model,
+                operation="post-validation",
+                duration=validation_time,
+            )
+
+            log_llm_error(
+                llm_error,
+                cards_count=len(cards),
+                strict_mode=strict_mode,
+            )
+
             logger.error(
-                "post_validation_llm_error", error=str(e), time=validation_time
+                "post_validation_llm_error",
+                error_type=llm_error.error_type.value,
+                error=str(llm_error),
+                user_message=format_llm_error_for_user(llm_error),
+                time=validation_time,
             )
 
             return PostValidationResult(
                 is_valid=False,
                 error_type="semantic",
-                error_details=f"Semantic validation failed: {str(e)}",
+                error_details=f"Semantic validation failed: {format_llm_error_for_user(llm_error)}",
                 corrected_cards=None,
                 validation_time=validation_time,
             )
@@ -384,32 +408,72 @@ Your job is to fix validation errors in APF flashcards.
 Always return valid JSON with the corrected_cards array.
 Never return an empty object or incomplete response."""
 
-            result = self.ollama_client.generate_json(
-                model=self.model,
-                prompt=prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-            )
+            # Call LLM with error handling
+            try:
+                llm_start_time = time.time()
 
-            # Handle case where model returns empty or invalid JSON
-            if not result or not isinstance(result, dict):
-                logger.warning(
-                    "auto_fix_invalid_response",
-                    response_type=type(result).__name__,
-                    response=str(result)[:200],
+                result = self.ollama_client.generate_json(
+                    model=self.model,
+                    prompt=prompt,
+                    system=system_prompt,
+                    temperature=self.temperature,
+                )
+
+                llm_duration = time.time() - llm_start_time
+
+                logger.info(
+                    "auto_fix_llm_complete",
+                    duration=round(llm_duration, 2),
+                    result_type=type(result).__name__,
+                )
+
+                # Handle case where model returns empty or invalid JSON
+                if not result or not isinstance(result, dict):
+                    logger.warning(
+                        "auto_fix_invalid_response",
+                        response_type=type(result).__name__,
+                        response=str(result)[:200],
+                    )
+                    return None
+
+                corrected_data = result.get("corrected_cards", [])
+                if not corrected_data:
+                    logger.warning(
+                        "auto_fix_no_corrections",
+                        result_keys=list(result.keys()),
+                        result_preview=str(result)[:200],
+                    )
+                    return None
+
+                logger.info(
+                    "auto_fix_success", corrected_cards_count=len(corrected_data)
+                )
+                return [GeneratedCard(**card) for card in corrected_data]
+
+            except Exception as llm_error:
+                llm_duration = time.time() - llm_start_time
+
+                # Categorize and log the error
+                categorized_error = categorize_llm_error(
+                    error=llm_error,
+                    model=self.model,
+                    operation="auto-fix",
+                    duration=llm_duration,
+                )
+
+                log_llm_error(
+                    categorized_error,
+                    cards_to_fix=len(cards_to_fix),
+                    error_details_length=len(error_details),
+                )
+
+                logger.error(
+                    "auto_fix_llm_failed",
+                    error_type=categorized_error.error_type.value,
+                    error=str(categorized_error),
+                    user_message=format_llm_error_for_user(categorized_error),
                 )
                 return None
-
-            corrected_data = result.get("corrected_cards", [])
-            if not corrected_data:
-                logger.warning(
-                    "auto_fix_no_corrections",
-                    result_keys=list(result.keys()),
-                    result_preview=str(result)[:200],
-                )
-                return None
-
-            return [GeneratedCard(**card) for card in corrected_data]
 
         except Exception as e:
             logger.error("auto_fix_failed", error=str(e))
