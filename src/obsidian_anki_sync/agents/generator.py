@@ -5,6 +5,7 @@ like qwen3:32b for high-quality card generation.
 """
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -252,11 +253,20 @@ class GeneratorAgent:
     ) -> str:
         """Build user prompt for LLM.
 
-        Reuses logic from APFGenerator._build_user_prompt.
+        Uses deterministic tag generation and provides clear examples.
         """
         ref_link = f"[[{manifest.source_path}#{manifest.source_anchor}]]"
 
-        prompt = f"""Generate an APF card in HTML format.
+        # Detect code language from answer
+        detected_lang = self._detect_code_language(answer)
+        code_lang = (
+            detected_lang if detected_lang != "text" else self._code_language_hint(metadata)
+        )
+
+        # Generate tags deterministically
+        suggested_tags = self._generate_tags(metadata, lang)
+
+        prompt = f"""Generate an APF card in HTML format following APF v2.1 specification.
 
 Metadata:
 - Topic: {metadata.topic}
@@ -264,6 +274,7 @@ Metadata:
 - Difficulty: {metadata.difficulty or "Not specified"}
 - Language: {lang}
 - Slug: {manifest.slug}
+- Code Language: {code_lang}
 
 Question:
 {question}
@@ -285,21 +296,44 @@ Answer:
         if qa_pair.context:
             prompt += f"\nAdditional Context:\n{qa_pair.context}\n"
 
-        # Derive code language hint
-        code_lang = self._code_language_hint(metadata)
-
-        # Add requirements
+        # Add requirements with few-shot example
         prompt += f"""
 Requirements:
-- CardType: Simple (or Missing if {{{{c}}}} detected in answer, or Draw if diagram marker present)
-- Tags: Derive from topic/subtopics, 3-6 snake_case tags, include primary language/tech
-- Primary language tag: {lang}
-- Topic-based tags: {metadata.topic.lower().replace(" ", "_")}
-- Preserve every code block using <pre><code class="language-{code_lang}"> ... </code></pre> with original indentation
-- Include manifest at end with slug "{manifest.slug}"
+- Use EXACTLY these tags: {" ".join(suggested_tags)}
+- CardType: Simple (or Missing if cloze {{{{c1::...}}}}, Draw if diagram)
+- Preserve code blocks with <pre><code class="language-{code_lang}">...</code></pre>
 - Add "Ref: {ref_link}" in Other notes section
-- Follow APF v2.1 format strictly
-- Output ONLY the card HTML, no explanations
+- Follow exact structure below
+
+CRITICAL: Output ONLY the card HTML. NO explanations before or after.
+
+Example Structure (follow exactly):
+
+<!-- Card 1 | slug: {manifest.slug} | CardType: Simple | Tags: {" ".join(suggested_tags)} -->
+
+<!-- Title -->
+[Your question here - max 80 chars]
+
+<!-- Key point (code block) -->
+<pre><code class="language-{code_lang}">
+[Your answer code here - preserve indentation]
+</code></pre>
+
+<!-- Key point notes -->
+<ul>
+  <li>Mechanism or rule explanation (max 20 words)</li>
+  <li>Key constraint or important detail</li>
+  <li>Common pitfall or edge case</li>
+</ul>
+
+<!-- Other notes (optional) -->
+<ul>
+  <li>Ref: {ref_link}</li>
+</ul>
+
+<!-- manifest: {{"slug":"{manifest.slug}","lang":"{lang}","type":"Simple","tags":{json.dumps(suggested_tags)}}} -->
+
+Now generate the card following this structure:
 """
 
         return prompt
@@ -348,10 +382,198 @@ Requirements:
 
         return "plaintext"
 
+    def _detect_code_language(self, code: str) -> str:
+        """Detect programming language from code content.
+
+        Uses syntax patterns to automatically detect the language.
+
+        Args:
+            code: Code snippet to analyze
+
+        Returns:
+            Detected language name or 'text' if unknown
+        """
+        if not code or not code.strip():
+            return "text"
+
+        code_lower = code.lower().strip()
+
+        # Kotlin patterns
+        if any(
+            k in code_lower
+            for k in [
+                "suspend fun",
+                "data class",
+                "sealed class",
+                "sealed interface",
+                "inline class",
+                "value class",
+            ]
+        ):
+            return "kotlin"
+        if "fun " in code_lower and ("val " in code_lower or "var " in code_lower):
+            return "kotlin"
+
+        # Java patterns
+        if any(
+            k in code_lower
+            for k in ["public class", "private class", "protected class"]
+        ):
+            return "java"
+        if "import java." in code_lower or "package " in code_lower:
+            return "java"
+
+        # Python patterns (check before JavaScript due to 'async' keyword overlap)
+        if any(k in code_lower for k in ["def ", "async def"]):
+            # Strong Python indicators
+            if any(k in code_lower for k in ["__init__", "self.", "import ", "from "]):
+                return "python"
+            # async def is Python-specific
+            if "async def" in code_lower:
+                return "python"
+
+        # JavaScript/TypeScript
+        if any(k in code_lower for k in ["function ", "const ", "let ", "=>", "async "]):
+            # TypeScript-specific
+            if any(
+                k in code
+                for k in ["interface ", "type ", ": string", ": number", "<T>"]
+            ):
+                return "typescript"
+            return "javascript"
+
+        # Shell/Bash
+        if code.startswith("#!") or any(
+            k in code_lower for k in ["#!/bin/", "export ", "echo ", "sudo "]
+        ):
+            return "bash"
+
+        # YAML
+        if re.match(r"^[a-z_]+:\s", code_lower, re.MULTILINE) and "-" in code:
+            return "yaml"
+
+        # JSON
+        if code.strip().startswith("{") and '"' in code and ":" in code:
+            return "json"
+
+        # SQL
+        if any(k in code_lower for k in ["select ", "insert ", "update ", "delete "]):
+            return "sql"
+
+        # Swift
+        if any(k in code_lower for k in ["func ", "var ", "let ", "import swift"]):
+            return "swift"
+
+        # Go
+        if "package main" in code_lower or "func main()" in code_lower:
+            return "go"
+
+        # Rust
+        if any(k in code_lower for k in ["fn ", "let mut", "impl ", "pub fn"]):
+            return "rust"
+
+        # Fallback to metadata hint
+        return "text"
+
+    def _generate_tags(self, metadata: NoteMetadata, lang: str) -> list[str]:
+        """Generate deterministic tags from metadata.
+
+        This ensures tag taxonomy compliance and consistency.
+
+        Args:
+            metadata: Note metadata
+            lang: Language code
+
+        Returns:
+            List of 3-6 snake_case tags
+        """
+        tags = []
+
+        # 1. Primary language/tech (required first)
+        primary_tech = self._code_language_hint(metadata)
+        if primary_tech != "plaintext":
+            tags.append(primary_tech)
+
+        # 2. Platform (if available)
+        platforms = {
+            "android",
+            "ios",
+            "kmp",
+            "jvm",
+            "nodejs",
+            "browser",
+            "linux",
+            "macos",
+            "windows",
+        }
+        for tag in metadata.tags:
+            tag_lower = tag.lower().replace("-", "_")
+            if tag_lower in platforms and tag_lower not in tags:
+                tags.append(tag_lower)
+                break
+
+        # 3. Topic-based tag
+        topic_tag = metadata.topic.lower().replace(" ", "_").replace("-", "_")
+        if topic_tag not in tags:
+            tags.append(topic_tag)
+
+        # 4. Subtopic tags (up to 3 more)
+        for subtopic in metadata.subtopics:
+            if len(tags) >= 6:
+                break
+            tag = subtopic.lower().replace(" ", "_").replace("-", "_")
+            if tag not in tags:
+                tags.append(tag)
+
+        # 5. Difficulty (if less than 6 tags and specified)
+        if len(tags) < 6 and metadata.difficulty:
+            difficulty_tag = f"difficulty_{metadata.difficulty.lower()}"
+            if difficulty_tag not in tags:
+                tags.append(difficulty_tag)
+
+        # Ensure at least 3 tags
+        while len(tags) < 3:
+            if "programming" not in tags:
+                tags.append("programming")
+            elif "conceptual" not in tags:
+                tags.append("conceptual")
+            else:
+                tags.append("general")
+
+        return tags[:6]  # Max 6 tags
+
+    def _generate_manifest(
+        self, manifest: Manifest, card_type: str, tags: list[str]
+    ) -> str:
+        """Generate manifest JSON string.
+
+        Args:
+            manifest: Card manifest
+            card_type: Card type (Simple, Missing, Draw)
+            tags: List of tags
+
+        Returns:
+            Manifest comment string
+        """
+        manifest_dict = {
+            "slug": manifest.slug,
+            "lang": manifest.lang,
+            "type": card_type,
+            "tags": tags,
+        }
+        return f'<!-- manifest: {json.dumps(manifest_dict, ensure_ascii=False)} -->'
+
     def _post_process_apf(
         self, apf_html: str, metadata: NoteMetadata, manifest: Manifest
     ) -> str:
         """Post-process APF HTML to ensure correctness.
+
+        This method:
+        1. Strips markdown code fences
+        2. Removes explanatory text before/after card
+        3. Detects card type
+        4. Generates and injects correct manifest
+        5. Ensures proper formatting
 
         Args:
             apf_html: Raw APF HTML from LLM
@@ -361,26 +583,62 @@ Requirements:
         Returns:
             Post-processed APF HTML
         """
-        # For now, return as-is
-        # In full implementation, this would:
-        # 1. Normalize code blocks (convert Markdown fences to <pre><code>)
-        # 2. Ensure manifest comment is present and correct
-        # 3. Validate HTML structure
+        # 1. Strip markdown code fences if present
+        apf_html = re.sub(r"^```html\s*\n", "", apf_html, flags=re.MULTILINE)
+        apf_html = re.sub(r"\n```\s*$", "", apf_html, flags=re.MULTILINE)
 
-        # Basic manifest check
-        if "<!-- manifest:" not in apf_html:
-            # Add manifest if missing
-            manifest_json = json.dumps(
-                {
-                    "slug": manifest.slug,
-                    "slug_base": manifest.slug_base,
-                    "lang": manifest.lang,
-                    "guid": manifest.guid,
-                    "type": "Simple",
-                    "tags": [],
-                },
-                ensure_ascii=False,
+        # 2. Strip any text before first card comment
+        card_start = apf_html.find("<!-- Card")
+        if card_start > 0:
+            logger.debug(
+                "stripped_text_before_card",
+                slug=manifest.slug,
+                chars_removed=card_start,
             )
-            apf_html += f"\n<!-- manifest: {manifest_json} -->"
+            apf_html = apf_html[card_start:]
+
+        # 3. Strip any text after manifest comment (if present)
+        manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
+        if manifest_match:
+            end_pos = manifest_match.end()
+            # Keep only until end of manifest
+            apf_html = apf_html[:end_pos]
+
+        # 4. Extract tags from card header
+        tags_match = re.search(r"Tags:\s*([^\]]+?)\s*-->", apf_html)
+        if tags_match:
+            # Use tags from model output
+            tags = tags_match.group(1).strip().split()
+            logger.debug("extracted_tags_from_output", slug=manifest.slug, tags=tags)
+        else:
+            # Generate tags deterministically
+            tags = self._generate_tags(metadata, manifest.lang)
+            logger.debug("generated_tags", slug=manifest.slug, tags=tags)
+
+        # 5. Detect card type
+        if "{{c" in apf_html:
+            card_type = "Missing"
+        elif "<img " in apf_html and "svg" in apf_html.lower():
+            card_type = "Draw"
+        else:
+            card_type = "Simple"
+
+        logger.debug("detected_card_type", slug=manifest.slug, type=card_type)
+
+        # 6. Generate correct manifest
+        correct_manifest = self._generate_manifest(manifest, card_type, tags)
+
+        # 7. Replace existing manifest or append
+        if "<!-- manifest:" in apf_html:
+            apf_html = re.sub(
+                r"<!-- manifest:.*?-->", correct_manifest, apf_html, flags=re.DOTALL
+            )
+            logger.debug("replaced_manifest", slug=manifest.slug)
+        else:
+            apf_html += "\n\n" + correct_manifest
+            logger.debug("appended_manifest", slug=manifest.slug)
+
+        # 8. Ensure proper formatting
+        apf_html = apf_html.strip()
 
         return apf_html

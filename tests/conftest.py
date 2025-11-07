@@ -3,6 +3,7 @@
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -75,6 +76,16 @@ def sample_qa_pair():
         related="Integration testing",
         context="Testing fundamentals",
     )
+
+
+@pytest.fixture
+def mock_ollama_provider():
+    """Create a mock Ollama provider for testing."""
+    mock_provider = MagicMock()
+    mock_provider.generate.return_value = {
+        "response": "<!-- Card 1 | slug: test | CardType: Simple | Tags: python testing -->\n<!-- Title -->\nTest card\n<!-- manifest: {} -->"
+    }
+    return mock_provider
 
 
 @pytest.fixture
