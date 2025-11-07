@@ -303,11 +303,14 @@ Requirements:
 - CardType: Simple (or Missing if cloze {{{{c1::...}}}}, Draw if diagram)
 - Preserve code blocks with <pre><code class="language-{code_lang}">...</code></pre>
 - Add "Ref: {ref_link}" in Other notes section
-- Follow exact structure below
+- Follow exact structure below including ALL wrapper sentinels
 
-CRITICAL: Output ONLY the card HTML. NO explanations before or after.
+CRITICAL: Output ONLY the complete APF v2.1 format below. NO explanations before or after.
 
 Example Structure (follow exactly):
+
+<!-- PROMPT_VERSION: apf-v2.1 -->
+<!-- BEGIN_CARDS -->
 
 <!-- Card 1 | slug: {manifest.slug} | CardType: Simple | Tags: {" ".join(suggested_tags)} -->
 
@@ -332,6 +335,9 @@ Example Structure (follow exactly):
 </ul>
 
 <!-- manifest: {{"slug":"{manifest.slug}","lang":"{lang}","type":"Simple","tags":{json.dumps(suggested_tags)}}} -->
+
+<!-- END_CARDS -->
+END_OF_CARDS
 
 Now generate the card following this structure:
 """
@@ -570,10 +576,11 @@ Now generate the card following this structure:
 
         This method:
         1. Strips markdown code fences
-        2. Removes explanatory text before/after card
-        3. Detects card type
-        4. Generates and injects correct manifest
-        5. Ensures proper formatting
+        2. Ensures APF v2.1 wrapper sentinels are present
+        3. Removes explanatory text before/after card
+        4. Detects card type
+        5. Generates and injects correct manifest
+        6. Ensures proper formatting
 
         Args:
             apf_html: Raw APF HTML from LLM
@@ -587,9 +594,21 @@ Now generate the card following this structure:
         apf_html = re.sub(r"^```html\s*\n", "", apf_html, flags=re.MULTILINE)
         apf_html = re.sub(r"\n```\s*$", "", apf_html, flags=re.MULTILINE)
 
-        # 2. Strip any text before first card comment
+        # 2. Strip any text before PROMPT_VERSION or Card comment
+        version_start = apf_html.find("<!-- PROMPT_VERSION:")
         card_start = apf_html.find("<!-- Card")
-        if card_start > 0:
+
+        if version_start >= 0:
+            # Has PROMPT_VERSION, strip everything before it
+            if version_start > 0:
+                logger.debug(
+                    "stripped_text_before_version",
+                    slug=manifest.slug,
+                    chars_removed=version_start,
+                )
+                apf_html = apf_html[version_start:]
+        elif card_start > 0:
+            # No PROMPT_VERSION, strip everything before Card
             logger.debug(
                 "stripped_text_before_card",
                 slug=manifest.slug,
@@ -597,12 +616,17 @@ Now generate the card following this structure:
             )
             apf_html = apf_html[card_start:]
 
-        # 3. Strip any text after manifest comment (if present)
-        manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
-        if manifest_match:
-            end_pos = manifest_match.end()
-            # Keep only until end of manifest
-            apf_html = apf_html[:end_pos]
+        # 3. Strip any text after END_OF_CARDS or manifest comment
+        end_of_cards_pos = apf_html.find("END_OF_CARDS")
+        if end_of_cards_pos >= 0:
+            # Keep until end of END_OF_CARDS line
+            apf_html = apf_html[:end_of_cards_pos + len("END_OF_CARDS")]
+        else:
+            # Fallback: Strip after manifest comment
+            manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
+            if manifest_match:
+                end_pos = manifest_match.end()
+                apf_html = apf_html[:end_pos]
 
         # 4. Extract tags from card header
         tags_match = re.search(r"Tags:\s*([^\]]+?)\s*-->", apf_html)
@@ -638,7 +662,35 @@ Now generate the card following this structure:
             apf_html += "\n\n" + correct_manifest
             logger.debug("appended_manifest", slug=manifest.slug)
 
-        # 8. Ensure proper formatting
+        # 8. Ensure APF v2.1 wrapper sentinels are present
+        has_prompt_version = "<!-- PROMPT_VERSION: apf-v2.1 -->" in apf_html
+        has_begin_cards = "<!-- BEGIN_CARDS -->" in apf_html
+        has_end_cards = "<!-- END_CARDS -->" in apf_html
+        has_end_of_cards = "END_OF_CARDS" in apf_html
+
+        if not (has_prompt_version and has_begin_cards and has_end_cards and has_end_of_cards):
+            # Missing wrapper sentinels, add them
+            logger.debug("adding_missing_wrapper_sentinels", slug=manifest.slug)
+
+            # Wrap the card content
+            lines = []
+            if not has_prompt_version:
+                lines.append("<!-- PROMPT_VERSION: apf-v2.1 -->")
+            if not has_begin_cards:
+                lines.append("<!-- BEGIN_CARDS -->")
+                lines.append("")
+
+            lines.append(apf_html.strip())
+
+            if not has_end_cards:
+                lines.append("")
+                lines.append("<!-- END_CARDS -->")
+            if not has_end_of_cards:
+                lines.append("END_OF_CARDS")
+
+            apf_html = "\n".join(lines)
+
+        # 9. Ensure proper formatting
         apf_html = apf_html.strip()
 
         return apf_html
