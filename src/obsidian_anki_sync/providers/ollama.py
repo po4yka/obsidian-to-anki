@@ -8,6 +8,7 @@ import httpx
 from ..utils.logging import get_logger
 from ..utils.retry import retry
 from .base import BaseLLMProvider
+from .safety import OllamaSafetyWrapper, SafetyConfig
 
 logger = get_logger(__name__)
 
@@ -30,6 +31,8 @@ class OllamaProvider(BaseLLMProvider):
         base_url: str = "http://localhost:11434",
         api_key: str | None = None,
         timeout: float = 900.0,
+        enable_safety: bool = True,
+        safety_config: SafetyConfig | None = None,
         **kwargs: Any,
     ):
         """Initialize Ollama provider.
@@ -38,6 +41,8 @@ class OllamaProvider(BaseLLMProvider):
             base_url: Base URL for Ollama API (local or cloud)
             api_key: API key for Ollama Cloud (optional, not needed for local)
             timeout: Request timeout in seconds
+            enable_safety: Enable safety controls
+            safety_config: Custom safety configuration
             **kwargs: Additional configuration options
         """
         super().__init__(base_url=base_url, api_key=api_key, timeout=timeout, **kwargs)
@@ -45,6 +50,13 @@ class OllamaProvider(BaseLLMProvider):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+
+        # Initialize safety wrapper
+        self.enable_safety = enable_safety
+        if self.enable_safety:
+            self.safety = OllamaSafetyWrapper(config=safety_config)
+        else:
+            self.safety = None
 
         # Set up headers
         headers = {}
@@ -68,6 +80,7 @@ class OllamaProvider(BaseLLMProvider):
             base_url=base_url,
             deployment_type=deployment_type,
             timeout=timeout,
+            safety_enabled=enable_safety,
         )
 
     def __del__(self) -> None:
@@ -139,38 +152,75 @@ class OllamaProvider(BaseLLMProvider):
         if stream:
             raise NotImplementedError("Streaming is not yet supported")
 
-        payload: dict[str, Any] = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": temperature},
-        }
+        # Safety controls: validate and sanitize input
+        if self.enable_safety and self.safety:
+            validation = self.safety.validate_input(prompt, system)
 
-        if system:
-            payload["system"] = system
+            # Use sanitized versions
+            prompt = validation["prompt"]
+            system = validation["system"]
+            estimated_tokens = validation["estimated_tokens"]
 
-        if format == "json":
-            payload["format"] = "json"
+            if validation["warnings"]:
+                logger.warning(
+                    "input_sanitized",
+                    warnings_count=len(validation["warnings"]),
+                    model=model,
+                )
 
-        request_start_time = time.time()
+            # Rate limiting and concurrency control
+            rate_info = self.safety.rate_limiter.check_and_wait(estimated_tokens)
+            if rate_info["wait_time"] > 0:
+                logger.info(
+                    "rate_limit_wait",
+                    wait_seconds=round(rate_info["wait_time"], 2),
+                    reason=rate_info["reason"],
+                )
 
-        # Check if this is the first request to this model
-        is_first_request = model not in self._model_first_request
-        if is_first_request:
-            self._model_first_request[model] = True
-
-        logger.info(
-            "ollama_generate_request",
-            model=model,
-            prompt_length=len(prompt),
-            system_length=len(system),
-            temperature=temperature,
-            format=format,
-            timeout=self.timeout,
-            first_request_to_model=is_first_request,
-        )
+            # Acquire concurrency slot
+            concurrency_wait = self.safety.concurrency_limiter.acquire()
+            if concurrency_wait > 0.5:
+                logger.info(
+                    "concurrency_wait",
+                    wait_seconds=round(concurrency_wait, 2),
+                    status=self.safety.concurrency_limiter.get_status(),
+                )
+        else:
+            estimated_tokens = (len(prompt) + len(system)) // 4
 
         try:
+            payload: dict[str, Any] = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": temperature},
+            }
+
+            if system:
+                payload["system"] = system
+
+            if format == "json":
+                payload["format"] = "json"
+
+            request_start_time = time.time()
+
+            # Check if this is the first request to this model
+            is_first_request = model not in self._model_first_request
+            if is_first_request:
+                self._model_first_request[model] = True
+
+            logger.info(
+                "ollama_generate_request",
+                model=model,
+                prompt_length=len(prompt),
+                system_length=len(system),
+                temperature=temperature,
+                format=format,
+                timeout=self.timeout,
+                estimated_tokens=estimated_tokens,
+                first_request_to_model=is_first_request,
+            )
+
             response = self.client.post(
                 f"{self.base_url}/api/generate", json=payload, timeout=self.timeout
             )
@@ -186,6 +236,36 @@ class OllamaProvider(BaseLLMProvider):
             prompt_eval_duration = result.get("prompt_eval_duration", 0) / 1e9
 
             tokens_per_sec = eval_count / eval_duration if eval_duration > 0 else 0
+            total_tokens = prompt_eval_count + eval_count
+
+            # Store token usage in result for caller access
+            result["_token_usage"] = {
+                "prompt_tokens": prompt_eval_count,
+                "completion_tokens": eval_count,
+                "total_tokens": total_tokens,
+            }
+
+            # Safety controls: validate output
+            if self.enable_safety and self.safety:
+                response_text = result.get("response", "")
+                expected_format = format if format else None
+                output_validation = self.safety.validate_output(
+                    response_text, expected_format=expected_format
+                )
+
+                if output_validation["warnings"]:
+                    logger.warning(
+                        "output_validation_warnings",
+                        warnings_count=len(output_validation["warnings"]),
+                        model=model,
+                    )
+
+                if not output_validation["is_valid"]:
+                    logger.error(
+                        "output_validation_failed",
+                        model=model,
+                        warnings=output_validation["warnings"],
+                    )
 
             # Log model loading time if this was the first request
             if is_first_request and request_duration > 30:
@@ -220,10 +300,11 @@ class OllamaProvider(BaseLLMProvider):
                 model=model,
                 response_length=len(result.get("response", "")),
                 request_duration=round(request_duration, 2),
-                eval_tokens=eval_count,
-                eval_duration=round(eval_duration, 2),
-                prompt_eval_tokens=prompt_eval_count,
+                prompt_tokens=prompt_eval_count,
+                completion_tokens=eval_count,
+                total_tokens=total_tokens,
                 prompt_eval_duration=round(prompt_eval_duration, 2),
+                eval_duration=round(eval_duration, 2),
                 tokens_per_second=round(tokens_per_sec, 2),
             )
 
@@ -256,6 +337,10 @@ class OllamaProvider(BaseLLMProvider):
                 request_duration=round(request_duration, 2),
             )
             raise
+        finally:
+            # Always release concurrency slot
+            if self.enable_safety and self.safety:
+                self.safety.concurrency_limiter.release()
 
     def pull_model(self, model: str) -> bool:
         """Pull a model from Ollama registry.
