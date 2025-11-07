@@ -22,7 +22,7 @@ class OpenRouterProvider(BaseLLMProvider):
     Configuration:
         api_key: OpenRouter API key (required, can use OPENROUTER_API_KEY env var)
         base_url: API endpoint URL (default: https://openrouter.ai/api/v1)
-        timeout: Request timeout in seconds (default: 120.0)
+        timeout: Request timeout in seconds (default: 180.0)
         max_tokens: Maximum tokens in response (default: 2048)
         site_url: Your site URL for OpenRouter rankings (optional)
         site_name: Your site name for OpenRouter rankings (optional)
@@ -32,7 +32,7 @@ class OpenRouterProvider(BaseLLMProvider):
         self,
         api_key: str | None = None,
         base_url: str = "https://openrouter.ai/api/v1",
-        timeout: float = 120.0,
+        timeout: float = 180.0,
         max_tokens: int = 2048,
         site_url: str | None = None,
         site_name: str | None = None,

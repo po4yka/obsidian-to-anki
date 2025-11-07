@@ -20,14 +20,14 @@ class LMStudioProvider(BaseLLMProvider):
 
     Configuration:
         base_url: API endpoint URL (default: http://localhost:1234/v1)
-        timeout: Request timeout in seconds (default: 120.0)
+        timeout: Request timeout in seconds (default: 600.0)
         max_tokens: Maximum tokens in response (default: 2048)
     """
 
     def __init__(
         self,
         base_url: str = "http://localhost:1234/v1",
-        timeout: float = 120.0,
+        timeout: float = 600.0,
         max_tokens: int = 2048,
         **kwargs: Any,
     ):

@@ -103,7 +103,21 @@ class BaseLLMProvider(ABC):
 
         response_text = result.get("response", "{}")
         try:
-            return cast(dict[str, Any], json.loads(response_text))
+            parsed = json.loads(response_text)
+
+            # Validate that we got a meaningful response, not just an empty object
+            if not parsed or (isinstance(parsed, dict) and len(parsed) == 0):
+                logger.error(
+                    "empty_json_response",
+                    provider=self.__class__.__name__,
+                    response_text=response_text[:500],
+                )
+                raise ValueError(
+                    f"LLM returned empty JSON response. This may indicate the model "
+                    f"completed too early or encountered an issue. Response: {response_text}"
+                )
+
+            return cast(dict[str, Any], parsed)
         except json.JSONDecodeError as e:
             logger.error(
                 "json_parse_error",
