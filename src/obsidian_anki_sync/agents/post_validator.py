@@ -343,28 +343,46 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
                     skipped_cards=len(cards) - 10,
                 )
 
-            prompt = f"""Fix these APF cards based on the validation errors.
+            # Simplified, more directive prompt
+            card_summaries = []
+            for i, card in enumerate(cards_to_fix, 1):
+                card_summaries.append(
+                    f"Card {i}:\n"
+                    f"  slug: {card.slug}\n"
+                    f"  lang: {card.lang}\n"
+                    f"  HTML length: {len(card.apf_html)} chars\n"
+                    f"  First 200 chars: {card.apf_html[:200]}..."
+                )
 
-VALIDATION ERRORS:
+            cards_summary = "\n\n".join(card_summaries)
+
+            prompt = f"""You must fix APF card validation errors and return valid JSON.
+
+ERRORS TO FIX:
 {error_details}
 
-CARDS TO FIX:
-{json.dumps([card.model_dump() for card in cards_to_fix], indent=2)}
+CARDS NEEDING FIXES:
+{cards_summary}
 
-Provide corrected cards in JSON format:
+REQUIRED OUTPUT FORMAT (return ONLY valid JSON):
 {{
     "corrected_cards": [
         {{
             "card_index": 1,
-            "slug": "slug",
+            "slug": "card-slug",
             "lang": "en",
-            "apf_html": "corrected HTML",
+            "apf_html": "corrected HTML here",
             "confidence": 0.9
         }}
     ]
-}}"""
+}}
 
-            system_prompt = "You are a card correction agent. Fix validation errors while preserving card content and intent."
+CRITICAL: You MUST return valid JSON with the corrected_cards array. Do not return empty object."""
+
+            system_prompt = """You are a card correction agent.
+Your job is to fix validation errors in APF flashcards.
+Always return valid JSON with the corrected_cards array.
+Never return an empty object or incomplete response."""
 
             result = self.ollama_client.generate_json(
                 model=self.model,
@@ -373,11 +391,25 @@ Provide corrected cards in JSON format:
                 temperature=self.temperature,
             )
 
-            corrected_data = result.get("corrected_cards", [])
-            if corrected_data:
-                return [GeneratedCard(**card) for card in corrected_data]
+            # Handle case where model returns empty or invalid JSON
+            if not result or not isinstance(result, dict):
+                logger.warning(
+                    "auto_fix_invalid_response",
+                    response_type=type(result).__name__,
+                    response=str(result)[:200],
+                )
+                return None
 
-            return None
+            corrected_data = result.get("corrected_cards", [])
+            if not corrected_data:
+                logger.warning(
+                    "auto_fix_no_corrections",
+                    result_keys=list(result.keys()),
+                    result_preview=str(result)[:200],
+                )
+                return None
+
+            return [GeneratedCard(**card) for card in corrected_data]
 
         except Exception as e:
             logger.error("auto_fix_failed", error=str(e))
