@@ -103,15 +103,7 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     except (ValueError, TypeError) as e:
         raise ParserError(f"Invalid date format in {file_path}: {e}")
 
-    # Check topic matches directory
-    expected_topic = file_path.parent.name
-    if data["topic"] != expected_topic:
-        logger.warning(
-            "topic_mismatch",
-            file=str(file_path),
-            yaml_topic=data["topic"],
-            dir_topic=expected_topic,
-        )
+    # Topic mismatch check is now handled by callers for aggregation
 
     # Build metadata object
     moc = _normalize_wikilink(data.get("moc"))
