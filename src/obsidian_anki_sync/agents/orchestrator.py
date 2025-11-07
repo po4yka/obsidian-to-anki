@@ -51,7 +51,7 @@ class AgentOrchestrator:
             # Create provider based on config (supports Ollama, LM Studio, OpenRouter)
             try:
                 self.provider = ProviderFactory.create_from_config(config)
-            except Exception as e:
+            except (ConnectionError, ValueError, RuntimeError, OSError) as e:
                 # Fallback to OllamaProvider with default settings
                 logger.warning(
                     "provider_creation_failed_fallback_to_ollama",
@@ -244,13 +244,20 @@ class AgentOrchestrator:
                     stage_times=stage_times,
                 )
 
-                # Update generation result with final cards
-                gen_result.cards = current_cards
+                # Create updated generation result with final cards (avoid mutation)
+                from .models import GenerationResult
+
+                final_gen_result = GenerationResult(
+                    cards=current_cards,
+                    total_cards=len(current_cards),
+                    generation_time=gen_result.generation_time,
+                    model_used=gen_result.model_used,
+                )
 
                 return AgentPipelineResult(
                     success=True,
                     pre_validation=pre_result,
-                    generation=gen_result,
+                    generation=final_gen_result,
                     post_validation=post_result,
                     total_time=total_time,
                     retry_count=retry_count,
@@ -337,9 +344,13 @@ class AgentOrchestrator:
 
         for gen_card in generated_cards:
             # Create manifest
+            # Safely extract slug_base by removing -index-lang suffix
+            parts = gen_card.slug.rsplit("-", 2)
+            slug_base = parts[0] if len(parts) >= 3 else gen_card.slug
+
             manifest = Manifest(
                 slug=gen_card.slug,
-                slug_base=gen_card.slug.rsplit("-", 2)[0],  # Remove -index-lang
+                slug_base=slug_base,
                 lang=gen_card.lang,
                 source_path="",  # Will be set by sync engine
                 source_anchor=f"qa-{gen_card.card_index}",

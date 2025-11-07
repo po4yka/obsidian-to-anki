@@ -248,8 +248,18 @@ Be thorough but constructive - suggest fixes when possible."""
             Formatted prompt string
         """
         # Build card summaries
+        # Limit to first 5 cards to avoid token limits, but warn if truncating
+        cards_to_validate = cards[:5]
+        if len(cards) > 5:
+            logger.warning(
+                "semantic_validation_truncated",
+                total_cards=len(cards),
+                validated_cards=5,
+                skipped_cards=len(cards) - 5,
+            )
+
         card_summaries = []
-        for card in cards[:5]:  # Limit to first 5 cards to avoid token limits
+        for card in cards_to_validate:
             # Extract title from HTML
             title = "Unknown"
             if "<!-- Title -->" in card.apf_html:
@@ -322,13 +332,24 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
             Corrected cards if successful, None otherwise
         """
         try:
+            # Include all cards (not just first 3) to ensure comprehensive fix
+            # Limit to reasonable size to avoid token limits
+            cards_to_fix = cards[:10]
+            if len(cards) > 10:
+                logger.warning(
+                    "auto_fix_truncated",
+                    total_cards=len(cards),
+                    fixing_cards=10,
+                    skipped_cards=len(cards) - 10,
+                )
+
             prompt = f"""Fix these APF cards based on the validation errors.
 
 VALIDATION ERRORS:
 {error_details}
 
 CARDS TO FIX:
-{json.dumps([card.model_dump() for card in cards[:3]], indent=2)}
+{json.dumps([card.model_dump() for card in cards_to_fix], indent=2)}
 
 Provide corrected cards in JSON format:
 {{

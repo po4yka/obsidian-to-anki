@@ -281,6 +281,9 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
 
     blocks = parts
 
+    # Track parsing failures to report to caller
+    failed_blocks: list[tuple[int, str]] = []
+
     for block in blocks:
         if not block.strip():
             continue
@@ -291,9 +294,26 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
+            else:
+                # Block was skipped (incomplete or invalid)
+                failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
             logger.error("qa_parse_error", card_index=card_index, error=str(e))
+            failed_blocks.append((card_index, str(e)))
             # Continue processing other blocks
+
+    # Report parsing summary
+    if failed_blocks:
+        logger.warning(
+            "qa_parsing_incomplete",
+            total_blocks=len(blocks),
+            successful=len(qa_pairs),
+            failed=len(failed_blocks),
+            failed_indices=[idx for idx, _ in failed_blocks],
+        )
+        # Log details of first few failures
+        for idx, error in failed_blocks[:3]:
+            logger.debug("qa_parse_failure_detail", card_index=idx, error=error)
 
     if not qa_pairs:
         logger.warning("no_qa_pairs_found")

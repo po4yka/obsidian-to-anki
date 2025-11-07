@@ -4,6 +4,7 @@ This agent generates APF cards from Q/A pairs using Ollama with powerful models
 like qwen3:32b for high-quality card generation.
 """
 
+import hashlib
 import json
 import re
 import time
@@ -130,8 +131,8 @@ class GeneratorAgent:
         # Generate slug
         slug = f"{slug_base}-{qa_pair.card_index}-{lang}"
 
-        # Generate GUID (deterministic based on slug)
-        guid = str(hash(slug))
+        # Generate GUID (deterministic based on slug using SHA256)
+        guid = hashlib.sha256(slug.encode()).hexdigest()[:16]
 
         return Manifest(
             slug=slug,
@@ -165,6 +166,29 @@ class GeneratorAgent:
         # Select language-specific content
         question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
         answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
+
+        # Validate that content exists for this language
+        if not question or not question.strip():
+            logger.error(
+                "empty_question_for_lang",
+                lang=lang,
+                slug=manifest.slug,
+                card_index=qa_pair.card_index,
+            )
+            raise ValueError(
+                f"Empty question for language '{lang}' in card {qa_pair.card_index}"
+            )
+
+        if not answer or not answer.strip():
+            logger.error(
+                "empty_answer_for_lang",
+                lang=lang,
+                slug=manifest.slug,
+                card_index=qa_pair.card_index,
+            )
+            raise ValueError(
+                f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
+            )
 
         # Build user prompt (reuse logic from APFGenerator)
         user_prompt = self._build_user_prompt(
