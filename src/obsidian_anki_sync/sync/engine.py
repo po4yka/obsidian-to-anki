@@ -397,7 +397,9 @@ class SyncEngine:
             notes_processed += 1
             if notes_processed % 10 == 0 or notes_processed == len(note_files):
                 elapsed_time = time.time() - batch_start_time
-                avg_time_per_note = elapsed_time / notes_processed if notes_processed > 0 else 0
+                avg_time_per_note = (
+                    elapsed_time / notes_processed if notes_processed > 0 else 0
+                )
                 remaining_notes = len(note_files) - notes_processed
                 estimated_remaining = avg_time_per_note * remaining_notes
 

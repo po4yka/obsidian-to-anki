@@ -260,7 +260,9 @@ class GeneratorAgent:
         # Detect code language from answer
         detected_lang = self._detect_code_language(answer)
         code_lang = (
-            detected_lang if detected_lang != "text" else self._code_language_hint(metadata)
+            detected_lang
+            if detected_lang != "text"
+            else self._code_language_hint(metadata)
         )
 
         # Generate tags deterministically
@@ -439,7 +441,9 @@ Now generate the card following this structure:
                 return "python"
 
         # JavaScript/TypeScript
-        if any(k in code_lower for k in ["function ", "const ", "let ", "=>", "async "]):
+        if any(
+            k in code_lower for k in ["function ", "const ", "let ", "=>", "async "]
+        ):
             # TypeScript-specific
             if any(
                 k in code
@@ -567,7 +571,7 @@ Now generate the card following this structure:
             "type": card_type,
             "tags": tags,
         }
-        return f'<!-- manifest: {json.dumps(manifest_dict, ensure_ascii=False)} -->'
+        return f"<!-- manifest: {json.dumps(manifest_dict, ensure_ascii=False)} -->"
 
     def _post_process_apf(
         self, apf_html: str, metadata: NoteMetadata, manifest: Manifest
@@ -620,7 +624,7 @@ Now generate the card following this structure:
         end_of_cards_pos = apf_html.find("END_OF_CARDS")
         if end_of_cards_pos >= 0:
             # Keep until end of END_OF_CARDS line
-            apf_html = apf_html[:end_of_cards_pos + len("END_OF_CARDS")]
+            apf_html = apf_html[: end_of_cards_pos + len("END_OF_CARDS")]
         else:
             # Fallback: Strip after manifest comment
             manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
@@ -668,7 +672,12 @@ Now generate the card following this structure:
         has_end_cards = "<!-- END_CARDS -->" in apf_html
         has_end_of_cards = "END_OF_CARDS" in apf_html
 
-        if not (has_prompt_version and has_begin_cards and has_end_cards and has_end_of_cards):
+        if not (
+            has_prompt_version
+            and has_begin_cards
+            and has_end_cards
+            and has_end_of_cards
+        ):
             # Missing wrapper sentinels, add them
             logger.debug("adding_missing_wrapper_sentinels", slug=manifest.slug)
 

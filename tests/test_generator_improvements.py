@@ -6,7 +6,6 @@ import re
 import pytest
 
 from obsidian_anki_sync.agents.generator import GeneratorAgent
-from obsidian_anki_sync.apf.linter import ALLOWED_LANGUAGES
 from obsidian_anki_sync.models import Manifest, NoteMetadata
 
 
@@ -178,7 +177,10 @@ class TestGenerateTags:
         """Test that tags include subtopics."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
-        assert any(subtopic.replace("-", "_") in tags for subtopic in ["microservices", "scalability"])
+        assert any(
+            subtopic.replace("-", "_") in tags
+            for subtopic in ["microservices", "scalability"]
+        )
 
     def test_generate_tags_deterministic(self, generator_agent, sample_metadata):
         """Test that tag generation is deterministic."""
@@ -285,7 +287,10 @@ Test question
 
         assert not result.startswith("```")
         assert not result.endswith("```")
-        assert result.startswith("<!-- Card")
+        # Should have APF v2.1 wrapper sentinels
+        assert result.startswith("<!-- PROMPT_VERSION: apf-v2.1 -->")
+        assert "<!-- BEGIN_CARDS -->" in result
+        assert "<!-- Card" in result
 
     def test_post_process_strips_text_before_card(
         self, generator_agent, sample_metadata, sample_manifest
@@ -301,7 +306,10 @@ Test question"""
             apf_html, sample_metadata, sample_manifest
         )
 
-        assert result.startswith("<!-- Card")
+        # Should have APF v2.1 wrapper sentinels
+        assert result.startswith("<!-- PROMPT_VERSION: apf-v2.1 -->")
+        assert "<!-- BEGIN_CARDS -->" in result
+        assert "<!-- Card" in result
         assert "Here's the generated card" not in result
 
     def test_post_process_injects_manifest(
