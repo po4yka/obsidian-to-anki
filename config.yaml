@@ -1,0 +1,74 @@
+# Obsidian to Anki Configuration
+# Your custom setup for ~/Documents/InterviewQuestions
+
+# Obsidian Configuration
+vault_path: "~/Documents/InterviewQuestions"
+source_dir: "."  # Since your Q&A files are directly in subdirectories like 40-Android, 30-System-Design, etc.
+
+# Anki Configuration
+anki_connect_url: "http://127.0.0.1:8765"
+anki_deck_name: "Interview Questions"
+anki_note_type: "APF: Simple (3.0.0)"
+
+# Runtime Settings
+run_mode: "apply"  # Options: apply, dry-run
+delete_mode: "delete"  # Options: delete, archive
+
+# Database
+db_path: ".sync_state.db"
+
+# Logging
+log_level: "INFO"  # Options: DEBUG, INFO, WARN, ERROR
+
+# =============================================================================
+# AGENT SYSTEM CONFIGURATION
+# =============================================================================
+
+# Feature Flag: Use Multi-Agent AI System
+# You have all required models installed: qwen3:8b, qwen3:14b, qwen3:32b
+use_agent_system: true
+
+# Agent Execution Mode
+# - parallel: Faster but uses 30-34GB RAM (recommended for M4 Max)
+# - sequential: Slower but lower memory usage
+agent_execution_mode: "parallel"
+
+# Ollama Configuration
+ollama_base_url: "http://localhost:11434"
+
+# Pre-Validator Agent (Fast structural checks)
+pre_validator_model: "qwen3:8b"
+pre_validator_temperature: 0.0
+pre_validation_enabled: true
+
+# Generator Agent (Card generation)
+generator_model: "qwen3:32b"
+generator_temperature: 0.3
+
+# Post-Validator Agent (Quality assurance)
+post_validator_model: "qwen3:14b"
+post_validator_temperature: 0.0
+post_validation_max_retries: 3
+post_validation_auto_fix: true
+post_validation_strict_mode: true
+
+# =============================================================================
+# LLM PROVIDER SETTINGS (Unified system)
+# =============================================================================
+
+# Primary provider: ollama (since you have models installed)
+llm_provider: "ollama"
+
+# Common LLM settings
+llm_temperature: 0.2
+llm_top_p: 0.3
+llm_timeout: 120.0
+llm_max_tokens: 2048
+
+# =============================================================================
+# DECK EXPORT SETTINGS (Optional .apkg generation)
+# =============================================================================
+
+export_deck_name: "Interview Questions"
+export_deck_description: "Generated from Obsidian notes"
+export_output_path: "interview_questions.apkg"
