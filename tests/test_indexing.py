@@ -151,8 +151,8 @@ class TestNoteIndex:
         for i in range(2):
             temp_db.upsert_note_index(
                 source_path=f"notes/failed{i}.md",
-                note_id=f"note{i+3}",
-                note_title=f"Note {i+3}",
+                note_id=f"note{i + 3}",
+                note_title=f"Note {i + 3}",
                 topic="Testing",
                 language_tags=["en"],
                 qa_pair_count=1,
@@ -246,7 +246,7 @@ class TestCardIndex:
                     source_path="notes/test.md",
                     card_index=i + 1,
                     lang=lang,
-                    slug=f"test-{i+1}-{lang}",
+                    slug=f"test-{i + 1}-{lang}",
                     in_obsidian=True,
                 )
 
@@ -367,8 +367,8 @@ class TestIndexStatistics:
         for i in range(2):
             temp_db.upsert_note_index(
                 source_path=f"notes/pending{i}.md",
-                note_id=f"note{i+3}",
-                note_title=f"Note {i+3}",
+                note_id=f"note{i + 3}",
+                note_title=f"Note {i + 3}",
                 topic="Testing",
                 language_tags=["en"],
                 qa_pair_count=1,
@@ -477,7 +477,7 @@ class TestIndexIntegration:
                     source_path="notes/test.md",
                     card_index=i + 1,
                     lang=lang,
-                    slug=f"test-{i+1}-{lang}",
+                    slug=f"test-{i + 1}-{lang}",
                     note_id="note1",
                     note_title="Test Note",
                 )
