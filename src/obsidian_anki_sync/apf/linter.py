@@ -157,13 +157,23 @@ def _validate_card_block(
         return
 
     # Validate card header
-    header_match = re.match(
-        r"<!-- Card (\d+) \| slug: ([a-z0-9-]+) \| CardType: (Simple|Missing|Draw) \| Tags: (.+?) -->",
-        lines[0].strip(),
-    )
+    header_pattern = r"<!-- Card (\d+) \| slug: ([a-z0-9-]+) \| CardType: (Simple|Missing|Draw) \| Tags: (.+?) -->"
+    header_match = re.match(header_pattern, lines[0].strip())
 
     if not header_match:
-        result.errors.append(f"Card {card_num}: Invalid card header format")
+        # Provide detailed error message showing what was found
+        actual_header = lines[0].strip()[:200]  # First 200 chars
+        logger.warning(
+            "invalid_card_header",
+            card_num=card_num,
+            actual=actual_header,
+            expected_pattern="<!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->",
+        )
+        result.errors.append(
+            f"Card {card_num}: Invalid card header format. "
+            f"Found: '{actual_header[:100]}...' | "
+            f"Expected: '<!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->'"
+        )
         return
 
     card_idx, slug, card_type, tags_str = header_match.groups()
