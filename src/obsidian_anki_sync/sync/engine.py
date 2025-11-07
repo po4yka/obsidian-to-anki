@@ -268,6 +268,10 @@ class SyncEngine:
         # Collect topic mismatches for aggregated logging
         topic_mismatches: dict[str, int] = {}
 
+        # Collect errors for aggregated logging
+        error_by_type: dict[str, int] = {}
+        error_samples: dict[str, list[str]] = {}
+
         # Progress tracking
         batch_start_time = time.time()
         notes_processed = 0
@@ -361,13 +365,22 @@ class SyncEngine:
                                 )
 
                         except Exception as e:
-                            logger.error(
-                                "card_generation_failed",
-                                file=relative_path,
-                                pair=qa_pair.card_index,
-                                lang=lang,
-                                error=str(e),
+                            error_type_name = type(e).__name__
+                            error_message = str(e)
+
+                            # Aggregate errors
+                            error_by_type[error_type_name] = (
+                                error_by_type.get(error_type_name, 0) + 1
                             )
+
+                            # Store sample errors (up to 3 per type)
+                            if error_type_name not in error_samples:
+                                error_samples[error_type_name] = []
+                            if len(error_samples[error_type_name]) < 3:
+                                error_samples[error_type_name].append(
+                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message[:80]}"
+                                )
+
                             self.stats["errors"] += 1
                             if self.progress:
                                 self.progress.fail_note(
@@ -398,6 +411,23 @@ class SyncEngine:
                     estimated_remaining_seconds=round(estimated_remaining, 1),
                     cards_generated=len(obsidian_cards),
                 )
+
+        # Log aggregated error summary
+        if error_by_type:
+            logger.warning(
+                "card_generation_errors_summary",
+                total_errors=self.stats["errors"],
+                error_breakdown=error_by_type,
+            )
+            # Log sample errors for each type
+            for err_type, samples in error_samples.items():
+                for i, sample in enumerate(samples):
+                    logger.warning(
+                        "error_sample",
+                        error_type=err_type,
+                        sample_num=i + 1,
+                        error=sample,
+                    )
 
         # Log aggregated topic mismatch summary
         if topic_mismatches:
