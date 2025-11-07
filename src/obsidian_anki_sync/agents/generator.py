@@ -723,7 +723,62 @@ Now generate the card following this structure:
 
             apf_html = "\n".join(lines)
 
-        # 9. Ensure proper formatting
+        # 9. Normalize card header to match validator expectations
+        apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
+
+        # 10. Ensure proper formatting
         apf_html = apf_html.strip()
+
+        return apf_html
+
+    def _normalize_card_header(
+        self, apf_html: str, manifest: Manifest, card_type: str, tags: list[str]
+    ) -> str:
+        """Normalize card header to match validator's expected format.
+
+        The validator expects exactly:
+        <!-- Card N | slug: slug-name | CardType: Simple | Tags: tag1 tag2 tag3 -->
+
+        Args:
+            apf_html: APF HTML content
+            manifest: Card manifest
+            card_type: Card type (Simple, Missing, Draw)
+            tags: List of tags
+
+        Returns:
+            APF HTML with normalized card header
+        """
+        # Build the correct header format
+        correct_header = f"<!-- Card {manifest.card_index} | slug: {manifest.slug} | CardType: {card_type} | Tags: {' '.join(tags)} -->"
+
+        # Find and replace existing card header
+        # Pattern matches various card header formats the LLM might produce
+        card_header_pattern = r"<!--\s*Card\s+\d+[^\]]*?-->"
+
+        match = re.search(card_header_pattern, apf_html)
+        if match:
+            apf_html = apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+            logger.debug(
+                "normalized_card_header",
+                slug=manifest.slug,
+                old_header=match.group(0)[:100],
+                new_header=correct_header,
+            )
+        else:
+            logger.warning(
+                "no_card_header_found_to_normalize",
+                slug=manifest.slug,
+                inserting_header=True,
+            )
+            # If no header found, insert it after BEGIN_CARDS
+            begin_cards_pos = apf_html.find("<!-- BEGIN_CARDS -->")
+            if begin_cards_pos >= 0:
+                insert_pos = begin_cards_pos + len("<!-- BEGIN_CARDS -->")
+                apf_html = (
+                    apf_html[:insert_pos]
+                    + "\n\n"
+                    + correct_header
+                    + apf_html[insert_pos:]
+                )
 
         return apf_html
