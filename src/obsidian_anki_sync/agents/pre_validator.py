@@ -61,7 +61,7 @@ class PreValidatorAgent:
 NOTE METADATA:
 - Title: {metadata.title}
 - Topic: {metadata.topic}
-- Languages: {', '.join(metadata.language_tags)}
+- Languages: {", ".join(metadata.language_tags)}
 - Q/A Pairs Found: {len(qa_pairs)}
 
 NOTE CONTENT (first 2000 chars):
