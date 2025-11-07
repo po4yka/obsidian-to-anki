@@ -141,30 +141,25 @@ If repairable, provide the FULL repaired content including frontmatter.
         # Build repair prompt
         prompt = self._build_repair_prompt(content, str(original_error))
 
+        # System prompt for note repair agent
+        system_prompt = """You are a note repair agent for Obsidian notes.
+Analyze structural and formatting issues in notes and provide fixes when possible.
+Always respond in valid JSON format with the exact structure requested."""
+
         # Call LLM for repair analysis
-        response_text = "N/A"  # Initialize to avoid undefined variable in error handling
         try:
-            response = self.ollama_client.generate(
+            repair_result = self.ollama_client.generate_json(
                 model=self.model,
                 prompt=prompt,
+                system=system_prompt,
                 temperature=self.temperature,
-                format="json",
             )
-
-            if isinstance(response, dict) and "response" in response:
-                response_text = response["response"]
-            else:
-                response_text = str(response)
-
-            # Parse JSON response
-            repair_result = json.loads(response_text)
 
         except json.JSONDecodeError as e:
             logger.error(
                 "parser_repair_invalid_json",
                 file=str(file_path),
                 error=str(e),
-                response=response_text[:500] if response_text != "N/A" else "N/A",
             )
             return None
         except Exception as e:
