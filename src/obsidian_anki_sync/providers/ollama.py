@@ -59,6 +59,10 @@ class OllamaProvider(BaseLLMProvider):
         )
 
         deployment_type = "cloud" if self.api_key else "local"
+
+        # Track first request per model (to measure model loading time)
+        self._model_first_request: dict[str, bool] = {}
+
         logger.info(
             "ollama_provider_initialized",
             base_url=base_url,
@@ -150,6 +154,11 @@ class OllamaProvider(BaseLLMProvider):
 
         request_start_time = time.time()
 
+        # Check if this is the first request to this model
+        is_first_request = model not in self._model_first_request
+        if is_first_request:
+            self._model_first_request[model] = True
+
         logger.info(
             "ollama_generate_request",
             model=model,
@@ -158,6 +167,7 @@ class OllamaProvider(BaseLLMProvider):
             temperature=temperature,
             format=format,
             timeout=self.timeout,
+            first_request_to_model=is_first_request,
         )
 
         try:
@@ -176,6 +186,15 @@ class OllamaProvider(BaseLLMProvider):
             prompt_eval_duration = result.get("prompt_eval_duration", 0) / 1e9
 
             tokens_per_sec = eval_count / eval_duration if eval_duration > 0 else 0
+
+            # Log model loading time if this was the first request
+            if is_first_request and request_duration > 30:
+                logger.info(
+                    "model_loading_detected",
+                    model=model,
+                    duration=round(request_duration, 2),
+                    note="First request to this model may include loading time",
+                )
 
             # Warn about slow operations
             if request_duration > 600:  # 10 minutes
