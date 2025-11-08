@@ -137,7 +137,7 @@ class PreValidatorAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent with structured output
-        self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
+        self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(  # type: ignore[call-overload]
             model=self.model,
             result_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
@@ -208,7 +208,7 @@ Validate the structure, frontmatter, and content quality."""
             result = await self.agent.run(prompt, deps=deps)
 
             # Convert to PreValidationResult
-            output = result.data
+            output = result.data  # type: ignore[attr-defined]
             validation_result = PreValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
@@ -264,7 +264,7 @@ class GeneratorAgentAI:
             self.system_prompt = "Generate APF cards following strict APF v2.1 format."
 
         # Create PydanticAI agent
-        self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
+        self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(  # type: ignore[call-overload]
             model=self.model,
             result_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
@@ -316,7 +316,7 @@ Q&A Pairs ({len(qa_pairs)}):
 """
         for idx, qa in enumerate(qa_pairs, 1):
             prompt += (
-                f"\n{idx}. Q: {qa.question[:100]}...\n   A: {qa.answer[:100]}...\n"
+                f"\n{idx}. Q: {qa.question_en[:100]}...\n   A: {qa.answer_en[:100]}...\n"
             )
 
         prompt += (
@@ -326,7 +326,7 @@ Q&A Pairs ({len(qa_pairs)}):
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data
+            output = result.data  # type: ignore[attr-defined]
 
             # Convert cards to GeneratedCard instances
             generated_cards: list[GeneratedCard] = []
@@ -388,7 +388,7 @@ class PostValidatorAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
+        self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(  # type: ignore[call-overload]
             model=self.model,
             result_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
@@ -458,7 +458,7 @@ Cards to validate:
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data
+            output = result.data  # type: ignore[attr-defined]
 
             # Convert suggested corrections to GeneratedCard list
             corrected_cards: list[GeneratedCard] | None = None

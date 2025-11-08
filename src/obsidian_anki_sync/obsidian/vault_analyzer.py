@@ -250,7 +250,7 @@ class VaultAnalyzer:
 
         stats = self.get_vault_stats()
 
-        issues = {
+        issues: dict[str, Any] = {
             "broken_links": stats.broken_links,
             "orphaned_notes": stats.orphaned_notes,
             "warnings": [],

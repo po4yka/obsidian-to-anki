@@ -9,6 +9,7 @@ The workflow supports conditional routing, automatic retries, and state persiste
 """
 
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Literal, TypedDict
 
@@ -342,7 +343,7 @@ def post_validation_node(state: PipelineState) -> PipelineState:
         state["messages"].append("Post-validation passed")
     elif state["retry_count"] < state["max_retries"] and state["auto_fix_enabled"]:
         # Apply corrections if available
-        if post_result.corrected_cards:
+        if post_result.corrected_cards and state["generation"] is not None:
             # Update generation with corrected cards
             corrected_dicts = [
                 card.model_dump() for card in post_result.corrected_cards
@@ -527,8 +528,8 @@ class LangGraphOrchestrator:
         # Initialize state
         initial_state: PipelineState = {
             "note_content": note_content,
-            "metadata_dict": metadata.model_dump(),
-            "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
+            "metadata_dict": asdict(metadata),
+            "qa_pairs_dicts": [asdict(qa) for qa in qa_pairs],
             "file_path": str(file_path) if file_path else None,
             "slug_base": slug_base,
             "pre_validation": None,
