@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 import frontmatter
-import yaml
 from ruamel.yaml import YAML
 
 from ..exceptions import ParserError
