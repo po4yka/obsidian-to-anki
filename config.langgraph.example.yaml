@@ -1,0 +1,138 @@
+# Example configuration for LangGraph + PydanticAI agent system
+#
+# This configuration enables the new agentic system with:
+# - PydanticAI for structured outputs and type-safe agents
+# - LangGraph for workflow orchestration with state management
+# - OpenRouter as the LLM provider for access to multiple models
+#
+# Copy this file to config.yaml and customize for your setup.
+
+# =============================================================================
+# Basic Configuration
+# =============================================================================
+
+# Obsidian vault path (required)
+vault_path: ~/Documents/ObsidianVault
+
+# Source directory within vault containing notes to sync
+source_dir: interview_questions/InterviewQuestions
+
+# Anki connection settings
+anki_connect_url: http://127.0.0.1:8765
+anki_deck_name: Interview Questions
+anki_note_type: APF::Simple
+
+# Runtime mode
+run_mode: apply  # or 'dry-run' for testing
+delete_mode: delete  # or 'archive' to preserve cards
+
+# Database and logging
+db_path: .sync_state.db
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# =============================================================================
+# LLM Provider Configuration
+# =============================================================================
+
+# Provider selection: openrouter, ollama, or lm_studio
+llm_provider: openrouter
+
+# OpenRouter settings (required when llm_provider = openrouter)
+# Get API key from: https://openrouter.ai/
+# Set via environment variable: OPENROUTER_API_KEY=your_key_here
+openrouter_base_url: https://openrouter.ai/api/v1
+openrouter_site_url: https://yoursite.com  # Optional, for rankings
+openrouter_site_name: Your App Name  # Optional, for rankings
+
+# Common LLM settings
+llm_temperature: 0.2
+llm_top_p: 0.3
+llm_timeout: 900.0  # 15 minutes
+llm_max_tokens: 2048
+
+# =============================================================================
+# LangGraph + PydanticAI Agent System (NEW!)
+# =============================================================================
+
+# Enable the new LangGraph-based workflow orchestration
+use_langgraph: true
+
+# Enable PydanticAI for type-safe structured outputs
+use_pydantic_ai: true
+
+# Model selection for each agent (OpenRouter model identifiers)
+# Pre-validator: Fast, cheap model for structural validation
+pydantic_ai_pre_validator_model: openai/gpt-4o-mini
+
+# Generator: Powerful model for high-quality card generation
+pydantic_ai_generator_model: anthropic/claude-3-5-sonnet
+# Alternatives:
+#   - openai/gpt-4-turbo
+#   - anthropic/claude-3-opus
+#   - google/gemini-pro-1.5
+
+# Post-validator: Moderate model for quality checking
+pydantic_ai_post_validator_model: openai/gpt-4o-mini
+
+# LangGraph workflow settings
+langgraph_max_retries: 3  # Maximum post-validation retry attempts
+langgraph_auto_fix: true  # Enable automatic error fixing
+langgraph_strict_mode: true  # Use strict validation rules
+langgraph_checkpoint_enabled: true  # Enable state persistence
+
+# =============================================================================
+# Legacy Agent System (for comparison)
+# =============================================================================
+
+# Set to false when using LangGraph system
+use_agent_system: false
+
+# Legacy agent models (used when use_agent_system=true and use_langgraph=false)
+pre_validator_model: qwen3:8b
+generator_model: qwen3:32b
+post_validator_model: qwen3:14b
+
+# Legacy agent settings
+pre_validation_enabled: true
+post_validation_max_retries: 3
+post_validation_auto_fix: true
+post_validation_strict_mode: true
+
+# =============================================================================
+# Deck Export Settings (Optional)
+# =============================================================================
+
+export_deck_name: Interview Questions Export
+export_deck_description: Generated flashcards for interview preparation
+export_output_path: ./exports/interview_questions.apkg
+
+# =============================================================================
+# Usage Notes
+# =============================================================================
+#
+# 1. Set OPENROUTER_API_KEY environment variable or create .env file:
+#    echo "OPENROUTER_API_KEY=your_key_here" > .env
+#
+# 2. The LangGraph system provides:
+#    - Automatic retry logic with state persistence
+#    - Conditional routing based on validation results
+#    - Type-safe structured outputs via PydanticAI
+#    - Better error handling and debugging
+#
+# 3. Recommended model combinations:
+#    - Fast/Cheap: gpt-4o-mini for all agents
+#    - Balanced: gpt-4o-mini for validators, claude-3-5-sonnet for generator
+#    - High-Quality: claude-3-opus for all agents (expensive!)
+#
+# 4. Cost optimization tips:
+#    - Use gpt-4o-mini for pre/post validation (cheap)
+#    - Reserve expensive models (claude-opus) for generation only
+#    - Set langgraph_max_retries=1 to reduce API calls
+#    - Use strict_mode=false for more lenient validation
+#
+# 5. For local models (Ollama/LM Studio):
+#    - Set llm_provider: ollama or lm_studio
+#    - Local models work but PydanticAI features may be limited
+#    - Structured outputs require compatible models
+#
+# =============================================================================

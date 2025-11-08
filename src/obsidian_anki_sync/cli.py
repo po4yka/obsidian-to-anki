@@ -58,7 +58,10 @@ def get_config_and_logger(
     if _config is None:
         _config = load_config(config_path)
         set_config(_config)
-        configure_logging(log_level or _config.log_level)
+
+        # Configure logging with vault-specific log directory
+        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
+        configure_logging(log_level or _config.log_level, log_dir=log_dir)
         _logger = get_logger("cli")
 
     return _config, _logger

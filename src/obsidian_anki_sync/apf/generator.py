@@ -11,6 +11,7 @@ from openai import OpenAI  # type: ignore
 
 from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
+from ..utils.code_detection import detect_code_language_from_metadata
 from ..utils.logging import get_logger
 from ..utils.retry import retry
 
@@ -299,42 +300,7 @@ Requirements:
 
     def _code_language_hint(self, metadata: NoteMetadata) -> str:
         """Derive a language hint for code blocks."""
-        candidates = list(metadata.tags) + metadata.subtopics + [metadata.topic]
-        known_languages = {
-            "kotlin",
-            "java",
-            "python",
-            "swift",
-            "cpp",
-            "c",
-            "csharp",
-            "go",
-            "rust",
-            "javascript",
-            "typescript",
-            "sql",
-            "bash",
-            "shell",
-            "yaml",
-            "json",
-            "html",
-            "css",
-            "gradle",
-            "groovy",
-        }
-        for raw in candidates:
-            if not raw:
-                continue
-            normalized = (
-                raw.lower()
-                .replace("language/", "")
-                .replace("lang/", "")
-                .replace("topic/", "")
-            )
-            normalized = normalized.replace("/", "_")
-            if normalized in known_languages:
-                return normalized
-        return "plaintext"
+        return detect_code_language_from_metadata(metadata)
 
     def _normalize_code_blocks(self, apf_html: str, default_lang: str) -> str:
         """Convert Markdown code fences to <pre><code> blocks if present."""

@@ -2,6 +2,7 @@
 
 import random
 import time
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any, cast
 
 import yaml  # type: ignore
@@ -268,11 +269,11 @@ class SyncEngine:
         existing_slugs: set[str] = set()
 
         # Collect topic mismatches for aggregated logging
-        topic_mismatches: dict[str, int] = {}
+        topic_mismatches: defaultdict[str, int] = defaultdict(int)
 
         # Collect errors for aggregated logging
-        error_by_type: dict[str, int] = {}
-        error_samples: dict[str, list[str]] = {}
+        error_by_type: defaultdict[str, int] = defaultdict(int)
+        error_samples: defaultdict[str, list[str]] = defaultdict(list)
 
         # Progress tracking
         batch_start_time = time.time()
@@ -290,7 +291,7 @@ class SyncEngine:
                 expected_topic = file_path.parent.name
                 if metadata.topic != expected_topic:
                     key = f"{expected_topic} -> {metadata.topic}"
-                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
+                    topic_mismatches[key] += 1
 
                 # Read full note content if using agent system
                 note_content = ""
@@ -370,14 +371,10 @@ class SyncEngine:
                             error_type_name = type(e).__name__
                             error_message = str(e)
 
-                            # Aggregate errors
-                            error_by_type[error_type_name] = (
-                                error_by_type.get(error_type_name, 0) + 1
-                            )
+                            # Aggregate errors with defaultdict
+                            error_by_type[error_type_name] += 1
 
                             # Store sample errors (up to 3 per type)
-                            if error_type_name not in error_samples:
-                                error_samples[error_type_name] = []
                             if len(error_samples[error_type_name]) < 3:
                                 error_samples[error_type_name].append(
                                     f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message[:80]}"

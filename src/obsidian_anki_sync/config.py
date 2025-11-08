@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 from .exceptions import ConfigurationError
@@ -90,6 +90,21 @@ class Config:
     post_validation_max_retries: int = 3
     post_validation_auto_fix: bool = True
     post_validation_strict_mode: bool = True
+
+    # LangGraph + PydanticAI Agent System (new!)
+    use_langgraph: bool = False  # Enable LangGraph-based orchestration
+    use_pydantic_ai: bool = False  # Enable PydanticAI for structured outputs
+
+    # PydanticAI Model Configuration (for use with LangGraph)
+    pydantic_ai_pre_validator_model: str = "openai/gpt-4o-mini"
+    pydantic_ai_generator_model: str = "anthropic/claude-3-5-sonnet"
+    pydantic_ai_post_validator_model: str = "openai/gpt-4o-mini"
+
+    # LangGraph Workflow Configuration
+    langgraph_max_retries: int = 3
+    langgraph_auto_fix: bool = True
+    langgraph_strict_mode: bool = True
+    langgraph_checkpoint_enabled: bool = True  # Enable state persistence
 
     def validate(self) -> None:
         """Validate configuration values."""
@@ -250,6 +265,22 @@ def load_config(config_path: Path | None = None) -> Config:
         post_validation_max_retries=get_int("post_validation_max_retries", 3),
         post_validation_auto_fix=get_bool("post_validation_auto_fix", True),
         post_validation_strict_mode=get_bool("post_validation_strict_mode", True),
+        # LangGraph + PydanticAI settings
+        use_langgraph=get_bool("use_langgraph", False),
+        use_pydantic_ai=get_bool("use_pydantic_ai", False),
+        pydantic_ai_pre_validator_model=get_str(
+            "pydantic_ai_pre_validator_model", "openai/gpt-4o-mini"
+        ),
+        pydantic_ai_generator_model=get_str(
+            "pydantic_ai_generator_model", "anthropic/claude-3-5-sonnet"
+        ),
+        pydantic_ai_post_validator_model=get_str(
+            "pydantic_ai_post_validator_model", "openai/gpt-4o-mini"
+        ),
+        langgraph_max_retries=get_int("langgraph_max_retries", 3),
+        langgraph_auto_fix=get_bool("langgraph_auto_fix", True),
+        langgraph_strict_mode=get_bool("langgraph_strict_mode", True),
+        langgraph_checkpoint_enabled=get_bool("langgraph_checkpoint_enabled", True),
     )
 
     config.validate()

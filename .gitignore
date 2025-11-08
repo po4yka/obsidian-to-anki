@@ -45,6 +45,8 @@ htmlcov/
 .env
 .sync_state.db
 *.log
+logs/
+.logs/
 
 # macOS
 .DS_Store
