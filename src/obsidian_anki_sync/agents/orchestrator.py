@@ -357,7 +357,9 @@ class AgentOrchestrator:
             if not content_hash and qa_pair:
                 content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
-                content_hash = hashlib.sha256(gen_card.apf_html.encode("utf-8")).hexdigest()
+                content_hash = hashlib.sha256(
+                    gen_card.apf_html.encode("utf-8")
+                ).hexdigest()
 
             cards.append(
                 Card(
