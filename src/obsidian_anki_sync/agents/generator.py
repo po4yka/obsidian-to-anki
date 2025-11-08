@@ -110,7 +110,7 @@ class GeneratorAgent:
         generation_time = time.time() - start_time
 
         # Calculate aggregate statistics
-        total_tokens = sum(
+        sum(
             card.confidence for card in generated_cards
         )  # Placeholder, would need to track actual tokens
 
@@ -118,9 +118,11 @@ class GeneratorAgent:
             "card_generation_complete",
             cards_generated=len(generated_cards),
             time=generation_time,
-            avg_time_per_card=round(generation_time / len(generated_cards), 2)
-            if generated_cards
-            else 0,
+            avg_time_per_card=(
+                round(generation_time / len(generated_cards), 2)
+                if generated_cards
+                else 0
+            ),
         )
 
         return GenerationResult(
@@ -921,7 +923,9 @@ Now generate the card following this structure:
 
         match = re.search(card_header_pattern, apf_html)
         if match:
-            apf_html = apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+            apf_html = (
+                apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+            )
             logger.debug(
                 "normalized_card_header",
                 slug=manifest.slug,

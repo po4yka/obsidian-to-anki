@@ -3,8 +3,7 @@
 import re
 import time
 from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
@@ -216,9 +215,7 @@ class InputValidator:
 
         # Check length
         if len(prompt) > max_length:
-            warnings.append(
-                f"Prompt exceeds max length ({len(prompt)} > {max_length})"
-            )
+            warnings.append(f"Prompt exceeds max length ({len(prompt)} > {max_length})")
             logger.warning(
                 "prompt_too_long",
                 length=len(prompt),
@@ -243,7 +240,9 @@ class InputValidator:
 
         # Check for excessive repetition (potential attack)
         if cls._detect_repetition(prompt):
-            warnings.append("Excessive repetition detected (potential prompt injection)")
+            warnings.append(
+                "Excessive repetition detected (potential prompt injection)"
+            )
             logger.warning("excessive_repetition_detected", prompt_length=len(prompt))
 
         return prompt, warnings

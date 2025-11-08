@@ -6,7 +6,6 @@ from typing import Any, cast
 import httpx
 
 from ..utils.logging import get_logger
-from ..utils.retry import retry
 from .base import BaseLLMProvider
 from .safety import OllamaSafetyWrapper, SafetyConfig
 
@@ -53,6 +52,7 @@ class OllamaProvider(BaseLLMProvider):
 
         # Initialize safety wrapper
         self.enable_safety = enable_safety
+        self.safety: OllamaSafetyWrapper | None
         if self.enable_safety:
             self.safety = OllamaSafetyWrapper(config=safety_config)
         else:
@@ -96,7 +96,7 @@ class OllamaProvider(BaseLLMProvider):
         """
         try:
             response = self.client.get(f"{self.base_url}/api/tags")
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception as e:
             logger.error(
                 "ollama_connection_check_failed",

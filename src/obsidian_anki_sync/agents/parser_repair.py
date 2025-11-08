@@ -8,14 +8,12 @@ This agent activates only when rule-based parsing fails:
 """
 
 import json
-import re
 from pathlib import Path
 
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
-from .models import ParserRepairResult
 
 logger = get_logger(__name__)
 
@@ -163,9 +161,7 @@ Always respond in valid JSON format with the exact structure requested."""
             )
             return None
         except Exception as e:
-            logger.error(
-                "parser_repair_llm_failed", file=str(file_path), error=str(e)
-            )
+            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
             return None
 
         # Check if repairable
