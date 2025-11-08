@@ -117,9 +117,7 @@ def parse_note_with_repair(
                 file=str(file_path),
                 original_error=str(e),
             )
-            raise ParserError(
-                f"Parse failed and repair unsuccessful: {e}"
-            ) from e
+            raise ParserError(f"Parse failed and repair unsuccessful: {e}") from e
 
         # Repair succeeded
         metadata, qa_pairs = result

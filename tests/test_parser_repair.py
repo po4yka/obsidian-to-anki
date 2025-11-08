@@ -89,7 +89,9 @@ class TestParserRepairAgent:
         assert parser_repair_agent.model == "qwen3:8b"
         assert parser_repair_agent.temperature == 0.0
 
-    def test_build_repair_prompt(self, parser_repair_agent, malformed_note_empty_language_tags):
+    def test_build_repair_prompt(
+        self, parser_repair_agent, malformed_note_empty_language_tags
+    ):
         """Test repair prompt generation."""
         error = "Missing required fields: language_tags"
         prompt = parser_repair_agent._build_repair_prompt(
@@ -120,10 +122,10 @@ class TestParserRepairAgent:
             "repairs": [
                 {
                     "issue": "language_tags is empty",
-                    "fix": "Set language_tags to [en, ru] based on content"
+                    "fix": "Set language_tags to [en, ru] based on content",
                 }
             ],
-            "repaired_content": repaired_note_content
+            "repaired_content": repaired_note_content,
         }
 
         parser_repair_agent.ollama_client.generate.return_value = {
@@ -151,7 +153,7 @@ class TestParserRepairAgent:
             "is_repairable": False,
             "diagnosis": "File contains no valid frontmatter or structure",
             "repairs": [],
-            "repaired_content": None
+            "repaired_content": None,
         }
 
         parser_repair_agent.ollama_client.generate.return_value = {
@@ -213,7 +215,7 @@ class TestAttemptRepairHelper:
             "is_repairable": True,
             "diagnosis": "Fixed language_tags",
             "repairs": [{"issue": "empty tags", "fix": "added [en, ru]"}],
-            "repaired_content": repaired_note_content
+            "repaired_content": repaired_note_content,
         }
 
         mock_ollama_provider.generate.return_value = {
@@ -224,7 +226,7 @@ class TestAttemptRepairHelper:
             file_path=test_file,
             original_error=ParserError("Parse failed"),
             ollama_client=mock_ollama_provider,
-            model="qwen3:8b"
+            model="qwen3:8b",
         )
 
         assert result is not None
@@ -298,8 +300,13 @@ Some content without frontmatter
         repair_response = {
             "is_repairable": True,
             "diagnosis": "Fixed structure",
-            "repairs": [{"issue": "missing frontmatter", "fix": "added frontmatter and sections"}],
-            "repaired_content": repaired_note_content
+            "repairs": [
+                {
+                    "issue": "missing frontmatter",
+                    "fix": "added frontmatter and sections",
+                }
+            ],
+            "repaired_content": repaired_note_content,
         }
 
         mock_ollama_provider.generate.return_value = {
@@ -311,7 +318,7 @@ Some content without frontmatter
             test_file,
             ollama_client=mock_ollama_provider,
             enable_repair=True,
-            repair_model="qwen3:8b"
+            repair_model="qwen3:8b",
         )
 
         assert metadata.language_tags == ["en", "ru"]
@@ -329,7 +336,7 @@ Some content without frontmatter
             "is_repairable": False,
             "diagnosis": "Fundamentally broken",
             "repairs": [],
-            "repaired_content": None
+            "repaired_content": None,
         }
 
         mock_ollama_provider.generate.return_value = {
