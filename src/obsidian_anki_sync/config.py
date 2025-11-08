@@ -172,8 +172,26 @@ def load_config(config_path: Path | None = None) -> Config:
 
     # Load config.yaml if exists
     config_data: dict[str, Any] = {}
-    if config_path and config_path.exists():
-        with open(config_path, encoding="utf-8") as f:
+    candidate_paths: list[Path] = []
+
+    if config_path:
+        candidate_paths.append(config_path.expanduser())
+    else:
+        env_path = os.getenv("OBSIDIAN_ANKI_CONFIG")
+        if env_path:
+            candidate_paths.append(Path(env_path).expanduser())
+        candidate_paths.append(Path.cwd() / "config.yaml")
+        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        candidate_paths.append(default_repo_config)
+
+    resolved_config_path: Path | None = None
+    for candidate in candidate_paths:
+        if candidate.exists():
+            resolved_config_path = candidate
+            break
+
+    if resolved_config_path:
+        with open(resolved_config_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
 
     # Helper to get string from config/env

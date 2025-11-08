@@ -20,6 +20,7 @@ from langgraph.graph.message import add_messages
 from ..config import Config
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
+from .slug_utils import generate_agent_slug_base
 from .models import (
     AgentPipelineResult,
     GeneratedCard,
@@ -595,14 +596,6 @@ class LangGraphOrchestrator:
         return result
 
     def _generate_slug_base(self, metadata: NoteMetadata) -> str:
-        """Generate base slug from note metadata.
+        """Generate base slug from note metadata using collision-safe helper."""
 
-        Args:
-            metadata: Note metadata
-
-        Returns:
-            Slug base string
-        """
-        topic = metadata.topic.lower().replace(" ", "-")
-        title = metadata.title.lower().replace(" ", "-")[:30]
-        return f"{topic}-{title}"
+        return generate_agent_slug_base(metadata)

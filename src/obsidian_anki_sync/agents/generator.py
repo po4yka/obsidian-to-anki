@@ -16,6 +16,7 @@ from ..utils.code_detection import (
     detect_code_language_from_content,
     detect_code_language_from_metadata,
 )
+from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
 from .debug_artifacts import save_failed_llm_call
 from .llm_errors import (
@@ -349,12 +350,15 @@ class GeneratorAgent:
                     retried=(attempt > 1),
                 )
 
+                content_hash = compute_content_hash(qa_pair, metadata, lang)
+
                 return GeneratedCard(
                     card_index=qa_pair.card_index,
                     slug=manifest.slug,
                     lang=lang,
                     apf_html=apf_html,
                     confidence=confidence,
+                    content_hash=content_hash,
                 )
 
             except Exception as e:
