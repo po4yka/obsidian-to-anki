@@ -547,7 +547,7 @@ class LangGraphOrchestrator:
 
         # Execute workflow
         final_state = self.app.invoke(
-            initial_state,
+            initial_state,  # type: ignore[arg-type]
             config={"configurable": {"thread_id": f"note-{metadata.title}"}},
         )
 
