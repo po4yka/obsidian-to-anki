@@ -5,7 +5,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional
 
+import frontmatter
 import yaml
+from ruamel.yaml import YAML
 
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
@@ -13,6 +15,13 @@ from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Configure ruamel.yaml for preserving comments and order
+# This is available for future write operations
+ruamel_yaml = YAML()
+ruamel_yaml.preserve_quotes = True
+ruamel_yaml.default_flow_style = False
+ruamel_yaml.width = 4096  # Prevent line wrapping
 
 
 def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
@@ -133,6 +142,8 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     """
     Extract and parse YAML frontmatter from note content.
 
+    Uses python-frontmatter with ruamel.yaml to preserve comments and order.
+
     Args:
         content: Full note content
         file_path: Path to the file (for context)
@@ -143,20 +154,17 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     Raises:
         ParserError: If frontmatter is missing or invalid
     """
-    # Extract frontmatter between --- markers
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
-    if not match:
-        raise ParserError(f"No frontmatter found in {file_path}")
-
-    frontmatter_text = match.group(1)
-
+    # Parse frontmatter using python-frontmatter
     try:
-        data = yaml.safe_load(frontmatter_text)
-    except yaml.YAMLError as e:
+        post = frontmatter.loads(content)
+    except Exception as e:
         raise ParserError(f"Invalid YAML in {file_path}: {e}")
 
+    # Extract metadata dictionary
+    data = post.metadata
+
     if not data:
-        raise ParserError(f"Empty frontmatter in {file_path}")
+        raise ParserError(f"No frontmatter found in {file_path}")
 
     # Validate required fields
     required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
