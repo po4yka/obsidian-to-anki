@@ -68,7 +68,9 @@ def categorize_llm_error(
     context = {"model": model, "operation": operation, "duration": round(duration, 2)}
 
     # Timeout errors
-    if isinstance(error, (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout)):
+    if isinstance(
+        error, (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout)
+    ):
         return LLMError(
             message=f"LLM request timed out after {duration:.1f}s for {operation}",
             error_type=LLMErrorType.TIMEOUT,

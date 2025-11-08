@@ -96,9 +96,7 @@ class SessionMetrics:
             "successful_operations": sum(
                 m.successful_calls for m in self.operations.values()
             ),
-            "failed_operations": sum(
-                m.failed_calls for m in self.operations.values()
-            ),
+            "failed_operations": sum(m.failed_calls for m in self.operations.values()),
             "retry_rate_pct": 0.0,
             "total_tokens": sum(m.total_tokens for m in self.operations.values()),
             "total_llm_time_seconds": round(
