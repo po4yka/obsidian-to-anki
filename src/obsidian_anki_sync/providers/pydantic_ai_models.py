@@ -85,7 +85,7 @@ class PydanticAIModelFactory:
             has_site_info=bool(site_url and site_name),
         )
 
-        return model
+        return model  # type: ignore[no-any-return]
 
     @staticmethod
     def create_from_config(
@@ -137,7 +137,7 @@ class PydanticAIModelFactory:
                 base_url=base_url,
             )
 
-            return OpenAIModel(  # type: ignore[call-overload]
+            return OpenAIModel(  # type: ignore[call-overload,no-any-return]
                 model_name,
                 base_url=base_url,
                 api_key=api_key,
