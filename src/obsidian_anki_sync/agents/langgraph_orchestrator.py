@@ -55,7 +55,9 @@ class PipelineState(TypedDict):
     post_validation: dict | None  # Serialized PostValidationResult
 
     # Workflow control
-    current_stage: Literal["pre_validation", "generation", "post_validation", "complete", "failed"]
+    current_stage: Literal[
+        "pre_validation", "generation", "post_validation", "complete", "failed"
+    ]
     retry_count: int
     max_retries: int
     auto_fix_enabled: bool
@@ -88,7 +90,10 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
     """
     import asyncio
     from ..models import NoteMetadata, QAPair
-    from ..providers.pydantic_ai_models import PydanticAIModelFactory, create_openrouter_model_from_env
+    from ..providers.pydantic_ai_models import (
+        PydanticAIModelFactory,
+        create_openrouter_model_from_env,
+    )
     from .pydantic_ai_agents import PreValidatorAgentAI
 
     logger.info("langgraph_pre_validation_start")
@@ -185,7 +190,9 @@ def generation_node(state: PipelineState) -> PipelineState:
     # Create PydanticAI model for generation
     try:
         # Use more powerful model for generation
-        model = create_openrouter_model_from_env(model_name="anthropic/claude-3-5-sonnet")
+        model = create_openrouter_model_from_env(
+            model_name="anthropic/claude-3-5-sonnet"
+        )
     except Exception as e:
         logger.error("failed_to_create_generator_model", error=str(e))
         # Return error result
@@ -232,7 +239,9 @@ def generation_node(state: PipelineState) -> PipelineState:
 
     state["generation"] = gen_result.model_dump()
     state["stage_times"]["generation"] = gen_result.generation_time
-    state["current_stage"] = "post_validation" if gen_result.total_cards > 0 else "failed"
+    state["current_stage"] = (
+        "post_validation" if gen_result.total_cards > 0 else "failed"
+    )
     state["messages"].append(f"Generated {gen_result.total_cards} cards")
 
     return state
@@ -283,7 +292,10 @@ def post_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
         state["post_validation"] = post_result.model_dump()
-        state["stage_times"]["post_validation"] = state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
+        state["stage_times"]["post_validation"] = (
+            state["stage_times"].get("post_validation", 0.0)
+            + post_result.validation_time
+        )
         state["current_stage"] = "complete"
         state["messages"].append("Post-validation skipped")
         return state
@@ -319,7 +331,9 @@ def post_validation_node(state: PipelineState) -> PipelineState:
     )
 
     state["post_validation"] = post_result.model_dump()
-    state["stage_times"]["post_validation"] = state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
+    state["stage_times"]["post_validation"] = (
+        state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
+    )
 
     # Determine next stage based on validation result
     if post_result.is_valid:
@@ -329,14 +343,18 @@ def post_validation_node(state: PipelineState) -> PipelineState:
         # Apply corrections if available
         if post_result.corrected_cards:
             # Update generation with corrected cards
-            corrected_dicts = [card.model_dump() for card in post_result.corrected_cards]
+            corrected_dicts = [
+                card.model_dump() for card in post_result.corrected_cards
+            ]
             state["generation"]["cards"] = corrected_dicts
             state["generation"]["total_cards"] = len(corrected_dicts)
             logger.info("applied_corrected_cards", count=len(corrected_dicts))
 
         state["retry_count"] += 1
         state["current_stage"] = "post_validation"  # Re-validate corrections
-        state["messages"].append(f"Applied fixes, re-validating (attempt {state['retry_count']})")
+        state["messages"].append(
+            f"Applied fixes, re-validating (attempt {state['retry_count']})"
+        )
     else:
         state["current_stage"] = "failed"
         state["messages"].append("Post-validation failed, no more retries")
@@ -349,7 +367,9 @@ def post_validation_node(state: PipelineState) -> PipelineState:
 # ============================================================================
 
 
-def should_continue_after_pre_validation(state: PipelineState) -> Literal["generation", "failed"]:
+def should_continue_after_pre_validation(
+    state: PipelineState,
+) -> Literal["generation", "failed"]:
     """Determine next node after pre-validation.
 
     Args:
@@ -364,7 +384,9 @@ def should_continue_after_pre_validation(state: PipelineState) -> Literal["gener
     return "failed"
 
 
-def should_continue_after_post_validation(state: PipelineState) -> Literal["complete", "generation", "failed"]:
+def should_continue_after_post_validation(
+    state: PipelineState,
+) -> Literal["complete", "generation", "failed"]:
     """Determine next node after post-validation.
 
     Args:
@@ -550,7 +572,8 @@ class LangGraphOrchestrator:
 
         result = AgentPipelineResult(
             success=success,
-            pre_validation=pre_validation or PreValidationResult(
+            pre_validation=pre_validation
+            or PreValidationResult(
                 is_valid=False, error_type="none", validation_time=0.0
             ),
             generation=generation,

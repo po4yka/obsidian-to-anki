@@ -60,7 +60,9 @@ class VaultIndexer:
 
         # Collect errors for aggregated logging
         error_by_type: defaultdict[str, int] = defaultdict(int)
-        error_samples: defaultdict[str, list[str]] = defaultdict(list)  # Store sample errors per type
+        error_samples: defaultdict[str, list[str]] = defaultdict(
+            list
+        )  # Store sample errors per type
 
         for file_path, relative_path in note_files:
             try:
