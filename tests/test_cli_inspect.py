@@ -36,7 +36,9 @@ def runner():
 
 @pytest.fixture(autouse=True)
 def patch_logging(monkeypatch):
-    monkeypatch.setattr("obsidian_anki_sync.cli.configure_logging", lambda level: None)
+    monkeypatch.setattr(
+        "obsidian_anki_sync.cli.configure_logging", lambda level, log_dir=None: None
+    )
     monkeypatch.setattr("obsidian_anki_sync.cli.get_logger", lambda name: MagicMock())
 
 
