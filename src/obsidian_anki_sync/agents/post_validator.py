@@ -403,7 +403,7 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
             # Match variations like "CardType:Simple", "cardtype: Simple", "CardType :Simple"
             fixed_header = re.sub(
                 r"[Cc]ard[Tt]ype\s*:\s*([Ss]imple|[Mm]issing|[Dd]raw)",
-                lambda m: f"CardType: {m.group(1).capitalize()}",
+                lambda m: f"CardType: {str(m.group(1)).capitalize()}",
                 fixed_header,
             )
 

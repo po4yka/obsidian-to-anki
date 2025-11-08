@@ -120,7 +120,7 @@ class OpenRouterProvider(BaseLLMProvider):
             # OpenRouter doesn't have a dedicated health endpoint,
             # so we try to list models as a health check
             response = self.client.get(f"{self.base_url}/models")
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception as e:
             logger.error(
                 "openrouter_connection_check_failed",
