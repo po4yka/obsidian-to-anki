@@ -532,7 +532,9 @@ class SyncEngine:
             raise ValueError(f"Agent pipeline failed: {error_msg}")
 
         # Convert GeneratedCard to Card instances
-        cards = self.agent_orchestrator.convert_to_cards(result.generation.cards)
+        cards = self.agent_orchestrator.convert_to_cards(
+            result.generation.cards, metadata, qa_pairs
+        )
 
         # Update card metadata with proper paths and GUIDs
         for card in cards:

@@ -16,6 +16,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 
 from ..models import NoteMetadata, QAPair
+from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
 from .models import (
     GeneratedCard,
@@ -328,14 +329,23 @@ Q&A Pairs ({len(qa_pairs)}):
 
             # Convert cards to GeneratedCard instances
             generated_cards: list[GeneratedCard] = []
+            qa_lookup = {qa.card_index: qa for qa in qa_pairs}
             for card_dict in output.cards:
                 try:
+                    card_index = card_dict["card_index"]
+                    lang = card_dict["lang"]
+                    qa_pair = qa_lookup.get(card_index)
+                    content_hash = ""
+                    if qa_pair is not None:
+                        content_hash = compute_content_hash(qa_pair, metadata, lang)
+
                     generated_card = GeneratedCard(
-                        card_index=card_dict["card_index"],
+                        card_index=card_index,
                         slug=card_dict["slug"],
-                        lang=card_dict["lang"],
+                        lang=lang,
                         apf_html=card_dict["apf_html"],
                         confidence=card_dict.get("confidence", output.confidence),
+                        content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)
                 except Exception as e:
