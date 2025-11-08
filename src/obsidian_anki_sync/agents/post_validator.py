@@ -422,7 +422,9 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
                 fixed_slug = re.sub(r"-+", "-", fixed_slug)
                 # Remove leading/trailing hyphens
                 fixed_slug = fixed_slug.strip("-")
-                fixed_header = fixed_header.replace(f"slug: {original_slug}", f"slug: {fixed_slug}")
+                fixed_header = fixed_header.replace(
+                    f"slug: {original_slug}", f"slug: {fixed_slug}"
+                )
 
             # 5. Ensure tags are space-separated, not comma-separated
             tags_match = re.search(r"Tags:\s*([^>]+)", fixed_header)
@@ -432,7 +434,9 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
                 fixed_tags = re.sub(r"\s*,\s*", " ", tags_str)
                 # Normalize multiple spaces
                 fixed_tags = re.sub(r"\s+", " ", fixed_tags)
-                fixed_header = fixed_header.replace(f"Tags: {tags_str}", f"Tags: {fixed_tags}")
+                fixed_header = fixed_header.replace(
+                    f"Tags: {tags_str}", f"Tags: {fixed_tags}"
+                )
 
             # 6. Ensure proper comment ending
             if not fixed_header.endswith("-->"):
