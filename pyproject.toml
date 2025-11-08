@@ -29,6 +29,9 @@ dependencies = [
     "autogen-agentchat>=0.4.0",
     "autogen-ext[ollama]>=0.4.8",
     "genanki>=0.13.0",
+    "pydantic-ai>=0.0.14",
+    "langgraph>=0.2.60",
+    "langgraph-checkpoint>=2.0.10",
 ]
 
 [project.optional-dependencies]
