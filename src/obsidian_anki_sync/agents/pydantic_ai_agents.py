@@ -315,9 +315,7 @@ Slug Base: {slug_base}
 Q&A Pairs ({len(qa_pairs)}):
 """
         for idx, qa in enumerate(qa_pairs, 1):
-            prompt += (
-                f"\n{idx}. Q: {qa.question_en[:100]}...\n   A: {qa.answer_en[:100]}...\n"
-            )
+            prompt += f"\n{idx}. Q: {qa.question_en[:100]}...\n   A: {qa.answer_en[:100]}...\n"
 
         prompt += (
             "\nGenerate complete APF HTML cards for all Q&A pairs in all languages."
