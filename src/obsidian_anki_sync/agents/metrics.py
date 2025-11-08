@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from ..utils.logging import get_logger
 
@@ -105,15 +105,15 @@ class SessionMetrics:
             "by_operation": {},
         }
 
-        total_calls = summary["total_operations"]
+        total_calls = cast(int, summary["total_operations"])
         if total_calls > 0:
             total_retried = sum(m.retried_calls for m in self.operations.values())
             summary["retry_rate_pct"] = round((total_retried / total_calls) * 100, 1)
-            summary["success_rate_pct"] = round(
-                (summary["successful_operations"] / total_calls) * 100, 1
-            )
+            successful_ops = cast(int, summary["successful_operations"])
+            summary["success_rate_pct"] = round((successful_ops / total_calls) * 100, 1)
 
         # Per-operation details
+        by_operation: dict[str, Any] = {}
         for op_name, metrics in self.operations.items():
             if metrics.total_calls == 0:
                 continue
@@ -127,7 +127,7 @@ class SessionMetrics:
                 else 0
             )
 
-            summary["by_operation"][op_name] = {
+            by_operation[op_name] = {
                 "calls": metrics.total_calls,
                 "success_rate_pct": round(success_rate, 1),
                 "failed": metrics.failed_calls,
@@ -139,6 +139,7 @@ class SessionMetrics:
                 "errors_by_type": metrics.errors_by_type,
             }
 
+        summary["by_operation"] = by_operation
         return summary
 
     def log_summary(self) -> None:

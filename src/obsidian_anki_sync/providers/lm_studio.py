@@ -72,7 +72,7 @@ class LMStudioProvider(BaseLLMProvider):
         """
         try:
             response = self.client.get(f"{self.base_url}/models")
-            return response.status_code == 200
+            return bool(response.status_code == 200)
         except Exception as e:
             logger.error(
                 "lm_studio_connection_check_failed",
