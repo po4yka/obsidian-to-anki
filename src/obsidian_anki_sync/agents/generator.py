@@ -12,6 +12,10 @@ from pathlib import Path
 
 from ..models import Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
+from ..utils.code_detection import (
+    detect_code_language_from_content,
+    detect_code_language_from_metadata,
+)
 from ..utils.logging import get_logger
 from .debug_artifacts import save_failed_llm_call
 from .llm_errors import (
@@ -109,10 +113,16 @@ class GeneratorAgent:
 
         generation_time = time.time() - start_time
 
-        # Calculate aggregate statistics
-        sum(
-            card.confidence for card in generated_cards
-        )  # Placeholder, would need to track actual tokens
+        # Calculate aggregate statistics for future metrics
+        total_confidence = sum(card.confidence for card in generated_cards)
+        avg_confidence = (
+            total_confidence / len(generated_cards) if generated_cards else 0
+        )
+        logger.debug(
+            "generation_confidence_stats",
+            avg_confidence=avg_confidence,
+            total=total_confidence,
+        )
 
         logger.info(
             "card_generation_complete",
@@ -537,48 +547,8 @@ Now generate the card following this structure:
         return prompt
 
     def _code_language_hint(self, metadata: NoteMetadata) -> str:
-        """Derive a language hint for code blocks.
-
-        Reuses logic from APFGenerator._code_language_hint.
-        """
-        candidates = list(metadata.tags) + metadata.subtopics + [metadata.topic]
-        known_languages = {
-            "kotlin",
-            "java",
-            "python",
-            "swift",
-            "cpp",
-            "c",
-            "csharp",
-            "go",
-            "rust",
-            "javascript",
-            "typescript",
-            "sql",
-            "bash",
-            "shell",
-            "yaml",
-            "json",
-            "html",
-            "css",
-            "gradle",
-            "groovy",
-        }
-
-        for raw in candidates:
-            if not raw:
-                continue
-            normalized = (
-                raw.lower()
-                .replace("language/", "")
-                .replace("lang/", "")
-                .replace("topic/", "")
-                .replace("/", "_")
-            )
-            if normalized in known_languages:
-                return normalized
-
-        return "plaintext"
+        """Derive a language hint for code blocks."""
+        return detect_code_language_from_metadata(metadata)
 
     def _detect_code_language(self, code: str) -> str:
         """Detect programming language from code content.
@@ -594,86 +564,8 @@ Now generate the card following this structure:
         if not code or not code.strip():
             return "text"
 
-        code_lower = code.lower().strip()
-
-        # Kotlin patterns
-        if any(
-            k in code_lower
-            for k in [
-                "suspend fun",
-                "data class",
-                "sealed class",
-                "sealed interface",
-                "inline class",
-                "value class",
-            ]
-        ):
-            return "kotlin"
-        if "fun " in code_lower and ("val " in code_lower or "var " in code_lower):
-            return "kotlin"
-
-        # Java patterns
-        if any(
-            k in code_lower
-            for k in ["public class", "private class", "protected class"]
-        ):
-            return "java"
-        if "import java." in code_lower or "package " in code_lower:
-            return "java"
-
-        # Python patterns (check before JavaScript due to 'async' keyword overlap)
-        if any(k in code_lower for k in ["def ", "async def"]):
-            # Strong Python indicators
-            if any(k in code_lower for k in ["__init__", "self.", "import ", "from "]):
-                return "python"
-            # async def is Python-specific
-            if "async def" in code_lower:
-                return "python"
-
-        # JavaScript/TypeScript
-        if any(
-            k in code_lower for k in ["function ", "const ", "let ", "=>", "async "]
-        ):
-            # TypeScript-specific
-            if any(
-                k in code
-                for k in ["interface ", "type ", ": string", ": number", "<T>"]
-            ):
-                return "typescript"
-            return "javascript"
-
-        # Shell/Bash
-        if code.startswith("#!") or any(
-            k in code_lower for k in ["#!/bin/", "export ", "echo ", "sudo "]
-        ):
-            return "bash"
-
-        # YAML
-        if re.match(r"^[a-z_]+:\s", code_lower, re.MULTILINE) and "-" in code:
-            return "yaml"
-
-        # JSON
-        if code.strip().startswith("{") and '"' in code and ":" in code:
-            return "json"
-
-        # SQL
-        if any(k in code_lower for k in ["select ", "insert ", "update ", "delete "]):
-            return "sql"
-
-        # Swift
-        if any(k in code_lower for k in ["func ", "var ", "let ", "import swift"]):
-            return "swift"
-
-        # Go
-        if "package main" in code_lower or "func main()" in code_lower:
-            return "go"
-
-        # Rust
-        if any(k in code_lower for k in ["fn ", "let mut", "impl ", "pub fn"]):
-            return "rust"
-
-        # Fallback to metadata hint
-        return "text"
+        detected = detect_code_language_from_content(code)
+        return detected if detected else "text"
 
     def _generate_tags(self, metadata: NoteMetadata, lang: str) -> list[str]:
         """Generate deterministic tags from metadata.

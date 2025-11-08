@@ -1,6 +1,7 @@
 """Indexing system for Obsidian vault and Anki cards."""
 
 import json
+from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -58,8 +59,10 @@ class VaultIndexer:
         topic_mismatches: dict[str, int] = {}
 
         # Collect errors for aggregated logging
-        error_by_type: dict[str, int] = {}
-        error_samples: dict[str, list[str]] = {}  # Store sample errors per type
+        error_by_type: defaultdict[str, int] = defaultdict(int)
+        error_samples: defaultdict[str, list[str]] = defaultdict(
+            list
+        )  # Store sample errors per type
 
         for file_path, relative_path in note_files:
             try:
@@ -149,14 +152,10 @@ class VaultIndexer:
                 error_type_name = type(e).__name__
                 error_message = str(e)
 
-                # Aggregate errors
-                error_by_type[error_type_name] = (
-                    error_by_type.get(error_type_name, 0) + 1
-                )
+                # Aggregate errors with defaultdict
+                error_by_type[error_type_name] += 1
 
                 # Store sample errors (up to 3 per type)
-                if error_type_name not in error_samples:
-                    error_samples[error_type_name] = []
                 if len(error_samples[error_type_name]) < 3:
                     error_samples[error_type_name].append(
                         f"{relative_path}: {error_message[:100]}"
