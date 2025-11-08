@@ -15,7 +15,6 @@ from typing import Annotated, Literal, TypedDict
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from pydantic import BaseModel, Field
 
 from ..config import Config
 from ..models import NoteMetadata, QAPair
@@ -92,7 +91,6 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
 
     from ..models import NoteMetadata, QAPair
     from ..providers.pydantic_ai_models import (
-        PydanticAIModelFactory,
         create_openrouter_model_from_env,
     )
     from .pydantic_ai_agents import PreValidatorAgentAI
