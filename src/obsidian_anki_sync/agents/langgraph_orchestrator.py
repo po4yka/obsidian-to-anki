@@ -89,6 +89,7 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
         Updated state with pre-validation results
     """
     import asyncio
+
     from ..models import NoteMetadata, QAPair
     from ..providers.pydantic_ai_models import (
         PydanticAIModelFactory,
@@ -176,6 +177,7 @@ def generation_node(state: PipelineState) -> PipelineState:
         Updated state with generation results
     """
     import asyncio
+
     from ..models import NoteMetadata, QAPair
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import GeneratorAgentAI
@@ -260,6 +262,7 @@ def post_validation_node(state: PipelineState) -> PipelineState:
         Updated state with post-validation results
     """
     import asyncio
+
     from ..models import NoteMetadata
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import PostValidatorAgentAI
