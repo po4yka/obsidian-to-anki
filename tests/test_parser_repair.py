@@ -126,9 +126,7 @@ class TestParserRepairAgent:
             "repaired_content": repaired_note_content,
         }
 
-        parser_repair_agent.ollama_client.generate.return_value = {
-            "response": json.dumps(repair_response)
-        }
+        parser_repair_agent.ollama_client.generate_json.return_value = repair_response
 
         # Attempt repair
         result = parser_repair_agent.repair_and_parse(
@@ -154,9 +152,7 @@ class TestParserRepairAgent:
             "repaired_content": None,
         }
 
-        parser_repair_agent.ollama_client.generate.return_value = {
-            "response": json.dumps(repair_response)
-        }
+        parser_repair_agent.ollama_client.generate_json.return_value = repair_response
 
         # Attempt repair
         result = parser_repair_agent.repair_and_parse(
@@ -171,7 +167,9 @@ class TestParserRepairAgent:
         test_file.write_text("---\ntest\n---")
 
         # Mock LLM exception
-        parser_repair_agent.ollama_client.generate.side_effect = Exception("LLM error")
+        parser_repair_agent.ollama_client.generate_json.side_effect = Exception(
+            "LLM error"
+        )
 
         # Attempt repair
         result = parser_repair_agent.repair_and_parse(
@@ -185,10 +183,10 @@ class TestParserRepairAgent:
         test_file = tmp_path / "test-note.md"
         test_file.write_text("---\ntest\n---")
 
-        # Mock invalid JSON response
-        parser_repair_agent.ollama_client.generate.return_value = {
-            "response": "This is not JSON"
-        }
+        # Mock invalid JSON response - generate_json raises JSONDecodeError
+        parser_repair_agent.ollama_client.generate_json.side_effect = (
+            json.JSONDecodeError("Invalid JSON", "This is not JSON", 0)
+        )
 
         # Attempt repair
         result = parser_repair_agent.repair_and_parse(
@@ -216,9 +214,7 @@ class TestAttemptRepairHelper:
             "repaired_content": repaired_note_content,
         }
 
-        mock_ollama_provider.generate.return_value = {
-            "response": json.dumps(repair_response)
-        }
+        mock_ollama_provider.generate_json.return_value = repair_response
 
         result = attempt_repair(
             file_path=test_file,
@@ -307,9 +303,7 @@ Some content without frontmatter
             "repaired_content": repaired_note_content,
         }
 
-        mock_ollama_provider.generate.return_value = {
-            "response": json.dumps(repair_response)
-        }
+        mock_ollama_provider.generate_json.return_value = repair_response
 
         # Should succeed with repair
         metadata, qa_pairs = parse_note_with_repair(
@@ -337,9 +331,7 @@ Some content without frontmatter
             "repaired_content": None,
         }
 
-        mock_ollama_provider.generate.return_value = {
-            "response": json.dumps(repair_response)
-        }
+        mock_ollama_provider.generate_json.return_value = repair_response
 
         # Should raise error when repair fails
         with pytest.raises(ParserError, match="Parse failed and repair unsuccessful"):
