@@ -35,6 +35,7 @@ class GeneratedCard(BaseModel):
     lang: str = Field(pattern="^(en|ru)$", description="Card language")
     apf_html: str = Field(min_length=1, description="APF HTML content")
     confidence: float = Field(ge=0.0, le=1.0, description="Generation confidence score")
+    content_hash: str = Field(default="", description="Stable content hash for change detection")
 
 
 class GenerationResult(BaseModel):

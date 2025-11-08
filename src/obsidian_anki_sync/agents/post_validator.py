@@ -467,6 +467,7 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
                     lang=card.lang,
                     apf_html=fixed_html,
                     confidence=card.confidence,
+                    content_hash=card.content_hash,
                 )
                 fixed_cards.append(fixed_card)
             else:
