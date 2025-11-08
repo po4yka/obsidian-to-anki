@@ -110,7 +110,7 @@ class GeneratorAgent:
         generation_time = time.time() - start_time
 
         # Calculate aggregate statistics
-        total_tokens = sum(
+        sum(
             card.confidence for card in generated_cards
         )  # Placeholder, would need to track actual tokens
 
