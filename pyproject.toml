@@ -22,6 +22,7 @@ dependencies = [
     "structlog>=25.5.0",
     "ruamel.yaml>=0.18.16",
     "python-frontmatter>=1.1.0",
+    "obsidiantools>=0.10.0",
     "beautifulsoup4>=4.14.2",
     "html5lib>=1.1",
     "pydantic>=2.0.0",
