@@ -8,6 +8,7 @@ This module coordinates:
 Implements retry logic and auto-fix capabilities.
 """
 
+import hashlib
 import time
 from pathlib import Path
 
@@ -16,11 +17,13 @@ from ..models import Card, Manifest, NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..providers.factory import ProviderFactory
 from ..providers.ollama import OllamaProvider
+from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
 from .generator import GeneratorAgent
 from .models import AgentPipelineResult, GeneratedCard
 from .post_validator import PostValidatorAgent
 from .pre_validator import PreValidatorAgent
+from .slug_utils import generate_agent_slug_base
 
 logger = get_logger(__name__)
 
@@ -315,32 +318,20 @@ class AgentOrchestrator:
         )
 
     def _generate_slug_base(self, metadata: NoteMetadata) -> str:
-        """Generate base slug from note metadata.
+        """Generate base slug from note metadata using collision-safe helper."""
 
-        Args:
-            metadata: Note metadata
+        return generate_agent_slug_base(metadata)
 
-        Returns:
-            Slug base string
-        """
-        # Simplified slug generation
-        # In production, use slug_generator module
-        topic = metadata.topic.lower().replace(" ", "-")
-        title = metadata.title.lower().replace(" ", "-")[:30]  # Limit length
+    def convert_to_cards(
+        self,
+        generated_cards: list[GeneratedCard],
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+    ) -> list[Card]:
+        """Convert GeneratedCard instances to Card instances."""
 
-        return f"{topic}-{title}"
-
-    def convert_to_cards(self, generated_cards: list[GeneratedCard]) -> list[Card]:
-        """Convert GeneratedCard instances to Card instances.
-
-        Args:
-            generated_cards: Generated cards from agent pipeline
-
-        Returns:
-            List of Card instances ready for Anki sync
-        """
-
-        cards = []
+        cards: list[Card] = []
+        qa_lookup = {qa.card_index: qa for qa in qa_pairs}
 
         for gen_card in generated_cards:
             # Create manifest
@@ -361,18 +352,26 @@ class AgentOrchestrator:
                 hash6=None,
             )
 
-            # Create card
-            card = Card(
-                slug=gen_card.slug,
-                lang=gen_card.lang,
-                apf_html=gen_card.apf_html,
-                manifest=manifest,
-                content_hash="",  # Will be computed by sync engine
-                note_type="APF::Simple",  # Default, can be detected from HTML
-                tags=[],  # Extract from manifest in HTML
-                guid=gen_card.slug,
-            )
+            qa_pair = qa_lookup.get(gen_card.card_index)
+            content_hash = gen_card.content_hash
+            if not content_hash and qa_pair:
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
+            elif not content_hash:
+                content_hash = hashlib.sha256(
+                    gen_card.apf_html.encode("utf-8")
+                ).hexdigest()
 
-            cards.append(card)
+            cards.append(
+                Card(
+                    slug=gen_card.slug,
+                    lang=gen_card.lang,
+                    apf_html=gen_card.apf_html,
+                    manifest=manifest,
+                    content_hash=content_hash,
+                    note_type="APF::Simple",  # Default, can be detected from HTML
+                    tags=[],  # Extract from manifest in HTML
+                    guid=gen_card.slug,
+                )
+            )
 
         return cards
