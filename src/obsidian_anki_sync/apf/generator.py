@@ -11,8 +11,8 @@ from openai import OpenAI  # type: ignore
 from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair
 from ..utils.code_detection import detect_code_language_from_metadata
-from ..utils.logging import get_logger
 from ..utils.content_hash import compute_content_hash
+from ..utils.logging import get_logger
 from ..utils.retry import retry
 
 logger = get_logger(__name__)

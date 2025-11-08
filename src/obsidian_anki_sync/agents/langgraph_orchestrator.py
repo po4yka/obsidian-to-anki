@@ -20,7 +20,6 @@ from langgraph.graph.message import add_messages
 from ..config import Config
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
-from .slug_utils import generate_agent_slug_base
 from .models import (
     AgentPipelineResult,
     GeneratedCard,
@@ -28,6 +27,7 @@ from .models import (
     PostValidationResult,
     PreValidationResult,
 )
+from .slug_utils import generate_agent_slug_base
 
 logger = get_logger(__name__)
 
