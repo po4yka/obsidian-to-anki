@@ -17,7 +17,12 @@ from pydantic_ai.models.openai import OpenAIModel
 
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
-from .models import GeneratedCard, GenerationResult, PostValidationResult, PreValidationResult
+from .models import (
+    GeneratedCard,
+    GenerationResult,
+    PostValidationResult,
+    PreValidationResult,
+)
 
 logger = get_logger(__name__)
 
@@ -256,9 +261,7 @@ class GeneratorAgentAI:
             self.system_prompt = prompt_path.read_text(encoding="utf-8")
         else:
             logger.warning("cards_prompt_not_found", path=str(prompt_path))
-            self.system_prompt = (
-                "Generate APF cards following strict APF v2.1 format."
-            )
+            self.system_prompt = "Generate APF cards following strict APF v2.1 format."
 
         # Create PydanticAI agent
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
@@ -312,9 +315,13 @@ Slug Base: {slug_base}
 Q&A Pairs ({len(qa_pairs)}):
 """
         for idx, qa in enumerate(qa_pairs, 1):
-            prompt += f"\n{idx}. Q: {qa.question[:100]}...\n   A: {qa.answer[:100]}...\n"
+            prompt += (
+                f"\n{idx}. Q: {qa.question[:100]}...\n   A: {qa.answer[:100]}...\n"
+            )
 
-        prompt += "\nGenerate complete APF HTML cards for all Q&A pairs in all languages."
+        prompt += (
+            "\nGenerate complete APF HTML cards for all Q&A pairs in all languages."
+        )
 
         try:
             # Run agent
@@ -334,7 +341,9 @@ Q&A Pairs ({len(qa_pairs)}):
                     )
                     generated_cards.append(generated_card)
                 except Exception as e:
-                    logger.warning("invalid_generated_card", error=str(e), card=card_dict)
+                    logger.warning(
+                        "invalid_generated_card", error=str(e), card=card_dict
+                    )
 
             generation_result = GenerationResult(
                 cards=generated_cards,
@@ -442,7 +451,9 @@ Cards to validate:
             prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
             prompt += f"HTML Preview: {card.apf_html[:200]}...\n"
 
-        prompt += f"\nValidate all {len(cards)} cards for correctness, accuracy, and quality."
+        prompt += (
+            f"\nValidate all {len(cards)} cards for correctness, accuracy, and quality."
+        )
 
         try:
             # Run agent

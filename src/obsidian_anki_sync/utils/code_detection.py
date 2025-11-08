@@ -157,8 +157,7 @@ def detect_code_language_from_content(content: str) -> str | None:
 
     # Rust indicators
     if any(
-        pattern in content
-        for pattern in ["fn ", "let mut", "impl ", "use ", "pub "]
+        pattern in content for pattern in ["fn ", "let mut", "impl ", "use ", "pub "]
     ):
         return "rust"
 

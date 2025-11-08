@@ -101,9 +101,9 @@ class VaultAnalyzer:
             count = len(self.vault.get_backlinks(note))
             if count > 0:
                 backlink_counts[note] = count
-        hub_notes = sorted(
-            backlink_counts.items(), key=lambda x: x[1], reverse=True
-        )[:10]
+        hub_notes = sorted(backlink_counts.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
 
         stats = VaultStats(
             total_notes=len(all_notes),
@@ -265,9 +265,7 @@ class VaultAnalyzer:
 
         # Check for broken links
         if stats.broken_links:
-            issues["warnings"].append(
-                f"Found {len(stats.broken_links)} broken links"
-            )
+            issues["warnings"].append(f"Found {len(stats.broken_links)} broken links")
 
         logger.info(
             "vault_integrity_check_complete",
