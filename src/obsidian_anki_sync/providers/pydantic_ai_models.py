@@ -70,7 +70,7 @@ class PydanticAIModelFactory:
             http_headers["X-Title"] = site_name
 
         # Create OpenAI-compatible model pointing to OpenRouter
-        model = OpenAIModel(
+        model = OpenAIModel(  # type: ignore[call-overload]
             model_name,
             base_url=base_url,
             api_key=api_key,
@@ -137,7 +137,7 @@ class PydanticAIModelFactory:
                 base_url=base_url,
             )
 
-            return OpenAIModel(
+            return OpenAIModel(  # type: ignore[call-overload]
                 model_name,
                 base_url=base_url,
                 api_key=api_key,
