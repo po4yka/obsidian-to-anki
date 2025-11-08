@@ -7,7 +7,6 @@ This agent validates generated APF cards for:
 - Template compliance
 """
 
-import json
 import time
 
 from ..apf.html_validator import validate_card_html

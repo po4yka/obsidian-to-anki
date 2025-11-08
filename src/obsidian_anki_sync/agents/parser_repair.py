@@ -8,14 +8,12 @@ This agent activates only when rule-based parsing fails:
 """
 
 import json
-import re
 from pathlib import Path
 
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
-from .models import ParserRepairResult
 
 logger = get_logger(__name__)
 

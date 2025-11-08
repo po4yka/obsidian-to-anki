@@ -6,7 +6,6 @@ from typing import Any, cast
 import httpx
 
 from ..utils.logging import get_logger
-from ..utils.retry import retry
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
