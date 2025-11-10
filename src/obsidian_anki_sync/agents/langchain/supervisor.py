@@ -420,6 +420,12 @@ class LangChainSupervisor:
             messages=[f"Error: {error}"],
             slug=note_context.slug,
             note_sections=(
-                note_context.sections if hasattr(note_context, "sections") else None
+                NoteSections(
+                    question=note_context.sections.question,
+                    answer=note_context.sections.answer,
+                    extra=note_context.sections.extra,
+                )
+                if hasattr(note_context, "sections") and note_context.sections
+                else None
             ),
         )
