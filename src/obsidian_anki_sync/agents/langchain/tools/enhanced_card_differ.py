@@ -8,7 +8,7 @@ import difflib
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from obsidian_anki_sync.agents.langchain.models import (
     CardDiffResult,
@@ -179,9 +179,7 @@ class EnhancedCardDiffer:
         )
 
         # Detect conflicts (edits in both Obsidian and Anki)
-        conflict_detected = self._detect_conflict(
-            last_obsidian_sync, last_anki_edit
-        )
+        conflict_detected = self._detect_conflict(last_obsidian_sync, last_anki_edit)
 
         # Perform basic diff
         changes = self._compute_field_changes(existing, proposed)
@@ -382,17 +380,21 @@ class EnhancedCardDiffer:
         for field_name, field_value in existing.fields.items():
             context_parts.append(f"**{field_name}**: {field_value}")
 
-        context_parts.extend([
-            "",
-            "## Proposed Card (From Updated Obsidian Note)",
-        ])
+        context_parts.extend(
+            [
+                "",
+                "## Proposed Card (From Updated Obsidian Note)",
+            ]
+        )
         for field_name, field_value in proposed.fields.items():
             context_parts.append(f"**{field_name}**: {field_value}")
 
-        context_parts.extend([
-            "",
-            "## Detected Changes",
-        ])
+        context_parts.extend(
+            [
+                "",
+                "## Detected Changes",
+            ]
+        )
         for change in changes:
             if change.field not in ("tags", "model_name", "deck_name"):
                 context_parts.append(f"**{change.field}**:")
@@ -409,7 +411,9 @@ class EnhancedCardDiffer:
             ]
 
             response = self.llm.invoke(messages)
-            response_text = response.content if hasattr(response, "content") else str(response)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
 
             # Parse JSON
             if "```json" in response_text:
@@ -422,10 +426,12 @@ class EnhancedCardDiffer:
             logger.debug(
                 "semantic_analysis_complete",
                 note_id=existing.note_id,
-                overall_recommendation=analysis.get("overall_assessment", {}).get("should_update"),
+                overall_recommendation=analysis.get("overall_assessment", {}).get(
+                    "should_update"
+                ),
             )
 
-            return analysis
+            return cast(dict[str, Any], analysis)
 
         except Exception as e:
             logger.error(
@@ -463,16 +469,24 @@ class EnhancedCardDiffer:
                 # Update severity based on LLM analysis
                 severity_str = analysis.get("severity", "content")
                 if severity_str == "cosmetic":
-                    change = change.model_copy(update={"severity": ChangeSeverity.COSMETIC})
+                    change = change.model_copy(
+                        update={"severity": ChangeSeverity.COSMETIC}
+                    )
                 elif severity_str == "content":
-                    change = change.model_copy(update={"severity": ChangeSeverity.CONTENT})
+                    change = change.model_copy(
+                        update={"severity": ChangeSeverity.CONTENT}
+                    )
                 elif severity_str == "structural":
-                    change = change.model_copy(update={"severity": ChangeSeverity.STRUCTURAL})
+                    change = change.model_copy(
+                        update={"severity": ChangeSeverity.STRUCTURAL}
+                    )
 
                 # Enhance message with LLM reasoning
                 reasoning = analysis.get("reasoning", "")
                 change_type = analysis.get("change_type", "")
-                enhanced_message = f"{change.message} | Type: {change_type} | {reasoning}"
+                enhanced_message = (
+                    f"{change.message} | Type: {change_type} | {reasoning}"
+                )
                 change = change.model_copy(update={"message": enhanced_message})
 
             enhanced_changes.append(change)
@@ -506,7 +520,11 @@ class EnhancedCardDiffer:
             elif self.conflict_resolution == ConflictResolution.ANKI_WINS:
                 return False, "Conflict detected: Anki version preserved", RiskLevel.LOW
             elif self.conflict_resolution == ConflictResolution.MANUAL:
-                return False, "Conflict detected: Manual review required", RiskLevel.HIGH
+                return (
+                    False,
+                    "Conflict detected: Manual review required",
+                    RiskLevel.HIGH,
+                )
             # MERGE and NEWEST_WINS would need more complex logic
 
         # Use semantic analysis if available

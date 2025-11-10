@@ -200,7 +200,7 @@ class OpenAIProvider(BaseLLMProvider):
                 last_exception = e
                 if e.response.status_code >= 500 and attempt < self.max_retries - 1:
                     # Retry on server errors
-                    wait_time = 2 ** attempt  # Exponential backoff
+                    wait_time = 2**attempt  # Exponential backoff
                     logger.warning(
                         "openai_retry",
                         attempt=attempt + 1,
@@ -213,7 +213,7 @@ class OpenAIProvider(BaseLLMProvider):
             except httpx.RequestError as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt
+                    wait_time = 2**attempt
                     logger.warning(
                         "openai_retry_request_error",
                         attempt=attempt + 1,

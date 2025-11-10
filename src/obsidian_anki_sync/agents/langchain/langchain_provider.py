@@ -5,7 +5,7 @@ and makes them compatible with LangChain's BaseChatModel interface.
 """
 
 import json
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, cast
 
 from obsidian_anki_sync.providers.base import BaseLLMProvider
 from obsidian_anki_sync.providers.factory import ProviderFactory
@@ -14,7 +14,12 @@ from obsidian_anki_sync.utils.logging import get_logger
 try:
     from langchain_core.callbacks import CallbackManagerForLLMRun
     from langchain_core.language_models import BaseChatModel
-    from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+    from langchain_core.messages import (
+        AIMessage,
+        BaseMessage,
+        HumanMessage,
+        SystemMessage,
+    )
     from langchain_core.outputs import ChatGeneration, ChatResult
 
     LANGCHAIN_AVAILABLE = True
@@ -145,9 +150,9 @@ class LangChainProviderAdapter(BaseChatModel):  # type: ignore
             result = self.provider.generate(
                 model=self.model_name,
                 prompt=prompt,
-                system=system_message or None,
+                system=system_message or "",
                 temperature=kwargs.get("temperature", self.temperature),
-                format=format_type,
+                format=format_type or "",
             )
 
             # Extract response text
@@ -210,7 +215,7 @@ class LangChainProviderAdapter(BaseChatModel):  # type: ignore
         # Parse JSON
         try:
             json_response = json.loads(response_text)
-            return json_response
+            return cast(dict[Any, Any], json_response)
         except json.JSONDecodeError as e:
             logger.error(
                 "json_parse_error",
@@ -244,16 +249,20 @@ def create_langchain_chat_model(
     provider = ProviderFactory.create_from_config(config)
 
     # Determine model name
-    final_model_name = model_name or getattr(config, "generator_model", "qwen3:14b")
+    final_model_name: str = model_name or str(
+        getattr(config, "generator_model", "qwen3:14b")
+    )
 
     # Determine temperature
-    final_temperature = temperature or getattr(config, "llm_temperature", 0.2)
+    final_temperature: float = temperature or float(
+        getattr(config, "llm_temperature", 0.2)
+    )
 
     # Determine max tokens
-    max_tokens = getattr(config, "llm_max_tokens", 1024)
+    max_tokens: int = int(getattr(config, "llm_max_tokens", 1024))
 
     # Determine timeout
-    timeout = getattr(config, "llm_timeout", 600.0)
+    timeout: float = float(getattr(config, "llm_timeout", 600.0))
 
     logger.info(
         "creating_langchain_chat_model",

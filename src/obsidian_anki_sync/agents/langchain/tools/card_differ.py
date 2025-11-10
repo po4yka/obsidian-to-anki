@@ -4,7 +4,7 @@ This tool performs field-by-field comparison and determines whether
 an update should be performed based on change severity and policy.
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from obsidian_anki_sync.agents.langchain.models import (
     CardDiffResult,
@@ -30,7 +30,7 @@ class CardDifferTool:
         self,
         allow_content_updates: bool = True,
         allow_structural_updates: bool = False,
-        llm: Optional[any] = None,
+        llm: Optional[Any] = None,
     ):
         """Initialize Card Differ Tool.
 
@@ -204,9 +204,7 @@ class CardDifferTool:
             return False, "No changes detected", RiskLevel.LOW
 
         # Check for structural changes
-        has_structural = any(
-            c.severity == ChangeSeverity.STRUCTURAL for c in changes
-        )
+        has_structural = any(c.severity == ChangeSeverity.STRUCTURAL for c in changes)
         if has_structural and not self.allow_structural_updates:
             return (
                 False,

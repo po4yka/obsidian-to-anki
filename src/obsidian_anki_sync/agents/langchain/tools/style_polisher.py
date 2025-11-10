@@ -8,9 +8,13 @@ This optional LLM-powered agent:
 """
 
 import json
-from typing import Optional
+from typing import Optional, cast
 
-from obsidian_anki_sync.agents.langchain.models import NoteContext, ProposedCard, QAReport
+from obsidian_anki_sync.agents.langchain.models import (
+    NoteContext,
+    ProposedCard,
+    QAReport,
+)
 from obsidian_anki_sync.utils.logging import get_logger
 
 try:
@@ -95,13 +99,18 @@ class StylePolisherTool:
             ]
 
             response = self.llm.invoke(messages)
-            response_text = response.content if hasattr(response, "content") else str(response)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
 
             # Parse and apply changes
             polished_fields = self._parse_response(response_text)
 
             # Create new ProposedCard with polished fields
-            return proposed_card.model_copy(update={"fields": polished_fields})
+            return cast(
+                ProposedCard,
+                proposed_card.model_copy(update={"fields": polished_fields}),
+            )
 
         except Exception as e:
             logger.warning("style_polish_failed", slug=proposed_card.slug, error=str(e))
@@ -134,4 +143,4 @@ class StylePolisherTool:
             response_text = response_text[start:end].strip()
 
         data = json.loads(response_text)
-        return data.get("fields", {})
+        return cast(dict[str, str], data.get("fields", {}))

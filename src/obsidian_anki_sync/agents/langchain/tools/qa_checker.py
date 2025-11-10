@@ -8,7 +8,6 @@ This LLM-powered agent performs semantic QA checks to ensure:
 """
 
 import json
-from typing import Optional
 
 from obsidian_anki_sync.agents.langchain.models import (
     IssueSeverity,
@@ -217,7 +216,9 @@ class QACheckerTool:
         ]
 
         response = self.llm.invoke(messages)
-        response_text = response.content if hasattr(response, "content") else str(response)
+        response_text = (
+            response.content if hasattr(response, "content") else str(response)
+        )
 
         # Parse JSON
         try:
@@ -234,5 +235,7 @@ class QACheckerTool:
             return QAReport(**report_dict)
 
         except (json.JSONDecodeError, Exception) as e:
-            logger.error("qa_report_parse_failed", error=str(e), response=response_text[:300])
+            logger.error(
+                "qa_report_parse_failed", error=str(e), response=response_text[:300]
+            )
             raise ValueError(f"Failed to parse QA report: {e}")

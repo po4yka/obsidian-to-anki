@@ -5,12 +5,11 @@ appropriate Anki card fields with correct type and deck selection.
 """
 
 import json
-from typing import Any, Optional
+from typing import Optional
 
 from obsidian_anki_sync.agents.langchain.models import (
     BilingualMode,
     CardType,
-    Language,
     NoteContext,
     NoteContextOrigin,
     ProposedCard,
@@ -236,7 +235,9 @@ class CardMapperTool:
         response = self.llm.invoke(messages)
 
         # Extract content
-        response_text = response.content if hasattr(response, "content") else str(response)
+        response_text = (
+            response.content if hasattr(response, "content") else str(response)
+        )
 
         # Parse JSON
         try:

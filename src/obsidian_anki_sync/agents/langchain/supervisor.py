@@ -202,7 +202,9 @@ class LangChainSupervisor:
                     )
 
                     feedback = self._build_qa_feedback(qa_report)
-                    proposed_card = self.card_mapper.map(note_context, feedback=feedback)
+                    proposed_card = self.card_mapper.map(
+                        note_context, feedback=feedback
+                    )
                     self._llm_calls += 1
 
                     # Re-validate
@@ -323,7 +325,11 @@ class LangChainSupervisor:
         return "\n".join(feedback_parts)
 
     def _determine_action(
-        self, schema_result: Any, qa_report: Any, diff_result: Any, note_context: NoteContext
+        self,
+        schema_result: Any,
+        qa_report: Any,
+        diff_result: Any,
+        note_context: NoteContext,
     ) -> SyncAction:
         """Determine final sync action."""
         # Check for critical failures
@@ -354,7 +360,9 @@ class LangChainSupervisor:
         elif action == SyncAction.UPDATE:
             messages.append(f"Update approved (QA: {qa_report.qa_score:.2f})")
             if diff_result:
-                messages.append(f"Changes: {len(diff_result.changes)}, Risk: {diff_result.risk_level.value}")
+                messages.append(
+                    f"Changes: {len(diff_result.changes)}, Risk: {diff_result.risk_level.value}"
+                )
         elif action == SyncAction.SKIP:
             messages.append("No update needed")
         elif action == SyncAction.MANUAL_REVIEW:
@@ -369,7 +377,9 @@ class LangChainSupervisor:
 
         return messages
 
-    def _create_error_decision(self, note_context: NoteContext, error: str) -> CardDecision:
+    def _create_error_decision(
+        self, note_context: NoteContext, error: str
+    ) -> CardDecision:
         """Create a manual review decision for errors."""
         from obsidian_anki_sync.agents.langchain.models import (
             BilingualMode,
@@ -385,7 +395,10 @@ class LangChainSupervisor:
             card_type=CardType.BASIC,
             model_name="APF: Simple (3.0.0)",
             deck_name="Interview::Error",
-            fields={"Front": note_context.sections.question, "Back": note_context.sections.answer},
+            fields={
+                "Front": note_context.sections.question,
+                "Back": note_context.sections.answer,
+            },
             tags=["error"],
             language=note_context.frontmatter.lang,
             bilingual_mode=BilingualMode.NONE,

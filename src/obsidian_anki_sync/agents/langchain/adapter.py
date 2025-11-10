@@ -4,7 +4,7 @@ This module provides conversion functions between:
 - Existing models (NoteMetadata, QAPair, Card) ← → LangChain models (NoteContext, ProposedCard, CardDecision)
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from obsidian_anki_sync.agents.langchain.models import (
     CardDecision,
@@ -15,9 +15,8 @@ from obsidian_anki_sync.agents.langchain.models import (
     NoteContextFrontmatter,
     NoteContextSections,
     ProposedCard,
-    Subquestion,
 )
-from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
+from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +30,7 @@ class AgentSystemAdapter:
         metadata: NoteMetadata,
         qa_pair: QAPair,
         vault_root: str,
-        config: any,
+        config: Any,
         existing_anki_note: Optional[dict] = None,
     ) -> NoteContext:
         """Convert existing models to NoteContext.
@@ -146,15 +145,21 @@ class AgentSystemAdapter:
         # Generate APF-like HTML or use fields directly
         # For simplicity, we'll create a manifest-based card
 
-        manifest = {
-            "slug": proposed_card.slug,
-            "slug_base": proposed_card.slug.split("-")[0] if "-" in proposed_card.slug else proposed_card.slug,
-            "lang": proposed_card.language.value,
-            "source_path": proposed_card.origin.note_path,
-            "note_id": metadata.id,
-            "note_title": metadata.title,
-            "card_index": qa_pair.card_index,
-        }
+        manifest = Manifest(
+            slug=proposed_card.slug,
+            slug_base=(
+                proposed_card.slug.split("-")[0]
+                if "-" in proposed_card.slug
+                else proposed_card.slug
+            ),
+            lang=proposed_card.language.value,
+            source_path=proposed_card.origin.note_path,
+            source_anchor="",
+            note_id=metadata.id,
+            note_title=metadata.title,
+            card_index=qa_pair.card_index,
+            guid="",
+        )
 
         # Simple HTML wrapper (actual APF generation would be more complex)
         apf_html = f"""<!-- BEGIN_CARDS -->
@@ -183,7 +188,7 @@ class AgentSystemAdapter:
             content_hash=content_hash,
             note_type=proposed_card.model_name,
             tags=proposed_card.tags,
-            guid=None,  # Will be generated
+            guid="",  # Will be generated
         )
 
         return card
@@ -200,7 +205,9 @@ class AgentSystemAdapter:
         Returns:
             Tuple of (action_type, card_or_none)
         """
-        logger.debug("adapter_from_card_decision", slug=decision.slug, action=decision.action)
+        logger.debug(
+            "adapter_from_card_decision", slug=decision.slug, action=decision.action
+        )
 
         action_map = {
             "create": "create",
