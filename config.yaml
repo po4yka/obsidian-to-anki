@@ -77,3 +77,49 @@ llm_max_tokens: 2048
 export_deck_name: "Interview Questions"
 export_deck_description: "Generated from Obsidian notes"
 export_output_path: "interview_questions.apkg"
+
+# =============================================================================
+# LANGCHAIN AGENT SYSTEM (New Multi-Agent Pipeline)
+# =============================================================================
+
+# Feature Flag: Use LangChain-based agent system
+# This is a new, more sophisticated agent system with:
+# - Card Mapping Agent (converts notes to cards)
+# - Schema Validation Tool (validates Anki model compatibility)
+# - QA Agent (semantic quality checks)
+# - Style/Hint Agent (optional refinement)
+# - Card Diff Agent (safe updates of existing cards)
+use_langchain_agents: false  # Set to true to enable
+
+# Supervisor Configuration
+langchain_agents:
+  # Retry and quality thresholds
+  max_mapping_retries: 2           # Retries if schema validation fails
+  min_qa_score: 0.8                # Minimum QA score (0-1) to pass
+  allow_auto_fix: true             # Allow automatic fixing based on feedback
+  max_llm_calls_per_card: 8        # Maximum total LLM calls per card
+
+  # Update policies
+  allow_content_updates: true      # Allow updates that change card content
+  allow_structural_updates: false  # Allow model/deck changes (risky)
+
+  # Optional features
+  enable_style_polish: false       # Enable style polishing step (slower but better quality)
+  strict_schema_validation: false  # Treat schema warnings as errors
+
+  # Model assignment (uses existing LLM config)
+  # mapping_model: Uses generator_model (qwen3:32b)
+  # qa_model: Uses post_validator_model (qwen3:14b)
+  # style_model: Uses pre_validator_model (qwen3:8b)
+
+  # Schema validation settings
+  max_front_length: 500            # Maximum characters for Front field
+  max_back_length: 2000            # Maximum characters for Back field
+  max_field_length: 4000           # Maximum characters for any field
+  max_tags: 20                     # Maximum number of tags
+
+  # Deck settings
+  default_deck_prefix: "Interview" # Default prefix for deck names
+
+  # Bilingual settings
+  bilingual_mode: "front_back"     # Options: "none", "front_back", "separate_cards"
