@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -10,7 +10,6 @@ from rich.table import Table
 
 from .cli_commands.shared import get_config_and_logger
 from .cli_commands.sync_handler import run_sync
-from .config import Config
 
 app = typer.Typer(
     name="obsidian-anki-sync",

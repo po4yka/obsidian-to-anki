@@ -130,7 +130,7 @@ class Config:
         self.vault_path = validated_vault  # Update with validated path
 
         # Validate source directory with path traversal protection
-        validated_source = validate_source_dir(validated_vault, self.source_dir)
+        _ = validate_source_dir(validated_vault, self.source_dir)
         # Keep source_dir as relative for consistency
         # but we've verified it exists and is safe
 
