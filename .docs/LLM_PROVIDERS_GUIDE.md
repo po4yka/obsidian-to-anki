@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Obsidian → Anki sync system supports multiple LLM providers, giving you flexibility in choosing the best model for your needs based on cost, performance, privacy, and quality.
+The Obsidian  Anki sync system supports multiple LLM providers, giving you flexibility in choosing the best model for your needs based on cost, performance, privacy, and quality.
 
 ## Supported Providers
 
@@ -23,16 +23,16 @@ The Obsidian → Anki sync system supports multiple LLM providers, giving you fl
 **Description**: Run open-source LLMs locally or use Ollama Cloud
 
 **Pros:**
-- ✅ Completely private (local execution)
-- ✅ No API costs
-- ✅ Works offline
-- ✅ Large model selection (Qwen, Llama, Mistral, etc.)
-- ✅ Fast inference with GPU
+-  Completely private (local execution)
+-  No API costs
+-  Works offline
+-  Large model selection (Qwen, Llama, Mistral, etc.)
+-  Fast inference with GPU
 
 **Cons:**
-- ❌ Requires powerful hardware (GPU recommended)
-- ❌ Initial model download required
-- ❌ Quality varies by model
+-  Requires powerful hardware (GPU recommended)
+-  Initial model download required
+-  Quality varies by model
 
 **Configuration:**
 
@@ -81,16 +81,16 @@ ollama list
 **Description**: Use OpenAI's GPT models via API
 
 **Pros:**
-- ✅ Highest quality (GPT-4)
-- ✅ Excellent reasoning and instruction following
-- ✅ JSON mode built-in
-- ✅ Fast API response
-- ✅ No local setup required
+-  Highest quality (GPT-4)
+-  Excellent reasoning and instruction following
+-  JSON mode built-in
+-  Fast API response
+-  No local setup required
 
 **Cons:**
-- ❌ API costs (can add up)
-- ❌ Requires internet connection
-- ❌ Data sent to OpenAI servers
+-  API costs (can add up)
+-  Requires internet connection
+-  Data sent to OpenAI servers
 
 **Configuration:**
 
@@ -140,16 +140,16 @@ obsidian-anki-sync test-run --count 1
 **Description**: Use Anthropic's Claude models via API
 
 **Pros:**
-- ✅ Excellent reasoning capabilities
-- ✅ Long context window (200k tokens for Claude 3)
-- ✅ Strong instruction following
-- ✅ Good at structured output
-- ✅ Competitive pricing
+-  Excellent reasoning capabilities
+-  Long context window (200k tokens for Claude 3)
+-  Strong instruction following
+-  Good at structured output
+-  Competitive pricing
 
 **Cons:**
-- ❌ API costs
-- ❌ Requires internet connection
-- ❌ No native JSON mode (uses system prompt)
+-  API costs
+-  Requires internet connection
+-  No native JSON mode (uses system prompt)
 
 **Configuration:**
 
@@ -196,16 +196,16 @@ obsidian-anki-sync test-run --count 1
 **Description**: Access 100+ models through a unified API
 
 **Pros:**
-- ✅ Access to many providers (OpenAI, Anthropic, Google, etc.)
-- ✅ Single API key for all models
-- ✅ Competitive pricing
-- ✅ Easy to switch models
-- ✅ Usage credits available
+-  Access to many providers (OpenAI, Anthropic, Google, etc.)
+-  Single API key for all models
+-  Competitive pricing
+-  Easy to switch models
+-  Usage credits available
 
 **Cons:**
-- ❌ API costs
-- ❌ Requires internet connection
-- ❌ Slight latency overhead
+-  API costs
+-  Requires internet connection
+-  Slight latency overhead
 
 **Configuration:**
 
@@ -255,16 +255,16 @@ obsidian-anki-sync test-run --count 1
 **Description**: Run local models with a user-friendly GUI
 
 **Pros:**
-- ✅ Completely private
-- ✅ No API costs
-- ✅ Visual model management
-- ✅ Easy setup
-- ✅ Works offline
+-  Completely private
+-  No API costs
+-  Visual model management
+-  Easy setup
+-  Works offline
 
 **Cons:**
-- ❌ Requires powerful hardware
-- ❌ Manual model selection
-- ❌ Windows/Mac only
+-  Requires powerful hardware
+-  Manual model selection
+-  Windows/Mac only
 
 **Configuration:**
 
@@ -296,20 +296,20 @@ pre_validator_model: "local-model"
 
 ```
 Do you need the HIGHEST quality?
-├─ Yes → OpenAI (GPT-4) or Anthropic (Claude 3 Opus)
-└─ No ↓
+ Yes  OpenAI (GPT-4) or Anthropic (Claude 3 Opus)
+ No 
 
 Is privacy a top concern?
-├─ Yes → Ollama (local) or LM Studio
-└─ No ↓
+ Yes  Ollama (local) or LM Studio
+ No 
 
 Do you want to minimize costs?
-├─ Yes → Ollama (local, free) or OpenRouter (cheap models)
-└─ No ↓
+ Yes  Ollama (local, free) or OpenRouter (cheap models)
+ No 
 
 Do you want access to many models?
-├─ Yes → OpenRouter
-└─ No → OpenAI or Anthropic
+ Yes  OpenRouter
+ No  OpenAI or Anthropic
 ```
 
 ### Use Case Recommendations

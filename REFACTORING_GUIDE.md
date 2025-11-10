@@ -167,8 +167,8 @@ class SyncEngine:
 
 ### Single Responsibility Principle
 Each module should have one primary responsibility:
-- ✅ Good: `path_validator.py` - validates paths
-- ❌ Bad: `utils.py` - does everything
+- Good: `path_validator.py` - validates paths
+- Bad: `utils.py` - does everything
 
 ### Clear Dependencies
 - Avoid circular dependencies
@@ -192,9 +192,9 @@ Each module should have one primary responsibility:
 | File | Lines | Status |
 |------|-------|--------|
 | cli.py | ~1,006 | Original (to be updated) |
-| cli_commands/shared.py | 64 | ✅ New |
-| cli_commands/sync_handler.py | 196 | ✅ New |
-| utils/path_validator.py | 214 | ✅ New |
+| cli_commands/shared.py | 64 | New |
+| cli_commands/sync_handler.py | 196 | New |
+| utils/path_validator.py | 214 | New |
 
 ### Target (Full Refactoring)
 | Module | Est. Lines | Priority |

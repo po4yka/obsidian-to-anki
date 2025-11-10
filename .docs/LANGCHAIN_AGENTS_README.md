@@ -1,4 +1,4 @@
-# LangChain Agent System for Obsidian → Anki Pipeline
+# LangChain Agent System for Obsidian  Anki Pipeline
 
 ## Overview
 
@@ -16,35 +16,35 @@ The LangChain Agent System is a sophisticated, multi-agent pipeline for converti
 
 ```
 Obsidian Note (Markdown)
-    ↓
+    
 NoteContext (Parsed)
-    ↓
-┌───────────────────── Supervisor Orchestrator ─────────────────────┐
-│                                                                    │
-│  1. Card Mapping Agent (LLM)                                     │
-│     └─> Converts NoteContext → ProposedCard                      │
-│                                                                    │
-│  2. Schema Validation Tool (Non-LLM)                             │
-│     └─> Validates ProposedCard against Anki model schema         │
-│     └─> Retries mapping if validation fails                      │
-│                                                                    │
-│  3. QA Agent (LLM)                                               │
-│     └─> Semantic correctness checks                              │
-│     └─> Pedagogical quality assessment                           │
-│                                                                    │
-│  4. Style/Hint Agent (LLM, Optional)                             │
-│     └─> Refines wording and generates hints                      │
-│                                                                    │
-│  5. Card Diff Agent (Non-LLM)                                    │
-│     └─> Compares with existing cards                             │
-│     └─> Determines update safety                                 │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-    ↓
+    
+ Supervisor Orchestrator 
+�                                                                    �
+�  1. Card Mapping Agent (LLM)                                     �
+�     > Converts NoteContext  ProposedCard                      �
+�                                                                    �
+�  2. Schema Validation Tool (Non-LLM)                             �
+�     > Validates ProposedCard against Anki model schema         �
+�     > Retries mapping if validation fails                      �
+�                                                                    �
+�  3. QA Agent (LLM)                                               �
+�     > Semantic correctness checks                              �
+�     > Pedagogical quality assessment                           �
+�                                                                    �
+�  4. Style/Hint Agent (LLM, Optional)                             �
+�     > Refines wording and generates hints                      �
+�                                                                    �
+�  5. Card Diff Agent (Non-LLM)                                    �
+�     > Compares with existing cards                             �
+�     > Determines update safety                                 �
+�                                                                    �
+�
+    
 CardDecision (create/update/skip/manual_review)
-    ↓
+    
 Anki Sync Layer
-    ↓
+    
 AnkiConnect
 ```
 
@@ -170,10 +170,10 @@ Output Card:
 
 **Retry Example**:
 ```
-Attempt 1: Map → Schema FAIL (missing required field)
-Attempt 2: Map with feedback → Schema PASS
+Attempt 1: Map  Schema FAIL (missing required field)
+Attempt 2: Map with feedback  Schema PASS
 QA Check: Score 0.75 (below threshold 0.8)
-Attempt 3: Map with QA feedback → QA Score 0.87 → PASS
+Attempt 3: Map with QA feedback  QA Score 0.87  PASS
 ```
 
 ## Configuration

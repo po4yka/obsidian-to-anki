@@ -75,7 +75,7 @@ The Obsidian to Anki APF Sync Service is a production-ready CLI tool that automa
 - [x] Retry decorators for network operations
 - [x] Enhanced exception handling
 - [x] Complete type hints
-- [x] Magic numbers → named constants
+- [x] Magic numbers  named constants
 - [x] Path security enhancements
 - [x] SQLite WAL mode for concurrency
 - [x] HTTP connection pooling
@@ -168,7 +168,7 @@ The Obsidian to Anki APF Sync Service is a production-ready CLI tool that automa
 ### MoSCoW Status
 
 #### Must (100% Complete)
-- 1-to-N conversion (note → multiple cards)
+- 1-to-N conversion (note  multiple cards)
 - APF v2.1 compliance
 - Deterministic output
 - AnkiConnect integration
@@ -228,30 +228,30 @@ The Obsidian to Anki APF Sync Service is a production-ready CLI tool that automa
 
 ```
 obsidian-interview-qa-to-anki/
-├── .docs/                      # Project documentation
-│   ├── APF Cards/              # APF specifications
-│   ├── CARDS_PROMPT.md         # LLM prompt template
-│   └── REQUIREMENTS.md         # Detailed requirements
-├── src/obsidian_anki_sync/     # Main package
-│   ├── anki/                   # AnkiConnect integration
-│   ├── apf/                    # APF generation & linting
-│   ├── obsidian/               # Markdown parsing
-│   ├── sync/                   # Sync engine & state
-│   ├── utils/                  # Utilities
-│   ├── cli.py                  # CLI interface
-│   ├── config.py               # Configuration
-│   └── models.py               # Data models
-├── tests/                      # Test suite
-│   ├── integration/            # Integration tests
-│   ├── test_*.py               # Unit tests
-│   └── conftest.py             # Pytest fixtures
-├── .venv/                      # Virtual environment (uv)
-├── uv.lock                     # Dependency lock file
-├── pyproject.toml              # Project configuration
-├── DEPENDENCIES.md             # Dependency documentation
-├── TESTING.md                  # Testing guide
-├── PROJECT_STATUS.md           # This file
-└── README.md                   # User guide
+ .docs/                      # Project documentation
+�    APF Cards/              # APF specifications
+�    CARDS_PROMPT.md         # LLM prompt template
+�    REQUIREMENTS.md         # Detailed requirements
+ src/obsidian_anki_sync/     # Main package
+�    anki/                   # AnkiConnect integration
+�    apf/                    # APF generation & linting
+�    obsidian/               # Markdown parsing
+�    sync/                   # Sync engine & state
+�    utils/                  # Utilities
+�    cli.py                  # CLI interface
+�    config.py               # Configuration
+�    models.py               # Data models
+ tests/                      # Test suite
+�    integration/            # Integration tests
+�    test_*.py               # Unit tests
+�    conftest.py             # Pytest fixtures
+ .venv/                      # Virtual environment (uv)
+ uv.lock                     # Dependency lock file
+ pyproject.toml              # Project configuration
+ DEPENDENCIES.md             # Dependency documentation
+ TESTING.md                  # Testing guide
+ PROJECT_STATUS.md           # This file
+ README.md                   # User guide
 ```
 
 ---

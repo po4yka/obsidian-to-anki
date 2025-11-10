@@ -1,4 +1,4 @@
-**Order:** `language/tool → platform/runtime → domain → subtopic`. Use 3–6 tags, snake\_case. Include at least one non-language tag.
+**Order:** `language/tool  platform/runtime  domain  subtopic`. Use 36 tags, snake\_case. Include at least one non-language tag.
 
 **Languages/Tools (seed)**
 kotlin, java, python, javascript, typescript, swift, objective\_c, c, cpp, rust, go, dart, ruby, php, csharp, sql, yaml, json, bash, powershell, docker, kubernetes, terraform, ansible, gradle, maven, git, regex.

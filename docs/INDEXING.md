@@ -35,17 +35,17 @@ obsidian-anki-sync sync
 Output includes index statistics:
 ```
 Index Statistics:
-┌──────────┬────────────────────┬───────┐
-│ Category │ Metric             │ Value │
-├──────────┼────────────────────┼───────┤
-│ Notes    │ Total              │ 250   │
-│ Notes    │ Pending            │ 10    │
-│ Notes    │ Completed          │ 240   │
-│ Cards    │ Total              │ 750   │
-│ Cards    │ In Obsidian        │ 750   │
-│ Cards    │ In Anki            │ 720   │
-│ Cards    │ In Database        │ 720   │
-└──────────┴────────────────────┴───────┘
+��
+� Category � Metric             � Value �
+��
+� Notes    � Total              � 250   �
+� Notes    � Pending            � 10    �
+� Notes    � Completed          � 240   �
+� Cards    � Total              � 750   �
+� Cards    � In Obsidian        � 750   �
+� Cards    � In Anki            � 720   �
+� Cards    � In Database        � 720   �
+�
 ```
 
 ### View current index
@@ -65,35 +65,35 @@ obsidian-anki-sync sync --no-index
 ### Indexing Workflow
 
 ```
-┌─────────────────────────────────────────┐
-│ 1. Vault Indexing                       │
-│    - Discover all notes                 │
-│    - Parse metadata and Q/A pairs       │
-│    - Create note_index entries          │
-│    - Create expected card_index entries │
-└─────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────┐
-│ 2. Database Indexing                    │
-│    - Query all cards from sync DB       │
-│    - Update card_index with DB info     │
-│    - Mark cards as in_database          │
-└─────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────┐
-│ 3. Anki Indexing                        │
-│    - Query Anki deck cards              │
-│    - Match to vault via slugs           │
-│    - Mark cards as in_anki              │
-│    - Identify orphaned cards            │
-└─────────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────────┐
-│ 4. Statistics Generation                │
-│    - Calculate totals and breakdowns    │
-│    - Generate status reports            │
-│    - Display to user                    │
-└─────────────────────────────────────────┘
+
+� 1. Vault Indexing                       �
+�    - Discover all notes                 �
+�    - Parse metadata and Q/A pairs       �
+�    - Create note_index entries          �
+�    - Create expected card_index entries �
+�
+              
+
+� 2. Database Indexing                    �
+�    - Query all cards from sync DB       �
+�    - Update card_index with DB info     �
+�    - Mark cards as in_database          �
+�
+              
+
+� 3. Anki Indexing                        �
+�    - Query Anki deck cards              �
+�    - Match to vault via slugs           �
+�    - Mark cards as in_anki              �
+�    - Identify orphaned cards            �
+�
+              
+
+� 4. Statistics Generation                �
+�    - Calculate totals and breakdowns    �
+�    - Generate status reports            �
+�    - Display to user                    �
+�
 ```
 
 ### Three-Way Reconciliation
@@ -109,16 +109,16 @@ Each card is tracked in three locations:
 **Examples:**
 
 ```
-Card A: [✓ Obsidian] [✓ Anki] [✓ Database]
+Card A: [ Obsidian] [ Anki] [ Database]
 Status: "synced" - Everything in sync
 
-Card B: [✓ Obsidian] [✗ Anki] [✗ Database]
+Card B: [ Obsidian] [� Anki] [� Database]
 Status: "expected" - New card to create
 
-Card C: [✗ Obsidian] [✓ Anki] [✓ Database]
+Card C: [� Obsidian] [ Anki] [ Database]
 Status: "orphaned" - Card in Anki but note deleted
 
-Card D: [✓ Obsidian] [✓ Anki] [✗ Database]
+Card D: [ Obsidian] [ Anki] [� Database]
 Status: "exists" - Card exists but not tracked
 ```
 
@@ -224,25 +224,25 @@ Output:
 Vault & Anki Index:
 
 Notes Index:
-┌─────────────────┬───────┐
-│ Metric          │ Count │
-├─────────────────┼───────┤
-│ Total Notes     │ 250   │
-│   Pending       │ 10    │
-│   Processing    │ 2     │
-│   Completed     │ 235   │
-│   Failed        │ 3     │
-└─────────────────┴───────┘
+�
+� Metric          � Count �
+�
+� Total Notes     � 250   �
+�   Pending       � 10    �
+�   Processing    � 2     �
+�   Completed     � 235   �
+�   Failed        � 3     �
+�
 
 Cards Index:
-┌─────────────────┬───────┐
-│ Metric          │ Count │
-├─────────────────┼───────┤
-│ Total Cards     │ 750   │
-│ In Obsidian     │ 750   │
-│ In Anki         │ 720   │
-│ In Database     │ 720   │
-└─────────────────┴───────┘
+�
+� Metric          � Count �
+�
+� Total Cards     � 750   �
+� In Obsidian     � 750   �
+� In Anki         � 720   �
+� In Database     � 720   �
+�
 
 Card Status Breakdown:
   expected: 30

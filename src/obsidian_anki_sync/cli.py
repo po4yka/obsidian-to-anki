@@ -197,7 +197,7 @@ def validate(
                 console.print(f"  [red]- {error}[/red]")
             logger.error("validation_failed", errors=errors)
         else:
-            console.print("\n[bold green]✓ Validation passed![/bold green]")
+            console.print("\n[bold green] Validation passed![/bold green]")
             logger.info("validation_passed")
 
     except Exception as e:
@@ -254,7 +254,7 @@ DB_PATH=.sync_state.db
 LOG_LEVEL=INFO
 """
         env_path.write_text(env_template)
-        console.print(f"[green]✓ Created .env template at {env_path}[/green]")
+        console.print(f"[green] Created .env template at {env_path}[/green]")
         logger.info("env_template_created", path=str(env_path))
     else:
         console.print(f"[yellow].env already exists at {env_path}[/yellow]")
@@ -265,7 +265,7 @@ LOG_LEVEL=INFO
     with StateDB(config.db_path):
         pass  # Database schema is initialized in __init__
 
-    console.print(f"[green]✓ Initialized database at {config.db_path}[/green]")
+    console.print(f"[green] Initialized database at {config.db_path}[/green]")
     logger.info("database_initialized", path=str(config.db_path))
 
     logger.info("init_completed")
@@ -298,7 +298,7 @@ def list_decks(
         else:
             console.print("\n[bold]Decks:[/bold]")
             for deck in decks:
-                console.print(f"  [cyan]• {deck}[/cyan]")
+                console.print(f"  [cyan]� {deck}[/cyan]")
 
         logger.info("list_decks_completed", count=len(decks))
 
@@ -335,7 +335,7 @@ def list_models(
         else:
             console.print("\n[bold]Models:[/bold]")
             for model in models:
-                console.print(f"  [cyan]• {model}[/cyan]")
+                console.print(f"  [cyan]� {model}[/cyan]")
 
         logger.info("list_models_completed", count=len(models))
 
@@ -375,7 +375,7 @@ def show_model_fields(
         else:
             console.print(f"\n[bold]Fields for model '{model_name}':[/bold]")
             for field in fields:
-                console.print(f"  [cyan]• {field}[/cyan]")
+                console.print(f"  [cyan]� {field}[/cyan]")
 
         logger.info("model_fields_completed", model=model_name, count=len(fields))
 
@@ -494,7 +494,7 @@ def export(
                             generated_cards = result.generation.cards
                             cards.extend(generated_cards)
                             console.print(
-                                f"  [green]✓[/green] {metadata.title} "
+                                f"  [green][/green] {metadata.title} "
                                 f"({len(generated_cards)} cards)"
                             )
                         else:
@@ -504,10 +504,10 @@ def export(
                                     result.post_validation.error_details or error_msg
                                 )
                             console.print(
-                                f"  [red]✗[/red] {metadata.title}: {error_msg}"
+                                f"  [red]�[/red] {metadata.title}: {error_msg}"
                             )
                     except Exception as e:
-                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+                        console.print(f"  [red]�[/red] {note_path.name}: {e}")
 
             else:
                 console.print("[cyan]Using OpenRouter for generation...[/cyan]")
@@ -526,11 +526,11 @@ def export(
                                 cards.append(card)
 
                         console.print(
-                            f"  [green]✓[/green] {metadata.title} "
+                            f"  [green][/green] {metadata.title} "
                             f"({len(qa_pairs) * len(metadata.language_tags)} cards)"
                         )
                     except Exception as e:
-                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+                        console.print(f"  [red]�[/red] {note_path.name}: {e}")
 
             if not cards:
                 console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
@@ -549,7 +549,7 @@ def export(
             )
 
             console.print(
-                f"\n[bold green]✓ Successfully exported {len(cards)} cards "
+                f"\n[bold green] Successfully exported {len(cards)} cards "
                 f"to {output_path}[/bold green]"
             )
 
@@ -759,7 +759,7 @@ def clean_progress(
             if session_id:
                 db.delete_progress(session_id)
                 console.print(
-                    f"[green]✓ Deleted progress for session: {session_id}[/green]"
+                    f"[green] Deleted progress for session: {session_id}[/green]"
                 )
                 logger.info("progress_deleted", session_id=session_id)
 
@@ -774,7 +774,7 @@ def clean_progress(
                         deleted_count += 1
 
                 console.print(
-                    f"[green]✓ Deleted {deleted_count} completed sessions[/green]"
+                    f"[green] Deleted {deleted_count} completed sessions[/green]"
                 )
                 logger.info("completed_progress_deleted", count=deleted_count)
 
@@ -828,7 +828,7 @@ def format(
 
             subprocess.run(cmd, check=True)
 
-        console.print("[green]✓ Format completed successfully[/green]")
+        console.print("[green] Format completed successfully[/green]")
         logger.info("format_completed", check=check)
     except subprocess.CalledProcessError as exc:
         logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
