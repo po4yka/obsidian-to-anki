@@ -35,7 +35,7 @@ Output:
 Incremental mode: Skipping 150 already processed notes
 
 Scanning: Processing 5 new notes
-✓ Processed 5 notes
+ Processed 5 notes
   Created: 15 cards
   Errors: 0
 ```
@@ -104,8 +104,8 @@ Example:
 ```
 Note: notes/interview-questions/q-java-hashmap.md
 Cards in database:
-  - q-java-hashmap-1-en (exists) ✓
-  - q-java-hashmap-1-ru (exists) ✓
+  - q-java-hashmap-1-en (exists) 
+  - q-java-hashmap-1-ru (exists) 
 
 Result: Note is "processed", will be skipped in incremental mode
 ```
@@ -167,11 +167,11 @@ obsidian-anki-sync index
 Output:
 ```
 Notes Index:
-┌─────────────┬───────┐
-│ Total Notes │ 200   │
-│ Pending     │ 50    │
-│ Completed   │ 150   │
-└─────────────┴───────┘
+�
+� Total Notes � 200   �
+� Pending     � 50    �
+� Completed   � 150   �
+�
 ```
 
 ## Use Cases
@@ -461,7 +461,7 @@ Processing: 50 new notes
 # Resume with incremental mode
 $ obsidian-anki-sync sync --incremental --resume abc123
 Resuming: 25/50 remaining
-✓ Complete!
+ Complete!
 ```
 
 ### Example 3: Verification Workflow
@@ -479,7 +479,7 @@ Summary: create: 3
 
 # Looks good, apply
 $ obsidian-anki-sync sync --incremental
-✓ Created 3 cards
+ Created 3 cards
 ```
 
 ## See Also

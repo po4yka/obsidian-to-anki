@@ -9,6 +9,11 @@ import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 from .exceptions import ConfigurationError
+from .utils.path_validator import (
+    validate_db_path,
+    validate_source_dir,
+    validate_vault_path,
+)
 
 
 @dataclass
@@ -52,6 +57,18 @@ class Config:
 
     # LM Studio provider settings
     lm_studio_base_url: str = "http://localhost:1234/v1"
+
+    # OpenAI provider settings
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_organization: str | None = None
+    openai_max_retries: int = 3
+
+    # Anthropic provider settings
+    anthropic_api_key: str = ""
+    anthropic_base_url: str = "https://api.anthropic.com"
+    anthropic_api_version: str = "2023-06-01"
+    anthropic_max_retries: int = 3
 
     # OpenRouter provider settings
     openrouter_api_key: str = ""
@@ -108,21 +125,29 @@ class Config:
 
     def validate(self) -> None:
         """Validate configuration values."""
-        if not self.vault_path.exists():
-            raise ConfigurationError(
-                f"Vault path does not exist: {self.vault_path}",
-                suggestion="Set VAULT_PATH environment variable or vault_path in config.yaml to a valid directory",
-            )
+        # Validate vault path with security checks
+        validated_vault = validate_vault_path(self.vault_path, allow_symlinks=False)
+        self.vault_path = validated_vault  # Update with validated path
 
-        full_source = self.vault_path / self.source_dir
-        if not full_source.exists():
-            raise ConfigurationError(
-                f"Source directory does not exist: {full_source}",
-                suggestion=f"Create the directory '{self.source_dir}' in your vault or update source_dir in config.yaml",
-            )
+        # Validate source directory with path traversal protection
+        _ = validate_source_dir(validated_vault, self.source_dir)
+        # Keep source_dir as relative for consistency
+        # but we've verified it exists and is safe
+
+        # Validate database path
+        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        self.db_path = validated_db  # Update with validated path
 
         # Validate LLM provider
-        valid_providers = ["ollama", "lm_studio", "lmstudio", "openrouter"]
+        valid_providers = [
+            "ollama",
+            "lm_studio",
+            "lmstudio",
+            "openrouter",
+            "openai",
+            "anthropic",
+            "claude",
+        ]
         if self.llm_provider.lower() not in valid_providers:
             raise ConfigurationError(
                 f"Invalid llm_provider: {self.llm_provider}. "
@@ -130,11 +155,27 @@ class Config:
                 suggestion=f"Set llm_provider to one of: {', '.join(valid_providers)}",
             )
 
-        # Provider-specific validation
-        if self.llm_provider.lower() == "openrouter" and not self.openrouter_api_key:
+        # Provider-specific API key validation
+        provider_lower = self.llm_provider.lower()
+
+        if provider_lower == "openrouter" and not self.openrouter_api_key:
             raise ConfigurationError(
                 "OpenRouter API key is required when using OpenRouter provider.",
                 suggestion="Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config.yaml",
+            )
+
+        if provider_lower == "openai" and not self.openai_api_key:
+            raise ConfigurationError(
+                "OpenAI API key is required when using OpenAI provider.",
+                suggestion="Set OPENAI_API_KEY environment variable or openai_api_key in config.yaml. "
+                "Get your API key from https://platform.openai.com/api-keys",
+            )
+
+        if provider_lower in ("anthropic", "claude") and not self.anthropic_api_key:
+            raise ConfigurationError(
+                "Anthropic API key is required when using Anthropic/Claude provider.",
+                suggestion="Set ANTHROPIC_API_KEY environment variable or anthropic_api_key in config.yaml. "
+                "Get your API key from https://console.anthropic.com/",
             )
 
         if self.run_mode not in ("apply", "dry-run"):
@@ -257,8 +298,27 @@ def load_config(config_path: Path | None = None) -> Config:
         ollama_api_key=config_data.get("ollama_api_key") or os.getenv("OLLAMA_API_KEY"),
         # LM Studio settings
         lm_studio_base_url=get_str("lm_studio_base_url", "http://localhost:1234/v1"),
+        # OpenAI settings
+        openai_api_key=str(
+            config_data.get("openai_api_key") or os.getenv("OPENAI_API_KEY") or ""
+        ),
+        openai_base_url=get_str("openai_base_url", "https://api.openai.com/v1"),
+        openai_organization=config_data.get("openai_organization")
+        or os.getenv("OPENAI_ORGANIZATION"),
+        openai_max_retries=get_int("openai_max_retries", 3),
+        # Anthropic settings
+        anthropic_api_key=str(
+            config_data.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY") or ""
+        ),
+        anthropic_base_url=get_str("anthropic_base_url", "https://api.anthropic.com"),
+        anthropic_api_version=get_str("anthropic_api_version", "2023-06-01"),
+        anthropic_max_retries=get_int("anthropic_max_retries", 3),
         # OpenRouter settings
-        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        openrouter_api_key=str(
+            config_data.get("openrouter_api_key")
+            or os.getenv("OPENROUTER_API_KEY")
+            or ""
+        ),
         openrouter_base_url=get_str(
             "openrouter_base_url", "https://openrouter.ai/api/v1"
         ),

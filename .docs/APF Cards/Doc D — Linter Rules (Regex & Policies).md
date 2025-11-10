@@ -26,7 +26,7 @@
 **Header line discipline:**
 
 * Reject if any non-whitespace appears on the same line as a field header.
-* Enforce one blank line between a field’s last content line and the next header.
+* Enforce one blank line between a fields last content line and the next header.
 
 **Title/Subtitle checks:**
 

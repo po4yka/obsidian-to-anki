@@ -209,16 +209,26 @@ class VaultAnalyzer:
                 try:
                     second_info = self.get_link_info(linked_note)
                     second_level_out.extend(second_info.outgoing_links)
-                except Exception:
-                    pass  # Skip if note doesn't exist
+                except (KeyError, AttributeError, FileNotFoundError) as e:
+                    # Skip if note doesn't exist or has invalid structure
+                    logger.debug(
+                        "skip_missing_linked_note",
+                        note=linked_note,
+                        error=str(e),
+                    )
 
             second_level_in = []
             for linking_note in link_info.incoming_links:
                 try:
                     second_info = self.get_link_info(linking_note)
                     second_level_in.extend(second_info.incoming_links)
-                except Exception:
-                    pass
+                except (KeyError, AttributeError, FileNotFoundError) as e:
+                    # Skip if note doesn't exist or has invalid structure
+                    logger.debug(
+                        "skip_missing_linking_note",
+                        note=linking_note,
+                        error=str(e),
+                    )
 
             related["outgoing_2nd_level"] = list(set(second_level_out))
             related["incoming_2nd_level"] = list(set(second_level_in))

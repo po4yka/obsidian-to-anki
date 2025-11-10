@@ -37,16 +37,22 @@ def runner():
 @pytest.fixture(autouse=True)
 def patch_logging(monkeypatch):
     monkeypatch.setattr(
-        "obsidian_anki_sync.cli.configure_logging", lambda level, log_dir=None: None
+        "obsidian_anki_sync.cli_commands.shared.configure_logging",
+        lambda level, log_dir=None: None,
     )
-    monkeypatch.setattr("obsidian_anki_sync.cli.get_logger", lambda name: MagicMock())
+    monkeypatch.setattr(
+        "obsidian_anki_sync.cli_commands.shared.get_logger", lambda name: MagicMock()
+    )
 
 
 def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None):
     monkeypatch.setattr(
-        "obsidian_anki_sync.cli.load_config", lambda path=None: test_config
+        "obsidian_anki_sync.cli_commands.shared.load_config",
+        lambda path=None: test_config,
     )
-    monkeypatch.setattr("obsidian_anki_sync.cli.set_config", lambda cfg: None)
+    monkeypatch.setattr(
+        "obsidian_anki_sync.cli_commands.shared.set_config", lambda cfg: None
+    )
 
     class DummyAnki:
         def __init__(self, url):

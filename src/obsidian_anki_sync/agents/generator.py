@@ -369,8 +369,12 @@ class GeneratorAgent:
                 if hasattr(e, "__context__") and hasattr(e.__context__, "response"):
                     try:
                         response_text = getattr(e.__context__, "response", None)
-                    except Exception:
-                        pass
+                    except (AttributeError, TypeError) as attr_err:
+                        # Defensive: Ignore if response extraction fails
+                        logger.debug(
+                            "response_extraction_failed",
+                            error=str(attr_err),
+                        )
 
                 # Categorize the error
                 llm_error = categorize_llm_error(

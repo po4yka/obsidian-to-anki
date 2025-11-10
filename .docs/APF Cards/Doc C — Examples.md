@@ -56,7 +56,7 @@ Complete the cache setup for Gradle in GitHub Actions.
 Sketch the call flow from ViewModel.getUser() to the HTTP socket.
 
 <!-- Key point (image) -->
-<img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='320'><rect width='100%' height='100%' fill='white'/><g font-family='monospace' font-size='14'><text x='20' y='30'>UI/ViewModel → UseCase → Repository → RemoteDataSource</text><text x='20' y='60'>→ Retrofit proxy → OkHttp interceptors → Transport → Server</text></g></svg>" alt="sequence diagram"/>
+<img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='320'><rect width='100%' height='100%' fill='white'/><g font-family='monospace' font-size='14'><text x='20' y='30'>UI/ViewModel  UseCase  Repository  RemoteDataSource</text><text x='20' y='60'> Retrofit proxy  OkHttp interceptors  Transport  Server</text></g></svg>" alt="sequence diagram"/>
 
 <!-- Key point notes -->
 <ul>
