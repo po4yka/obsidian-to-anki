@@ -120,7 +120,9 @@ class AnthropicProvider(BaseLLMProvider):
                 f"{self.base_url}/v1/messages",
                 json=test_payload,
             )
-            return bool(response.status_code in (200, 400))  # 400 means API is accessible
+            return bool(
+                response.status_code in (200, 400)
+            )  # 400 means API is accessible
         except Exception as e:
             logger.error(
                 "anthropic_connection_check_failed",
@@ -231,8 +233,11 @@ class AnthropicProvider(BaseLLMProvider):
             except httpx.HTTPStatusError as e:
                 last_exception = e
                 # Check for rate limiting or server errors
-                if e.response.status_code in (429, 500, 502, 503, 504) and attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff
+                if (
+                    e.response.status_code in (429, 500, 502, 503, 504)
+                    and attempt < self.max_retries - 1
+                ):
+                    wait_time = 2**attempt  # Exponential backoff
                     logger.warning(
                         "anthropic_retry",
                         attempt=attempt + 1,
@@ -245,7 +250,7 @@ class AnthropicProvider(BaseLLMProvider):
             except httpx.RequestError as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt
+                    wait_time = 2**attempt
                     logger.warning(
                         "anthropic_retry_request_error",
                         attempt=attempt + 1,
@@ -312,7 +317,7 @@ class AnthropicProvider(BaseLLMProvider):
             logger.error(
                 "anthropic_parse_error",
                 error=str(e),
-                response_data=str(data)[:500] if 'data' in locals() else "N/A",
+                response_data=str(data)[:500] if "data" in locals() else "N/A",
             )
             raise ValueError(f"Failed to parse Anthropic response: {e}")
         except Exception as e:

@@ -2,10 +2,9 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ============================================================================
 # Enums
@@ -143,9 +142,7 @@ class ExistingAnkiNote(BaseModel):
     note_id: int
     model_name: str
     deck_name: str
-    fields: dict[str, str] = Field(
-        ..., description="Field name → field value mapping"
-    )
+    fields: dict[str, str] = Field(..., description="Field name → field value mapping")
     tags: list[str]
     last_sync_ts: str = Field(..., description="ISO8601 timestamp")
     slug: str = Field(..., description="For consistency")
@@ -196,7 +193,9 @@ class NoteContext(BaseModel):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to ensure proper JSON serialization."""
-        return super().model_dump_json(by_alias=True, exclude_none=False, **kwargs)
+        return cast(
+            str, super().model_dump_json(by_alias=True, exclude_none=False, **kwargs)
+        )
 
 
 # ============================================================================

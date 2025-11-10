@@ -5,7 +5,7 @@ using pure Python logic for reliability and determinism.
 """
 
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from obsidian_anki_sync.agents.langchain.models import (
     CardType,
@@ -79,7 +79,7 @@ class SchemaValidatorTool:
 
     def __init__(
         self,
-        anki_client: Optional[any] = None,
+        anki_client: Optional[Any] = None,
         max_front_length: int = DEFAULT_MAX_FRONT_LENGTH,
         max_back_length: int = DEFAULT_MAX_BACK_LENGTH,
         max_field_length: int = DEFAULT_MAX_FIELD_LENGTH,
