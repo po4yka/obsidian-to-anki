@@ -155,7 +155,7 @@ pytest -m "not slow"
 ### E2E Tests
 
 **Missing (Deferred to Phase 9):**
-- E2E-01: Process ‰¥5 notes with ‰¥2 multi-pair
+- E2E-01: Process 5 notes with 2 multi-pair
 - E2E-02: Bilingual card generation
 - E2E-03: Full sync cycle
 - E2E-dryrun-01: Dry-run validation

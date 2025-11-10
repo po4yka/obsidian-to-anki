@@ -229,22 +229,22 @@ The Obsidian to Anki APF Sync Service is a production-ready CLI tool that automa
 ```
 obsidian-interview-qa-to-anki/
  .docs/                      # Project documentation
-‚    APF Cards/              # APF specifications
-‚    CARDS_PROMPT.md         # LLM prompt template
-‚    REQUIREMENTS.md         # Detailed requirements
+    APF Cards/              # APF specifications
+    CARDS_PROMPT.md         # LLM prompt template
+    REQUIREMENTS.md         # Detailed requirements
  src/obsidian_anki_sync/     # Main package
-‚    anki/                   # AnkiConnect integration
-‚    apf/                    # APF generation & linting
-‚    obsidian/               # Markdown parsing
-‚    sync/                   # Sync engine & state
-‚    utils/                  # Utilities
-‚    cli.py                  # CLI interface
-‚    config.py               # Configuration
-‚    models.py               # Data models
+    anki/                   # AnkiConnect integration
+    apf/                    # APF generation & linting
+    obsidian/               # Markdown parsing
+    sync/                   # Sync engine & state
+    utils/                  # Utilities
+    cli.py                  # CLI interface
+    config.py               # Configuration
+    models.py               # Data models
  tests/                      # Test suite
-‚    integration/            # Integration tests
-‚    test_*.py               # Unit tests
-‚    conftest.py             # Pytest fixtures
+    integration/            # Integration tests
+    test_*.py               # Unit tests
+    conftest.py             # Pytest fixtures
  .venv/                      # Virtual environment (uv)
  uv.lock                     # Dependency lock file
  pyproject.toml              # Project configuration
