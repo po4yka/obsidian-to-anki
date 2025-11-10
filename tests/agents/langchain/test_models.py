@@ -131,7 +131,9 @@ class TestProposedCard:
                 language=Language.EN,
                 bilingual_mode=BilingualMode.NONE,
                 slug="test",
-                origin=NoteContextOrigin(note_path="/test.md", source_note_lang=Language.EN),
+                origin=NoteContextOrigin(
+                    note_path="/test.md", source_note_lang=Language.EN
+                ),
             )
 
 
@@ -270,7 +272,9 @@ class TestCardDecision:
             language=Language.EN,
             bilingual_mode=BilingualMode.NONE,
             slug="test",
-            origin=NoteContextOrigin(note_path="/test.md", source_note_lang=Language.EN),
+            origin=NoteContextOrigin(
+                note_path="/test.md", source_note_lang=Language.EN
+            ),
         )
 
         decision = CardDecision(
@@ -297,7 +301,9 @@ class TestCardDecision:
             language=Language.EN,
             bilingual_mode=BilingualMode.NONE,
             slug="test",
-            origin=NoteContextOrigin(note_path="/test.md", source_note_lang=Language.EN),
+            origin=NoteContextOrigin(
+                note_path="/test.md", source_note_lang=Language.EN
+            ),
         )
 
         decision = CardDecision(
