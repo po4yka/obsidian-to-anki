@@ -9,15 +9,16 @@ Synchronize Obsidian Q&A notes to Anki APF cards using LLM-powered generation wi
 ## ✨ Features
 
 - 📝 Parse Obsidian markdown notes with Q&A pairs
-- 🤖 **Multi-Provider LLM Support**: Choose from **Ollama** (local/cloud), **LM Studio**, or **OpenRouter**
+- 🤖 **Multi-Provider LLM Support**: Choose from **Ollama**, **LM Studio**, **OpenAI**, **Anthropic**, or **OpenRouter**
 - 🔒 **100% Privacy**: Optional fully local processing with no cloud APIs
 - 🔄 Bidirectional synchronization (create/update/delete/restore)
 - 🌍 Bilingual card support (EN/RU)
 - 🔖 Stable slug-based tracking with collision resolution
-- 💾 SQLite state management
+- 💾 SQLite state management with proper connection handling
 - 👀 Dry-run mode for previewing changes
 - ✅ Three-stage validation pipeline with auto-fix
 - 🔌 Unified provider configuration with single point of model specification
+- 🛡️ **Security**: Path traversal protection, symlink attack prevention, input validation
 
 ## 🆕 Multi-Agent AI System
 
@@ -178,7 +179,7 @@ obsidian-anki-sync sync --use-agents --dry-run
 
 ## 🔌 Multiple LLM Provider Support
 
-The service now supports **three LLM providers** with a unified configuration system:
+The service now supports **five LLM providers** with a unified configuration system:
 
 ### Supported Providers
 
@@ -186,7 +187,9 @@ The service now supports **three LLM providers** with a unified configuration sy
 |----------|------|----------|------------------|
 | **Ollama** | Local/Cloud | Privacy, offline usage | Easy (CLI) |
 | **LM Studio** | Local | GUI preference, model testing | Easy (GUI) |
-| **OpenRouter** | Cloud | Quick setup, SOTA models | Easiest (API key) |
+| **OpenAI** | Cloud | GPT-4, GPT-4 Turbo models | Easy (API key) |
+| **Anthropic** | Cloud | Claude 3 models (Opus, Sonnet, Haiku) | Easy (API key) |
+| **OpenRouter** | Cloud | Multi-model gateway, SOTA access | Easy (API key) |
 
 ### Configuration
 
@@ -194,17 +197,42 @@ Choose your provider in `config.yaml`:
 
 ```yaml
 # Provider selection
-llm_provider: "ollama"  # or "lm_studio" or "openrouter"
+llm_provider: "ollama"  # Options: "ollama", "lm_studio", "openai", "anthropic", "openrouter"
 
-# Provider-specific settings
+# Provider-specific settings (only configure what you use)
+
+# Ollama (local/cloud LLMs)
 ollama_base_url: "http://localhost:11434"
+# ollama_api_key: "sk-..."  # Only for Ollama Cloud
+
+# LM Studio (local GUI)
 lm_studio_base_url: "http://localhost:1234/v1"
-openrouter_api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
+
+# OpenAI (GPT models)
+# openai_api_key: "sk-..."  # Or set OPENAI_API_KEY env var
+# openai_base_url: "https://api.openai.com/v1"  # Optional custom endpoint
+
+# Anthropic (Claude models)
+# anthropic_api_key: "sk-ant-..."  # Or set ANTHROPIC_API_KEY env var
+# anthropic_base_url: "https://api.anthropic.com"
+
+# OpenRouter (multi-model gateway)
+# openrouter_api_key: "sk-or-..."  # Or set OPENROUTER_API_KEY env var
 
 # Model specifications (adjust for your provider)
-pre_validator_model: "qwen3:8b"
-generator_model: "qwen3:32b"
-post_validator_model: "qwen3:14b"
+pre_validator_model: "qwen3:8b"           # For Ollama
+generator_model: "qwen3:32b"              # For Ollama
+post_validator_model: "qwen3:14b"         # For Ollama
+
+# For OpenAI:
+# generator_model: "gpt-4-turbo-preview"
+# post_validator_model: "gpt-4"
+# pre_validator_model: "gpt-3.5-turbo"
+
+# For Anthropic:
+# generator_model: "claude-3-opus-20240229"
+# post_validator_model: "claude-3-sonnet-20240229"
+# pre_validator_model: "claude-3-haiku-20240307"
 ```
 
 ### Quick Setup Examples
@@ -222,10 +250,32 @@ ollama pull qwen3:8b qwen3:14b qwen3:32b
 3. Start local server
 4. Set `llm_provider: "lm_studio"`
 
+**OpenAI:**
+```bash
+# Get API key from https://platform.openai.com/api-keys
+export OPENAI_API_KEY="sk-..."
+
+# Or in config.yaml
+echo "openai_api_key: sk-..." >> config.yaml
+```
+
+**Anthropic (Claude):**
+```bash
+# Get API key from https://console.anthropic.com/
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Or in config.yaml
+echo "anthropic_api_key: sk-ant-..." >> config.yaml
+```
+
 **OpenRouter:**
-1. Get API key from https://openrouter.ai
-2. Set `OPENROUTER_API_KEY` environment variable
-3. Set `llm_provider: "openrouter"`
+```bash
+# Get API key from https://openrouter.ai/keys
+export OPENROUTER_API_KEY="sk-or-..."
+
+# Or in config.yaml
+echo "openrouter_api_key: sk-or-..." >> config.yaml
+```
 
 ### Documentation
 
@@ -552,6 +602,34 @@ pip install -e ".[dev]"
 chmod -R 755 .venv/
 ```
 
+## 🛡️ Security Features
+
+This project implements multiple security measures to protect your data:
+
+### Path Security
+- **Path Traversal Prevention**: Source directories are validated to prevent `..` escapes
+- **Symlink Attack Prevention**: Symlinks are blocked by default (configurable)
+- **Vault Boundary Enforcement**: All note paths must be within the vault directory
+- **Filename Sanitization**: Automatic removal of dangerous characters from filenames
+
+### API Security
+- **API Key Validation**: Provider-specific validation at startup with helpful error messages
+- **Environment Variable Support**: Secure key storage via environment variables
+- **No Hardcoded Secrets**: All sensitive data loaded from config or environment
+
+### Error Handling
+- **Specific Exception Types**: No bare `except:` blocks that could mask errors
+- **Detailed Error Logging**: All errors include context and suggestions
+- **Resource Cleanup**: Proper context manager usage for database connections
+
+### Configuration Validation
+All configuration values are validated at startup:
+- Vault path existence and permissions
+- Source directory within vault boundaries
+- Database path validity
+- API keys for selected providers
+- Model specifications
+
 ## 📚 Documentation
 
 - **[Agent Integration Plan](.docs/AGENT_INTEGRATION_PLAN.md)** - Detailed architecture and implementation
@@ -559,6 +637,7 @@ chmod -R 755 .venv/
 - **[Requirements](.docs/REQUIREMENTS.md)** - Project specifications
 - **[APF Format](.docs/APF_FORMAT.md)** - Card format specification
 - **[Cards Prompt](.docs/CARDS_PROMPT.md)** - LLM generation instructions
+- **[Security Best Practices](#-security-features)** - See above section
 
 ## 🤝 Contributing
 
