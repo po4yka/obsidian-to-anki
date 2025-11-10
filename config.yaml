@@ -61,14 +61,58 @@ post_validation_strict_mode: true
 # LLM PROVIDER SETTINGS (Unified system)
 # =============================================================================
 
-# Primary provider: ollama (since you have models installed)
+# Choose your LLM provider
+# Options: "ollama", "openai", "anthropic", "claude", "openrouter", "lm_studio"
 llm_provider: "ollama"
 
-# Common LLM settings
+# Common LLM settings (applies to all providers)
 llm_temperature: 0.2
 llm_top_p: 0.3
 llm_timeout: 600.0  # Increased for large models (qwen3:32b, qwen3:14b)
 llm_max_tokens: 2048
+
+# =============================================================================
+# PROVIDER-SPECIFIC SETTINGS
+# =============================================================================
+
+# --- Ollama (Local/Cloud LLMs) ---
+# ollama_base_url is already set above (line 37)
+# ollama_api_key: ""  # Required only for Ollama Cloud
+
+# --- OpenAI (GPT models) ---
+# To use OpenAI: set llm_provider to "openai" and provide API key
+# openai_api_key: "sk-..."  # Get from https://platform.openai.com/api-keys
+# openai_base_url: "https://api.openai.com/v1"  # Custom endpoint (optional)
+# openai_organization: ""  # Organization ID (optional)
+# openai_max_retries: 3
+
+# Recommended OpenAI models for each role:
+# - generator_model: "gpt-4-turbo-preview" or "gpt-4"
+# - post_validator_model: "gpt-4" or "gpt-3.5-turbo"
+# - pre_validator_model: "gpt-3.5-turbo"
+
+# --- Anthropic (Claude models) ---
+# To use Claude: set llm_provider to "anthropic" or "claude" and provide API key
+# anthropic_api_key: "sk-ant-..."  # Get from https://console.anthropic.com/
+# anthropic_base_url: "https://api.anthropic.com"
+# anthropic_api_version: "2023-06-01"
+# anthropic_max_retries: 3
+
+# Recommended Claude models for each role:
+# - generator_model: "claude-3-opus-20240229" or "claude-3-sonnet-20240229"
+# - post_validator_model: "claude-3-sonnet-20240229"
+# - pre_validator_model: "claude-3-haiku-20240307"
+
+# --- OpenRouter (Multi-model gateway) ---
+# To use OpenRouter: set llm_provider to "openrouter" and provide API key
+# openrouter_api_key: "sk-or-..."  # Get from https://openrouter.ai/keys
+# openrouter_base_url: "https://openrouter.ai/api/v1"
+# openrouter_site_url: "https://your-site.com"  # For ranking (optional)
+# openrouter_site_name: "Your App Name"  # For ranking (optional)
+
+# --- LM Studio (Local GUI-based LLMs) ---
+# To use LM Studio: set llm_provider to "lm_studio" and ensure server is running
+# lm_studio_base_url: "http://localhost:1234/v1"
 
 # =============================================================================
 # DECK EXPORT SETTINGS (Optional .apkg generation)
@@ -77,3 +121,49 @@ llm_max_tokens: 2048
 export_deck_name: "Interview Questions"
 export_deck_description: "Generated from Obsidian notes"
 export_output_path: "interview_questions.apkg"
+
+# =============================================================================
+# LANGCHAIN AGENT SYSTEM (New Multi-Agent Pipeline)
+# =============================================================================
+
+# Feature Flag: Use LangChain-based agent system
+# This is a new, more sophisticated agent system with:
+# - Card Mapping Agent (converts notes to cards)
+# - Schema Validation Tool (validates Anki model compatibility)
+# - QA Agent (semantic quality checks)
+# - Style/Hint Agent (optional refinement)
+# - Card Diff Agent (safe updates of existing cards)
+use_langchain_agents: false  # Set to true to enable
+
+# Supervisor Configuration
+langchain_agents:
+  # Retry and quality thresholds
+  max_mapping_retries: 2           # Retries if schema validation fails
+  min_qa_score: 0.8                # Minimum QA score (0-1) to pass
+  allow_auto_fix: true             # Allow automatic fixing based on feedback
+  max_llm_calls_per_card: 8        # Maximum total LLM calls per card
+
+  # Update policies
+  allow_content_updates: true      # Allow updates that change card content
+  allow_structural_updates: false  # Allow model/deck changes (risky)
+
+  # Optional features
+  enable_style_polish: false       # Enable style polishing step (slower but better quality)
+  strict_schema_validation: false  # Treat schema warnings as errors
+
+  # Model assignment (uses existing LLM config)
+  # mapping_model: Uses generator_model (qwen3:32b)
+  # qa_model: Uses post_validator_model (qwen3:14b)
+  # style_model: Uses pre_validator_model (qwen3:8b)
+
+  # Schema validation settings
+  max_front_length: 500            # Maximum characters for Front field
+  max_back_length: 2000            # Maximum characters for Back field
+  max_field_length: 4000           # Maximum characters for any field
+  max_tags: 20                     # Maximum number of tags
+
+  # Deck settings
+  default_deck_prefix: "Interview" # Default prefix for deck names
+
+  # Bilingual settings
+  bilingual_mode: "front_back"     # Options: "none", "front_back", "separate_cards"

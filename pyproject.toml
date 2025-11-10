@@ -32,6 +32,7 @@ dependencies = [
     "pydantic-ai>=0.0.14",
     "langgraph>=0.2.60",
     "langgraph-checkpoint>=2.0.10",
+    "langchain-core>=0.3.0",
 ]
 
 [project.optional-dependencies]
