@@ -90,7 +90,7 @@ Respond with JSON only:
       "change_type": "typo_fix",
       "severity": "cosmetic",
       "recommendation": "approve",
-      "reasoning": "Fixed spelling: 'recieve' † 'receive'",
+      "reasoning": "Fixed spelling: 'recieve' â†’ 'receive'",
       "semantic_similarity": 0.99,
       "preserves_learning": true
     },
@@ -276,7 +276,7 @@ class EnhancedCardDiffer:
                     old_value=existing.model_name,
                     new_value=proposed.model_name,
                     severity=ChangeSeverity.STRUCTURAL,
-                    message=f"Model change: {existing.model_name} † {proposed.model_name}",
+                    message=f"Model change: {existing.model_name} â†’ {proposed.model_name}",
                 )
             )
 
@@ -288,7 +288,7 @@ class EnhancedCardDiffer:
                     old_value=existing.deck_name,
                     new_value=proposed.deck_name,
                     severity=ChangeSeverity.STRUCTURAL,
-                    message=f"Deck change: {existing.deck_name} † {proposed.deck_name}",
+                    message=f"Deck change: {existing.deck_name} â†’ {proposed.deck_name}",
                 )
             )
 

@@ -142,7 +142,7 @@ class ExistingAnkiNote(BaseModel):
     note_id: int
     model_name: str
     deck_name: str
-    fields: dict[str, str] = Field(..., description="Field name † field value mapping")
+    fields: dict[str, str] = Field(..., description="Field name â†’ field value mapping")
     tags: list[str]
     last_sync_ts: str = Field(..., description="ISO8601 timestamp")
     slug: str = Field(..., description="For consistency")
@@ -222,7 +222,7 @@ class ProposedCard(BaseModel):
     deck_name: str = Field(..., description="Resolved deck name")
     fields: dict[str, str] = Field(
         ...,
-        description="Field name † value mapping (Front, Back, Extra, Hint, etc.)",
+        description="Field name â†’ value mapping (Front, Back, Extra, Hint, etc.)",
     )
     tags: list[str]
     language: Language

@@ -65,7 +65,7 @@ COMMON ISSUES TO CHECK:
 1. Empty or missing language_tags (should be [en, ru] if both languages present)
 2. Missing required frontmatter fields: id, title, topic, language_tags, created, updated
 3. Invalid YAML syntax in frontmatter
-4. Missing section headers: # Question (EN), # �оп�ос (RU), ## Answer (EN), ## Ответ (RU)
+4. Missing section headers: # Question (EN), # Вопрос (RU), ## Answer (EN), ## Ответ (RU)
 5. Incorrect section ordering (both RU-first and EN-first are valid)
 6. Missing content in question or answer sections
 
@@ -79,10 +79,10 @@ created: 2025-01-01
 updated: 2025-01-01
 ---
 
-# �оп�ос (RU) OR # Question (EN)
+# Вопрос (RU) OR # Question (EN)
 > Question text
 
-# Question (EN) OR # �оп�ос (RU)
+# Question (EN) OR # Вопрос (RU)
 > Question text
 
 ## Ответ (RU) OR ## Answer (EN)

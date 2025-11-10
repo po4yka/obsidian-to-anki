@@ -252,7 +252,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     card_index = 1
 
     # Find all Q/A blocks
-    # Pattern supports both EN�RU and RU�EN ordering for questions/answers.
+    # Pattern supports both EN→RU and RU→EN ordering for questions/answers.
 
     # Find positions of question markers that start new blocks
     # A question marker starts a new block if it comes after a separator or at the start
@@ -265,7 +265,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
         stripped = line.strip()
 
         # Check if this is a question marker
-        is_question_marker = stripped in ("# Question (EN)", "# �оп�ос (RU)")
+        is_question_marker = stripped in ("# Question (EN)", "# Вопрос (RU)")
 
         # Start new block if: (1) question marker AND (2) we've seen answers or this is the first block
         if is_question_marker and (in_answer_section or not current_block_lines):
@@ -353,7 +353,7 @@ def _parse_single_qa_block(
             state = "QUESTION_EN"
             current_section = question_en
             continue
-        elif stripped == "# �оп�ос (RU)":
+        elif stripped == "# Вопрос (RU)":
             state = "QUESTION_RU"
             current_section = question_ru
             continue
