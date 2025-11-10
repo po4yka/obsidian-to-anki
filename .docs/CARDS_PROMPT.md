@@ -78,7 +78,7 @@ When unsure, pick the **simplest** type that still targets the intended recall.
 <text>
 
 <!-- Sample (code block or image) (optional for Missing) -->
-<pre><code class="language-<lang>">code ‰ 12 LOC, ‰ 88 cols</code></pre>
+<pre><code class="language-<lang>">code ~ 12 LOC, ~ 88 cols</code></pre>
 
 <!-- Key point (code block / image) -->
 <pre><code class="language-<lang>">answer as code OR</code></pre>
@@ -86,7 +86,7 @@ When unsure, pick the **simplest** type that still targets the intended recall.
 
 <!-- Key point notes -->
 <ul>
-  <li>36 bullets, each ‰ 20 words; focus on mechanism, rule, or pitfall.</li>
+  <li>36 bullets, each ~ 20 words; focus on mechanism, rule, or pitfall.</li>
 </ul>
 
 <!-- Other notes (optional) -->
@@ -104,10 +104,10 @@ When unsure, pick the **simplest** type that still targets the intended recall.
 
 ## 5) Field Rules
 
-* **Title:** ‰ 80 chars; ask one question or state one prompt. No duplicates across a batch.
+* **Title:** ~ 80 chars; ask one question or state one prompt. No duplicates across a batch.
 * **Subtitle (opt):** a short context label (e.g., Coroutines / Flow).
 * **Syntax (inline) (opt):** a oneliner `<code>` spotlighting the key token/signature.
-* **Sample (caption/code/image) (opt):** only whats necessary to understand the question; ‰ 12 LOC, ‰ 88 columns, no unused imports.
+* **Sample (caption/code/image) (opt):** only whats necessary to understand the question; ~ 12 LOC, ~ 88 columns, no unused imports.
 * **Key point:** the **answer** as code, image, or tight bullet list. For **Missing**, place `{{cN::...}}` in the **Key point** code; do not cloze comments or whitespace.
 * **Key point notes:** 36 bullets: rule, why, constraint, edge case, typical failure. Avoid anecdotes.
 * **Other notes (opt):** at most 2 links to official docs or spec; one **Assumption** bullet if ambiguity was resolved.
