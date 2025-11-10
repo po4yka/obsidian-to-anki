@@ -30,11 +30,11 @@ Allows you to safely interrupt sync (Ctrl+C) and resume later without re-process
 
 ### Key Features
 
-- ✅ Progress tracking with session IDs
-- ✅ Graceful interruption handling (SIGINT/SIGTERM)
-- ✅ Automatic resume detection
-- ✅ Per-note progress tracking
-- ✅ State persistence to SQLite database
+-  Progress tracking with session IDs
+-  Graceful interruption handling (SIGINT/SIGTERM)
+-  Automatic resume detection
+-  Per-note progress tracking
+-  State persistence to SQLite database
 
 ### Example Usage
 
@@ -50,15 +50,15 @@ Resume with: obsidian-anki-sync sync --resume abc123
 # Later, resume
 $ obsidian-anki-sync sync --resume abc123
 Resuming from 50/100...
-✓ Completed!
+ Completed!
 ```
 
 ### When to Use
 
-- ✅ Long-running syncs that might be interrupted
-- ✅ Syncing large vaults (>100 notes)
-- ✅ When you need to stop and continue later
-- ✅ Automated syncs that might be interrupted
+-  Long-running syncs that might be interrupted
+-  Syncing large vaults (>100 notes)
+-  When you need to stop and continue later
+-  Automated syncs that might be interrupted
 
 ### Documentation
 
@@ -72,10 +72,10 @@ Processes only new notes that haven't been synced yet, dramatically speeding up 
 
 ### Key Features
 
-- ✅ Smart filtering based on database tracking
-- ✅ 10-100x faster for daily workflows
-- ✅ Works with all other features
-- ✅ Perfect for large vaults
+-  Smart filtering based on database tracking
+-  10-100x faster for daily workflows
+-  Works with all other features
+-  Perfect for large vaults
 
 ### Example Usage
 
@@ -84,15 +84,15 @@ Processes only new notes that haven't been synced yet, dramatically speeding up 
 $ obsidian-anki-sync sync --incremental
 Incremental mode: Skipping 500 already processed notes
 Processing: 5 new notes
-✓ Created 15 cards in 10 seconds
+ Created 15 cards in 10 seconds
 ```
 
 ### When to Use
 
-- ✅ Daily sync workflow
-- ✅ Adding a few notes to large vault
-- ✅ Quick syncs for new content
-- ✅ After initial full sync
+-  Daily sync workflow
+-  Adding a few notes to large vault
+-  Quick syncs for new content
+-  After initial full sync
 
 ### Performance
 
@@ -114,12 +114,12 @@ Builds a complete catalog of your vault and Anki cards before processing, enabli
 
 ### Key Features
 
-- ✅ Full vault inventory with metadata
-- ✅ Card tracking across three locations (vault, Anki, database)
-- ✅ Status tracking for notes and cards
-- ✅ Rich statistics and reporting
-- ✅ Orphaned card detection
-- ✅ Incremental re-indexing
+-  Full vault inventory with metadata
+-  Card tracking across three locations (vault, Anki, database)
+-  Status tracking for notes and cards
+-  Rich statistics and reporting
+-  Orphaned card detection
+-  Incremental re-indexing
 
 ### Example Usage
 
@@ -128,15 +128,15 @@ Builds a complete catalog of your vault and Anki cards before processing, enabli
 $ obsidian-anki-sync sync
 
 Index Statistics:
-┌──────────┬─────────────┬───────┐
-│ Category │ Metric      │ Value │
-├──────────┼─────────────┼───────┤
-│ Notes    │ Total       │ 250   │
-│ Notes    │ Completed   │ 240   │
-│ Cards    │ Total       │ 750   │
-│ Cards    │ In Obsidian │ 750   │
-│ Cards    │ In Anki     │ 720   │
-└──────────┴─────────────┴───────┘
+��
+� Category � Metric      � Value �
+��
+� Notes    � Total       � 250   �
+� Notes    � Completed   � 240   �
+� Cards    � Total       � 750   �
+� Cards    � In Obsidian � 750   �
+� Cards    � In Anki     � 720   �
+�
 
 # View index anytime
 $ obsidian-anki-sync index
@@ -147,18 +147,18 @@ $ obsidian-anki-sync index
 Each card is tracked in three locations:
 
 ```
-Card A: [✓ Obsidian] [✓ Anki] [✓ Database] → "synced"
-Card B: [✓ Obsidian] [✗ Anki] [✗ Database] → "expected" (needs creation)
-Card C: [✗ Obsidian] [✓ Anki] [✓ Database] → "orphaned" (note deleted)
+Card A: [ Obsidian] [ Anki] [ Database]  "synced"
+Card B: [ Obsidian] [� Anki] [� Database]  "expected" (needs creation)
+Card C: [� Obsidian] [ Anki] [ Database]  "orphaned" (note deleted)
 ```
 
 ### When to Use
 
-- ✅ Always (it's on by default!)
-- ✅ Troubleshooting sync issues
-- ✅ Auditing vault/Anki state
-- ✅ Finding orphaned cards
-- ✅ Monitoring sync health
+-  Always (it's on by default!)
+-  Troubleshooting sync issues
+-  Auditing vault/Anki state
+-  Finding orphaned cards
+-  Monitoring sync health
 
 ### Documentation
 
@@ -172,10 +172,10 @@ All features work together seamlessly:
 
 | Feature Combination | Compatible | Example Command |
 |---------------------|------------|-----------------|
-| Resumable + Incremental | ✅ | `sync --incremental --resume <id>` |
-| Resumable + Indexing | ✅ | `sync --resume <id>` (indexing auto) |
-| Incremental + Indexing | ✅ | `sync --incremental` (indexing auto) |
-| All Three | ✅ | `sync --incremental --resume <id>` |
+| Resumable + Incremental |  | `sync --incremental --resume <id>` |
+| Resumable + Indexing |  | `sync --resume <id>` (indexing auto) |
+| Incremental + Indexing |  | `sync --incremental` (indexing auto) |
+| All Three |  | `sync --incremental --resume <id>` |
 
 ### CLI Flags Summary
 
@@ -256,7 +256,7 @@ $ obsidian-anki-sync sync --incremental
 $ obsidian-anki-sync sync
 Found incomplete sync from 2 hours ago
 Resume this sync? [Y/n]: y
-✓ Resumed and completed!
+ Resumed and completed!
 ```
 
 #### Monitoring and Maintenance
@@ -431,10 +431,10 @@ Result: 70x faster daily workflow!
 ### Upgrading from Previous Version
 
 No migration needed! New features are:
-- ✅ Backward compatible
-- ✅ Opt-in for incremental mode
-- ✅ Enabled by default for indexing
-- ✅ No breaking changes
+-  Backward compatible
+-  Opt-in for incremental mode
+-  Enabled by default for indexing
+-  No breaking changes
 
 ### First Sync After Upgrade
 
@@ -553,4 +553,4 @@ obsidian-anki-sync sync --incremental
 obsidian-anki-sync index
 ```
 
-Happy syncing! 🚀
+Happy syncing! 

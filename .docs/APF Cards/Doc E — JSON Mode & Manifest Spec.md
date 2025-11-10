@@ -14,8 +14,8 @@
   "sample_lang": null|"kotlin|yaml|...",
   "keypoint_code_or_image": "code or data:image/svg+xml,...",
   "keypoint_lang": null|"kotlin|yaml|svg|...",
-  "keypoint_notes": ["…","…"],
-  "other_notes": ["Assumption: …","Ref: https://…"],
+  "keypoint_notes": ["",""],
+  "other_notes": ["Assumption: ","Ref: https://"],
   "tags": ["kotlin","android","coroutines","flow"]
 }
 ```

@@ -1,4 +1,4 @@
-"""LangChain-based multi-agent system for Obsidian â†’ Anki pipeline."""
+"""LangChain-based multi-agent system for Obsidian † Anki pipeline."""
 
 from obsidian_anki_sync.agents.langchain.models import (
     CardDecision,

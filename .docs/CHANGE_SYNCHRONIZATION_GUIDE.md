@@ -18,20 +18,20 @@ When updating existing cards, we must balance:
 
 ### Common Problems
 
-❌ **Naive Approach** (Always overwrite):
+ **Naive Approach** (Always overwrite):
 ```python
 # BAD: Blindly overwrite existing card
 anki.update_card(note_id, new_fields)  # Loses user edits!
 ```
 
-❌ **Too Conservative** (Never update):
+ **Too Conservative** (Never update):
 ```python
 # BAD: Skip all updates
 if card_exists:
     return "skip"  # Typos never get fixed!
 ```
 
-✅ **Intelligent Approach** (Analyze and decide):
+ **Intelligent Approach** (Analyze and decide):
 ```python
 # GOOD: Semantic analysis + smart decision
 diff = enhanced_differ.compare(existing, proposed)
@@ -56,7 +56,7 @@ if diff.risk_level == "low" and diff.should_update:
 - Spelling/grammar corrections only
 - No semantic change
 
-**Action**: ✅ Auto-approve
+**Action**:  Auto-approve
 
 ### 2. Clarifications (Usually Safe)
 
@@ -74,7 +74,7 @@ if diff.risk_level == "low" and diff.should_update:
 - Additional details added
 - Core meaning unchanged
 
-**Action**: ✅ Auto-approve (with confidence check)
+**Action**:  Auto-approve (with confidence check)
 
 ### 3. Rephrasing (Review Recommended)
 
@@ -89,7 +89,7 @@ if diff.risk_level == "low" and diff.should_update:
 - Semantic similarity high (>85%)
 - Learning cue changed
 
-**Action**: ⚠️ Review recommended (may disrupt recall)
+**Action**:  Review recommended (may disrupt recall)
 
 ### 4. Content Addition (Review Recommended)
 
@@ -106,7 +106,7 @@ if diff.risk_level == "low" and diff.should_update:
 - Expansion of answer
 - Learning effort increased
 
-**Action**: ⚠️ Review (especially for mature cards)
+**Action**:  Review (especially for mature cards)
 
 ### 5. Meaning Change (Requires Review)
 
@@ -122,7 +122,7 @@ if diff.risk_level == "low" and diff.should_update:
 - May indicate error correction
 - High learning impact
 
-**Action**: 🛑 Manual review required
+**Action**:  Manual review required
 
 ### 6. Complete Rewrite (Manual Review)
 
@@ -140,7 +140,7 @@ if diff.risk_level == "low" and diff.should_update:
 - Different question or answer
 - Essentially a new card
 
-**Action**: 🛑 Manual review or create new card
+**Action**:  Manual review or create new card
 
 ---
 
@@ -151,34 +151,34 @@ The **Enhanced Card Differ** uses LLM to understand changes semantically:
 ### How It Works
 
 ```
-┌─────────────────────────────────────────┐
-│  1. Text-based diff                     │
-│     - Compute similarity (SequenceMatcher)
-│     - Identify changed fields           │
-└────────────┬────────────────────────────┘
-             │
-┌────────────▼────────────────────────────┐
-│  2. LLM Semantic Analysis               │
-│     - Classify change type              │
-│     - Assess severity                   │
-│     - Evaluate learning impact          │
-│     - Provide recommendation            │
-└────────────┬────────────────────────────┘
-             │
-┌────────────▼────────────────────────────┐
-│  3. Policy-based Decision               │
-│     - Check update policies             │
-│     - Detect conflicts                  │
-│     - Determine risk level              │
-│     - Approve/reject/review             │
-└────────────┬────────────────────────────┘
-             │
-┌────────────▼────────────────────────────┐
-│  4. Execute or Queue for Review         │
-│     - Auto-apply low-risk changes       │
-│     - Queue medium-risk for review      │
-│     - Block high-risk changes           │
-└─────────────────────────────────────────┘
+
+�  1. Text-based diff                     �
+�     - Compute similarity (SequenceMatcher)
+�     - Identify changed fields           �
+��
+             �
+�
+�  2. LLM Semantic Analysis               �
+�     - Classify change type              �
+�     - Assess severity                   �
+�     - Evaluate learning impact          �
+�     - Provide recommendation            �
+��
+             �
+�
+�  3. Policy-based Decision               �
+�     - Check update policies             �
+�     - Detect conflicts                  �
+�     - Determine risk level              �
+�     - Approve/reject/review             �
+��
+             �
+�
+�  4. Execute or Queue for Review         �
+�     - Auto-apply low-risk changes       �
+�     - Queue medium-risk for review      �
+�     - Block high-risk changes           �
+�
 ```
 
 ### LLM Analysis Output
@@ -190,7 +190,7 @@ The **Enhanced Card Differ** uses LLM to understand changes semantically:
       "change_type": "typo_fix",
       "severity": "cosmetic",
       "recommendation": "approve",
-      "reasoning": "Fixed spelling: 'recieve' → 'receive'",
+      "reasoning": "Fixed spelling: 'recieve'  'receive'",
       "semantic_similarity": 0.99,
       "preserves_learning": true
     },
@@ -223,15 +223,15 @@ A conflict occurs when a card has been modified in **both** Obsidian and Anki si
 
 ```
 Timeline:
-─────────────────────────────────────────────────>
+>
 
-t0: Last sync (Obsidian ← → Anki match)
-    │
-    ├─ t1: User edits card in Anki (fixes typo)
-    │
-    └─ t2: User updates Obsidian note (adds content)
-         │
-         └─ t3: Sync triggered ⚠️ CONFLICT!
+t0: Last sync (Obsidian   Anki match)
+    �
+     t1: User edits card in Anki (fixes typo)
+    �
+     t2: User updates Obsidian note (adds content)
+         �
+          t3: Sync triggered  CONFLICT!
 ```
 
 ### Detecting Conflicts
@@ -469,22 +469,22 @@ obsidian-anki-sync sync --dry-run --show-diffs
 obsidian-anki-sync sync --interactive
 
 # Output:
-# ┌─────────────────────────────────────────────────┐
-# │ Card Update Review (1/5)                        │
-# ├─────────────────────────────────────────────────┤
-# │ Note: binary-search-tree.md                     │
-# │ Slug: binary-search-tree-en                     │
-# │ Risk: MEDIUM                                    │
-# ├─────────────────────────────────────────────────┤
-# │ Field: Back                                     │
-# │ Type: content_addition                          │
-# ├─────────────────────────────────────────────────┤
-# │ - Old: "A tree where left < parent < right"    │
-# │ + New: "A tree where left < parent < right     │
-# │         Time complexity: O(log n) average"      │
-# ├─────────────────────────────────────────────────┤
-# │ [A]pprove  [R]eject  [S]kip  [Q]uit            │
-# └─────────────────────────────────────────────────┘
+# 
+# � Card Update Review (1/5)                        �
+# 
+# � Note: binary-search-tree.md                     �
+# � Slug: binary-search-tree-en                     �
+# � Risk: MEDIUM                                    �
+# 
+# � Field: Back                                     �
+# � Type: content_addition                          �
+# 
+# � - Old: "A tree where left < parent < right"    �
+# � + New: "A tree where left < parent < right     �
+# �         Time complexity: O(log n) average"      �
+# 
+# � [A]pprove  [R]eject  [S]kip  [Q]uit            �
+# �
 ```
 
 ### Batch Review
@@ -574,7 +574,7 @@ obsidian-anki-sync report --changes --last-7-days
 
 # Output:
 # Change Summary (Last 7 Days)
-# ════════════════════════════════════════
+# 
 # Total Updates:        145
 # Auto-Approved:        120 (82.8%)
 # Manual Review:         20 (13.8%)
@@ -616,7 +616,7 @@ obsidian-anki-sync sync --dry-run
 obsidian-anki-sync report --affected-cards
 
 # If concerned, backup Anki
-Tools → Create Backup
+Tools  Create Backup
 
 # Then proceed
 obsidian-anki-sync sync
@@ -717,14 +717,14 @@ obsidian-anki-sync sync
 
 | Change Type | Auto-Approve? | Risk Level | Action |
 |-------------|---------------|------------|--------|
-| Typo fix | ✅ Yes | Low | Apply |
-| Clarification | ✅ Yes (if high similarity) | Low-Medium | Apply |
-| Rephrasing | ⚠️ Review | Medium | Queue for review |
-| Content addition | ⚠️ Review | Medium | Queue for review |
-| Meaning change | 🛑 No | High | Manual review required |
-| Complete rewrite | 🛑 No | High | Manual review or new card |
-| Structural change | 🛑 No (unless enabled) | High | Manual review required |
-| Conflict detected | 🛑 No (unless policy) | High | Resolution strategy |
+| Typo fix |  Yes | Low | Apply |
+| Clarification |  Yes (if high similarity) | Low-Medium | Apply |
+| Rephrasing |  Review | Medium | Queue for review |
+| Content addition |  Review | Medium | Queue for review |
+| Meaning change |  No | High | Manual review required |
+| Complete rewrite |  No | High | Manual review or new card |
+| Structural change |  No (unless enabled) | High | Manual review required |
+| Conflict detected |  No (unless policy) | High | Resolution strategy |
 
 ---
 

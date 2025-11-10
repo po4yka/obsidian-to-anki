@@ -18,26 +18,26 @@ This document describes the architecture of the LangChain-based multi-agent syst
 
 ```
 Obsidian Note (Markdown)
-    ↓
+    
 Obsidian Parser (existing)
-    ↓
+    
 NoteContext (JSON-serializable)
-    ↓
+    
 LangChain Supervisor Orchestrator
-    ↓
-┌─────────────────────────────────────────┐
-│  Multi-Agent Pipeline (LangChain Tools) │
-│  1. Card Mapping Agent                  │
-│  2. Schema Validation Tool              │
-│  3. QA Agent                            │
-│  4. Style/Hint Agent (optional)         │
-│  5. Card Diff Agent (for updates)       │
-└─────────────────────────────────────────┘
-    ↓
+    
+
+�  Multi-Agent Pipeline (LangChain Tools) �
+�  1. Card Mapping Agent                  �
+�  2. Schema Validation Tool              �
+�  3. QA Agent                            �
+�  4. Style/Hint Agent (optional)         �
+�  5. Card Diff Agent (for updates)       �
+�
+    
 CardDecision (create/update/skip/manual_review)
-    ↓
+    
 Anki Sync Layer (existing)
-    ↓
+    
 AnkiConnect API
 ```
 
@@ -81,7 +81,7 @@ AnkiConnect API
 - **Input**: NoteContext
 - **Output**: ProposedCard
 - **Responsibilities**:
-  - Map note structure to Anki fields (Question → Front, Answer → Back)
+  - Map note structure to Anki fields (Question  Front, Answer  Back)
   - Select appropriate card_type (Basic, Cloze, Custom)
   - Resolve deck_name and model_name from config
   - Handle bilingual content
@@ -143,17 +143,17 @@ AnkiConnect API
 **Happy Path Flow:**
 ```python
 1. Receive NoteContext
-2. Call map_to_anki_fields() → ProposedCard
-3. Call validate_anki_schema() → SchemaValidationResult
+2. Call map_to_anki_fields()  ProposedCard
+3. Call validate_anki_schema()  SchemaValidationResult
    - If invalid: retry with feedback (max_mapping_retries)
    - If still invalid: action = "manual_review"
 4. [Optional] Call polish_card_style()
-5. Call qa_check_card() → QAReport
+5. Call qa_check_card()  QAReport
    - If qa_score < min_qa_score or high severity issues:
      - If allow_auto_fix: retry mapping with QA feedback
      - Else: action = "manual_review"
 6. If existing_anki_note present:
-   - Call compare_cards() → CardDiffResult
+   - Call compare_cards()  CardDiffResult
    - Set action based on should_update and policy
 7. Else:
    - action = "create" (if valid and QA passed)
@@ -161,8 +161,8 @@ AnkiConnect API
 ```
 
 **Retry Strategy:**
-- Schema validation failures → re-map with error context
-- QA failures → re-map with issue descriptions
+- Schema validation failures  re-map with error context
+- QA failures  re-map with issue descriptions
 - Maximum retries controlled by `max_mapping_retries` config
 - Total LLM calls capped by `max_llm_calls_per_card`
 
@@ -231,10 +231,10 @@ else:
 ```python
 class AgentSystemAdapter:
     @staticmethod
-    def to_note_context(metadata, qa_pairs, config) → NoteContext
+    def to_note_context(metadata, qa_pairs, config)  NoteContext
 
     @staticmethod
-    def from_card_decision(decision) → list[Card]
+    def from_card_decision(decision)  list[Card]
 ```
 
 ### 6. Testing Strategy
@@ -247,10 +247,10 @@ class AgentSystemAdapter:
 #### 6.2 Integration Tests
 - **Agent Pipeline**: Mocked LLM responses, golden files
 - **Orchestrator**: Retry logic, error handling, config variations
-- **End-to-End**: Full NoteContext → CardDecision flow
+- **End-to-End**: Full NoteContext  CardDecision flow
 
 #### 6.3 Snapshot Tests
-- **Determinism**: Same input → same output (with fixed model/temp)
+- **Determinism**: Same input  same output (with fixed model/temp)
 - **Regression**: Golden files for known-good cards
 
 ### 7. Observability
@@ -352,40 +352,40 @@ class AgentSystemAdapter:
 
 ```
 src/obsidian_anki_sync/
-├── agents/
-│   ├── langchain/                    # NEW
-│   │   ├── __init__.py
-│   │   ├── models.py                 # Pydantic data structures
-│   │   ├── supervisor.py             # Supervisor Orchestrator
-│   │   ├── tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── card_mapper.py        # Card Mapping Agent
-│   │   │   ├── schema_validator.py   # Schema Validation Tool
-│   │   │   ├── qa_checker.py         # QA Agent
-│   │   │   ├── style_polisher.py     # Style/Hint Agent
-│   │   │   └── card_differ.py        # Card Diff Agent
-│   │   ├── adapter.py                # Adapter to existing models
-│   │   └── config.py                 # Agent config dataclass
-│   ├── orchestrator.py               # EXISTING (keep for backward compat)
-│   └── ...
-├── providers/
-│   ├── langchain_provider.py         # NEW: LangChain wrapper
-│   └── ...
-└── ...
+ agents/
+�    langchain/                    # NEW
+�   �    __init__.py
+�   �    models.py                 # Pydantic data structures
+�   �    supervisor.py             # Supervisor Orchestrator
+�   �    tools/
+�   �   �    __init__.py
+�   �   �    card_mapper.py        # Card Mapping Agent
+�   �   �    schema_validator.py   # Schema Validation Tool
+�   �   �    qa_checker.py         # QA Agent
+�   �   �    style_polisher.py     # Style/Hint Agent
+�   �   �    card_differ.py        # Card Diff Agent
+�   �    adapter.py                # Adapter to existing models
+�   �    config.py                 # Agent config dataclass
+�    orchestrator.py               # EXISTING (keep for backward compat)
+�    ...
+ providers/
+�    langchain_provider.py         # NEW: LangChain wrapper
+�    ...
+ ...
 
 tests/
-├── agents/
-│   ├── langchain/                    # NEW
-│   │   ├── test_models.py
-│   │   ├── test_supervisor.py
-│   │   ├── test_card_mapper.py
-│   │   ├── test_schema_validator.py
-│   │   ├── test_qa_checker.py
-│   │   ├── test_style_polisher.py
-│   │   ├── test_card_differ.py
-│   │   └── test_adapter.py
-│   └── ...
-└── ...
+ agents/
+�    langchain/                    # NEW
+�   �    test_models.py
+�   �    test_supervisor.py
+�   �    test_card_mapper.py
+�   �    test_schema_validator.py
+�   �    test_qa_checker.py
+�   �    test_style_polisher.py
+�   �    test_card_differ.py
+�   �    test_adapter.py
+�    ...
+ ...
 ```
 
 ## Success Criteria

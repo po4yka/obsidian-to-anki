@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation plan for intelligent change synchronization in the Obsidian → Anki pipeline.
+This document outlines the implementation plan for intelligent change synchronization in the Obsidian  Anki pipeline.
 
 ---
 
@@ -45,7 +45,7 @@ class ConflictInfo(BaseModel):
     manual_review_required: bool
 ```
 
-**Status**: ✅ Models defined (enhanced_card_differ.py has enums)
+**Status**:  Models defined (enhanced_card_differ.py has enums)
 
 ### 1.2 Change History Database
 
@@ -522,7 +522,7 @@ def rollback(note_id: int, to_timestamp: Optional[str], last_n: int):
             value=change.old_value,
         )
 
-    console.print(f"✅ Rolled back {len(changes)} changes")
+    console.print(f" Rolled back {len(changes)} changes")
 
 @cli.command()
 @click.option("--note-id", type=int)
@@ -676,7 +676,7 @@ Output statistics on change patterns, auto-approval rates, etc.
 If implementing incrementally, prioritize in this order:
 
 ### Priority 1 (Most Impact)
-1. ✅ Enhanced Card Differ with LLM analysis (Already implemented!)
+1.  Enhanced Card Differ with LLM analysis (Already implemented!)
 2. Change History Database
 3. Incremental field updates
 
@@ -694,15 +694,15 @@ If implementing incrementally, prioritize in this order:
 
 ## Current Status
 
-✅ **Completed**:
+ **Completed**:
 - Enhanced Card Differ implementation
 - Data models for change tracking
 - Documentation (this guide + CHANGE_SYNCHRONIZATION_GUIDE.md)
 
-🔄 **In Progress**:
+ **In Progress**:
 - Integration with supervisor
 
-📋 **Remaining**:
+� **Remaining**:
 - Change history database
 - Timestamp tracking
 - Conflict resolution

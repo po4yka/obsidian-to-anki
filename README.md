@@ -6,68 +6,68 @@ Synchronize Obsidian Q&A notes to Anki APF cards using LLM-powered generation wi
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-## ✨ Features
+## Features
 
-- 📝 Parse Obsidian markdown notes with Q&A pairs
-- 🤖 **Multi-Provider LLM Support**: Choose from **Ollama**, **LM Studio**, **OpenAI**, **Anthropic**, or **OpenRouter**
-- 🔒 **100% Privacy**: Optional fully local processing with no cloud APIs
-- 🔄 Bidirectional synchronization (create/update/delete/restore)
-- 🌍 Bilingual card support (EN/RU)
-- 🔖 Stable slug-based tracking with collision resolution
-- 💾 SQLite state management with proper connection handling
-- 👀 Dry-run mode for previewing changes
-- ✅ Three-stage validation pipeline with auto-fix
-- 🔌 Unified provider configuration with single point of model specification
-- 🛡️ **Security**: Path traversal protection, symlink attack prevention, input validation
+- Parse Obsidian markdown notes with Q&A pairs
+- **Multi-Provider LLM Support**: Choose from **Ollama**, **LM Studio**, **OpenAI**, **Anthropic**, or **OpenRouter**
+- **100% Privacy**: Optional fully local processing with no cloud APIs
+- Bidirectional synchronization (create/update/delete/restore)
+- Bilingual card support (EN/RU)
+- Stable slug-based tracking with collision resolution
+- SQLite state management with proper connection handling
+- Dry-run mode for previewing changes
+- Three-stage validation pipeline with auto-fix
+- Unified provider configuration with single point of model specification
+- **Security**: Path traversal protection, symlink attack prevention, input validation
 
-## 🆕 Multi-Agent AI System
+## Multi-Agent AI System
 
 This project now supports a sophisticated **multi-agent AI system** for generating Anki flashcards using local LLMs running on Apple Silicon via Ollama.
 
 ### Architecture
 
 ```
-┌─────────────────┐
-│ Obsidian Note   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Pre-Validator Agent    │  Fast structural validation
-│  (Qwen3-8B)             │  • Check formatting
-│                         │  • Verify structure
-└────────┬────────────────┘  • Validate syntax
-         │
-         ▼ (if valid)
-┌─────────────────────────┐
-│  Generator Agent        │  High-quality generation
-│  (Qwen3-32B)            │  • Parse markdown
-│                         │  • Extract concepts
-└────────┬────────────────┘  • Create card pairs
-         │
-         ▼
-┌─────────────────────────┐
-│  Validator Agent        │  Quality assurance
-│  (Qwen3-14B)            │  • Check syntax
-│                         │  • Verify facts
-└────────┬────────────────┘  • Ensure coherence
-         │
-         ▼ (if valid)
-┌─────────────────┐
-│  Anki Card      │
-└─────────────────┘
+
+� Obsidian Note   �
+��
+         �
+         �
+
+�  Pre-Validator Agent    �  Fast structural validation
+�  (Qwen3-8B)             �  � Check formatting
+�                         �  � Verify structure
+��  � Validate syntax
+         �
+         � (if valid)
+
+�  Generator Agent        �  High-quality generation
+�  (Qwen3-32B)            �  � Parse markdown
+�                         �  � Extract concepts
+��  � Create card pairs
+         �
+         �
+
+�  Validator Agent        �  Quality assurance
+�  (Qwen3-14B)            �  � Check syntax
+�                         �  � Verify facts
+��  � Ensure coherence
+         �
+         � (if valid)
+
+�  Anki Card      �
+�
 ```
 
 ### Benefits
 
 | Benefit | Description |
 |---------|-------------|
-| **🚀 15-20% faster** | Pre-validator rejects malformed notes early |
-| **✅ Higher quality** | Independent validation catches errors before sync |
-| **🔧 Auto-fix** | Automatic retry with corrections |
-| **🔒 Privacy-first** | 100% local processing, no cloud APIs |
-| **💰 Cost-effective** | No API costs after initial model download |
-| **🎯 Better accuracy** | Three-stage validation ensures quality |
+| **15-20% faster** | Pre-validator rejects malformed notes early |
+| **Higher quality** | Independent validation catches errors before sync |
+| **Auto-fix** | Automatic retry with corrections |
+| **Privacy-first** | 100% local processing, no cloud APIs |
+| **Cost-effective** | No API costs after initial model download |
+| **Better accuracy** | Three-stage validation ensures quality |
 
 ### System Requirements
 
@@ -152,15 +152,15 @@ obsidian-anki-sync sync --use-agents --dry-run
 
 | Feature | Agent System | OpenRouter |
 |---------|-------------|------------|
-| **Privacy** | ✅ 100% Local | ❌ Cloud API |
-| **Cost** | ✅ Free after download | ❌ Per-token pricing |
-| **Quality** | ✅ Three-stage validation | ⚠️ Single-pass |
-| **Speed** | ⚠️ First run slower | ✅ Fast API calls |
-| **Requirements** | ❌ 32GB+ RAM, M3+ Mac | ✅ Any system |
-| **Setup** | ⚠️ Install Ollama + models | ✅ API key only |
-| **Offline** | ✅ Works offline | ❌ Requires internet |
-| **Validation** | ✅ Pre + Post validation | ❌ None |
-| **Auto-fix** | ✅ Automatic corrections | ❌ Manual fixes |
+| **Privacy** | 100% Local | Cloud API |
+| **Cost** | Free after download | Per-token pricing |
+| **Quality** | Three-stage validation | Single-pass |
+| **Speed** | First run slower | Fast API calls |
+| **Requirements** | 32GB+ RAM, M3+ Mac | Any system |
+| **Setup** | Install Ollama + models | API key only |
+| **Offline** | Works offline | Requires internet |
+| **Validation** | Pre + Post validation | None |
+| **Auto-fix** | Automatic corrections | Manual fixes |
 
 **When to use which:**
 - **Use Agent System** if you:
@@ -177,7 +177,7 @@ obsidian-anki-sync sync --use-agents --dry-run
   - Prefer cloud-based solutions
   - Don't have Apple Silicon
 
-## 🔌 Multiple LLM Provider Support
+## Multiple LLM Provider Support
 
 The service now supports **five LLM providers** with a unified configuration system:
 
@@ -283,7 +283,7 @@ echo "openrouter_api_key: sk-or-..." >> config.yaml
 - **Example Config:** [config.providers.example.yaml](config.providers.example.yaml)
 - **API Reference:** [src/obsidian_anki_sync/providers/README.md](src/obsidian_anki_sync/providers/README.md)
 
-## 📦 Installation
+## Installation
 
 This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable dependency management.
 
@@ -338,7 +338,7 @@ source .venv/bin/activate  # Unix/macOS
 
 1. Download [Anki](https://apps.ankiweb.net/)
 2. Install AnkiConnect addon:
-   - In Anki: Tools → Add-ons → Get Add-ons
+   - In Anki: Tools to Add-ons to Get Add-ons
    - Code: `2055492159`
    - Restart Anki
 
@@ -357,7 +357,7 @@ ollama pull qwen3:32b
 ollama pull qwen3:14b
 ```
 
-## 🚀 Usage
+## Usage
 
 ### Basic Usage (OpenRouter)
 
@@ -461,7 +461,7 @@ obsidian-anki-sync init
 obsidian-anki-sync validate path/to/note.md
 ```
 
-## 📊 Performance
+## Performance
 
 ### Agent System Benchmarks
 
@@ -485,7 +485,7 @@ Tested on MacBook M4 Max (48GB RAM):
 | Medium notes (15 cards) | 15 cards/min | $0.12/note |
 | Complex notes (30 cards) | 8 cards/min | $0.25/note |
 
-## 🛠️ Development
+## Development
 
 ### Code Style
 
@@ -526,7 +526,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Agent System Issues
 
@@ -579,8 +579,8 @@ curl https://openrouter.ai/api/v1/models \
 #### AnkiConnect Not Responding
 
 1. Ensure Anki is running
-2. Check AnkiConnect is enabled: Tools → Add-ons
-3. Verify port: Tools → Add-ons → AnkiConnect → Config
+2. Check AnkiConnect is enabled: Tools to Add-ons
+3. Verify port: Tools to Add-ons to AnkiConnect to Config
 4. Default port should be `8765`
 
 ### Common Issues
@@ -602,7 +602,7 @@ pip install -e ".[dev]"
 chmod -R 755 .venv/
 ```
 
-## 🛡️ Security Features
+## Security Features
 
 This project implements multiple security measures to protect your data:
 
@@ -630,7 +630,7 @@ All configuration values are validated at startup:
 - API keys for selected providers
 - Model specifications
 
-## 📚 Documentation
+## Documentation
 
 - **[Agent Integration Plan](.docs/AGENT_INTEGRATION_PLAN.md)** - Detailed architecture and implementation
 - **[Configuration Example](config.agents.example.yaml)** - Fully commented configuration
@@ -639,7 +639,7 @@ All configuration values are validated at startup:
 - **[Cards Prompt](.docs/CARDS_PROMPT.md)** - LLM generation instructions
 - **[Security Best Practices](#-security-features)** - See above section
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please:
 
@@ -650,11 +650,11 @@ Contributions welcome! Please:
 5. Format code: `uv run black . && uv run isort .`
 6. Submit a pull request
 
-## 📝 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with [Typer](https://typer.tiangolo.com/) and [Rich](https://rich.readthedocs.io/)
 - Multi-agent system powered by [Ollama](https://ollama.ai/) and [Qwen3](https://huggingface.co/Qwen)

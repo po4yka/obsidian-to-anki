@@ -7,9 +7,9 @@ This directory contains a comprehensive investigation into why qwen3:32b and qwe
 ## Quick Summary
 
 The system is configured with a **120-second timeout** that is **too short** for large LLM models:
-- **qwen3:8b**: Needs 30-80 seconds ✓ Works
-- **qwen3:14b**: Needs 100-180 seconds ✗ Timeout
-- **qwen3:32b**: Needs 150-300+ seconds ✗ Timeout
+- **qwen3:8b**: Needs 30-80 seconds  Works
+- **qwen3:14b**: Needs 100-180 seconds  Timeout
+- **qwen3:32b**: Needs 150-300+ seconds  Timeout
 
 **Root Cause**: Configuration issue (80% of problem) + Model performance expectations (20% of problem)
 
@@ -60,12 +60,12 @@ The system is configured with a **120-second timeout** that is **too short** for
 
 ```
 config.yaml has: llm_timeout: 120.0
-                                    ↓
+                                    
 Ollama provider gets: 120-second timeout
-                                    ↓
+                                    
 qwen3:32b request starts, needs ~200 seconds
-                                    ↓
-Request aborts at exactly 120 seconds ← TIMEOUT ERROR
+                                    
+Request aborts at exactly 120 seconds  TIMEOUT ERROR
 ```
 
 ## The Solution in 30 Seconds
@@ -96,15 +96,15 @@ This sets a 10-minute timeout via environment variable.
 |--------|---------|
 | **Root Cause** | 120s timeout configured, but large models need 150-300s |
 | **Severity** | HIGH - Blocks agent system with large models |
-| **Configurability** | ✓ Fully configurable, 3 methods available |
-| **Retry Logic** | ✓ Working, but cannot help with timeouts |
+| **Configurability** |  Fully configurable, 3 methods available |
+| **Retry Logic** |  Working, but cannot help with timeouts |
 | **Fix Complexity** | TRIVIAL - 5 number changes |
 | **Risk Level** | ZERO - Only relaxing timeout limits |
 | **Effort** | < 5 minutes to implement |
 
 ## Configuration Locations Found
 
-1. **config.yaml:65** - Explicit 120.0 seconds ← Currently used!
+1. **config.yaml:65** - Explicit 120.0 seconds  Currently used!
 2. **config.py:213** - Fallback default 120.0 seconds
 3. **ollama.py:32** - Provider default 900.0 seconds (overridden)
 4. **lm_studio.py:30** - Provider default 120.0 seconds
@@ -127,28 +127,28 @@ Based on code analysis and logging thresholds:
 
 ```
 qwen3:8b (8B params)
-├─ Model load: 10-15 seconds
-├─ Processing: 30-50 seconds  
-└─ Total: 40-65 seconds ✓ Safe with 120s
+ Model load: 10-15 seconds
+ Processing: 30-50 seconds  
+ Total: 40-65 seconds  Safe with 120s
 
 qwen3:14b (14B params)
-├─ Model load: 20-30 seconds
-├─ Processing: 60-150 seconds
-└─ Total: 80-180 seconds ✗ Exceeds 120s!
+ Model load: 20-30 seconds
+ Processing: 60-150 seconds
+ Total: 80-180 seconds  Exceeds 120s!
 
 qwen3:32b (32B params)
-├─ Model load: 30-40 seconds
-├─ Processing: 120-260 seconds
-└─ Total: 150-300+ seconds ✗ Exceeds 120s by 230s!
+ Model load: 30-40 seconds
+ Processing: 120-260 seconds
+ Total: 150-300+ seconds  Exceeds 120s by 230s!
 ```
 
 ## Architecture Issues
 
 The timeout configuration has a **precedence problem**:
 
-1. config.yaml explicitly sets 120.0 ← USED
+1. config.yaml explicitly sets 120.0  USED
 2. Config loader has 120.0 fallback
-3. Provider has 900.0 default ← IGNORED (overridden by #2)
+3. Provider has 900.0 default  IGNORED (overridden by #2)
 
 This creates a mismatch between intent (900s) and actual use (120s).
 
@@ -161,22 +161,22 @@ The `@retry` decorator with 3 attempts and exponential backoff cannot help becau
 
 Example:
 ```
-Attempt 1: 0s → 120s [TIMEOUT]
+Attempt 1: 0s  120s [TIMEOUT]
 Wait 2s
-Attempt 2: 122s → 242s [TIMEOUT]  
+Attempt 2: 122s  242s [TIMEOUT]  
 Wait 4s
-Attempt 3: 246s → 366s [TIMEOUT]
+Attempt 3: 246s  366s [TIMEOUT]
 Result: FAILURE (timeout is the root cause, not transient)
 ```
 
 ## What's Not the Problem
 
-- ✓ Ollama server is working fine
-- ✓ Models are installed and functional
-- ✓ Network connectivity is fine
-- ✓ Retry mechanism is working correctly
-- ✓ No bugs in the code
-- ✓ Models aren't "too slow" - large models ARE slow by design
+-  Ollama server is working fine
+-  Models are installed and functional
+-  Network connectivity is fine
+-  Retry mechanism is working correctly
+-  No bugs in the code
+-  Models aren't "too slow" - large models ARE slow by design
 
 It's simply a **configuration timeout too short for the model size**.
 
@@ -215,9 +215,9 @@ python -m obsidian_anki_sync.cli --model qwen3:32b  # Should complete in ~200s
 ## Questions?
 
 Refer to the specific documentation file:
-- **"How does this work?"** → TIMEOUT_VISUAL_GUIDE.md
-- **"What exactly needs to change?"** → TIMEOUT_FIXES.md  
-- **"Tell me everything"** → TIMEOUT_INVESTIGATION.md
+- **"How does this work?"**  TIMEOUT_VISUAL_GUIDE.md
+- **"What exactly needs to change?"**  TIMEOUT_FIXES.md  
+- **"Tell me everything"**  TIMEOUT_INVESTIGATION.md
 
 ---
 

@@ -6,23 +6,23 @@ ObsidianAnkiSyncError, making it easy to catch all sync-related errors.
 
 Exception Hierarchy:
     ObsidianAnkiSyncError (base)
-    ├── ConfigurationError - Configuration loading/validation errors
-    ├── ProviderError - LLM provider communication errors
-    │   ├── ProviderConnectionError - Provider connection failures
-    │   └── ProviderTimeoutError - Provider request timeouts
-    ├── ValidationError - Card/note validation errors
-    │   └── ParserError - Obsidian note parsing errors
-    ├── SyncError - Synchronization operation errors
-    │   ├── IndexingError - Index building/reading errors
-    │   └── StateError - State database errors
-    ├── AnkiError - Anki-related errors
-    │   ├── AnkiConnectError - AnkiConnect communication errors
-    │   ├── FieldMappingError - Field mapping errors
-    │   └── DeckExportError - Deck export errors
-    └── AgentError - Multi-agent system errors
-        ├── PreValidationError - Pre-validator agent errors
-        ├── GeneratorError - Generator agent errors
-        └── PostValidationError - Post-validator agent errors
+     ConfigurationError - Configuration loading/validation errors
+     ProviderError - LLM provider communication errors
+    �    ProviderConnectionError - Provider connection failures
+    �    ProviderTimeoutError - Provider request timeouts
+     ValidationError - Card/note validation errors
+    �    ParserError - Obsidian note parsing errors
+     SyncError - Synchronization operation errors
+    �    IndexingError - Index building/reading errors
+    �    StateError - State database errors
+     AnkiError - Anki-related errors
+    �    AnkiConnectError - AnkiConnect communication errors
+    �    FieldMappingError - Field mapping errors
+    �    DeckExportError - Deck export errors
+     AgentError - Multi-agent system errors
+         PreValidationError - Pre-validator agent errors
+         GeneratorError - Generator agent errors
+         PostValidationError - Post-validator agent errors
 
 Usage Examples:
     # Catch all sync errors
