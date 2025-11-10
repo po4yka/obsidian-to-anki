@@ -423,8 +423,8 @@ LOG_LEVEL=INFO
     # Initialize database
     from .sync.state_db import StateDB
 
-    db = StateDB(config.db_path)
-    db.close()
+    with StateDB(config.db_path):
+        pass  # Database schema is initialized in __init__
 
     console.print(f"[green]✓ Initialized database at {config.db_path}[/green]")
     logger.info("database_initialized", path=str(config.db_path))
