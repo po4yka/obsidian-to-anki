@@ -27,35 +27,35 @@ This project now supports a sophisticated **multi-agent AI system** for generati
 ### Architecture
 
 ```
-
-� Obsidian Note   �
-��
-         �
-         �
-
-�  Pre-Validator Agent    �  Fast structural validation
-�  (Qwen3-8B)             �  � Check formatting
-�                         �  � Verify structure
-��  � Validate syntax
-         �
-         � (if valid)
-
-�  Generator Agent        �  High-quality generation
-�  (Qwen3-32B)            �  � Parse markdown
-�                         �  � Extract concepts
-��  � Create card pairs
-         �
-         �
-
-�  Validator Agent        �  Quality assurance
-�  (Qwen3-14B)            �  � Check syntax
-�                         �  � Verify facts
-��  � Ensure coherence
-         �
-         � (if valid)
-
-�  Anki Card      �
-�
+┌─────────────────┐
+│ Obsidian Note   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  Pre-Validator Agent    │  Fast structural validation
+│  (Qwen3-8B)             │  • Check formatting
+│                         │  • Verify structure
+└────────┬────────────────┘  • Validate syntax
+         │
+         ▼ (if valid)
+┌─────────────────────────┐
+│  Generator Agent        │  High-quality generation
+│  (Qwen3-32B)            │  • Parse markdown
+│                         │  • Extract concepts
+└────────┬────────────────┘  • Create card pairs
+         │
+         ▼
+┌─────────────────────────┐
+│  Validator Agent        │  Quality assurance
+│  (Qwen3-14B)            │  • Check syntax
+│                         │  • Verify facts
+└────────┬────────────────┘  • Ensure coherence
+         │
+         ▼ (if valid)
+┌─────────────────┐
+│  Anki Card      │
+└─────────────────┘
 ```
 
 ### Benefits
@@ -338,7 +338,7 @@ source .venv/bin/activate  # Unix/macOS
 
 1. Download [Anki](https://apps.ankiweb.net/)
 2. Install AnkiConnect addon:
-   - In Anki: Tools to Add-ons to Get Add-ons
+   - In Anki: Tools → Add-ons → Get Add-ons
    - Code: `2055492159`
    - Restart Anki
 
@@ -579,8 +579,8 @@ curl https://openrouter.ai/api/v1/models \
 #### AnkiConnect Not Responding
 
 1. Ensure Anki is running
-2. Check AnkiConnect is enabled: Tools to Add-ons
-3. Verify port: Tools to Add-ons to AnkiConnect to Config
+2. Check AnkiConnect is enabled: Tools → Add-ons
+3. Verify port: Tools → Add-ons → AnkiConnect → Config
 4. Default port should be `8765`
 
 ### Common Issues

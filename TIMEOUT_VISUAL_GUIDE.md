@@ -60,49 +60,49 @@ qwen3:8b Request (needs ~60 seconds):
 
 ```
 
-‚                      User Config                             ‚
-‚                    (config.yaml)                             ‚
-‚              llm_timeout: 120.0 seconds                      ‚
-¬˜
-                         ‚
-                         ¼
+                      User Config                             
+                    (config.yaml)                             
+              llm_timeout: 120.0 seconds                      
 
-‚               Config Loading (config.py)                     ‚
-‚    load_config()  get_float("llm_timeout", 120.0)          ‚
-‚                                                              ‚
-‚    Issue: Fallback default (120.0) conflicts with          ‚
-‚    dataclass definition (900.0)                             ‚
-¬˜
-                         ‚
-                         ¼
+                         
+                         
 
-‚              Config Object Created                           ‚
-‚         config.llm_timeout = 120.0 seconds                  ‚
-¬˜
-                         ‚
-                         ¼
+               Config Loading (config.py)                     
+    load_config()  get_float("llm_timeout", 120.0)          
+                                                              
+    Issue: Fallback default (120.0) conflicts with          
+    dataclass definition (900.0)                             
 
-‚           Provider Factory (factory.py)                      ‚
-‚    kwargs["timeout"] = getattr(config,                      ‚
-‚                        "llm_timeout", 120.0)                ‚
-‚                      = 120.0 seconds                        ‚
-¬˜
-                         ‚
-                         ¼
+                         
+                         
 
-‚          Provider Initialization                             ‚
-‚   OllamaProvider(timeout=120.0)  [overrides 900.0 default]  ‚
-‚   httpx.Client(timeout=httpx.Timeout(120.0))               ‚
-¬˜
-                         ‚
-                         ¼
+              Config Object Created                           
+         config.llm_timeout = 120.0 seconds                  
 
-‚           Request Execution (ollama.py)                      ‚
-‚    response = client.post(..., timeout=120.0)              ‚
-‚                                                              ‚
-‚    For qwen3:32b (needs 200s):                             ‚
-‚    ± 120 seconds elapsed  httpx.TimeoutException        ‚
-˜
+                         
+                         
+
+           Provider Factory (factory.py)                      
+    kwargs["timeout"] = getattr(config,                      
+                        "llm_timeout", 120.0)                
+                      = 120.0 seconds                        
+
+                         
+                         
+
+          Provider Initialization                             
+   OllamaProvider(timeout=120.0)  [overrides 900.0 default]  
+   httpx.Client(timeout=httpx.Timeout(120.0))               
+
+                         
+                         
+
+           Request Execution (ollama.py)                      
+    response = client.post(..., timeout=120.0)              
+                                                              
+    For qwen3:32b (needs 200s):                             
+     120 seconds elapsed  httpx.TimeoutException        
+
 ```
 
 ## Timeout Configuration Hierarchy
@@ -111,38 +111,38 @@ qwen3:8b Request (needs ~60 seconds):
 PRECEDENCE ORDER (highest to lowest):
 
 
-‚ 1. Environment Variable (Highest)       ‚
-‚    export LLM_TIMEOUT=600.0             ‚
-‚    Overrides everything                 ‚
-¬˜
-               ‚
-               ¼
+ 1. Environment Variable (Highest)       
+    export LLM_TIMEOUT=600.0             
+    Overrides everything                 
 
-‚ 2. Config File (config.yaml)            ‚
-‚    llm_timeout: 600.0                   ‚
-‚    Overrides code defaults              ‚
-¬˜
-               ‚
-               ¼
+               
+               
 
-‚ 3a. Config Load Fallback (config.py)    ‚
-‚     get_float("llm_timeout", 120.0)     ‚
-‚     Used if not in config file          ‚
-¬˜
-               ‚
-               ¼
+ 2. Config File (config.yaml)            
+    llm_timeout: 600.0                   
+    Overrides code defaults              
 
-‚ 3b. Dataclass Default                   ‚
-‚     Config.llm_timeout = 900.0          ‚
-‚     NOT USED (overridden by 3a)         ‚
-¬˜
-               ‚
-               ¼
+               
+               
 
-‚ 4. Provider Defaults (Lowest)           ‚
-‚    OllamaProvider(timeout=900.0)        ‚
-‚    Never reached (config value used)    ‚
-˜
+ 3a. Config Load Fallback (config.py)    
+     get_float("llm_timeout", 120.0)     
+     Used if not in config file          
+
+               
+               
+
+ 3b. Dataclass Default                   
+     Config.llm_timeout = 900.0          
+     NOT USED (overridden by 3a)         
+
+               
+               
+
+ 4. Provider Defaults (Lowest)           
+    OllamaProvider(timeout=900.0)        
+    Never reached (config value used)    
+
 ```
 
 ## Model Performance Expectations
@@ -164,19 +164,19 @@ Note: Times vary by prompt length, model quantization, and hardware specs
 ## Issue vs Solution Comparison
 
 ```
-¬¬
-‚                  ‚ CURRENT (BROKEN) ‚ FIXED            ‚
-¼¼
-‚ Config Default   ‚ 120.0 seconds    ‚ 900.0 seconds    ‚
-‚ Config File      ‚ 120.0 seconds    ‚ 600.0 seconds    ‚
-‚ Ollama Provider  ‚ 900.0 (overridden)‚ 900.0 (used)    ‚
-‚ LM Studio        ‚ 120.0 seconds    ‚ 600.0 seconds    ‚
-‚ OpenRouter       ‚ 120.0 seconds    ‚ 180.0 seconds    ‚
-¼¼
-‚ qwen3:8b Result  ‚  Works (60s)    ‚  Works (60s)    ‚
-‚ qwen3:14b Result ‚  TIMEOUT       ‚  Works (150s)   ‚
-‚ qwen3:32b Result ‚  TIMEOUT       ‚  Works (200s)   ‚
-˜
+
+                   CURRENT (BROKEN)  FIXED            
+
+ Config Default    120.0 seconds     900.0 seconds    
+ Config File       120.0 seconds     600.0 seconds    
+ Ollama Provider   900.0 (overridden) 900.0 (used)    
+ LM Studio         120.0 seconds     600.0 seconds    
+ OpenRouter        120.0 seconds     180.0 seconds    
+
+ qwen3:8b Result    Works (60s)      Works (60s)    
+ qwen3:14b Result   TIMEOUT         Works (150s)   
+ qwen3:32b Result   TIMEOUT         Works (200s)   
+
 ```
 
 ## Retry Logic Impact
@@ -235,21 +235,21 @@ def get_float(key: str, default: float) -> float:
 PROBLEM CHAIN:
 
 1. Config loads with 120s default (config.py:213)
-   ‚
+   
     config.yaml explicitly sets 120.0
-   ‚  (has been this way since initial setup)
-   ‚
+     (has been this way since initial setup)
+   
 2. Timeout value (120s) passed to provider factory
-   ‚
+   
     Factory overrides Ollama provider's 900s default
-   ‚  (provider default is never used)
-   ‚
+     (provider default is never used)
+   
 3. Ollama client initialized with 120s timeout
-   ‚
+   
     httpx.Timeout(120.0) created
-   ‚
+   
 4. Request to qwen3:32b (needs ~200s)
-   ‚
+   
     Request times out after exactly 120 seconds
       User sees error, card generation fails
 ```
