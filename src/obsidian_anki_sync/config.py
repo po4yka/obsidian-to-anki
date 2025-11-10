@@ -299,21 +299,26 @@ def load_config(config_path: Path | None = None) -> Config:
         # LM Studio settings
         lm_studio_base_url=get_str("lm_studio_base_url", "http://localhost:1234/v1"),
         # OpenAI settings
-        openai_api_key=config_data.get("openai_api_key")
-        or os.getenv("OPENAI_API_KEY", ""),
+        openai_api_key=str(
+            config_data.get("openai_api_key") or os.getenv("OPENAI_API_KEY") or ""
+        ),
         openai_base_url=get_str("openai_base_url", "https://api.openai.com/v1"),
         openai_organization=config_data.get("openai_organization")
         or os.getenv("OPENAI_ORGANIZATION"),
         openai_max_retries=get_int("openai_max_retries", 3),
         # Anthropic settings
-        anthropic_api_key=config_data.get("anthropic_api_key")
-        or os.getenv("ANTHROPIC_API_KEY", ""),
+        anthropic_api_key=str(
+            config_data.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY") or ""
+        ),
         anthropic_base_url=get_str("anthropic_base_url", "https://api.anthropic.com"),
         anthropic_api_version=get_str("anthropic_api_version", "2023-06-01"),
         anthropic_max_retries=get_int("anthropic_max_retries", 3),
         # OpenRouter settings
-        openrouter_api_key=config_data.get("openrouter_api_key")
-        or os.getenv("OPENROUTER_API_KEY", ""),
+        openrouter_api_key=str(
+            config_data.get("openrouter_api_key")
+            or os.getenv("OPENROUTER_API_KEY")
+            or ""
+        ),
         openrouter_base_url=get_str(
             "openrouter_base_url", "https://openrouter.ai/api/v1"
         ),
