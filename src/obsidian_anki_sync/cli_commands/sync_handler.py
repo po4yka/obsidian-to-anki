@@ -1,6 +1,5 @@
 """Sync command implementation logic."""
 
-from pathlib import Path
 from typing import Any
 
 import typer
