@@ -298,7 +298,7 @@ def list_decks(
         else:
             console.print("\n[bold]Decks:[/bold]")
             for deck in decks:
-                console.print(f"  [cyan]¢ {deck}[/cyan]")
+                console.print(f"  [cyan]â€¢ {deck}[/cyan]")
 
         logger.info("list_decks_completed", count=len(decks))
 
@@ -335,7 +335,7 @@ def list_models(
         else:
             console.print("\n[bold]Models:[/bold]")
             for model in models:
-                console.print(f"  [cyan]¢ {model}[/cyan]")
+                console.print(f"  [cyan]â€¢ {model}[/cyan]")
 
         logger.info("list_models_completed", count=len(models))
 
@@ -375,7 +375,7 @@ def show_model_fields(
         else:
             console.print(f"\n[bold]Fields for model '{model_name}':[/bold]")
             for field in fields:
-                console.print(f"  [cyan]¢ {field}[/cyan]")
+                console.print(f"  [cyan]â€¢ {field}[/cyan]")
 
         logger.info("model_fields_completed", model=model_name, count=len(fields))
 
@@ -504,10 +504,10 @@ def export(
                                     result.post_validation.error_details or error_msg
                                 )
                             console.print(
-                                f"  [red]—[/red] {metadata.title}: {error_msg}"
+                                f"  [red][/red] {metadata.title}: {error_msg}"
                             )
                     except Exception as e:
-                        console.print(f"  [red]—[/red] {note_path.name}: {e}")
+                        console.print(f"  [red][/red] {note_path.name}: {e}")
 
             else:
                 console.print("[cyan]Using OpenRouter for generation...[/cyan]")
@@ -530,7 +530,7 @@ def export(
                             f"({len(qa_pairs) * len(metadata.language_tags)} cards)"
                         )
                     except Exception as e:
-                        console.print(f"  [red]—[/red] {note_path.name}: {e}")
+                        console.print(f"  [red][/red] {note_path.name}: {e}")
 
             if not cards:
                 console.print("\n[yellow]No cards generated. Exiting.[/yellow]")

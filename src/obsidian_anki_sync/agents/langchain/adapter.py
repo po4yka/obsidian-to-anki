@@ -1,7 +1,7 @@
 """Adapter for bridging existing data models with LangChain agent models.
 
 This module provides conversion functions between:
-- Existing models (NoteMetadata, QAPair, Card) Üê Ü LangChain models (NoteContext, ProposedCard, CardDecision)
+- Existing models (NoteMetadata, QAPair, Card) ‚Üê ‚Üí LangChain models (NoteContext, ProposedCard, CardDecision)
 """
 
 from typing import Any, Optional

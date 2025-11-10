@@ -26,14 +26,14 @@ def validate_vault_path(vault_path: Path, allow_symlinks: bool = False) -> Path:
     if not vault_path.exists():
         raise ConfigurationError(
             f"Vault path does not exist: {vault_path}",
-            suggestion="Verify the vault_path in your configuration points to an existing directory"
+            suggestion="Verify the vault_path in your configuration points to an existing directory",
         )
 
     # Check if it's a directory
     if not vault_path.is_dir():
         raise ConfigurationError(
             f"Vault path is not a directory: {vault_path}",
-            suggestion="vault_path must point to a directory, not a file"
+            suggestion="vault_path must point to a directory, not a file",
         )
 
     # Resolve to absolute path (and check for symlinks)
@@ -41,15 +41,14 @@ def validate_vault_path(vault_path: Path, allow_symlinks: bool = False) -> Path:
         resolved_path = vault_path.resolve(strict=True)
     except (OSError, RuntimeError) as e:
         raise ConfigurationError(
-            f"Cannot resolve vault path: {vault_path}",
-            suggestion=f"Error: {e}"
+            f"Cannot resolve vault path: {vault_path}", suggestion=f"Error: {e}"
         )
 
     # Check for symlink traversal attacks
     if not allow_symlinks and vault_path.is_symlink():
         raise ConfigurationError(
             f"Vault path is a symlink: {vault_path}",
-            suggestion="For security, symlinks are not allowed. Use the actual directory path or set allow_symlinks=True"
+            suggestion="For security, symlinks are not allowed. Use the actual directory path or set allow_symlinks=True",
         )
 
     return resolved_path
@@ -77,21 +76,21 @@ def validate_source_dir(vault_path: Path, source_dir: Path) -> Path:
     except ValueError:
         raise ConfigurationError(
             f"Source directory is outside vault: {source_dir}",
-            suggestion="source_dir must be a relative path within the vault (no .. allowed)"
+            suggestion="source_dir must be a relative path within the vault (no .. allowed)",
         )
 
     # Check if it exists
     if not full_source_path.exists():
         raise ConfigurationError(
             f"Source directory does not exist: {full_source_path}",
-            suggestion=f"Create directory '{source_dir}' in your vault or update source_dir in config"
+            suggestion=f"Create directory '{source_dir}' in your vault or update source_dir in config",
         )
 
     # Check if it's a directory
     if not full_source_path.is_dir():
         raise ConfigurationError(
             f"Source path is not a directory: {full_source_path}",
-            suggestion="source_dir must point to a directory"
+            suggestion="source_dir must point to a directory",
         )
 
     return full_source_path
@@ -116,11 +115,12 @@ def validate_note_path(vault_path: Path, note_path: Path) -> Path:
 
     # Resolve to absolute path
     try:
-        resolved_note = note_path.resolve(strict=False)  # Allow non-existent for future creation
+        resolved_note = note_path.resolve(
+            strict=False
+        )  # Allow non-existent for future creation
     except (OSError, RuntimeError) as e:
         raise ConfigurationError(
-            f"Cannot resolve note path: {note_path}",
-            suggestion=f"Error: {e}"
+            f"Cannot resolve note path: {note_path}", suggestion=f"Error: {e}"
         )
 
     # Security: Ensure note is within vault (prevent path traversal)
@@ -129,7 +129,7 @@ def validate_note_path(vault_path: Path, note_path: Path) -> Path:
     except ValueError:
         raise ConfigurationError(
             f"Note path is outside vault: {note_path}",
-            suggestion="Note files must be within the vault directory"
+            suggestion="Note files must be within the vault directory",
         )
 
     return resolved_note
@@ -156,15 +156,14 @@ def validate_db_path(db_path: Path, vault_path: Optional[Path] = None) -> Path:
         resolved_db = db_path.resolve(strict=False)  # Allow non-existent
     except (OSError, RuntimeError) as e:
         raise ConfigurationError(
-            f"Cannot resolve database path: {db_path}",
-            suggestion=f"Error: {e}"
+            f"Cannot resolve database path: {db_path}", suggestion=f"Error: {e}"
         )
 
     # Check parent directory exists
     if not resolved_db.parent.exists():
         raise ConfigurationError(
             f"Database directory does not exist: {resolved_db.parent}",
-            suggestion=f"Create directory {resolved_db.parent} first"
+            suggestion=f"Create directory {resolved_db.parent} first",
         )
 
     # Warning: If DB is inside vault, it might get synced
@@ -186,23 +185,37 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
         Sanitized filename
     """
     # Remove or replace dangerous characters
-    dangerous_chars = ['/', '\\', '\0', '\n', '\r', '\t', '|', '>', '<', '?', '*', '"', ':']
+    dangerous_chars = [
+        "/",
+        "\\",
+        "\0",
+        "\n",
+        "\r",
+        "\t",
+        "|",
+        ">",
+        "<",
+        "?",
+        "*",
+        '"',
+        ":",
+    ]
     sanitized = filename
 
     for char in dangerous_chars:
-        sanitized = sanitized.replace(char, '_')
+        sanitized = sanitized.replace(char, "_")
 
     # Remove leading/trailing spaces and dots (Windows issues)
-    sanitized = sanitized.strip('. ')
+    sanitized = sanitized.strip(". ")
 
     # Truncate to max length
     if len(sanitized) > max_length:
         # Keep extension if present
-        parts = sanitized.rsplit('.', 1)
+        parts = sanitized.rsplit(".", 1)
         if len(parts) == 2:
             name, ext = parts
             max_name_len = max_length - len(ext) - 1
-            sanitized = name[:max_name_len] + '.' + ext
+            sanitized = name[:max_name_len] + "." + ext
         else:
             sanitized = sanitized[:max_length]
 
