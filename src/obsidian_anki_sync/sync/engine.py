@@ -319,8 +319,14 @@ class SyncEngine:
                 )
                 self.stats["errors"] += 1
                 continue
-            except Exception:
-                logger.exception("unexpected_parsing_error", file=relative_path)
+            except Exception as e:
+                # Catch any unexpected errors during parsing to prevent full sync failure
+                logger.exception(
+                    "unexpected_parsing_error",
+                    file=relative_path,
+                    error_type=type(e).__name__,
+                    error_msg=str(e),
+                )
                 self.stats["errors"] += 1
                 continue
 
@@ -388,8 +394,14 @@ class SyncEngine:
 
                 self.stats["processed"] += 1
 
-            except Exception:
-                logger.exception("card_generation_failed", file=relative_path)
+            except Exception as e:
+                # Catch unexpected errors during card generation to prevent full sync failure
+                logger.exception(
+                    "card_generation_failed",
+                    file=relative_path,
+                    error_type=type(e).__name__,
+                    error_msg=str(e),
+                )
                 self.stats["errors"] += 1
 
             # Progress indicator (log every 10 notes or on completion)
