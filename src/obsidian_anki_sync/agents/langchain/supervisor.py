@@ -419,4 +419,7 @@ class LangChainSupervisor:
             diff=None,
             messages=[f"Error: {error}"],
             slug=note_context.slug,
+            note_sections=(
+                note_context.sections if hasattr(note_context, "sections") else None
+            ),
         )
