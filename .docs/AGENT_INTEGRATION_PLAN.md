@@ -18,10 +18,10 @@ This document outlines the plan to integrate the multi-agent AI system (Pre-Vali
 
 ```
 Current Flow:
-ObsidianParser → APFGenerator (OpenRouter) → AnkiSync
+ObsidianParser  APFGenerator (OpenRouter)  AnkiSync
 
 New Agent Flow:
-ObsidianParser → AgentOrchestrator → [Pre-Validator → Generator → Post-Validator] → AnkiSync
+ObsidianParser  AgentOrchestrator  [Pre-Validator  Generator  Post-Validator]  AnkiSync
 ```
 
 ### 3. Component Mapping

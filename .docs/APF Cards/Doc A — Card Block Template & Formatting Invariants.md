@@ -3,9 +3,9 @@
 **Invariants**
 
 * Field comment on its **own line only** (e.g., `<!-- Title -->`). Content begins on the **next line**.
-* Place **exactly one blank line** between the **end of a field’s content** and the **next field comment**.
-* After `</code></pre>` or `</ul>`: newline → blank line → next field comment.
-* Optional fields: print the comment + **one blank line**; no placeholders (`<text>`, `N/A`, `…`) unless the field is actually used.
+* Place **exactly one blank line** between the **end of a fields content** and the **next field comment**.
+* After `</code></pre>` or `</ul>`: newline  blank line  next field comment.
+* Optional fields: print the comment + **one blank line**; no placeholders (`<text>`, `N/A`, ``) unless the field is actually used.
 * Titles/Subtitles are **plain text** (no `<text>` wrappers).
 * Headers must match **verbatim** (capitalization and spacing).
 
@@ -27,21 +27,21 @@ Your subtitle here
 Short caption for the sample below
 
 <!-- Sample (code block or image) (optional for Missing) -->
-<pre><code class="language-<lang>">code ≤ 12 LOC, ≤ 88 cols</code></pre>
+<pre><code class="language-<lang>">code � 12 LOC, � 88 cols</code></pre>
 
 <!-- Key point (code block / image) -->
 <pre><code class="language-<lang>">answer as code OR</code></pre>
-<!-- OR for Draw: <img src="data:image/svg+xml;utf8,<svg …>" alt="diagram"/> -->
+<!-- OR for Draw: <img src="data:image/svg+xml;utf8,<svg >" alt="diagram"/> -->
 
 <!-- Key point notes -->
 <ul>
-  <li>3–6 bullets; mechanism, rule, pitfall.</li>
+  <li>36 bullets; mechanism, rule, pitfall.</li>
 </ul>
 
 <!-- Other notes (optional) -->
 <ul>
-  <li>Assumption: … (only if needed)</li>
-  <li>Ref: <a href="https://…">official docs</a></li>
+  <li>Assumption:  (only if needed)</li>
+  <li>Ref: <a href="https://">official docs</a></li>
 </ul>
 
 <!-- Markdown (optional) -->

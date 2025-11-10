@@ -2,14 +2,14 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from .config import Config, load_config, set_config
-from .utils.logging import configure_logging, get_logger
+from .cli_commands.shared import get_config_and_logger
+from .cli_commands.sync_handler import run_sync
 
 app = typer.Typer(
     name="obsidian-anki-sync",
@@ -18,53 +18,6 @@ app = typer.Typer(
 )
 
 console = Console()
-
-# Global state for config and logger (cached for performance across CLI commands)
-# Note: This is a simple caching mechanism. For multi-threaded/async usage,
-# consider using a proper dependency injection framework or context manager.
-_config: Config | None = None
-_logger: Any | None = None
-
-
-def get_config_and_logger(
-    config_path: Annotated[
-        Path | None,
-        typer.Option("--config", help="Path to config.yaml", exists=True),
-    ] = None,
-    log_level: Annotated[
-        str,
-        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
-    ] = "INFO",
-) -> tuple[Config, Any]:
-    """Load configuration and logger (dependency injection helper).
-
-    This function uses module-level caching to avoid reloading config
-    for each CLI command invocation. The cache is cleared when the
-    Python process exits.
-
-    Args:
-        config_path: Optional path to config file
-        log_level: Logging level
-
-    Returns:
-        Tuple of (Config, Logger)
-
-    Note:
-        This caching mechanism is not thread-safe. For concurrent usage,
-        consider using a proper dependency injection framework.
-    """
-    global _config, _logger
-
-    if _config is None:
-        _config = load_config(config_path)
-        set_config(_config)
-
-        # Configure logging with vault-specific log directory
-        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
-        configure_logging(log_level or _config.log_level, log_dir=log_dir)
-        _logger = get_logger("cli")
-
-    return _config, _logger
 
 
 @app.command()
@@ -122,131 +75,16 @@ def sync(
         config.use_agent_system = use_agents
         logger.info("agent_system_override", use_agents=use_agents)
 
-    logger.info(
-        "sync_started",
+    # Delegate to sync handler
+    run_sync(
+        config=config,
+        logger=logger,
         dry_run=dry_run,
         incremental=incremental,
-        vault=str(config.vault_path),
+        no_index=no_index,
+        resume=resume,
+        no_resume=no_resume,
     )
-
-    from .anki.client import AnkiClient
-    from .sync.engine import SyncEngine
-    from .sync.progress import ProgressTracker
-    from .sync.state_db import StateDB
-
-    try:
-        with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
-            # Check for incomplete syncs or resume request
-            progress_tracker = None
-            session_id = resume
-
-            if not no_resume:
-                if not session_id:
-                    # Check for incomplete syncs
-                    incomplete = db.get_incomplete_progress()
-                    if incomplete:
-                        latest = incomplete[0]
-                        console.print(
-                            f"\n[yellow]Found incomplete sync from {latest['updated_at']}[/yellow]"
-                        )
-                        console.print(f"  Session: {latest['session_id']}")
-                        console.print(
-                            f"  Progress: {latest['notes_processed']}/{latest['total_notes']} notes"
-                        )
-
-                        # Ask user if they want to resume
-                        resume_choice = typer.confirm("Resume this sync?", default=True)
-                        if resume_choice:
-                            session_id = latest["session_id"]
-
-                # Create or resume progress tracker
-                if session_id:
-                    try:
-                        progress_tracker = ProgressTracker(db, session_id=session_id)
-                        console.print(
-                            f"\n[green]Resuming sync session: {session_id}[/green]\n"
-                        )
-                    except ValueError as e:
-                        console.print(f"\n[red]Cannot resume: {e}[/red]\n")
-                        return
-                else:
-                    # Start new sync with progress tracking
-                    progress_tracker = ProgressTracker(db)
-                    console.print(
-                        f"\n[cyan]Starting new sync session: {progress_tracker.progress.session_id}[/cyan]\n"
-                    )
-
-            # Show incremental mode info
-            if incremental:
-                processed_count = len(db.get_processed_note_paths())
-                console.print(
-                    f"\n[cyan]Incremental mode: Skipping {processed_count} already processed notes[/cyan]\n"
-                )
-
-            engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
-            stats = engine.sync(
-                dry_run=dry_run, incremental=incremental, build_index=not no_index
-            )
-
-            # Show index results if available
-            if "index" in stats and not no_index:
-                console.print("\n[bold cyan]Index Statistics:[/bold cyan]")
-                index_table = Table(show_header=True, header_style="bold magenta")
-                index_table.add_column("Category", style="cyan")
-                index_table.add_column("Metric", style="yellow")
-                index_table.add_column("Value", style="green")
-
-                index_stats = stats["index"]
-
-                # Note statistics
-                index_table.add_row(
-                    "Notes", "Total", str(index_stats.get("total_notes", 0))
-                )
-                note_status = index_stats.get("note_status", {})
-                for status, count in note_status.items():
-                    index_table.add_row("Notes", status.capitalize(), str(count))
-
-                # Card statistics
-                index_table.add_row(
-                    "Cards", "Total", str(index_stats.get("total_cards", 0))
-                )
-                index_table.add_row(
-                    "Cards",
-                    "In Obsidian",
-                    str(index_stats.get("cards_in_obsidian", 0)),
-                )
-                index_table.add_row(
-                    "Cards", "In Anki", str(index_stats.get("cards_in_anki", 0))
-                )
-                index_table.add_row(
-                    "Cards",
-                    "In Database",
-                    str(index_stats.get("cards_in_database", 0)),
-                )
-
-                console.print(index_table)
-                console.print()
-
-            # Create a Rich table for sync results
-            table = Table(
-                title="Sync Results", show_header=True, header_style="bold magenta"
-            )
-            table.add_column("Metric", style="cyan")
-            table.add_column("Value", style="green")
-
-            for key, value in stats.items():
-                if key != "index":  # Skip index stats (already displayed)
-                    table.add_row(key, str(value))
-
-            console.print()
-            console.print(table)
-
-            logger.info("sync_completed", stats=stats)
-
-    except Exception as e:
-        logger.error("sync_failed", error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
 
 
 @app.command(name="test-run")
@@ -358,7 +196,7 @@ def validate(
                 console.print(f"  [red]- {error}[/red]")
             logger.error("validation_failed", errors=errors)
         else:
-            console.print("\n[bold green]✓ Validation passed![/bold green]")
+            console.print("\n[bold green] Validation passed![/bold green]")
             logger.info("validation_passed")
 
     except Exception as e:
@@ -415,7 +253,7 @@ DB_PATH=.sync_state.db
 LOG_LEVEL=INFO
 """
         env_path.write_text(env_template)
-        console.print(f"[green]✓ Created .env template at {env_path}[/green]")
+        console.print(f"[green] Created .env template at {env_path}[/green]")
         logger.info("env_template_created", path=str(env_path))
     else:
         console.print(f"[yellow].env already exists at {env_path}[/yellow]")
@@ -423,10 +261,10 @@ LOG_LEVEL=INFO
     # Initialize database
     from .sync.state_db import StateDB
 
-    db = StateDB(config.db_path)
-    db.close()
+    with StateDB(config.db_path):
+        pass  # Database schema is initialized in __init__
 
-    console.print(f"[green]✓ Initialized database at {config.db_path}[/green]")
+    console.print(f"[green] Initialized database at {config.db_path}[/green]")
     logger.info("database_initialized", path=str(config.db_path))
 
     logger.info("init_completed")
@@ -655,7 +493,7 @@ def export(
                             generated_cards = result.generation.cards
                             cards.extend(generated_cards)
                             console.print(
-                                f"  [green]✓[/green] {metadata.title} "
+                                f"  [green][/green] {metadata.title} "
                                 f"({len(generated_cards)} cards)"
                             )
                         else:
@@ -665,10 +503,10 @@ def export(
                                     result.post_validation.error_details or error_msg
                                 )
                             console.print(
-                                f"  [red]✗[/red] {metadata.title}: {error_msg}"
+                                f"  [red][/red] {metadata.title}: {error_msg}"
                             )
                     except Exception as e:
-                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+                        console.print(f"  [red][/red] {note_path.name}: {e}")
 
             else:
                 console.print("[cyan]Using OpenRouter for generation...[/cyan]")
@@ -687,11 +525,11 @@ def export(
                                 cards.append(card)
 
                         console.print(
-                            f"  [green]✓[/green] {metadata.title} "
+                            f"  [green][/green] {metadata.title} "
                             f"({len(qa_pairs) * len(metadata.language_tags)} cards)"
                         )
                     except Exception as e:
-                        console.print(f"  [red]✗[/red] {note_path.name}: {e}")
+                        console.print(f"  [red][/red] {note_path.name}: {e}")
 
             if not cards:
                 console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
@@ -710,7 +548,7 @@ def export(
             )
 
             console.print(
-                f"\n[bold green]✓ Successfully exported {len(cards)} cards "
+                f"\n[bold green] Successfully exported {len(cards)} cards "
                 f"to {output_path}[/bold green]"
             )
 
@@ -920,7 +758,7 @@ def clean_progress(
             if session_id:
                 db.delete_progress(session_id)
                 console.print(
-                    f"[green]✓ Deleted progress for session: {session_id}[/green]"
+                    f"[green] Deleted progress for session: {session_id}[/green]"
                 )
                 logger.info("progress_deleted", session_id=session_id)
 
@@ -935,7 +773,7 @@ def clean_progress(
                         deleted_count += 1
 
                 console.print(
-                    f"[green]✓ Deleted {deleted_count} completed sessions[/green]"
+                    f"[green] Deleted {deleted_count} completed sessions[/green]"
                 )
                 logger.info("completed_progress_deleted", count=deleted_count)
 
@@ -989,7 +827,7 @@ def format(
 
             subprocess.run(cmd, check=True)
 
-        console.print("[green]✓ Format completed successfully[/green]")
+        console.print("[green] Format completed successfully[/green]")
         logger.info("format_completed", check=check)
     except subprocess.CalledProcessError as exc:
         logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)

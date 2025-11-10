@@ -6,14 +6,14 @@ This document describes the test suite and how to run tests.
 
 ```
 tests/
-├── conftest.py               # Pytest fixtures
-├── test_parser.py            # Parser tests (UNIT-parse-01/02, UNIT-yaml-01)
-├── test_slug_generator.py    # Slug generation tests (UNIT-slug-01)
-├── test_apf_linter.py        # APF validation tests (UNIT-apf-a, UNIT-tag-01, LINT-cloze)
-├── test_state_db.py          # Database tests
-└── integration/
-    ├── test_anki_client.py   # AnkiConnect tests (INT-01, INT-crud-01)
-    └── test_sync_determinism.py  # Sync flow tests (INT-02, REGR-det-01)
+ conftest.py               # Pytest fixtures
+ test_parser.py            # Parser tests (UNIT-parse-01/02, UNIT-yaml-01)
+ test_slug_generator.py    # Slug generation tests (UNIT-slug-01)
+ test_apf_linter.py        # APF validation tests (UNIT-apf-a, UNIT-tag-01, LINT-cloze)
+ test_state_db.py          # Database tests
+ integration/
+     test_anki_client.py   # AnkiConnect tests (INT-01, INT-crud-01)
+     test_sync_determinism.py  # Sync flow tests (INT-02, REGR-det-01)
 ```
 
 ## Running Tests
@@ -155,7 +155,7 @@ pytest -m "not slow"
 ### E2E Tests
 
 **Missing (Deferred to Phase 9):**
-- E2E-01: Process ≥5 notes with ≥2 multi-pair
+- E2E-01: Process 5 notes with 2 multi-pair
 - E2E-02: Bilingual card generation
 - E2E-03: Full sync cycle
 - E2E-dryrun-01: Dry-run validation

@@ -56,7 +56,7 @@ post_validator_model: "lmstudio-community/Qwen2.5-14B-Instruct-GGUF"
 **Setup:**
 1. Download LM Studio: https://lmstudio.ai
 2. Load a model in LM Studio
-3. Start the local server (Developer → Local Server)
+3. Start the local server (Developer  Local Server)
 4. Use the model identifier shown in LM Studio
 
 **Features:**
@@ -167,7 +167,7 @@ export POST_VALIDATOR_MODEL=qwen3:14b
 |---------|---------------|-----------|------------|--------------|
 | **Cost** | Free | Free | Pay per token | Pay per usage |
 | **Privacy** | 100% private | 100% private | Cloud-based | Cloud-based |
-| **Offline** | ✅ Yes | ✅ Yes | ❌ No | ❌ No |
+| **Offline** |  Yes |  Yes |  No |  No |
 | **Hardware** | Required | Required | Not required | Not required |
 | **Setup** | Easy (CLI) | Easy (GUI) | Easiest (API key) | Easy (API key) |
 | **Model Selection** | Large library | Large library | 100+ models | Growing library |
