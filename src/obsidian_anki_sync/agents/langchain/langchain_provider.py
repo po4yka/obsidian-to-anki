@@ -20,7 +20,7 @@ try:
         HumanMessage,
         SystemMessage,
     )
-    from langchain_core.outputs import ChatGeneration, ChatResult
+    from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
@@ -30,8 +30,30 @@ except ImportError:
     BaseMessage = object  # type: ignore
     ChatResult = object  # type: ignore
     AIMessage = object  # type: ignore
+    ChatGenerationChunk = object  # type: ignore
 
 logger = get_logger(__name__)
+
+
+def _extract_string_content(content: Any) -> str:
+    """Extract string content from LangChain message content.
+
+    LangChain message content can be str or list[str | dict].
+    This helper ensures we get a string.
+    """
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # Extract text from list of content blocks
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                parts.append(str(item["text"]))
+        return "\n".join(parts)
+    else:
+        return str(content)
 
 
 class LangChainProviderAdapter(BaseChatModel):  # type: ignore
@@ -120,17 +142,21 @@ class LangChainProviderAdapter(BaseChatModel):  # type: ignore
         """
         # Convert LangChain messages to our format
         system_message = ""
-        user_messages = []
+        user_messages: list[str] = []
 
         for msg in messages:
             if isinstance(msg, SystemMessage):
-                system_message = msg.content
+                system_message = _extract_string_content(msg.content)
             elif isinstance(msg, HumanMessage):
-                user_messages.append(msg.content)
+                user_messages.append(_extract_string_content(msg.content))
             elif isinstance(msg, AIMessage):
                 # For multi-turn conversations, we'd need to handle this
                 # For now, just log it
-                logger.debug("ai_message_in_history", content=msg.content[:100])
+                content_str = _extract_string_content(msg.content)
+                logger.debug(
+                    "ai_message_in_history",
+                    content=content_str[:100] if content_str else "",
+                )
 
         # Combine user messages into a single prompt
         prompt = "\n\n".join(user_messages) if user_messages else ""
@@ -184,7 +210,7 @@ class LangChainProviderAdapter(BaseChatModel):  # type: ignore
         stop: Optional[list[str]] = None,
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
-    ) -> Iterator[ChatGeneration]:
+    ) -> Iterator[ChatGenerationChunk]:
         """Stream generation is not implemented for this adapter."""
         raise NotImplementedError(
             "Streaming is not supported by this adapter. Use _generate instead."
@@ -210,7 +236,7 @@ class LangChainProviderAdapter(BaseChatModel):  # type: ignore
         kwargs["format"] = "json"
 
         result = self._generate(messages, **kwargs)
-        response_text = result.generations[0].message.content
+        response_text = _extract_string_content(result.generations[0].message.content)
 
         # Parse JSON
         try:
@@ -285,7 +311,7 @@ def create_structured_llm(
     model_name: Optional[str] = None,
     temperature: Optional[float] = None,
     output_schema: Optional[type] = None,
-) -> BaseChatModel:
+) -> Any:
     """Create a LangChain LLM configured for structured output.
 
     Args:
@@ -295,7 +321,7 @@ def create_structured_llm(
         output_schema: Optional Pydantic model for structured output
 
     Returns:
-        LangChain BaseChatModel configured for structured output
+        LangChain BaseChatModel or Runnable with structured output
     """
     chat_model = create_langchain_chat_model(config, model_name, temperature)
 

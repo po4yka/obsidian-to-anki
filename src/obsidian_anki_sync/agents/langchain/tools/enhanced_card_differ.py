@@ -411,9 +411,24 @@ class EnhancedCardDiffer:
             ]
 
             response = self.llm.invoke(messages)
-            response_text = (
-                response.content if hasattr(response, "content") else str(response)
-            )
+            # Extract string content (response.content can be str or list)
+            if hasattr(response, "content"):
+                content = response.content
+                if isinstance(content, str):
+                    response_text = content
+                elif isinstance(content, list):
+                    # Extract text from list of content blocks
+                    parts = []
+                    for item in content:
+                        if isinstance(item, str):
+                            parts.append(item)
+                        elif isinstance(item, dict) and "text" in item:
+                            parts.append(str(item["text"]))
+                    response_text = "\n".join(parts)
+                else:
+                    response_text = str(content)
+            else:
+                response_text = str(response)
 
             # Parse JSON
             if "```json" in response_text:

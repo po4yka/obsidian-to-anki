@@ -220,7 +220,7 @@ class AnthropicProvider(BaseLLMProvider):
         )
 
         # Retry logic
-        last_exception = None
+        last_exception: httpx.HTTPStatusError | httpx.RequestError | None = None
         for attempt in range(self.max_retries):
             try:
                 response = self.client.post(
