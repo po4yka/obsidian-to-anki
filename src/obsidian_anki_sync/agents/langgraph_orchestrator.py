@@ -20,10 +20,22 @@ from langgraph.graph.message import add_messages
 from ..config import Config
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
+from .exceptions import (
+    GenerationError,
+    ModelError,
+    PostValidationError,
+    PreValidationError,
+    StructuredOutputError,
+    WorkflowError,
+)
 from .models import (
     AgentPipelineResult,
+    CardSplittingResult,
+    ContextEnrichmentResult,
+    DuplicateDetectionResult,
     GeneratedCard,
     GenerationResult,
+    MemorizationQualityResult,
     PostValidationResult,
     PreValidationResult,
 )
@@ -49,16 +61,34 @@ class PipelineState(TypedDict):
     qa_pairs_dicts: list[dict]  # Serialized QAPair list
     file_path: str | None
     slug_base: str
+    config: Config  # Service configuration for model selection
+    existing_cards_dicts: list[dict] | None  # Serialized existing cards for duplicate check
 
     # Pipeline stage results
     pre_validation: dict | None  # Serialized PreValidationResult
+    card_splitting: dict | None  # Serialized CardSplittingResult
     generation: dict | None  # Serialized GenerationResult
     post_validation: dict | None  # Serialized PostValidationResult
+    context_enrichment: dict | None  # Serialized ContextEnrichmentResult
+    memorization_quality: dict | None  # Serialized MemorizationQualityResult
+    duplicate_detection: dict | None  # Serialized DuplicateDetectionResult (per card)
 
     # Workflow control
     current_stage: Literal[
-        "pre_validation", "generation", "post_validation", "complete", "failed"
+        "pre_validation",
+        "card_splitting",
+        "generation",
+        "post_validation",
+        "context_enrichment",
+        "memorization_quality",
+        "duplicate_detection",
+        "complete",
+        "failed",
     ]
+    enable_card_splitting: bool
+    enable_context_enrichment: bool
+    enable_memorization_quality: bool
+    enable_duplicate_detection: bool
     retry_count: int
     max_retries: int
     auto_fix_enabled: bool
@@ -105,11 +135,12 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
     qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
     file_path = Path(state["file_path"]) if state["file_path"] else None
 
-    # Create PydanticAI model (using OpenRouter as default)
+    # Create PydanticAI model from config
     try:
-        # Try to create from environment (requires OPENROUTER_API_KEY)
-        model = create_openrouter_model_from_env(model_name="openai/gpt-4o-mini")
-    except Exception as e:
+        # Get model name from unified config
+        model_name = state["config"].get_model_for_agent("pre_validator")
+        model = create_openrouter_model_from_env(model_name=model_name)
+    except (ValueError, KeyError) as e:
         logger.warning("failed_to_create_openrouter_model", error=str(e))
         # Fallback to simple validation
         pre_result = PreValidationResult(
@@ -140,12 +171,32 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
             )
         )
         pre_result.validation_time = time.time() - start_time
-    except Exception as e:
-        logger.error("langgraph_pre_validation_error", error=str(e))
+    except PreValidationError as e:
+        logger.error("langgraph_pre_validation_error", error=str(e), details=e.details)
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
-            error_details=f"Pre-validation failed: {str(e)}",
+            error_details=str(e),
+            auto_fix_applied=False,
+            fixed_content=None,
+            validation_time=time.time() - start_time,
+        )
+    except (StructuredOutputError, ModelError) as e:
+        logger.error("langgraph_pre_validation_model_error", error=str(e), details=e.details)
+        pre_result = PreValidationResult(
+            is_valid=False,
+            error_type="format",
+            error_details=f"Model error: {str(e)}",
+            auto_fix_applied=False,
+            fixed_content=None,
+            validation_time=time.time() - start_time,
+        )
+    except Exception as e:
+        logger.error("langgraph_pre_validation_unexpected_error", error=str(e))
+        pre_result = PreValidationResult(
+            is_valid=False,
+            error_type="structure",
+            error_details=f"Unexpected error: {str(e)}",
             auto_fix_applied=False,
             fixed_content=None,
             validation_time=time.time() - start_time,
@@ -161,6 +212,93 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
     state["stage_times"]["pre_validation"] = pre_result.validation_time
     state["current_stage"] = "generation" if pre_result.is_valid else "failed"
     state["messages"].append(f"Pre-validation: {pre_result.error_type}")
+
+    return state
+
+
+def card_splitting_node(state: PipelineState) -> PipelineState:
+    """Execute card splitting analysis stage.
+
+    Determines if note should generate 1 or N cards based on content complexity.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with card splitting results
+    """
+    import asyncio
+
+    from ..models import NoteMetadata, QAPair
+    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
+    from .pydantic_ai_agents import CardSplittingAgentAI
+
+    logger.info("langgraph_card_splitting_start")
+    start_time = time.time()
+
+    # Check if card splitting is enabled
+    if not state.get("enable_card_splitting", True):
+        logger.info("card_splitting_skipped", reason="disabled")
+        state["card_splitting"] = None
+        state["current_stage"] = "generation"
+        return state
+
+    # Deserialize metadata and QA pairs
+    metadata = NoteMetadata(**state["metadata_dict"])
+    qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
+
+    # Create PydanticAI model from config
+    try:
+        # Get model name from unified config
+        model_name = state["config"].get_model_for_agent("card_splitting")
+        model = create_openrouter_model_from_env(model_name=model_name)
+    except (ValueError, KeyError) as e:
+        logger.warning("failed_to_create_card_splitting_model", error=str(e))
+        # Fallback: skip card splitting analysis
+        state["card_splitting"] = None
+        state["current_stage"] = "generation"
+        state["stage_times"]["card_splitting"] = time.time() - start_time
+        state["messages"].append("Card splitting skipped (model unavailable)")
+        return state
+
+    # Create card splitting agent
+    splitting_agent = CardSplittingAgentAI(model=model, temperature=0.0)
+
+    # Run splitting analysis
+    try:
+        splitting_result = asyncio.run(
+            splitting_agent.analyze(
+                note_content=state["note_content"],
+                metadata=metadata,
+                qa_pairs=qa_pairs,
+            )
+        )
+        splitting_result.analysis_time = time.time() - start_time
+    except Exception as e:
+        logger.error("langgraph_card_splitting_error", error=str(e))
+        # Fallback: assume no splitting needed
+        from .models import CardSplittingResult
+
+        splitting_result = CardSplittingResult(
+            should_split=False,
+            split_reason="",
+            recommended_splits=[],
+            analysis_time=time.time() - start_time,
+        )
+
+    logger.info(
+        "langgraph_card_splitting_complete",
+        should_split=splitting_result.should_split,
+        recommended_splits=len(splitting_result.recommended_splits),
+        time=splitting_result.analysis_time,
+    )
+
+    state["card_splitting"] = splitting_result.model_dump()
+    state["stage_times"]["card_splitting"] = splitting_result.analysis_time
+    state["current_stage"] = "generation"
+    state["messages"].append(
+        f"Card splitting: {'split into ' + str(len(splitting_result.recommended_splits)) if splitting_result.should_split else 'no split needed'}"
+    )
 
     return state
 
@@ -189,12 +327,11 @@ def generation_node(state: PipelineState) -> PipelineState:
     metadata = NoteMetadata(**state["metadata_dict"])
     qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
 
-    # Create PydanticAI model for generation
+    # Create PydanticAI model from config
     try:
-        # Use more powerful model for generation
-        model = create_openrouter_model_from_env(
-            model_name="anthropic/claude-3-5-sonnet"
-        )
+        # Get model name from unified config
+        model_name = state["config"].get_model_for_agent("generator")
+        model = create_openrouter_model_from_env(model_name=model_name)
     except Exception as e:
         logger.error("failed_to_create_generator_model", error=str(e))
         # Return error result
@@ -281,9 +418,10 @@ def post_validation_node(state: PipelineState) -> PipelineState:
 
     cards = [GeneratedCard(**card_dict) for card_dict in generation["cards"]]
 
-    # Create PydanticAI model for validation
+    # Create PydanticAI model from config
     try:
-        model = create_openrouter_model_from_env(model_name="openai/gpt-4o-mini")
+        model_name = state["config"].get_model_for_agent("post_validator")
+        model = create_openrouter_model_from_env(model_name=model_name)
     except Exception as e:
         logger.warning("failed_to_create_post_validator_model", error=str(e))
         # Assume valid if validator unavailable
@@ -340,7 +478,11 @@ def post_validation_node(state: PipelineState) -> PipelineState:
 
     # Determine next stage based on validation result
     if post_result.is_valid:
-        state["current_stage"] = "complete"
+        # Move to enrichment if enabled, otherwise complete
+        if state.get("enable_context_enrichment", True):
+            state["current_stage"] = "context_enrichment"
+        else:
+            state["current_stage"] = "complete"
         state["messages"].append("Post-validation passed")
     elif state["retry_count"] < state["max_retries"] and state["auto_fix_enabled"]:
         # Apply corrections if available
@@ -365,6 +507,350 @@ def post_validation_node(state: PipelineState) -> PipelineState:
     return state
 
 
+def context_enrichment_node(state: PipelineState) -> PipelineState:
+    """Execute context enrichment stage.
+
+    Enhances generated cards with examples, mnemonics, and helpful context.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with enrichment results
+    """
+    import asyncio
+
+    from ..models import NoteMetadata
+    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
+    from .pydantic_ai_agents import ContextEnrichmentAgentAI
+
+    logger.info("langgraph_context_enrichment_start")
+    start_time = time.time()
+
+    # Check if enrichment is enabled
+    if not state.get("enable_context_enrichment", True):
+        logger.info("context_enrichment_skipped", reason="disabled")
+        state["context_enrichment"] = None
+        state["current_stage"] = (
+            "memorization_quality"
+            if state.get("enable_memorization_quality", True)
+            else "complete"
+        )
+        return state
+
+    # Check if we have cards to enrich
+    if state["generation"] is None or not state["generation"]["cards"]:
+        logger.warning("context_enrichment_no_cards")
+        state["context_enrichment"] = None
+        state["current_stage"] = (
+            "memorization_quality"
+            if state.get("enable_memorization_quality", True)
+            else "complete"
+        )
+        return state
+
+    try:
+        # Create model from unified config
+        model_name = state["config"].get_model_for_agent("context_enrichment")
+        model = create_openrouter_model_from_env(model_name=model_name)
+
+        # Create enrichment agent
+        enrichment_agent = ContextEnrichmentAgentAI(model=model, temperature=0.3)
+
+        # Deserialize metadata and cards
+        metadata = NoteMetadata(**state["metadata_dict"])
+        cards = [GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]]
+
+        # Enrich each card
+        enriched_cards = []
+        total_enriched = 0
+
+        for card in cards:
+            try:
+                result = asyncio.run(enrichment_agent.enrich(card, metadata))
+
+                if result.should_enrich and result.enriched_card:
+                    enriched_cards.append(result.enriched_card)
+                    total_enriched += 1
+                    logger.info(
+                        "card_enriched",
+                        slug=card.slug,
+                        additions=result.additions_summary,
+                    )
+                else:
+                    enriched_cards.append(card)  # Keep original
+
+            except Exception as e:
+                logger.error("card_enrichment_failed", slug=card.slug, error=str(e))
+                enriched_cards.append(card)  # Keep original on error
+
+        # Update generation with enriched cards
+        state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
+
+        # Create enrichment result summary
+        enrichment_result = ContextEnrichmentResult(
+            should_enrich=total_enriched > 0,
+            enriched_card=None,  # Individual results not stored in summary
+            additions=[],
+            additions_summary=f"Enriched {total_enriched}/{len(cards)} cards",
+            enrichment_rationale=f"Enhanced cards with examples and context",
+            enrichment_time=time.time() - start_time,
+        )
+
+        state["context_enrichment"] = enrichment_result.model_dump()
+        state["stage_times"]["context_enrichment"] = enrichment_result.enrichment_time
+
+        logger.info(
+            "langgraph_context_enrichment_complete",
+            enriched_count=total_enriched,
+            total_cards=len(cards),
+            time=enrichment_result.enrichment_time,
+        )
+
+    except (ValueError, KeyError) as e:
+        logger.warning("context_enrichment_failed", error=str(e))
+        state["context_enrichment"] = None
+        state["stage_times"]["context_enrichment"] = time.time() - start_time
+
+    # Move to next stage
+    state["current_stage"] = (
+        "memorization_quality"
+        if state.get("enable_memorization_quality", True)
+        else "complete"
+    )
+    state["messages"].append(
+        f"Context enrichment: {state['context_enrichment'] is not None}"
+    )
+
+    return state
+
+
+def memorization_quality_node(state: PipelineState) -> PipelineState:
+    """Execute memorization quality assessment stage.
+
+    Evaluates cards for spaced repetition effectiveness.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with quality assessment results
+    """
+    import asyncio
+
+    from ..models import NoteMetadata
+    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
+    from .pydantic_ai_agents import MemorizationQualityAgentAI
+
+    logger.info("langgraph_memorization_quality_start")
+    start_time = time.time()
+
+    # Check if quality check is enabled
+    if not state.get("enable_memorization_quality", True):
+        logger.info("memorization_quality_skipped", reason="disabled")
+        state["memorization_quality"] = None
+        state["current_stage"] = "complete"
+        return state
+
+    # Check if we have cards to assess
+    if state["generation"] is None or not state["generation"]["cards"]:
+        logger.warning("memorization_quality_no_cards")
+        state["memorization_quality"] = None
+        state["current_stage"] = "complete"
+        return state
+
+    try:
+        # Create model from unified config
+        model_name = state["config"].get_model_for_agent("memorization_quality")
+        model = create_openrouter_model_from_env(model_name=model_name)
+
+        # Create memorization quality agent
+        quality_agent = MemorizationQualityAgentAI(model=model, temperature=0.0)
+
+        # Deserialize metadata and cards
+        metadata = NoteMetadata(**state["metadata_dict"])
+        cards = [GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]]
+
+        # Assess all cards
+        quality_result = asyncio.run(quality_agent.assess(cards, metadata))
+
+        state["memorization_quality"] = quality_result.model_dump()
+        state["stage_times"]["memorization_quality"] = quality_result.assessment_time
+
+        logger.info(
+            "langgraph_memorization_quality_complete",
+            is_memorizable=quality_result.is_memorizable,
+            score=quality_result.memorization_score,
+            issues_count=len(quality_result.issues),
+            time=quality_result.assessment_time,
+        )
+
+        # Log issues if any
+        if not quality_result.is_memorizable:
+            logger.warning(
+                "memorization_quality_issues",
+                score=quality_result.memorization_score,
+                issues=quality_result.issues,
+                improvements=quality_result.suggested_improvements,
+            )
+
+    except (ValueError, KeyError) as e:
+        logger.warning("memorization_quality_failed", error=str(e))
+        # Create permissive fallback result
+        quality_result = MemorizationQualityResult(
+            is_memorizable=True,
+            memorization_score=0.7,
+            issues=[],
+            strengths=[],
+            suggested_improvements=[f"Assessment failed: {str(e)}"],
+            assessment_time=time.time() - start_time,
+        )
+        state["memorization_quality"] = quality_result.model_dump()
+        state["stage_times"]["memorization_quality"] = quality_result.assessment_time
+
+    # Move to duplicate detection if enabled, otherwise complete
+    state["current_stage"] = (
+        "duplicate_detection"
+        if state.get("enable_duplicate_detection", False)
+        else "complete"
+    )
+    state["messages"].append(
+        f"Memorization quality: score={state['memorization_quality']['memorization_score']:.2f}"
+    )
+
+    return state
+
+
+def duplicate_detection_node(state: PipelineState) -> PipelineState:
+    """Execute duplicate detection stage.
+
+    Checks newly generated cards against existing cards from Anki.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with duplicate detection results
+    """
+    import asyncio
+
+    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
+    from .pydantic_ai_agents import DuplicateDetectionAgentAI
+
+    logger.info("langgraph_duplicate_detection_start")
+    start_time = time.time()
+
+    # Check if duplicate detection is enabled
+    if not state.get("enable_duplicate_detection", False):
+        logger.info("duplicate_detection_skipped", reason="disabled")
+        state["duplicate_detection"] = None
+        state["current_stage"] = "complete"
+        return state
+
+    # Check if we have cards to check
+    if state["generation"] is None or not state["generation"]["cards"]:
+        logger.warning("duplicate_detection_no_cards")
+        state["duplicate_detection"] = None
+        state["current_stage"] = "complete"
+        return state
+
+    # Check if we have existing cards to compare against
+    if not state.get("existing_cards_dicts"):
+        logger.info("duplicate_detection_skipped", reason="no_existing_cards")
+        state["duplicate_detection"] = None
+        state["current_stage"] = "complete"
+        return state
+
+    try:
+        # Create model from unified config
+        model_name = state["config"].get_model_for_agent("duplicate_detection")
+        model = create_openrouter_model_from_env(model_name=model_name)
+
+        # Create duplicate detection agent
+        detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
+
+        # Deserialize cards
+        new_cards = [
+            GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
+        ]
+        existing_cards = [
+            GeneratedCard(**card_dict) for card_dict in state["existing_cards_dicts"]
+        ]
+
+        # Check each new card against existing cards
+        duplicate_results = []
+        total_duplicates_found = 0
+
+        for new_card in new_cards:
+            try:
+                result = asyncio.run(
+                    detection_agent.find_duplicates(new_card, existing_cards)
+                )
+                duplicate_results.append(
+                    {
+                        "card_slug": new_card.slug,
+                        "result": result.model_dump(),
+                    }
+                )
+
+                if result.is_duplicate:
+                    total_duplicates_found += 1
+                    logger.warning(
+                        "duplicate_card_detected",
+                        new_slug=new_card.slug,
+                        best_match=result.best_match.card_slug
+                        if result.best_match
+                        else None,
+                        similarity=result.best_match.similarity_score
+                        if result.best_match
+                        else 0.0,
+                        recommendation=result.recommendation,
+                    )
+
+            except Exception as e:
+                logger.error(
+                    "card_duplicate_check_failed", slug=new_card.slug, error=str(e)
+                )
+                # Add empty result for this card
+                duplicate_results.append(
+                    {
+                        "card_slug": new_card.slug,
+                        "result": None,
+                    }
+                )
+
+        # Store all results
+        detection_summary = {
+            "total_cards_checked": len(new_cards),
+            "duplicates_found": total_duplicates_found,
+            "results": duplicate_results,
+            "detection_time": time.time() - start_time,
+        }
+
+        state["duplicate_detection"] = detection_summary
+        state["stage_times"]["duplicate_detection"] = detection_summary["detection_time"]
+
+        logger.info(
+            "langgraph_duplicate_detection_complete",
+            cards_checked=len(new_cards),
+            duplicates_found=total_duplicates_found,
+            time=detection_summary["detection_time"],
+        )
+
+    except (ValueError, KeyError) as e:
+        logger.warning("duplicate_detection_failed", error=str(e))
+        state["duplicate_detection"] = None
+        state["stage_times"]["duplicate_detection"] = time.time() - start_time
+
+    # Move to complete
+    state["current_stage"] = "complete"
+    state["messages"].append(
+        f"Duplicate detection: {state.get('duplicate_detection', {}).get('duplicates_found', 0)} duplicates found"
+    )
+
+    return state
+
+
 # ============================================================================
 # Conditional Routing
 # ============================================================================
@@ -372,7 +858,7 @@ def post_validation_node(state: PipelineState) -> PipelineState:
 
 def should_continue_after_pre_validation(
     state: PipelineState,
-) -> Literal["generation", "failed"]:
+) -> Literal["card_splitting", "generation", "failed"]:
     """Determine next node after pre-validation.
 
     Args:
@@ -383,13 +869,16 @@ def should_continue_after_pre_validation(
     """
     pre_validation = state.get("pre_validation")
     if pre_validation and pre_validation["is_valid"]:
+        # Route to card splitting if enabled, otherwise directly to generation
+        if state.get("enable_card_splitting", True):
+            return "card_splitting"
         return "generation"
     return "failed"
 
 
 def should_continue_after_post_validation(
     state: PipelineState,
-) -> Literal["complete", "generation", "failed"]:
+) -> Literal["context_enrichment", "generation", "failed"]:
     """Determine next node after post-validation.
 
     Args:
@@ -400,12 +889,50 @@ def should_continue_after_post_validation(
     """
     current_stage = state.get("current_stage", "failed")
 
-    if current_stage == "complete":
-        return "complete"
+    if current_stage == "context_enrichment":
+        return "context_enrichment"
     elif current_stage == "generation":
         return "generation"  # Retry
     else:
         return "failed"
+
+
+def should_continue_after_enrichment(
+    state: PipelineState,
+) -> Literal["memorization_quality", "complete"]:
+    """Determine next node after context enrichment.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Next node name
+    """
+    current_stage = state.get("current_stage", "complete")
+
+    if current_stage == "memorization_quality":
+        return "memorization_quality"
+    else:
+        return "complete"
+
+
+def should_continue_after_memorization_quality(
+    state: PipelineState,
+) -> Literal["duplicate_detection", "complete"]:
+    """Determine next node after memorization quality.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Next node name
+    """
+    current_stage = state.get("current_stage", "complete")
+
+    if current_stage == "duplicate_detection":
+        return "duplicate_detection"
+    else:
+        return "complete"
 
 
 # ============================================================================
@@ -423,22 +950,57 @@ class LangGraphOrchestrator:
     def __init__(
         self,
         config: Config,
-        max_retries: int = 3,
-        auto_fix_enabled: bool = True,
-        strict_mode: bool = True,
+        max_retries: int | None = None,
+        auto_fix_enabled: bool | None = None,
+        strict_mode: bool | None = None,
+        enable_card_splitting: bool | None = None,
+        enable_context_enrichment: bool | None = None,
+        enable_memorization_quality: bool | None = None,
+        enable_duplicate_detection: bool | None = None,
     ):
         """Initialize LangGraph orchestrator.
 
         Args:
             config: Service configuration
-            max_retries: Maximum post-validation retry attempts
-            auto_fix_enabled: Enable automatic error fixing
-            strict_mode: Use strict validation mode
+            max_retries: Maximum post-validation retry attempts (uses config if None)
+            auto_fix_enabled: Enable automatic error fixing (uses config if None)
+            strict_mode: Use strict validation mode (uses config if None)
+            enable_card_splitting: Enable card splitting agent (uses config if None)
+            enable_context_enrichment: Enable context enrichment agent (uses config if None)
+            enable_memorization_quality: Enable memorization quality agent (uses config if None)
+            enable_duplicate_detection: Enable duplicate detection agent (uses config if None)
         """
         self.config = config
-        self.max_retries = max_retries
-        self.auto_fix_enabled = auto_fix_enabled
-        self.strict_mode = strict_mode
+        # Use config values as defaults if not explicitly provided
+        self.max_retries = (
+            max_retries if max_retries is not None else config.langgraph_max_retries
+        )
+        self.auto_fix_enabled = (
+            auto_fix_enabled if auto_fix_enabled is not None else config.langgraph_auto_fix
+        )
+        self.strict_mode = (
+            strict_mode if strict_mode is not None else config.langgraph_strict_mode
+        )
+        self.enable_card_splitting = (
+            enable_card_splitting
+            if enable_card_splitting is not None
+            else getattr(config, "enable_card_splitting", True)  # Default to True
+        )
+        self.enable_context_enrichment = (
+            enable_context_enrichment
+            if enable_context_enrichment is not None
+            else config.enable_context_enrichment
+        )
+        self.enable_memorization_quality = (
+            enable_memorization_quality
+            if enable_memorization_quality is not None
+            else config.enable_memorization_quality
+        )
+        self.enable_duplicate_detection = (
+            enable_duplicate_detection
+            if enable_duplicate_detection is not None
+            else getattr(config, "enable_duplicate_detection", False)  # Default to False
+        )
 
         # Build the workflow graph
         self.workflow = self._build_workflow()
@@ -454,6 +1016,10 @@ class LangGraphOrchestrator:
             max_retries=max_retries,
             auto_fix=auto_fix_enabled,
             strict_mode=strict_mode,
+            card_splitting=enable_card_splitting,
+            context_enrichment=enable_context_enrichment,
+            memorization_quality=enable_memorization_quality,
+            duplicate_detection=enable_duplicate_detection,
         )
 
     def _build_workflow(self) -> StateGraph:
@@ -465,10 +1031,16 @@ class LangGraphOrchestrator:
         # Create workflow graph
         workflow = StateGraph(PipelineState)
 
-        # Add nodes
+        # Add core nodes
         workflow.add_node("pre_validation", pre_validation_node)
+        workflow.add_node("card_splitting", card_splitting_node)
         workflow.add_node("generation", generation_node)
         workflow.add_node("post_validation", post_validation_node)
+
+        # Add enhancement nodes
+        workflow.add_node("context_enrichment", context_enrichment_node)
+        workflow.add_node("memorization_quality", memorization_quality_node)
+        workflow.add_node("duplicate_detection", duplicate_detection_node)
 
         # Set entry point
         workflow.set_entry_point("pre_validation")
@@ -478,10 +1050,14 @@ class LangGraphOrchestrator:
             "pre_validation",
             should_continue_after_pre_validation,
             {
+                "card_splitting": "card_splitting",
                 "generation": "generation",
                 "failed": END,
             },
         )
+
+        # Card splitting always goes to generation
+        workflow.add_edge("card_splitting", "generation")
 
         workflow.add_edge("generation", "post_validation")
 
@@ -489,11 +1065,34 @@ class LangGraphOrchestrator:
             "post_validation",
             should_continue_after_post_validation,
             {
-                "complete": END,
+                "context_enrichment": "context_enrichment",
                 "generation": "generation",  # Retry loop
                 "failed": END,
             },
         )
+
+        # Add enrichment to quality routing
+        workflow.add_conditional_edges(
+            "context_enrichment",
+            should_continue_after_enrichment,
+            {
+                "memorization_quality": "memorization_quality",
+                "complete": END,
+            },
+        )
+
+        # Memorization quality to duplicate detection routing
+        workflow.add_conditional_edges(
+            "memorization_quality",
+            should_continue_after_memorization_quality,
+            {
+                "duplicate_detection": "duplicate_detection",
+                "complete": END,
+            },
+        )
+
+        # Duplicate detection always goes to END
+        workflow.add_edge("duplicate_detection", END)
 
         return workflow
 
@@ -503,6 +1102,7 @@ class LangGraphOrchestrator:
         metadata: NoteMetadata,
         qa_pairs: list[QAPair],
         file_path: Path | None = None,
+        existing_cards: list[GeneratedCard] | None = None,
     ) -> AgentPipelineResult:
         """Process a note through the LangGraph workflow.
 
@@ -511,6 +1111,7 @@ class LangGraphOrchestrator:
             metadata: Parsed metadata
             qa_pairs: Parsed Q/A pairs
             file_path: Optional file path for validation
+            existing_cards: Optional list of existing cards for duplicate detection
 
         Returns:
             AgentPipelineResult with all pipeline stages
@@ -533,10 +1134,22 @@ class LangGraphOrchestrator:
             "qa_pairs_dicts": [asdict(qa) for qa in qa_pairs],
             "file_path": str(file_path) if file_path else None,
             "slug_base": slug_base,
+            "config": self.config,  # Pass config for model selection
+            "existing_cards_dicts": (
+                [card.model_dump() for card in existing_cards] if existing_cards else None
+            ),
             "pre_validation": None,
+            "card_splitting": None,
             "generation": None,
             "post_validation": None,
+            "context_enrichment": None,
+            "memorization_quality": None,
+            "duplicate_detection": None,
             "current_stage": "pre_validation",
+            "enable_card_splitting": self.enable_card_splitting,
+            "enable_context_enrichment": self.enable_context_enrichment,
+            "enable_memorization_quality": self.enable_memorization_quality,
+            "enable_duplicate_detection": self.enable_duplicate_detection,
             "retry_count": 0,
             "max_retries": self.max_retries,
             "auto_fix_enabled": self.auto_fix_enabled,
@@ -562,6 +1175,11 @@ class LangGraphOrchestrator:
             if final_state.get("pre_validation")
             else None
         )
+        card_splitting = (
+            CardSplittingResult(**final_state["card_splitting"])
+            if final_state.get("card_splitting")
+            else None
+        )
         generation = (
             GenerationResult(**final_state["generation"])
             if final_state.get("generation")
@@ -570,6 +1188,16 @@ class LangGraphOrchestrator:
         post_validation = (
             PostValidationResult(**final_state["post_validation"])
             if final_state.get("post_validation")
+            else None
+        )
+        context_enrichment = (
+            ContextEnrichmentResult(**final_state["context_enrichment"])
+            if final_state.get("context_enrichment")
+            else None
+        )
+        memorization_quality = (
+            MemorizationQualityResult(**final_state["memorization_quality"])
+            if final_state.get("memorization_quality")
             else None
         )
 
@@ -581,6 +1209,7 @@ class LangGraphOrchestrator:
             ),
             generation=generation,
             post_validation=post_validation,
+            memorization_quality=memorization_quality,
             total_time=total_time,
             retry_count=final_state["retry_count"],
         )

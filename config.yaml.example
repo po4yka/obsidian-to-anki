@@ -1,0 +1,128 @@
+# Obsidian to Anki Sync Configuration
+# Copy this file to config.yaml and adjust for your setup
+
+# =============================================================================
+# Obsidian Vault Settings
+# =============================================================================
+vault_path: "/path/to/your/obsidian/vault"
+source_dir: "anki"  # Subdirectory containing notes to sync
+
+# =============================================================================
+# Anki Connection Settings
+# =============================================================================
+anki_connect_url: "http://localhost:8765"
+anki_deck_name: "Obsidian::Imported"
+anki_note_type: "APF (Prompt)"
+
+# =============================================================================
+# Sync Behavior
+# =============================================================================
+run_mode: "apply"  # "apply" or "dry-run"
+delete_mode: "archive"  # "delete" or "archive"
+
+# =============================================================================
+# Database
+# =============================================================================
+db_path: ".obsidian/plugins/obsidian-to-anki/sync.db"
+
+# =============================================================================
+# Logging
+# =============================================================================
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# =============================================================================
+# LangGraph + PydanticAI Agent System
+# =============================================================================
+use_langgraph: true  # Enable LangGraph-based orchestration
+use_pydantic_ai: true  # Enable PydanticAI for structured outputs
+
+# =============================================================================
+# UNIFIED MODEL CONFIGURATION
+# =============================================================================
+# This is the SINGLE place to configure your LLM model!
+# All agents will use this model by default.
+#
+# For OpenRouter (recommended):
+default_llm_model: "openrouter/polaris-alpha"
+#
+# Other options:
+# default_llm_model: "openai/gpt-4o-mini"
+# default_llm_model: "openai/gpt-4o"
+# default_llm_model: "anthropic/claude-3-5-sonnet"
+# default_llm_model: "google/gemini-pro-1.5"
+# default_llm_model: "meta-llama/llama-3.1-70b-instruct"
+
+# -----------------------------------------------------------------------------
+# Individual Agent Model Overrides (optional)
+# -----------------------------------------------------------------------------
+# Leave these EMPTY to use default_llm_model for all agents.
+# Only set them if you want specific agents to use different models.
+#
+# Example: Use expensive model for generation, cheap for validation
+# pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"
+# pydantic_ai_pre_validator_model: "openai/gpt-4o-mini"
+#
+pydantic_ai_pre_validator_model: ""  # Empty = use default
+pydantic_ai_generator_model: ""  # Empty = use default
+pydantic_ai_post_validator_model: ""  # Empty = use default
+context_enrichment_model: ""  # Empty = use default
+memorization_quality_model: ""  # Empty = use default
+card_splitting_model: ""  # Empty = use default
+duplicate_detection_model: ""  # Empty = use default
+
+# =============================================================================
+# LangGraph Workflow Settings
+# =============================================================================
+langgraph_max_retries: 3  # Post-validation retry attempts
+langgraph_auto_fix: true  # Enable automatic error fixing
+langgraph_strict_mode: true  # Strict validation mode
+langgraph_checkpoint_enabled: true  # State persistence
+
+# =============================================================================
+# Enhancement Agents (Quality Improvements)
+# =============================================================================
+# These agents improve card quality and learning effectiveness
+enable_card_splitting: true  # Analyze if note should be split into multiple cards
+enable_context_enrichment: true  # Add examples, mnemonics, visual structure
+enable_memorization_quality: true  # Check SRS effectiveness
+enable_duplicate_detection: false  # Check against existing cards (requires passing existing_cards to process_note)
+
+# =============================================================================
+# LLM Provider Configuration
+# =============================================================================
+# Choose your provider: "openrouter", "openai", "anthropic", "ollama", "lm_studio"
+llm_provider: "openrouter"
+
+# OpenRouter Settings (recommended for access to multiple models)
+openrouter_api_key: "${OPENROUTER_API_KEY}"  # Or set directly
+openrouter_base_url: "https://openrouter.ai/api/v1"
+openrouter_site_url: "https://github.com/yourname/obsidian-to-anki"  # Optional
+openrouter_site_name: "Obsidian-to-Anki"  # Optional
+
+# OpenAI Settings (if using OpenAI directly)
+# openai_api_key: "${OPENAI_API_KEY}"
+# openai_base_url: "https://api.openai.com/v1"
+
+# Anthropic Settings (if using Claude directly)
+# anthropic_api_key: "${ANTHROPIC_API_KEY}"
+# anthropic_base_url: "https://api.anthropic.com"
+
+# Ollama Settings (for local models)
+# ollama_base_url: "http://localhost:11434"
+# ollama_api_key: null  # Only for Ollama Cloud
+
+# LM Studio Settings (for local models)
+# lm_studio_base_url: "http://localhost:1234/v1"
+
+# =============================================================================
+# LLM Parameters
+# =============================================================================
+llm_temperature: 0.2  # Creativity level (0.0-1.0)
+llm_top_p: 0.3  # Nucleus sampling
+llm_timeout: 900.0  # Request timeout (seconds)
+llm_max_tokens: 2048  # Maximum response length
+
+# =============================================================================
+# Legacy Agent System (deprecated - use LangGraph instead)
+# =============================================================================
+use_agent_system: false  # Old agent system (not recommended)

@@ -18,9 +18,32 @@ from pydantic_ai.models.openai import OpenAIModel
 from ..models import NoteMetadata, QAPair
 from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
+from .exceptions import (
+    GenerationError,
+    ModelError,
+    PostValidationError,
+    PreValidationError,
+    StructuredOutputError,
+)
+from .improved_prompts import (
+    CARD_GENERATION_SYSTEM_PROMPT,
+    POST_VALIDATION_SYSTEM_PROMPT,
+    PRE_VALIDATION_SYSTEM_PROMPT,
+)
+from .memorization_prompts import MEMORIZATION_QUALITY_PROMPT
+from .card_splitting_prompts import CARD_SPLITTING_DECISION_PROMPT
+from .duplicate_detection_prompts import DUPLICATE_DETECTION_PROMPT
+from .context_enrichment_prompts import CONTEXT_ENRICHMENT_PROMPT
 from .models import (
+    CardSplitPlan,
+    CardSplittingResult,
+    ContextEnrichmentResult,
+    DuplicateDetectionResult,
+    DuplicateMatch,
+    EnrichmentAddition,
     GeneratedCard,
     GenerationResult,
+    MemorizationQualityResult,
     PostValidationResult,
     PreValidationResult,
 )
@@ -84,6 +107,58 @@ class PostValidationOutput(BaseModel):
     )
 
 
+class MemorizationIssue(BaseModel):
+    """A single memorization quality issue."""
+
+    type: str = Field(description="Issue type (atomic_violation, information_leakage, etc.)")
+    severity: str = Field(description="Severity: low, medium, high")
+    message: str = Field(description="Detailed description of the issue")
+
+
+class MemorizationQualityOutput(BaseModel):
+    """Structured output from memorization quality agent."""
+
+    is_memorizable: bool = Field(description="Whether card is suitable for spaced repetition")
+    memorization_score: float = Field(
+        ge=0.0, le=1.0, description="Quality score for long-term retention"
+    )
+    issues: list[MemorizationIssue] = Field(
+        default_factory=list, description="List of memorization issues found"
+    )
+    strengths: list[str] = Field(
+        default_factory=list, description="What the card does well"
+    )
+    suggested_improvements: list[str] = Field(
+        default_factory=list, description="Actionable improvements"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Confidence in assessment"
+    )
+
+
+class CardSplitPlanOutput(BaseModel):
+    """Single card plan in split output."""
+
+    card_number: int = Field(ge=1)
+    concept: str
+    question: str
+    answer_summary: str
+    rationale: str
+
+
+class CardSplittingOutput(BaseModel):
+    """Structured output from card splitting agent."""
+
+    should_split: bool = Field(description="Whether to split into multiple cards")
+    card_count: int = Field(ge=1, description="Number of cards to generate")
+    splitting_strategy: str = Field(description="Strategy: none/concept/list/example/hierarchical/step")
+    split_plan: list[CardSplitPlanOutput] = Field(
+        default_factory=list, description="Plan for each card"
+    )
+    reasoning: str = Field(description="Explanation of the decision")
+    confidence: float = Field(ge=0.0, le=1.0, description="Decision confidence")
+
+
 # ============================================================================
 # Agent Dependencies
 # ============================================================================
@@ -113,6 +188,14 @@ class PostValidationDeps(BaseModel):
     cards: list[GeneratedCard]
     metadata: NoteMetadata
     strict_mode: bool = True
+
+
+class CardSplittingDeps(BaseModel):
+    """Dependencies for card splitting agent."""
+
+    note_content: str
+    metadata: NoteMetadata
+    qa_pairs: list[QAPair]
 
 
 # ============================================================================
@@ -147,20 +230,8 @@ class PreValidatorAgentAI:
         logger.info("pydantic_ai_pre_validator_initialized", model=str(model))
 
     def _get_system_prompt(self) -> str:
-        """Get system prompt for pre-validation."""
-        return """You are a pre-validation agent for Obsidian notes converted to Anki cards.
-
-Your task is to validate note structure, formatting, and frontmatter before card generation.
-
-Check for:
-1. Valid YAML frontmatter with required fields (title, topic, tags, language_tags)
-2. Proper Q&A pair formatting
-3. Correct markdown structure
-4. Content completeness
-5. Language tag consistency
-
-Provide detailed error information and suggested fixes if validation fails.
-Be strict but helpful in your validation."""
+        """Get system prompt for pre-validation with few-shot examples."""
+        return PRE_VALIDATION_SYSTEM_PROMPT
 
     async def validate(
         self,
@@ -227,16 +298,25 @@ Validate the structure, frontmatter, and content quality."""
 
             return validation_result
 
+        except ValueError as e:
+            # Structured output parsing error
+            logger.error("pydantic_ai_pre_validation_parse_error", error=str(e))
+            raise StructuredOutputError(
+                "Failed to parse pre-validation output",
+                details={"error": str(e), "title": metadata.title}
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_pre_validation_timeout", error=str(e))
+            raise ModelError(
+                "Pre-validation timed out",
+                details={"title": metadata.title}
+            ) from e
         except Exception as e:
             logger.error("pydantic_ai_pre_validation_failed", error=str(e))
-            return PreValidationResult(
-                is_valid=False,
-                error_type="structure",
-                error_details=f"Validation failed: {str(e)}",
-                auto_fix_applied=False,
-                fixed_content=None,
-                validation_time=0.0,
-            )
+            raise PreValidationError(
+                f"Pre-validation failed: {str(e)}",
+                details={"title": metadata.title}
+            ) from e
 
 
 class GeneratorAgentAI:
@@ -256,13 +336,8 @@ class GeneratorAgentAI:
         self.model = model
         self.temperature = temperature
 
-        # Load APF prompt
-        prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
-        if prompt_path.exists():
-            self.system_prompt = prompt_path.read_text(encoding="utf-8")
-        else:
-            logger.warning("cards_prompt_not_found", path=str(prompt_path))
-            self.system_prompt = "Generate APF cards following strict APF v2.1 format."
+        # Use improved system prompt with few-shot examples
+        self.system_prompt = CARD_GENERATION_SYSTEM_PROMPT
 
         # Create PydanticAI agent
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(  # type: ignore[call-overload]
@@ -348,10 +423,21 @@ Q&A Pairs ({len(qa_pairs)}):
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)
-                except Exception as e:
+                except (KeyError, ValueError) as e:
                     logger.warning(
                         "invalid_generated_card", error=str(e), card=card_dict
                     )
+                    continue
+
+            if not generated_cards:
+                raise GenerationError(
+                    "No valid cards generated",
+                    details={
+                        "title": metadata.title,
+                        "qa_pairs_count": len(qa_pairs),
+                        "raw_cards_count": len(output.cards)
+                    }
+                )
 
             generation_result = GenerationResult(
                 cards=generated_cards,
@@ -368,14 +454,26 @@ Q&A Pairs ({len(qa_pairs)}):
 
             return generation_result
 
+        except GenerationError:
+            raise  # Re-raise our custom error
+        except ValueError as e:
+            logger.error("pydantic_ai_generation_parse_error", error=str(e))
+            raise StructuredOutputError(
+                "Failed to parse generation output",
+                details={"error": str(e), "title": metadata.title}
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_generation_timeout", error=str(e))
+            raise ModelError(
+                "Card generation timed out",
+                details={"title": metadata.title}
+            ) from e
         except Exception as e:
             logger.error("pydantic_ai_generation_failed", error=str(e))
-            return GenerationResult(
-                cards=[],
-                total_cards=0,
-                generation_time=0.0,
-                model_used=str(self.model),
-            )
+            raise GenerationError(
+                f"Card generation failed: {str(e)}",
+                details={"title": metadata.title}
+            ) from e
 
 
 class PostValidatorAgentAI:
@@ -405,22 +503,8 @@ class PostValidatorAgentAI:
         logger.info("pydantic_ai_post_validator_initialized", model=str(model))
 
     def _get_system_prompt(self) -> str:
-        """Get system prompt for post-validation."""
-        return """You are a post-validation agent for APF (Active Prompt Framework) cards.
-
-Your task is to validate generated cards for:
-1. APF syntax correctness (HTML structure, required fields)
-2. Factual accuracy (content matches source Q&A)
-3. Semantic coherence (cards make sense)
-4. Template compliance (proper APF v2.1 format)
-5. Language consistency
-
-For each issue found:
-- Identify the card_index
-- Describe the specific problem
-- Suggest a correction if possible
-
-Be thorough and strict in your validation."""
+        """Get system prompt for post-validation with few-shot examples."""
+        return POST_VALIDATION_SYSTEM_PROMPT
 
     async def validate(
         self,
@@ -476,8 +560,9 @@ Cards to validate:
                     try:
                         corrected_card = GeneratedCard(**correction)
                         corrected_cards.append(corrected_card)
-                    except Exception as e:
+                    except (KeyError, ValueError) as e:
                         logger.warning("invalid_correction", error=str(e))
+                        continue
 
             validation_result = PostValidationResult(
                 is_valid=output.is_valid,
@@ -496,12 +581,796 @@ Cards to validate:
 
             return validation_result
 
+        except ValueError as e:
+            logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            raise StructuredOutputError(
+                "Failed to parse post-validation output",
+                details={"error": str(e), "cards_count": len(cards)}
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_post_validation_timeout", error=str(e))
+            raise ModelError(
+                "Post-validation timed out",
+                details={"cards_count": len(cards)}
+            ) from e
         except Exception as e:
             logger.error("pydantic_ai_post_validation_failed", error=str(e))
-            return PostValidationResult(
-                is_valid=False,
-                error_type="syntax",
-                error_details=f"Validation failed: {str(e)}",
-                corrected_cards=None,
-                validation_time=0.0,
+            raise PostValidationError(
+                f"Post-validation failed: {str(e)}",
+                details={"cards_count": len(cards)}
+            ) from e
+
+
+class MemorizationQualityAgentAI:
+    """PydanticAI-based memorization quality agent.
+
+    Evaluates whether generated cards are effective for spaced repetition
+    and long-term memory retention.
+    """
+
+    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+        """Initialize memorization quality agent.
+
+        Args:
+            model: PydanticAI model instance
+            temperature: Sampling temperature (0.0 for deterministic)
+        """
+        self.model = model
+        self.temperature = temperature
+
+        # Create PydanticAI agent
+        self.agent: Agent[PostValidationDeps, MemorizationQualityOutput] = Agent(  # type: ignore[call-overload]
+            model=self.model,
+            result_type=MemorizationQualityOutput,
+            system_prompt=MEMORIZATION_QUALITY_PROMPT,
+        )
+
+        logger.info("pydantic_ai_memorization_agent_initialized", model=str(model))
+
+    async def assess(
+        self,
+        cards: list[GeneratedCard],
+        metadata: NoteMetadata,
+    ) -> MemorizationQualityResult:
+        """Assess memorization quality of generated cards.
+
+        Args:
+            cards: Generated cards to assess
+            metadata: Note metadata for context
+
+        Returns:
+            MemorizationQualityResult with assessment
+        """
+        logger.info("pydantic_ai_memorization_assessment_start", cards_count=len(cards))
+
+        # Create dependencies (reuse PostValidationDeps)
+        deps = PostValidationDeps(
+            cards=cards,
+            metadata=metadata,
+            strict_mode=True
+        )
+
+        # Build assessment prompt
+        prompt = f"""Assess memorization quality of these {len(cards)} Anki cards:
+
+Metadata:
+- Title: {metadata.title}
+- Topic: {metadata.topic}
+- Languages: {', '.join(metadata.language_tags)}
+
+Cards to assess:
+"""
+        for card in cards[:5]:  # Show first 5 for context
+            prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
+            # Extract Front and Back from APF HTML (simplified)
+            front_match = card.apf_html.split("<!-- Front -->")
+            if len(front_match) > 1:
+                front_text = front_match[1].split("<!-- Back -->")[0].strip()[:150]
+                prompt += f"Front: {front_text}...\n"
+            back_match = card.apf_html.split("<!-- Back -->")
+            if len(back_match) > 1:
+                back_text = back_match[1].split("<!--")[0].strip()[:150]
+                prompt += f"Back: {back_text}...\n"
+
+        prompt += f"\nAssess all {len(cards)} cards for memorization effectiveness."
+
+        try:
+            # Run agent
+            result = await self.agent.run(prompt, deps=deps)
+            output = result.data  # type: ignore[attr-defined]
+
+            # Convert to MemorizationQualityResult
+            issues_list = [issue.model_dump() for issue in output.issues]
+
+            quality_result = MemorizationQualityResult(
+                is_memorizable=output.is_memorizable,
+                memorization_score=output.memorization_score,
+                issues=issues_list,
+                strengths=output.strengths,
+                suggested_improvements=output.suggested_improvements,
+                assessment_time=0.0,
             )
+
+            logger.info(
+                "pydantic_ai_memorization_assessment_complete",
+                is_memorizable=output.is_memorizable,
+                score=output.memorization_score,
+                issues_found=len(output.issues),
+            )
+
+            return quality_result
+
+        except ValueError as e:
+            logger.error("pydantic_ai_memorization_parse_error", error=str(e))
+            raise StructuredOutputError(
+                "Failed to parse memorization assessment output",
+                details={"error": str(e), "cards_count": len(cards)}
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_memorization_timeout", error=str(e))
+            raise ModelError(
+                "Memorization assessment timed out",
+                details={"cards_count": len(cards)}
+            ) from e
+        except Exception as e:
+            logger.error("pydantic_ai_memorization_failed", error=str(e))
+            # Return permissive result instead of failing
+            logger.warning("memorization_agent_fallback", error=str(e))
+            return MemorizationQualityResult(
+                is_memorizable=True,  # Assume cards are okay if agent fails
+                memorization_score=0.7,  # Default acceptable score
+                issues=[],
+                strengths=[],
+                suggested_improvements=[f"Memorization agent failed: {str(e)}"],
+                assessment_time=0.0,
+            )
+
+
+class CardSplittingAgentAI:
+    """PydanticAI-based card splitting agent.
+
+    Determines whether a note should generate one card or multiple cards,
+    and provides a splitting plan if needed.
+    """
+
+    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+        """Initialize card splitting agent.
+
+        Args:
+            model: PydanticAI model instance
+            temperature: Sampling temperature (0.0 for deterministic)
+        """
+        self.model = model
+        self.temperature = temperature
+
+        # Create PydanticAI agent
+        self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(  # type: ignore[call-overload]
+            model=self.model,
+            result_type=CardSplittingOutput,
+            system_prompt=CARD_SPLITTING_DECISION_PROMPT,
+        )
+
+        logger.info("pydantic_ai_card_splitting_agent_initialized", model=str(model))
+
+    async def analyze(
+        self,
+        note_content: str,
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+    ) -> CardSplittingResult:
+        """Analyze note and determine if splitting is needed.
+
+        Args:
+            note_content: Full note content
+            metadata: Note metadata
+            qa_pairs: Parsed Q/A pairs
+
+        Returns:
+            CardSplittingResult with splitting decision and plan
+        """
+        logger.info(
+            "pydantic_ai_card_splitting_start",
+            title=metadata.title,
+            qa_count=len(qa_pairs)
+        )
+
+        # Create dependencies
+        deps = CardSplittingDeps(
+            note_content=note_content,
+            metadata=metadata,
+            qa_pairs=qa_pairs
+        )
+
+        # Build analysis prompt
+        prompt = f"""Analyze this note and determine if it should generate one or multiple cards:
+
+Title: {metadata.title}
+Topic: {metadata.topic}
+Q&A Pairs: {len(qa_pairs)}
+
+Content Preview:
+{note_content[:800]}...
+
+Questions:
+"""
+        for idx, qa in enumerate(qa_pairs[:3], 1):
+            prompt += f"\n{idx}. {qa.question_en[:150]}"
+            if len(qa.question_en) > 150:
+                prompt += "..."
+
+        prompt += f"\n\nShould this note generate one card or split into multiple cards? Provide a detailed splitting plan."
+
+        try:
+            import time
+            start_time = time.time()
+
+            # Run agent
+            result = await self.agent.run(prompt, deps=deps)
+            output = result.data  # type: ignore[attr-defined]
+
+            # Convert split plan
+            split_plans = []
+            for plan_output in output.split_plan:
+                split_plan = CardSplitPlan(
+                    card_number=plan_output.card_number,
+                    concept=plan_output.concept,
+                    question=plan_output.question,
+                    answer_summary=plan_output.answer_summary,
+                    rationale=plan_output.rationale
+                )
+                split_plans.append(split_plan)
+
+            # Create result
+            splitting_result = CardSplittingResult(
+                should_split=output.should_split,
+                card_count=output.card_count,
+                splitting_strategy=output.splitting_strategy,  # type: ignore[arg-type]
+                split_plan=split_plans,
+                reasoning=output.reasoning,
+                decision_time=time.time() - start_time
+            )
+
+            logger.info(
+                "pydantic_ai_card_splitting_complete",
+                should_split=output.should_split,
+                card_count=output.card_count,
+                strategy=output.splitting_strategy,
+                confidence=output.confidence
+            )
+
+            return splitting_result
+
+        except ValueError as e:
+            logger.error("pydantic_ai_card_splitting_parse_error", error=str(e))
+            raise StructuredOutputError(
+                "Failed to parse card splitting output",
+                details={"error": str(e), "title": metadata.title}
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_card_splitting_timeout", error=str(e))
+            raise ModelError(
+                "Card splitting analysis timed out",
+                details={"title": metadata.title}
+            ) from e
+        except Exception as e:
+            logger.error("pydantic_ai_card_splitting_failed", error=str(e))
+            # Return conservative fallback (no split)
+            logger.warning("card_splitting_agent_fallback", error=str(e))
+            return CardSplittingResult(
+                should_split=False,
+                card_count=1,
+                splitting_strategy="none",
+                split_plan=[
+                    CardSplitPlan(
+                        card_number=1,
+                        concept=metadata.title,
+                        question=qa_pairs[0].question_en if qa_pairs else "Question",
+                        answer_summary=qa_pairs[0].answer_en[:100] if qa_pairs else "Answer",
+                        rationale=f"Fallback: Agent failed ({str(e)})"
+                    )
+                ],
+                reasoning=f"Card splitting agent failed: {str(e)}. Defaulting to single card.",
+                decision_time=0.0
+            )
+
+
+# ============================================================================
+# Duplicate Detection Agent
+# ============================================================================
+
+
+class DuplicateMatchOutput(BaseModel):
+    """Output model for a duplicate match."""
+
+    card_slug: str = Field(min_length=1)
+    similarity_score: float = Field(ge=0.0, le=1.0)
+    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    reasoning: str = Field(default="")
+
+
+class DuplicateDetectionOutput(BaseModel):
+    """Structured output from duplicate detection agent."""
+
+    is_duplicate: bool = Field(description="True if exact or semantic duplicate")
+    similarity_score: float = Field(ge=0.0, le=1.0)
+    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    reasoning: str = Field(description="Explanation of similarity assessment")
+    recommendation: str = Field(description="delete/merge/keep_both/review_manually")
+    better_card: str | None = Field(
+        default=None, description="'new' or existing card slug if duplicate"
+    )
+    merge_suggestion: str | None = Field(default=None)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class DuplicateDetectionDeps(BaseModel):
+    """Dependencies for duplicate detection agent."""
+
+    new_card_question: str
+    new_card_answer: str
+    existing_card_question: str
+    existing_card_answer: str
+    existing_card_slug: str
+
+
+class DuplicateDetectionAgentAI:
+    """PydanticAI-based duplicate detection agent.
+
+    Analyzes cards to identify duplicates and overlapping content.
+    """
+
+    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+        """Initialize duplicate detection agent.
+
+        Args:
+            model: PydanticAI model instance
+            temperature: Sampling temperature (0.0 for deterministic)
+        """
+        self.model = model
+        self.temperature = temperature
+
+        # Create PydanticAI agent
+        self.agent: Agent[DuplicateDetectionDeps, DuplicateDetectionOutput] = Agent(  # type: ignore[call-overload]
+            model=self.model,
+            result_type=DuplicateDetectionOutput,
+            system_prompt=DUPLICATE_DETECTION_PROMPT,
+        )
+
+        logger.info("pydantic_ai_duplicate_detection_agent_initialized", model=str(model))
+
+    async def check_duplicate(
+        self,
+        new_card: GeneratedCard,
+        existing_card: GeneratedCard
+    ) -> tuple[bool, float, str]:
+        """Check if new card is a duplicate of existing card.
+
+        Args:
+            new_card: Newly generated card
+            existing_card: Existing card to compare against
+
+        Returns:
+            Tuple of (is_duplicate, similarity_score, reasoning)
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Extract question/answer from APF HTML (simplified)
+            new_q, new_a = self._extract_qa_from_apf(new_card.apf_html)
+            existing_q, existing_a = self._extract_qa_from_apf(existing_card.apf_html)
+
+            # Create dependencies
+            deps = DuplicateDetectionDeps(
+                new_card_question=new_q,
+                new_card_answer=new_a,
+                existing_card_question=existing_q,
+                existing_card_answer=existing_a,
+                existing_card_slug=existing_card.slug
+            )
+
+            # Build prompt
+            prompt = f"""Compare these two cards and determine if they are duplicates:
+
+**New Card**:
+Q: {new_q}
+A: {new_a}
+
+**Existing Card (slug: {existing_card.slug})**:
+Q: {existing_q}
+A: {existing_a}
+
+Analyze similarity and provide your assessment."""
+
+            logger.info(
+                "pydantic_ai_duplicate_check_start",
+                new_slug=new_card.slug,
+                existing_slug=existing_card.slug
+            )
+
+            # Run agent
+            result = await self.agent.run(prompt, deps=deps)
+            output = result.data  # type: ignore[attr-defined]
+
+            elapsed = time.time() - start_time
+
+            logger.info(
+                "pydantic_ai_duplicate_check_complete",
+                is_duplicate=output.is_duplicate,
+                similarity=output.similarity_score,
+                type=output.duplicate_type,
+                elapsed=elapsed
+            )
+
+            return (output.is_duplicate, output.similarity_score, output.reasoning)
+
+        except Exception as e:
+            logger.error("pydantic_ai_duplicate_check_failed", error=str(e))
+            # Conservative fallback: assume not duplicate
+            return (False, 0.0, f"Detection failed: {str(e)}")
+
+    async def find_duplicates(
+        self,
+        new_card: GeneratedCard,
+        existing_cards: list[GeneratedCard]
+    ) -> DuplicateDetectionResult:
+        """Find all potential duplicates of a new card.
+
+        Args:
+            new_card: Newly generated card
+            existing_cards: List of existing cards to check against
+
+        Returns:
+            DuplicateDetectionResult with all matches
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            matches = []
+
+            # Check against each existing card
+            for existing_card in existing_cards:
+                is_dup, score, reasoning = await self.check_duplicate(new_card, existing_card)
+
+                # Determine duplicate type based on score
+                if score >= 0.95:
+                    dup_type = "exact"
+                elif score >= 0.80:
+                    dup_type = "semantic"
+                elif score >= 0.50:
+                    dup_type = "partial_overlap"
+                else:
+                    dup_type = "unique"
+
+                if score >= 0.50:  # Only include significant matches
+                    match = DuplicateMatch(
+                        card_slug=existing_card.slug,
+                        similarity_score=score,
+                        duplicate_type=dup_type,  # type: ignore[arg-type]
+                        reasoning=reasoning
+                    )
+                    matches.append(match)
+
+            # Sort by similarity (highest first)
+            matches.sort(key=lambda m: m.similarity_score, reverse=True)
+
+            # Determine overall result
+            best_match = matches[0] if matches else None
+            is_duplicate = best_match is not None and best_match.similarity_score >= 0.80
+
+            # Recommendation based on best match
+            if best_match:
+                if best_match.similarity_score >= 0.95:
+                    recommendation = "delete"
+                elif best_match.similarity_score >= 0.80:
+                    recommendation = "merge"
+                elif best_match.similarity_score >= 0.65:
+                    recommendation = "review_manually"
+                else:
+                    recommendation = "keep_both"
+            else:
+                recommendation = "keep_both"
+
+            result = DuplicateDetectionResult(
+                is_duplicate=is_duplicate,
+                best_match=best_match,
+                all_matches=matches,
+                recommendation=recommendation,  # type: ignore[arg-type]
+                better_card=None,  # Would need more logic to determine
+                merge_suggestion=None,
+                detection_time=time.time() - start_time
+            )
+
+            logger.info(
+                "pydantic_ai_find_duplicates_complete",
+                new_slug=new_card.slug,
+                matches_found=len(matches),
+                is_duplicate=is_duplicate,
+                recommendation=recommendation
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error("pydantic_ai_find_duplicates_failed", error=str(e))
+            # Return safe fallback
+            return DuplicateDetectionResult(
+                is_duplicate=False,
+                best_match=None,
+                all_matches=[],
+                recommendation="keep_both",  # type: ignore[arg-type]
+                better_card=None,
+                merge_suggestion=None,
+                detection_time=0.0
+            )
+
+    def _extract_qa_from_apf(self, apf_html: str) -> tuple[str, str]:
+        """Extract question and answer from APF HTML.
+
+        Args:
+            apf_html: APF format HTML
+
+        Returns:
+            Tuple of (question, answer)
+        """
+        # Simplified extraction - in real implementation would parse HTML properly
+        # For now, just extract text between tags
+        import re
+
+        question = ""
+        answer = ""
+
+        # Extract Front (question)
+        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        if front_match:
+            # Remove HTML tags
+            question = re.sub(r'<[^>]+>', '', front_match.group(1)).strip()
+
+        # Extract Back (answer)
+        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        if back_match:
+            answer = re.sub(r'<[^>]+>', '', back_match.group(1)).strip()
+
+        return question or "Unknown question", answer or "Unknown answer"
+
+
+# ============================================================================
+# Context Enrichment Agent
+# ============================================================================
+
+
+class EnrichmentAdditionOutput(BaseModel):
+    """Output model for an enrichment addition."""
+
+    enrichment_type: str = Field(description="example/mnemonic/visual/related/practical")
+    content: str = Field(min_length=1)
+    rationale: str = Field(default="")
+
+
+class ContextEnrichmentOutput(BaseModel):
+    """Structured output from context enrichment agent."""
+
+    should_enrich: bool = Field(description="Whether card needs enrichment")
+    enrichment_type: list[str] = Field(
+        default_factory=list,
+        description="Types of enrichment to add"
+    )
+    enriched_answer: str = Field(default="", description="Enhanced answer text")
+    enriched_extra: str = Field(default="", description="Enhanced Extra section")
+    additions_summary: str = Field(default="", description="Summary of additions")
+    rationale: str = Field(default="", description="Why enrichment helps")
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ContextEnrichmentDeps(BaseModel):
+    """Dependencies for context enrichment agent."""
+
+    question: str
+    answer: str
+    extra: str
+    card_slug: str
+    note_title: str
+
+
+class ContextEnrichmentAgentAI:
+    """PydanticAI-based context enrichment agent.
+
+    Enhances cards with examples, mnemonics, and helpful context.
+    """
+
+    def __init__(self, model: OpenAIModel, temperature: float = 0.3):
+        """Initialize context enrichment agent.
+
+        Args:
+            model: PydanticAI model instance
+            temperature: Sampling temperature (0.3 for some creativity)
+        """
+        self.model = model
+        self.temperature = temperature
+
+        # Create PydanticAI agent
+        self.agent: Agent[ContextEnrichmentDeps, ContextEnrichmentOutput] = Agent(  # type: ignore[call-overload]
+            model=self.model,
+            result_type=ContextEnrichmentOutput,
+            system_prompt=CONTEXT_ENRICHMENT_PROMPT,
+        )
+
+        logger.info("pydantic_ai_context_enrichment_agent_initialized", model=str(model))
+
+    async def enrich(
+        self,
+        card: GeneratedCard,
+        metadata: NoteMetadata
+    ) -> ContextEnrichmentResult:
+        """Enrich a card with additional context and examples.
+
+        Args:
+            card: Card to enrich
+            metadata: Note metadata for context
+
+        Returns:
+            ContextEnrichmentResult with enriched card
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Extract Q/A from APF HTML
+            question, answer = self._extract_qa_from_apf(card.apf_html)
+            extra = self._extract_extra_from_apf(card.apf_html)
+
+            # Create dependencies
+            deps = ContextEnrichmentDeps(
+                question=question,
+                answer=answer,
+                extra=extra or "",
+                card_slug=card.slug,
+                note_title=metadata.title
+            )
+
+            # Build prompt
+            prompt = f"""Analyze this flashcard and determine if it needs enrichment:
+
+**Card (slug: {card.slug})**
+Note: {metadata.title}
+
+Q: {question}
+A: {answer}
+Extra: {extra or "(none)"}
+
+Consider adding:
+- Concrete examples (code, real-world scenarios)
+- Mnemonics or memory aids
+- Visual structure (formatting, bullets)
+- Related concepts or comparisons
+- Practical tips or common pitfalls
+
+Provide your enrichment assessment."""
+
+            logger.info("pydantic_ai_enrichment_start", slug=card.slug)
+
+            # Run agent
+            result = await self.agent.run(prompt, deps=deps)
+            output = result.data  # type: ignore[attr-defined]
+
+            # If enrichment recommended, create enriched card
+            enriched_card = None
+            additions = []
+
+            if output.should_enrich:
+                # Reconstruct APF HTML with enrichments
+                enriched_apf = self._rebuild_apf_html(
+                    card.apf_html,
+                    output.enriched_answer or answer,
+                    output.enriched_extra or extra
+                )
+
+                enriched_card = GeneratedCard(
+                    card_index=card.card_index,
+                    slug=card.slug,
+                    lang=card.lang,
+                    apf_html=enriched_apf,
+                    confidence=card.confidence,
+                    content_hash=compute_content_hash(enriched_apf)
+                )
+
+                # Create additions list
+                for enrich_type in output.enrichment_type:
+                    addition = EnrichmentAddition(
+                        enrichment_type=enrich_type,  # type: ignore[arg-type]
+                        content=output.enriched_extra[:200] + "..." if len(output.enriched_extra) > 200 else output.enriched_extra,
+                        rationale=output.rationale
+                    )
+                    additions.append(addition)
+
+            enrichment_result = ContextEnrichmentResult(
+                should_enrich=output.should_enrich,
+                enriched_card=enriched_card,
+                additions=additions,
+                additions_summary=output.additions_summary,
+                enrichment_rationale=output.rationale,
+                enrichment_time=time.time() - start_time
+            )
+
+            logger.info(
+                "pydantic_ai_enrichment_complete",
+                slug=card.slug,
+                should_enrich=output.should_enrich,
+                types=output.enrichment_type,
+                confidence=output.confidence
+            )
+
+            return enrichment_result
+
+        except Exception as e:
+            logger.error("pydantic_ai_enrichment_failed", error=str(e), slug=card.slug)
+            # Return safe fallback (no enrichment)
+            return ContextEnrichmentResult(
+                should_enrich=False,
+                enriched_card=None,
+                additions=[],
+                additions_summary=f"Enrichment failed: {str(e)}",
+                enrichment_rationale="Agent encountered error",
+                enrichment_time=0.0
+            )
+
+    def _extract_qa_from_apf(self, apf_html: str) -> tuple[str, str]:
+        """Extract question and answer from APF HTML."""
+        import re
+
+        question = ""
+        answer = ""
+
+        # Extract Front (question)
+        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        if front_match:
+            question = re.sub(r'<[^>]+>', '', front_match.group(1)).strip()
+
+        # Extract Back (answer)
+        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        if back_match:
+            answer = re.sub(r'<[^>]+>', '', back_match.group(1)).strip()
+
+        return question or "Unknown", answer or "Unknown"
+
+    def _extract_extra_from_apf(self, apf_html: str) -> str:
+        """Extract Extra section from APF HTML."""
+        import re
+
+        extra_match = re.search(r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
+        if extra_match:
+            return re.sub(r'<[^>]+>', '', extra_match.group(1)).strip()
+        return ""
+
+    def _rebuild_apf_html(self, original_apf: str, new_answer: str, new_extra: str) -> str:
+        """Rebuild APF HTML with enriched content."""
+        import re
+
+        # Replace answer
+        apf_html = re.sub(
+            r'(<div class="back">)(.*?)(</div>)',
+            rf'\1{new_answer}\3',
+            original_apf,
+            flags=re.DOTALL
+        )
+
+        # Replace or add extra
+        if '<div class="extra">' in apf_html:
+            apf_html = re.sub(
+                r'(<div class="extra">)(.*?)(</div>)',
+                rf'\1{new_extra}\3',
+                apf_html,
+                flags=re.DOTALL
+            )
+        else:
+            # Add extra before closing tag
+            apf_html = apf_html.replace(
+                '</div>\n</div>',
+                f'</div>\n<div class="extra">{new_extra}</div>\n</div>'
+            )
+
+        return apf_html
