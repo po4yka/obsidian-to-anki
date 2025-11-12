@@ -69,6 +69,50 @@ class PostValidationResult(BaseModel):
     validation_time: float = 0.0
 
 
+class MemorizationQualityResult(BaseModel):
+    """Result from memorization quality agent.
+
+    Evaluates whether cards are effective for spaced repetition learning.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    is_memorizable: bool
+    memorization_score: float = Field(ge=0.0, le=1.0)
+    issues: list[dict[str, str]] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    suggested_improvements: list[str] = Field(default_factory=list)
+    assessment_time: float = 0.0
+
+
+class CardSplitPlan(BaseModel):
+    """Plan for a single card in a split."""
+
+    model_config = ConfigDict(frozen=False)
+
+    card_number: int = Field(ge=1)
+    concept: str = Field(min_length=1)
+    question: str = Field(min_length=1)
+    answer_summary: str = Field(min_length=1)
+    rationale: str = Field(default="")
+
+
+class CardSplittingResult(BaseModel):
+    """Result from card splitting agent.
+
+    Determines if note should generate one or multiple cards.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    should_split: bool
+    card_count: int = Field(ge=1)
+    splitting_strategy: Literal["none", "concept", "list", "example", "hierarchical", "step"]
+    split_plan: list[CardSplitPlan] = Field(default_factory=list)
+    reasoning: str = ""
+    decision_time: float = 0.0
+
+
 class ParserRepairResult(BaseModel):
     """Result from parser-repair agent.
 
@@ -84,10 +128,66 @@ class ParserRepairResult(BaseModel):
     repair_time: float = 0.0
 
 
-class AgentPipelineResult(BaseModel):
-    """Complete result from the three-agent pipeline.
+class DuplicateMatch(BaseModel):
+    """A potential duplicate card match."""
 
-    Tracks results from pre-validation, generation, and post-validation stages.
+    model_config = ConfigDict(frozen=False)
+
+    card_slug: str = Field(min_length=1, description="Slug of potential duplicate card")
+    similarity_score: float = Field(ge=0.0, le=1.0, description="Similarity score")
+    duplicate_type: Literal["exact", "semantic", "partial_overlap", "unique"]
+    reasoning: str = Field(default="", description="Why this is considered a duplicate")
+
+
+class DuplicateDetectionResult(BaseModel):
+    """Result from duplicate detection agent.
+
+    Identifies redundant or overlapping cards.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    is_duplicate: bool
+    best_match: Optional[DuplicateMatch] = None
+    all_matches: list[DuplicateMatch] = Field(default_factory=list)
+    recommendation: Literal["delete", "merge", "keep_both", "review_manually"]
+    better_card: Optional[str] = Field(
+        default=None, description="Slug of better card if duplicate ('new' or existing slug)"
+    )
+    merge_suggestion: Optional[str] = None
+    detection_time: float = 0.0
+
+
+class EnrichmentAddition(BaseModel):
+    """A specific enrichment added to a card."""
+
+    model_config = ConfigDict(frozen=False)
+
+    enrichment_type: Literal["example", "mnemonic", "visual", "related", "practical"]
+    content: str = Field(min_length=1)
+    rationale: str = Field(default="")
+
+
+class ContextEnrichmentResult(BaseModel):
+    """Result from context enrichment agent.
+
+    Enhances cards with examples, mnemonics, and context.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    should_enrich: bool
+    enriched_card: Optional[GeneratedCard] = None
+    additions: list[EnrichmentAddition] = Field(default_factory=list)
+    additions_summary: str = ""
+    enrichment_rationale: str = ""
+    enrichment_time: float = 0.0
+
+
+class AgentPipelineResult(BaseModel):
+    """Complete result from the multi-agent pipeline.
+
+    Tracks results from pre-validation, generation, post-validation, and memorization quality stages.
     """
 
     model_config = ConfigDict(frozen=False)
@@ -96,5 +196,6 @@ class AgentPipelineResult(BaseModel):
     pre_validation: PreValidationResult
     generation: Optional[GenerationResult] = None
     post_validation: Optional[PostValidationResult] = None
+    memorization_quality: Optional[MemorizationQualityResult] = None
     total_time: float = Field(ge=0.0)
     retry_count: int = Field(ge=0, description="Number of post-validation retries")

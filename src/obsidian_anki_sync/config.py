@@ -112,16 +112,57 @@ class Config:
     use_langgraph: bool = False  # Enable LangGraph-based orchestration
     use_pydantic_ai: bool = False  # Enable PydanticAI for structured outputs
 
-    # PydanticAI Model Configuration (for use with LangGraph)
-    pydantic_ai_pre_validator_model: str = "openai/gpt-4o-mini"
-    pydantic_ai_generator_model: str = "anthropic/claude-3-5-sonnet"
-    pydantic_ai_post_validator_model: str = "openai/gpt-4o-mini"
+    # ============================================================================
+    # Unified Model Configuration (OpenRouter)
+    # ============================================================================
+    # Default model used by ALL agents unless specifically overridden
+    # Examples: "openrouter/polaris-alpha", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
+    default_llm_model: str = "openrouter/polaris-alpha"
+
+    # Individual agent model overrides (optional - leave empty to use default_llm_model)
+    # Only set these if you want a specific agent to use a different model
+    pydantic_ai_pre_validator_model: str = ""  # Empty = use default_llm_model
+    pydantic_ai_generator_model: str = ""  # Empty = use default_llm_model
+    pydantic_ai_post_validator_model: str = ""  # Empty = use default_llm_model
+    context_enrichment_model: str = ""  # Empty = use default_llm_model
+    memorization_quality_model: str = ""  # Empty = use default_llm_model
+    card_splitting_model: str = ""  # Empty = use default_llm_model
+    duplicate_detection_model: str = ""  # Empty = use default_llm_model
 
     # LangGraph Workflow Configuration
     langgraph_max_retries: int = 3
     langgraph_auto_fix: bool = True
     langgraph_strict_mode: bool = True
     langgraph_checkpoint_enabled: bool = True  # Enable state persistence
+
+    # Enhancement Agents (optional quality improvements)
+    enable_card_splitting: bool = True  # Analyze if note should be split
+    enable_context_enrichment: bool = True  # Add examples and mnemonics
+    enable_memorization_quality: bool = True  # Check SRS effectiveness
+    enable_duplicate_detection: bool = False  # Check against existing cards (requires existing_cards)
+
+    def get_model_for_agent(self, agent_type: str) -> str:
+        """Get the model name for a specific agent.
+
+        Args:
+            agent_type: Agent type (e.g., "pre_validator", "generator", "context_enrichment")
+
+        Returns:
+            Model name (uses default_llm_model if agent-specific model is not set)
+        """
+        agent_model_map = {
+            "pre_validator": self.pydantic_ai_pre_validator_model,
+            "generator": self.pydantic_ai_generator_model,
+            "post_validator": self.pydantic_ai_post_validator_model,
+            "context_enrichment": self.context_enrichment_model,
+            "memorization_quality": self.memorization_quality_model,
+            "card_splitting": self.card_splitting_model,
+            "duplicate_detection": self.duplicate_detection_model,
+        }
+
+        # Get agent-specific model, fall back to default if empty
+        agent_model = agent_model_map.get(agent_type, "")
+        return agent_model if agent_model else self.default_llm_model
 
     def validate(self) -> None:
         """Validate configuration values."""

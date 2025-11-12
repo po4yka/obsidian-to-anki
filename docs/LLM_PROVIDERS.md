@@ -165,7 +165,6 @@ export POST_VALIDATOR_MODEL=qwen3:14b
 
 | Feature | Ollama (Local) | LM Studio | OpenRouter | Ollama Cloud |
 |---------|---------------|-----------|------------|--------------|
-| **Cost** | Free | Free | Pay per token | Pay per usage |
 | **Privacy** | 100% private | 100% private | Cloud-based | Cloud-based |
 | **Offline** |  Yes |  Yes |  No |  No |
 | **Hardware** | Required | Required | Not required | Not required |
