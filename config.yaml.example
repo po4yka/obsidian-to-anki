@@ -7,6 +7,14 @@
 vault_path: "/path/to/your/obsidian/vault"
 source_dir: "anki"  # Subdirectory containing notes to sync
 
+# Optional: Specify multiple subdirectories to search for Q&A notes
+# If source_subdirs is provided, it overrides source_dir
+# source_subdirs:
+#   - "."  # Root of vault
+#   - "Interviews"
+#   - "CS/Algorithms"
+#   - "Projects/Notes"
+
 # =============================================================================
 # Anki Connection Settings
 # =============================================================================

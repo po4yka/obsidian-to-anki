@@ -260,7 +260,13 @@ class SyncEngine:
             incremental=incremental,
         )
 
-        note_files = discover_notes(self.config.vault_path, self.config.source_dir)
+        # Use source_subdirs if configured, otherwise use source_dir
+        source_dirs = (
+            self.config.source_subdirs
+            if self.config.source_subdirs
+            else self.config.source_dir
+        )
+        note_files = discover_notes(self.config.vault_path, source_dirs)
 
         # Filter for incremental mode
         if incremental:
