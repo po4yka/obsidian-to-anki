@@ -188,11 +188,21 @@ class LMStudioProvider(BaseLLMProvider):
             return standardized_result
 
         except httpx.HTTPStatusError as e:
+            # Parse response for structured error details if available
+            error_details = {}
+            try:
+                error_json = e.response.json()
+                error_details = error_json
+            except Exception:
+                error_details = {"raw_response": e.response.text}
+
             logger.error(
                 "lm_studio_http_error",
                 status_code=e.response.status_code,
+                model=model,
+                prompt_length=len(prompt),
                 error=str(e),
-                response_text=e.response.text[:500],
+                error_details=error_details,
             )
             raise
         except httpx.RequestError as e:
@@ -235,7 +245,10 @@ class LMStudioProvider(BaseLLMProvider):
         except json.JSONDecodeError as e:
             logger.error(
                 "lm_studio_json_parse_error",
+                model=model,
                 error=str(e),
-                response_text=response_text[:500],
+                error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
+                response_text=response_text,
+                response_length=len(response_text),
             )
             raise
