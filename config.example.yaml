@@ -167,3 +167,4 @@ langchain_agents:
 
   # Bilingual settings
   bilingual_mode: "front_back"     # Options: "none", "front_back", "separate_cards"
+
