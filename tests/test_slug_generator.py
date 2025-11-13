@@ -6,7 +6,7 @@ from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slu
 class TestSlugGeneration:
     """Test slug generation (UNIT-slug-01)."""
 
-    def test_basic_slug_generation(self):
+    def test_basic_slug_generation(self) -> None:
         """Test basic slug generation."""
         slug, slug_base, hash6 = generate_slug(
             source_path="70-Kotlin/q-coroutines-basics.md",
@@ -20,7 +20,7 @@ class TestSlugGeneration:
         assert "p01" in slug_base
         assert hash6 is None  # No collision
 
-    def test_slug_sanitization(self):
+    def test_slug_sanitization(self) -> None:
         """Test slug sanitization of special characters."""
         slug, slug_base, hash6 = generate_slug(
             source_path="Test/Q&A File!@#.md",
@@ -36,7 +36,7 @@ class TestSlugGeneration:
         # Should collapse multiple dashes
         assert "--" not in slug
 
-    def test_directory_included_in_slug(self):
+    def test_directory_included_in_slug(self) -> None:
         """Slug should reflect directory segments to avoid collisions."""
         slug, slug_base, _ = generate_slug(
             source_path="40-Android/performance/q-startup.md",
@@ -47,7 +47,7 @@ class TestSlugGeneration:
 
         assert "40-android" in slug_base
 
-    def test_slug_collision_resolution(self):
+    def test_slug_collision_resolution(self) -> None:
         """Test collision resolution with hash6."""
         existing = {"test-slug-p01-en"}
 
@@ -62,7 +62,7 @@ class TestSlugGeneration:
         assert hash6  # sanity check
         assert slug not in existing
 
-    def test_slug_collision_suffix_is_stable(self):
+    def test_slug_collision_suffix_is_stable(self) -> None:
         """Hash suffix should be stable across calls regardless of content changes."""
         existing = {"duplicate-note-p01-en"}
         slug1, _, hash1 = generate_slug(
@@ -82,7 +82,7 @@ class TestSlugGeneration:
         assert slug1 == slug2
         assert hash1 == hash2
 
-    def test_language_suffix(self):
+    def test_language_suffix(self) -> None:
         """Test language suffix added to slug."""
         slug_en, _, _ = generate_slug("test.md", 1, "en", set())
         slug_ru, _, _ = generate_slug("test.md", 1, "ru", set())
@@ -91,7 +91,7 @@ class TestSlugGeneration:
         assert slug_ru.endswith("-ru")
         assert slug_en != slug_ru
 
-    def test_card_index_formatting(self):
+    def test_card_index_formatting(self) -> None:
         """Test card index zero-padding."""
         slug1, base1, _ = generate_slug("test.md", 1, "en", set())
         slug9, base9, _ = generate_slug("test.md", 9, "en", set())
@@ -101,7 +101,7 @@ class TestSlugGeneration:
         assert "p09" in base9
         assert "p10" in base10
 
-    def test_slug_determinism(self):
+    def test_slug_determinism(self) -> None:
         """Test slug generation is deterministic."""
         slug1, base1, hash1 = generate_slug("test.md", 1, "en", set())
         slug2, base2, hash2 = generate_slug("test.md", 1, "en", set())
@@ -114,7 +114,7 @@ class TestSlugGeneration:
 class TestManifestCreation:
     """Test manifest generation."""
 
-    def test_create_basic_manifest(self, sample_metadata):
+    def test_create_basic_manifest(self, sample_metadata) -> None:
         """Test creating a manifest."""
         manifest = create_manifest(
             slug="test-p01-en",
@@ -135,7 +135,7 @@ class TestManifestCreation:
         assert manifest.note_id == sample_metadata.id
         assert manifest.card_index == 1
 
-    def test_manifest_with_hash(self, sample_metadata):
+    def test_manifest_with_hash(self, sample_metadata) -> None:
         """Test manifest with collision hash."""
         manifest = create_manifest(
             slug="test-abc123-p01-en",

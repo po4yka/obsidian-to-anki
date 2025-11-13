@@ -17,7 +17,7 @@ class TestAnkiClient:
     """Test AnkiConnect client (INT-01)."""
 
     @respx.mock
-    def test_successful_invoke(self, mock_anki_url):
+    def test_successful_invoke(self, mock_anki_url) -> None:
         """Test successful API call."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(200, json={"result": "success", "error": None})
@@ -29,7 +29,7 @@ class TestAnkiClient:
         assert result == "success"
 
     @respx.mock
-    def test_error_response(self, mock_anki_url):
+    def test_error_response(self, mock_anki_url) -> None:
         """Test error handling."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(
@@ -43,7 +43,7 @@ class TestAnkiClient:
             client.invoke("testAction")
 
     @respx.mock
-    def test_find_notes(self, mock_anki_url):
+    def test_find_notes(self, mock_anki_url) -> None:
         """Test finding notes."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(200, json={"result": [1, 2, 3], "error": None})
@@ -55,7 +55,7 @@ class TestAnkiClient:
         assert notes == [1, 2, 3]
 
     @respx.mock
-    def test_notes_info(self, mock_anki_url):
+    def test_notes_info(self, mock_anki_url) -> None:
         """Test getting note info."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(
@@ -80,7 +80,7 @@ class TestAnkiClient:
         assert info[0]["noteId"] == 1
 
     @respx.mock
-    def test_add_note(self, mock_anki_url):
+    def test_add_note(self, mock_anki_url) -> None:
         """Test adding a note (INT-crud-01)."""
         route = respx.post(mock_anki_url)
         route.mock(
@@ -104,7 +104,7 @@ class TestAnkiClient:
         assert payload["params"]["note"]["guid"] == "guid-123"
 
     @respx.mock
-    def test_update_note_fields(self, mock_anki_url):
+    def test_update_note_fields(self, mock_anki_url) -> None:
         """Test updating note fields (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(200, json={"result": None, "error": None})
@@ -116,7 +116,7 @@ class TestAnkiClient:
         # Should not raise
 
     @respx.mock
-    def test_delete_notes(self, mock_anki_url):
+    def test_delete_notes(self, mock_anki_url) -> None:
         """Test deleting notes (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
             return_value=httpx.Response(200, json={"result": None, "error": None})
@@ -128,7 +128,7 @@ class TestAnkiClient:
         # Should not raise
 
     @respx.mock
-    def test_http_error(self, mock_anki_url):
+    def test_http_error(self, mock_anki_url) -> None:
         """Test HTTP error handling."""
         respx.post(mock_anki_url).mock(return_value=httpx.Response(500))
 

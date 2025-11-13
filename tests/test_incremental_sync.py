@@ -13,20 +13,20 @@ class TestIncrementalSync:
     """Test incremental sync mode."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_get_processed_note_paths_empty(self, temp_db):
+    def test_get_processed_note_paths_empty(self, temp_db) -> None:
         """Test getting processed paths from empty database."""
         paths = temp_db.get_processed_note_paths()
         assert isinstance(paths, set)
         assert len(paths) == 0
 
-    def test_get_processed_note_paths_with_cards(self, temp_db):
+    def test_get_processed_note_paths_with_cards(self, temp_db) -> None:
         """Test getting processed paths with cards."""
         # Add test cards
         card1 = self._create_test_card("notes/note1.md", "slug1", 1, "en")
@@ -44,7 +44,7 @@ class TestIncrementalSync:
         assert "notes/note1.md" in paths
         assert "notes/note2.md" in paths
 
-    def test_get_processed_note_paths_distinct(self, temp_db):
+    def test_get_processed_note_paths_distinct(self, temp_db) -> None:
         """Test that processed paths are distinct."""
         # Add multiple cards from same note
         for i in range(5):
@@ -57,7 +57,7 @@ class TestIncrementalSync:
         assert len(paths) == 1
         assert "notes/same-note.md" in paths
 
-    def test_incremental_filtering(self, temp_db):
+    def test_incremental_filtering(self, temp_db) -> None:
         """Test filtering notes for incremental sync."""
         # Add some processed notes
         card1 = self._create_test_card("notes/old1.md", "slug1", 1, "en")
@@ -87,7 +87,7 @@ class TestIncrementalSync:
         assert ("path3", "notes/new1.md") in new_notes
         assert ("path4", "notes/new2.md") in new_notes
 
-    def test_incremental_with_no_new_notes(self, temp_db):
+    def test_incremental_with_no_new_notes(self, temp_db) -> None:
         """Test incremental mode when no new notes exist."""
         # Add all notes to database
         for i in range(3):
@@ -111,7 +111,7 @@ class TestIncrementalSync:
 
         assert len(new_notes) == 0
 
-    def test_incremental_with_all_new_notes(self, temp_db):
+    def test_incremental_with_all_new_notes(self, temp_db) -> None:
         """Test incremental mode when all notes are new."""
         # Empty database
         processed_paths = temp_db.get_processed_note_paths()
@@ -132,7 +132,7 @@ class TestIncrementalSync:
 
         assert len(new_notes) == 3
 
-    def test_incremental_after_card_deletion(self, temp_db):
+    def test_incremental_after_card_deletion(self, temp_db) -> None:
         """Test incremental mode after card deletion."""
         # Add and then delete a card
         card = self._create_test_card("notes/deleted.md", "slug1", 1, "en")
@@ -149,7 +149,7 @@ class TestIncrementalSync:
         paths_after = temp_db.get_processed_note_paths()
         assert "notes/deleted.md" not in paths_after
 
-    def test_incremental_with_multilingual_notes(self, temp_db):
+    def test_incremental_with_multilingual_notes(self, temp_db) -> None:
         """Test incremental mode with multi-language cards."""
         # Add cards for a note in multiple languages
         card_en = self._create_test_card("notes/multi.md", "slug-en", 1, "en")
@@ -165,7 +165,7 @@ class TestIncrementalSync:
         assert len(paths) == 1
         assert "notes/multi.md" in paths
 
-    def test_incremental_performance(self, temp_db):
+    def test_incremental_performance(self, temp_db) -> None:
         """Test performance with large number of cards."""
         # Add many cards
         for i in range(100):
@@ -206,14 +206,14 @@ class TestIncrementalSyncStatistics:
     """Test statistics tracking for incremental sync."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_track_processed_count(self, temp_db):
+    def test_track_processed_count(self, temp_db) -> None:
         """Test tracking number of processed notes."""
         # Initially zero
         assert len(temp_db.get_processed_note_paths()) == 0
@@ -226,7 +226,7 @@ class TestIncrementalSyncStatistics:
             paths = temp_db.get_processed_note_paths()
             assert len(paths) == i + 1
 
-    def test_filter_statistics(self, temp_db):
+    def test_filter_statistics(self, temp_db) -> None:
         """Test calculating filter statistics."""
         # Add 3 processed notes
         for i in range(3):

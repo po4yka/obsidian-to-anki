@@ -21,18 +21,14 @@ from ..config import Config
 from ..models import NoteMetadata, QAPair
 from ..utils.logging import get_logger
 from .exceptions import (
-    GenerationError,
     ModelError,
-    PostValidationError,
     PreValidationError,
     StructuredOutputError,
-    WorkflowError,
 )
 from .models import (
     AgentPipelineResult,
     CardSplittingResult,
     ContextEnrichmentResult,
-    DuplicateDetectionResult,
     GeneratedCard,
     GenerationResult,
     MemorizationQualityResult,
@@ -62,7 +58,9 @@ class PipelineState(TypedDict):
     file_path: str | None
     slug_base: str
     config: Config  # Service configuration for model selection
-    existing_cards_dicts: list[dict] | None  # Serialized existing cards for duplicate check
+    existing_cards_dicts: (
+        list[dict] | None
+    )  # Serialized existing cards for duplicate check
 
     # Pipeline stage results
     pre_validation: dict | None  # Serialized PreValidationResult
@@ -182,7 +180,9 @@ def pre_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
     except (StructuredOutputError, ModelError) as e:
-        logger.error("langgraph_pre_validation_model_error", error=str(e), details=e.details)
+        logger.error(
+            "langgraph_pre_validation_model_error", error=str(e), details=e.details
+        )
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="format",
@@ -559,7 +559,9 @@ def context_enrichment_node(state: PipelineState) -> PipelineState:
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
-        cards = [GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]]
+        cards = [
+            GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
+        ]
 
         # Enrich each card
         enriched_cards = []
@@ -593,7 +595,7 @@ def context_enrichment_node(state: PipelineState) -> PipelineState:
             enriched_card=None,  # Individual results not stored in summary
             additions=[],
             additions_summary=f"Enriched {total_enriched}/{len(cards)} cards",
-            enrichment_rationale=f"Enhanced cards with examples and context",
+            enrichment_rationale="Enhanced cards with examples and context",
             enrichment_time=time.time() - start_time,
         )
 
@@ -669,7 +671,9 @@ def memorization_quality_node(state: PipelineState) -> PipelineState:
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
-        cards = [GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]]
+        cards = [
+            GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
+        ]
 
         # Assess all cards
         quality_result = asyncio.run(quality_agent.assess(cards, metadata))
@@ -714,9 +718,10 @@ def memorization_quality_node(state: PipelineState) -> PipelineState:
         if state.get("enable_duplicate_detection", False)
         else "complete"
     )
-    state["messages"].append(
-        f"Memorization quality: score={state['memorization_quality']['memorization_score']:.2f}"
-    )
+    if state["memorization_quality"] is not None:
+        state["messages"].append(
+            f"Memorization quality: score={state['memorization_quality']['memorization_score']:.2f}"
+        )
 
     return state
 
@@ -773,8 +778,10 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
         new_cards = [
             GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
         ]
+        existing_cards_dicts = state.get("existing_cards_dicts")
+        assert existing_cards_dicts is not None, "existing_cards_dicts should not be None"
         existing_cards = [
-            GeneratedCard(**card_dict) for card_dict in state["existing_cards_dicts"]
+            GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
         ]
 
         # Check each new card against existing cards
@@ -798,12 +805,14 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
                     logger.warning(
                         "duplicate_card_detected",
                         new_slug=new_card.slug,
-                        best_match=result.best_match.card_slug
-                        if result.best_match
-                        else None,
-                        similarity=result.best_match.similarity_score
-                        if result.best_match
-                        else 0.0,
+                        best_match=(
+                            result.best_match.card_slug if result.best_match else None
+                        ),
+                        similarity=(
+                            result.best_match.similarity_score
+                            if result.best_match
+                            else 0.0
+                        ),
                         recommendation=result.recommendation,
                     )
 
@@ -820,15 +829,16 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
                 )
 
         # Store all results
+        detection_time = time.time() - start_time
         detection_summary = {
             "total_cards_checked": len(new_cards),
             "duplicates_found": total_duplicates_found,
             "results": duplicate_results,
-            "detection_time": time.time() - start_time,
+            "detection_time": detection_time,
         }
 
         state["duplicate_detection"] = detection_summary
-        state["stage_times"]["duplicate_detection"] = detection_summary["detection_time"]
+        state["stage_times"]["duplicate_detection"] = detection_time
 
         logger.info(
             "langgraph_duplicate_detection_complete",
@@ -844,8 +854,9 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
 
     # Move to complete
     state["current_stage"] = "complete"
+    duplicate_detection = state.get("duplicate_detection") or {}
     state["messages"].append(
-        f"Duplicate detection: {state.get('duplicate_detection', {}).get('duplicates_found', 0)} duplicates found"
+        f"Duplicate detection: {duplicate_detection.get('duplicates_found', 0)} duplicates found"
     )
 
     return state
@@ -976,7 +987,9 @@ class LangGraphOrchestrator:
             max_retries if max_retries is not None else config.langgraph_max_retries
         )
         self.auto_fix_enabled = (
-            auto_fix_enabled if auto_fix_enabled is not None else config.langgraph_auto_fix
+            auto_fix_enabled
+            if auto_fix_enabled is not None
+            else config.langgraph_auto_fix
         )
         self.strict_mode = (
             strict_mode if strict_mode is not None else config.langgraph_strict_mode
@@ -999,7 +1012,9 @@ class LangGraphOrchestrator:
         self.enable_duplicate_detection = (
             enable_duplicate_detection
             if enable_duplicate_detection is not None
-            else getattr(config, "enable_duplicate_detection", False)  # Default to False
+            else getattr(
+                config, "enable_duplicate_detection", False
+            )  # Default to False
         )
 
         # Build the workflow graph
@@ -1136,7 +1151,9 @@ class LangGraphOrchestrator:
             "slug_base": slug_base,
             "config": self.config,  # Pass config for model selection
             "existing_cards_dicts": (
-                [card.model_dump() for card in existing_cards] if existing_cards else None
+                [card.model_dump() for card in existing_cards]
+                if existing_cards
+                else None
             ),
             "pre_validation": None,
             "card_splitting": None,
@@ -1175,7 +1192,7 @@ class LangGraphOrchestrator:
             if final_state.get("pre_validation")
             else None
         )
-        card_splitting = (
+        (
             CardSplittingResult(**final_state["card_splitting"])
             if final_state.get("card_splitting")
             else None
@@ -1190,7 +1207,7 @@ class LangGraphOrchestrator:
             if final_state.get("post_validation")
             else None
         )
-        context_enrichment = (
+        (
             ContextEnrichmentResult(**final_state["context_enrichment"])
             if final_state.get("context_enrichment")
             else None
