@@ -15,7 +15,7 @@ def _build_client() -> AnkiClient:
     return client
 
 
-def test_update_note_tags_adds_and_removes_diff():
+def test_update_note_tags_adds_and_removes_diff() -> None:
     client = _build_client()
     client.notes_info = MagicMock(return_value=[{"tags": ["existing", "legacy"]}])
     client.add_tags = MagicMock()
@@ -27,7 +27,7 @@ def test_update_note_tags_adds_and_removes_diff():
     client.remove_tags.assert_called_once_with([42], "legacy")
 
 
-def test_update_note_tags_handles_empty_target():
+def test_update_note_tags_handles_empty_target() -> None:
     client = _build_client()
     client.notes_info = MagicMock(return_value=[{"tags": ["old1", "old2"]}])
     client.add_tags = MagicMock()
@@ -39,7 +39,7 @@ def test_update_note_tags_handles_empty_target():
     client.remove_tags.assert_called_once_with([99], "old1 old2")
 
 
-def test_update_note_tags_raises_when_note_missing():
+def test_update_note_tags_raises_when_note_missing() -> None:
     client = _build_client()
     client.notes_info = MagicMock(return_value=[])
     client.add_tags = MagicMock()

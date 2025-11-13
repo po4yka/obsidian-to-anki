@@ -53,7 +53,7 @@ def sample_manifest():
 class TestDetectCodeLanguage:
     """Tests for _detect_code_language method."""
 
-    def test_detect_kotlin(self, generator_agent):
+    def test_detect_kotlin(self, generator_agent) -> None:
         """Test Kotlin code detection."""
         kotlin_code = """suspend fun fetchData(): Result<User> {
     val result = repository.getData()
@@ -61,12 +61,12 @@ class TestDetectCodeLanguage:
 }"""
         assert generator_agent._detect_code_language(kotlin_code) == "kotlin"
 
-    def test_detect_kotlin_data_class(self, generator_agent):
+    def test_detect_kotlin_data_class(self, generator_agent) -> None:
         """Test Kotlin data class detection."""
         kotlin_code = "data class User(val name: String, val age: Int)"
         assert generator_agent._detect_code_language(kotlin_code) == "kotlin"
 
-    def test_detect_java(self, generator_agent):
+    def test_detect_java(self, generator_agent) -> None:
         """Test Java code detection."""
         java_code = """public class Main {
     public static void main(String[] args) {
@@ -75,21 +75,21 @@ class TestDetectCodeLanguage:
 }"""
         assert generator_agent._detect_code_language(java_code) == "java"
 
-    def test_detect_python(self, generator_agent):
+    def test_detect_python(self, generator_agent) -> None:
         """Test Python code detection."""
         python_code = """async def fetch_data() -> User:
     result = await repository.get_data()
     return result"""
         assert generator_agent._detect_code_language(python_code) == "python"
 
-    def test_detect_python_class(self, generator_agent):
+    def test_detect_python_class(self, generator_agent) -> None:
         """Test Python class detection."""
         python_code = """class User:
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self.name = name"""
         assert generator_agent._detect_code_language(python_code) == "python"
 
-    def test_detect_javascript(self, generator_agent):
+    def test_detect_javascript(self, generator_agent) -> None:
         """Test JavaScript code detection."""
         js_code = """const fetchData = async () => {
     const result = await fetch('/api/data');
@@ -97,7 +97,7 @@ class TestDetectCodeLanguage:
 };"""
         assert generator_agent._detect_code_language(js_code) == "javascript"
 
-    def test_detect_typescript(self, generator_agent):
+    def test_detect_typescript(self, generator_agent) -> None:
         """Test TypeScript code detection."""
         ts_code = """interface User {
     name: string;
@@ -109,7 +109,7 @@ const getUser = (): User => {
 };"""
         assert generator_agent._detect_code_language(ts_code) == "typescript"
 
-    def test_detect_bash(self, generator_agent):
+    def test_detect_bash(self, generator_agent) -> None:
         """Test Bash script detection."""
         bash_code = """#!/bin/bash
 export PATH=/usr/local/bin:$PATH
@@ -117,7 +117,7 @@ echo "Hello World"
 sudo apt-get update"""
         assert generator_agent._detect_code_language(bash_code) == "bash"
 
-    def test_detect_yaml(self, generator_agent):
+    def test_detect_yaml(self, generator_agent) -> None:
         """Test YAML detection."""
         yaml_code = """name: CI Pipeline
 on:
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-latest"""
         assert generator_agent._detect_code_language(yaml_code) == "yaml"
 
-    def test_detect_json(self, generator_agent):
+    def test_detect_json(self, generator_agent) -> None:
         """Test JSON detection."""
         json_code = """{
     "name": "test",
@@ -140,7 +140,7 @@ jobs:
 }"""
         assert generator_agent._detect_code_language(json_code) == "json"
 
-    def test_detect_sql(self, generator_agent):
+    def test_detect_sql(self, generator_agent) -> None:
         """Test SQL detection."""
         sql_code = """SELECT u.name, u.email
 FROM users u
@@ -148,7 +148,7 @@ WHERE u.active = true
 ORDER BY u.created_at DESC;"""
         assert generator_agent._detect_code_language(sql_code) == "sql"
 
-    def test_detect_empty_code(self, generator_agent):
+    def test_detect_empty_code(self, generator_agent) -> None:
         """Test empty code returns text."""
         assert generator_agent._detect_code_language("") == "text"
         assert generator_agent._detect_code_language("   ") == "text"
@@ -157,7 +157,7 @@ ORDER BY u.created_at DESC;"""
 class TestGenerateTags:
     """Tests for _generate_tags method."""
 
-    def test_generate_tags_basic(self, generator_agent, sample_metadata):
+    def test_generate_tags_basic(self, generator_agent, sample_metadata) -> None:
         """Test basic tag generation."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
@@ -167,13 +167,13 @@ class TestGenerateTags:
         for tag in tags:
             assert re.match(r"^[a-z0-9_]+$", tag)
 
-    def test_generate_tags_includes_topic(self, generator_agent, sample_metadata):
+    def test_generate_tags_includes_topic(self, generator_agent, sample_metadata) -> None:
         """Test that tags include topic."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
         assert "system_design" in tags
 
-    def test_generate_tags_includes_subtopics(self, generator_agent, sample_metadata):
+    def test_generate_tags_includes_subtopics(self, generator_agent, sample_metadata) -> None:
         """Test that tags include subtopics."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
@@ -182,14 +182,14 @@ class TestGenerateTags:
             for subtopic in ["microservices", "scalability"]
         )
 
-    def test_generate_tags_deterministic(self, generator_agent, sample_metadata):
+    def test_generate_tags_deterministic(self, generator_agent, sample_metadata) -> None:
         """Test that tag generation is deterministic."""
         tags1 = generator_agent._generate_tags(sample_metadata, "en")
         tags2 = generator_agent._generate_tags(sample_metadata, "en")
 
         assert tags1 == tags2
 
-    def test_generate_tags_with_platform(self, generator_agent):
+    def test_generate_tags_with_platform(self, generator_agent) -> None:
         """Test tag generation with platform tags."""
         metadata = NoteMetadata(
             id="test-002",
@@ -206,7 +206,7 @@ class TestGenerateTags:
 
         assert "android" in tags
 
-    def test_generate_tags_with_difficulty(self, generator_agent, sample_metadata):
+    def test_generate_tags_with_difficulty(self, generator_agent, sample_metadata) -> None:
         """Test tag generation includes difficulty."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
@@ -214,7 +214,7 @@ class TestGenerateTags:
         if len(tags) < 6:
             assert any("difficulty" in tag for tag in tags)
 
-    def test_generate_tags_minimum_count(self, generator_agent):
+    def test_generate_tags_minimum_count(self, generator_agent) -> None:
         """Test that at least 3 tags are generated."""
         minimal_metadata = NoteMetadata(
             id="test-003",
@@ -233,7 +233,7 @@ class TestGenerateTags:
 class TestGenerateManifest:
     """Tests for _generate_manifest method."""
 
-    def test_generate_manifest_structure(self, generator_agent, sample_manifest):
+    def test_generate_manifest_structure(self, generator_agent, sample_manifest) -> None:
         """Test manifest has correct structure."""
         tags = ["python", "testing", "pytest"]
         manifest_str = generator_agent._generate_manifest(
@@ -252,7 +252,7 @@ class TestGenerateManifest:
         assert "type" in manifest_data
         assert "tags" in manifest_data
 
-    def test_generate_manifest_values(self, generator_agent, sample_manifest):
+    def test_generate_manifest_values(self, generator_agent, sample_manifest) -> None:
         """Test manifest contains correct values."""
         tags = ["kotlin", "android", "coroutines"]
         manifest_str = generator_agent._generate_manifest(
@@ -273,7 +273,7 @@ class TestPostProcessAPF:
 
     def test_post_process_strips_markdown_fences(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test that markdown code fences are stripped."""
         apf_html = """```html
 <!-- Card 1 | slug: test | CardType: Simple | Tags: python testing -->
@@ -294,7 +294,7 @@ Test question
 
     def test_post_process_strips_text_before_card(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test that explanatory text before card is removed."""
         apf_html = """Here's the generated card:
 
@@ -314,7 +314,7 @@ Test question"""
 
     def test_post_process_injects_manifest(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test that manifest is injected if missing."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: python testing -->
 <!-- Title -->
@@ -343,7 +343,7 @@ result = test()
 
     def test_post_process_replaces_invalid_manifest(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test that invalid manifest is replaced."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: python -->
 <!-- Title -->
@@ -362,7 +362,7 @@ Test question
 
     def test_post_process_detects_card_type_missing(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test card type detection for Missing cards."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: python -->
 <!-- Title -->
@@ -370,7 +370,7 @@ Complete the code
 
 <!-- Key point (code block with cloze) -->
 <pre><code class="language-python">
-def test():
+def test() -> None:
     return {{c1::42}}
 </code></pre>"""
 
@@ -384,7 +384,7 @@ def test():
 
     def test_post_process_detects_card_type_draw(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test card type detection for Draw cards."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: python -->
 <!-- Title -->
@@ -403,7 +403,7 @@ Draw the architecture
 
     def test_post_process_uses_model_tags(
         self, generator_agent, sample_metadata, sample_manifest
-    ):
+    ) -> None:
         """Test that tags from model output are used if valid."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: kotlin android coroutines -->
 <!-- Title -->

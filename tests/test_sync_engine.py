@@ -6,7 +6,7 @@ from obsidian_anki_sync.models import Card, Manifest
 from obsidian_anki_sync.sync.engine import SyncEngine
 
 
-def test_update_card_updates_fields_and_tags(test_config):
+def test_update_card_updates_fields_and_tags(test_config) -> None:
     """_update_card should refresh fields, tags, and database state."""
     from obsidian_anki_sync.anki.client import AnkiClient
     from obsidian_anki_sync.sync.state_db import StateDB

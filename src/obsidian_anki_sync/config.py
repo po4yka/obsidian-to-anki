@@ -139,7 +139,9 @@ class Config:
     enable_card_splitting: bool = True  # Analyze if note should be split
     enable_context_enrichment: bool = True  # Add examples and mnemonics
     enable_memorization_quality: bool = True  # Check SRS effectiveness
-    enable_duplicate_detection: bool = False  # Check against existing cards (requires existing_cards)
+    enable_duplicate_detection: bool = (
+        False  # Check against existing cards (requires existing_cards)
+    )
 
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.

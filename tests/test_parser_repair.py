@@ -82,14 +82,14 @@ Testing is verification.
 class TestParserRepairAgent:
     """Tests for ParserRepairAgent class."""
 
-    def test_initialization(self, parser_repair_agent):
+    def test_initialization(self, parser_repair_agent) -> None:
         """Test agent initialization."""
         assert parser_repair_agent.model == "qwen3:8b"
         assert parser_repair_agent.temperature == 0.0
 
     def test_build_repair_prompt(
         self, parser_repair_agent, malformed_note_empty_language_tags
-    ):
+    ) -> None:
         """Test repair prompt generation."""
         error = "Missing required fields: language_tags"
         prompt = parser_repair_agent._build_repair_prompt(
@@ -107,7 +107,7 @@ class TestParserRepairAgent:
         malformed_note_empty_language_tags,
         repaired_note_content,
         tmp_path,
-    ):
+    ) -> None:
         """Test successful repair and parse."""
         # Create temp file with malformed content
         test_file = tmp_path / "test-note.md"
@@ -138,7 +138,7 @@ class TestParserRepairAgent:
         assert metadata.language_tags == ["en", "ru"]
         assert len(qa_pairs) == 1
 
-    def test_repair_and_parse_unrepairable(self, parser_repair_agent, tmp_path):
+    def test_repair_and_parse_unrepairable(self, parser_repair_agent, tmp_path) -> None:
         """Test unrepairable note."""
         # Create temp file with fundamentally broken content
         test_file = tmp_path / "broken-note.md"
@@ -161,7 +161,7 @@ class TestParserRepairAgent:
 
         assert result is None
 
-    def test_repair_and_parse_llm_failure(self, parser_repair_agent, tmp_path):
+    def test_repair_and_parse_llm_failure(self, parser_repair_agent, tmp_path) -> None:
         """Test LLM call failure."""
         test_file = tmp_path / "test-note.md"
         test_file.write_text("---\ntest\n---")
@@ -178,7 +178,7 @@ class TestParserRepairAgent:
 
         assert result is None
 
-    def test_repair_and_parse_invalid_json(self, parser_repair_agent, tmp_path):
+    def test_repair_and_parse_invalid_json(self, parser_repair_agent, tmp_path) -> None:
         """Test invalid JSON response from LLM."""
         test_file = tmp_path / "test-note.md"
         test_file.write_text("---\ntest\n---")
@@ -201,7 +201,7 @@ class TestAttemptRepairHelper:
 
     def test_attempt_repair_calls_agent(
         self, mock_ollama_provider, tmp_path, repaired_note_content
-    ):
+    ) -> None:
         """Test that attempt_repair creates agent and calls repair_and_parse."""
         test_file = tmp_path / "test-note.md"
         test_file.write_text("malformed content")
@@ -231,7 +231,7 @@ class TestAttemptRepairHelper:
 class TestParseNoteWithRepair:
     """Tests for parse_note_with_repair function."""
 
-    def test_parse_note_with_repair_success_no_repair_needed(self, tmp_path):
+    def test_parse_note_with_repair_success_no_repair_needed(self, tmp_path) -> None:
         """Test parsing a valid note that doesn't need repair."""
         # Create valid note
         valid_note = """---
@@ -266,7 +266,7 @@ Testing is verification.
         assert metadata.language_tags == ["en", "ru"]
         assert len(qa_pairs) == 1
 
-    def test_parse_note_with_repair_disabled(self, tmp_path):
+    def test_parse_note_with_repair_disabled(self, tmp_path) -> None:
         """Test that repair is skipped when disabled."""
         # Create malformed note with missing frontmatter
         malformed_note = """# Question
@@ -281,7 +281,7 @@ Test without frontmatter
 
     def test_parse_note_with_repair_success(
         self, tmp_path, mock_ollama_provider, repaired_note_content
-    ):
+    ) -> None:
         """Test successful parsing with repair."""
         # Create malformed note without frontmatter
         malformed_note = """# Question
@@ -316,7 +316,7 @@ Some content without frontmatter
         assert metadata.language_tags == ["en", "ru"]
         assert len(qa_pairs) == 1
 
-    def test_parse_note_with_repair_failure(self, tmp_path, mock_ollama_provider):
+    def test_parse_note_with_repair_failure(self, tmp_path, mock_ollama_provider) -> None:
         """Test that error is raised when repair fails."""
         # Create malformed note
         malformed_note = "Completely broken"

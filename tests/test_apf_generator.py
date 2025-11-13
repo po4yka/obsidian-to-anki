@@ -96,19 +96,19 @@ def sample_qa_pair_for_prompt():
 
 def test_code_language_hint_detects_known_language(
     dummy_config, sample_metadata_for_code
-):
+) -> None:
     gen = APFGenerator(dummy_config)
     assert gen._code_language_hint(sample_metadata_for_code) == "kotlin"
 
 
-def test_code_language_hint_falls_back_to_plaintext(dummy_config, plain_metadata):
+def test_code_language_hint_falls_back_to_plaintext(dummy_config, plain_metadata) -> None:
     gen = APFGenerator(dummy_config)
     assert gen._code_language_hint(plain_metadata) == "plaintext"
 
 
 def test_prompt_includes_code_language_instruction(
     dummy_config, sample_metadata_for_code, sample_qa_pair_for_prompt, sample_manifest
-):
+) -> None:
     gen = APFGenerator(dummy_config)
     prompt = gen._build_user_prompt(
         question=sample_qa_pair_for_prompt.question_en,
@@ -121,7 +121,7 @@ def test_prompt_includes_code_language_instruction(
     assert '<pre><code class="language-kotlin"' in prompt
 
 
-def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
+def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest) -> None:
     gen = APFGenerator(dummy_config)
     html = '<!-- manifest: {"slug":"old","guid":"bad","tags":[]} -->'
     updated = gen._ensure_manifest(
@@ -134,7 +134,7 @@ def test_ensure_manifest_updates_guid_and_tags(dummy_config, sample_manifest):
 
 def test_normalize_code_blocks_converts_markdown(
     dummy_config, sample_metadata_for_code
-):
+) -> None:
     gen = APFGenerator(dummy_config)
     html = 'Intro\n```kotlin\nprintln("hi")\n```\nOutro'
     normalized = gen._normalize_code_blocks(
@@ -147,7 +147,7 @@ def test_normalize_code_blocks_converts_markdown(
 
 def test_normalize_code_blocks_uses_default_when_missing_lang(
     dummy_config, plain_metadata
-):
+) -> None:
     gen = APFGenerator(dummy_config)
     html = """```
 val x = 1
@@ -160,7 +160,7 @@ val x = 1
     assert "val x = 1" in normalized
 
 
-def test_extract_tags_sanitizes_slashes(dummy_config):
+def test_extract_tags_sanitizes_slashes(dummy_config) -> None:
     metadata = NoteMetadata(
         id="t-1",
         title="Tagged",

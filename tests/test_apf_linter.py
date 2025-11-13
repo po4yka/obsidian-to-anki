@@ -6,7 +6,7 @@ from obsidian_anki_sync.apf.linter import validate_apf
 class TestAPFValidation:
     """Test APF format validation (UNIT-apf-a)."""
 
-    def test_valid_simple_card(self):
+    def test_valid_simple_card(self) -> None:
         """Test validation of a valid Simple card."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -27,7 +27,7 @@ What is unit testing?
 <!-- Key point (code block / image) -->
 <pre><code class="language-python">
 # Unit testing example
-def test_addition():
+def test_addition() -> None:
     assert 1 + 1 == 2
 </code></pre>
 
@@ -55,7 +55,7 @@ END_OF_CARDS"""
         assert result.is_valid
         assert len(result.errors) == 0
 
-    def test_missing_sentinels(self):
+    def test_missing_sentinels(self) -> None:
         """Test error on missing sentinels."""
         apf_html = """<!-- Card 1 | slug: test | CardType: Simple | Tags: python -->
 <!-- Title -->
@@ -72,7 +72,7 @@ Answer
         assert any("BEGIN_CARDS" in e for e in result.errors)
         assert any("END_CARDS" in e for e in result.errors)
 
-    def test_missing_end_of_cards(self):
+    def test_missing_end_of_cards(self) -> None:
         """Test error on missing END_OF_CARDS."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -90,7 +90,7 @@ Answer
         assert not result.is_valid
         assert any("END_OF_CARDS" in e for e in result.errors)
 
-    def test_invalid_card_header(self):
+    def test_invalid_card_header(self) -> None:
         """Test error on invalid card header format."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -109,7 +109,7 @@ END_OF_CARDS"""
 class TestTagValidation:
     """Test tag validation (UNIT-tag-01)."""
 
-    def test_valid_tag_count(self):
+    def test_valid_tag_count(self) -> None:
         """Test validation of tag count (3-6)."""
         # Valid: 3 tags
         apf_html = self._make_card_html("python testing unit_testing")
@@ -123,7 +123,7 @@ class TestTagValidation:
         result = validate_apf(apf_html)
         assert result.is_valid
 
-    def test_too_few_tags(self):
+    def test_too_few_tags(self) -> None:
         """Test error on too few tags."""
         apf_html = self._make_card_html("python testing")
         result = validate_apf(apf_html)
@@ -131,7 +131,7 @@ class TestTagValidation:
         assert not result.is_valid
         assert any("Must have 3-6 tags" in e for e in result.errors)
 
-    def test_too_many_tags(self):
+    def test_too_many_tags(self) -> None:
         """Test error on too many tags."""
         apf_html = self._make_card_html("a b c d e f g h")
         result = validate_apf(apf_html)
@@ -139,7 +139,7 @@ class TestTagValidation:
         assert not result.is_valid
         assert any("Must have 3-6 tags" in e for e in result.errors)
 
-    def test_invalid_tag_format(self):
+    def test_invalid_tag_format(self) -> None:
         """Test error on non-snake_case tags."""
         apf_html = self._make_card_html("python TestCase camelCase")
         result = validate_apf(apf_html)
@@ -147,7 +147,7 @@ class TestTagValidation:
         assert not result.is_valid
         assert any("not in snake_case" in e for e in result.errors)
 
-    def test_missing_non_language_tag(self):
+    def test_missing_non_language_tag(self) -> None:
         """Test error when all tags are languages."""
         apf_html = self._make_card_html("python java kotlin")
         result = validate_apf(apf_html)
@@ -174,7 +174,7 @@ END_OF_CARDS"""
 class TestClozeValidation:
     """Test cloze deletion validation (LINT-cloze)."""
 
-    def test_valid_cloze_density(self):
+    def test_valid_cloze_density(self) -> None:
         """Test valid cloze numbering (1..N)."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -195,7 +195,7 @@ END_OF_CARDS"""
 
         assert result.is_valid
 
-    def test_sparse_cloze_numbering(self):
+    def test_sparse_cloze_numbering(self) -> None:
         """Test error on sparse cloze numbering (e.g., 1, 3, 5)."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -217,7 +217,7 @@ END_OF_CARDS"""
         assert not result.is_valid
         assert any("not dense" in e for e in result.errors)
 
-    def test_missing_clozes_in_missing_card(self):
+    def test_missing_clozes_in_missing_card(self) -> None:
         """Test warning when Missing card has no clozes."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -242,7 +242,7 @@ END_OF_CARDS"""
 class TestManifestValidation:
     """Test manifest validation."""
 
-    def test_missing_manifest(self):
+    def test_missing_manifest(self) -> None:
         """Test error when manifest is missing."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
@@ -261,7 +261,7 @@ END_OF_CARDS"""
         assert not result.is_valid
         assert any("Missing manifest" in e for e in result.errors)
 
-    def test_slug_mismatch(self):
+    def test_slug_mismatch(self) -> None:
         """Test error when manifest slug doesn't match header."""
         apf_html = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
