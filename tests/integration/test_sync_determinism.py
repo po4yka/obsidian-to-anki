@@ -33,7 +33,9 @@ class TestSyncDeterminism:
 class TestSyncFlow:
     """Test sync orchestration flow (INT-02)."""
 
-    def test_create_flow(self, test_config, temp_dir, sample_metadata, sample_qa_pair) -> None:
+    def test_create_flow(
+        self, test_config, temp_dir, sample_metadata, sample_qa_pair
+    ) -> None:
         """Test create card flow."""
         # Setup mocks
         from obsidian_anki_sync.anki.client import AnkiClient

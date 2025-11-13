@@ -316,7 +316,9 @@ Some content without frontmatter
         assert metadata.language_tags == ["en", "ru"]
         assert len(qa_pairs) == 1
 
-    def test_parse_note_with_repair_failure(self, tmp_path, mock_ollama_provider) -> None:
+    def test_parse_note_with_repair_failure(
+        self, tmp_path, mock_ollama_provider
+    ) -> None:
         """Test that error is raised when repair fails."""
         # Create malformed note
         malformed_note = "Completely broken"
