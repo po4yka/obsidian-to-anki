@@ -17,7 +17,9 @@ class TestContentHash:
 
         assert hash_original != hash_modified
 
-    def test_hash_changes_with_references(self, sample_qa_pair, sample_metadata) -> None:
+    def test_hash_changes_with_references(
+        self, sample_qa_pair, sample_metadata
+    ) -> None:
         """References contribute to hash."""
         hash_original = compute_content_hash(sample_qa_pair, sample_metadata, "en")
 

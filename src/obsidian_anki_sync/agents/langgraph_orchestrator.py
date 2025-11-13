@@ -273,7 +273,7 @@ def card_splitting_node(state: PipelineState) -> PipelineState:
                 qa_pairs=qa_pairs,
             )
         )
-        splitting_result.analysis_time = time.time() - start_time
+        splitting_result.decision_time = time.time() - start_time
     except Exception as e:
         logger.error("langgraph_card_splitting_error", error=str(e))
         # Fallback: assume no splitting needed
@@ -281,23 +281,25 @@ def card_splitting_node(state: PipelineState) -> PipelineState:
 
         splitting_result = CardSplittingResult(
             should_split=False,
-            split_reason="",
-            recommended_splits=[],
-            analysis_time=time.time() - start_time,
+            card_count=1,
+            splitting_strategy="none",
+            reasoning="",
+            split_plan=[],
+            decision_time=time.time() - start_time,
         )
 
     logger.info(
         "langgraph_card_splitting_complete",
         should_split=splitting_result.should_split,
-        recommended_splits=len(splitting_result.recommended_splits),
-        time=splitting_result.analysis_time,
+        recommended_splits=len(splitting_result.split_plan),
+        time=splitting_result.decision_time,
     )
 
     state["card_splitting"] = splitting_result.model_dump()
-    state["stage_times"]["card_splitting"] = splitting_result.analysis_time
+    state["stage_times"]["card_splitting"] = splitting_result.decision_time
     state["current_stage"] = "generation"
     state["messages"].append(
-        f"Card splitting: {'split into ' + str(len(splitting_result.recommended_splits)) if splitting_result.should_split else 'no split needed'}"
+        f"Card splitting: {'split into ' + str(len(splitting_result.split_plan)) if splitting_result.should_split else 'no split needed'}"
     )
 
     return state
@@ -779,7 +781,9 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
             GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
         ]
         existing_cards_dicts = state.get("existing_cards_dicts")
-        assert existing_cards_dicts is not None, "existing_cards_dicts should not be None"
+        assert (
+            existing_cards_dicts is not None
+        ), "existing_cards_dicts should not be None"
         existing_cards = [
             GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
         ]
@@ -824,7 +828,7 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
                 duplicate_results.append(
                     {
                         "card_slug": new_card.slug,
-                        "result": None,
+                        "result": [],
                     }
                 )
 

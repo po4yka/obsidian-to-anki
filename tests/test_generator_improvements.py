@@ -167,13 +167,17 @@ class TestGenerateTags:
         for tag in tags:
             assert re.match(r"^[a-z0-9_]+$", tag)
 
-    def test_generate_tags_includes_topic(self, generator_agent, sample_metadata) -> None:
+    def test_generate_tags_includes_topic(
+        self, generator_agent, sample_metadata
+    ) -> None:
         """Test that tags include topic."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
         assert "system_design" in tags
 
-    def test_generate_tags_includes_subtopics(self, generator_agent, sample_metadata) -> None:
+    def test_generate_tags_includes_subtopics(
+        self, generator_agent, sample_metadata
+    ) -> None:
         """Test that tags include subtopics."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
@@ -182,7 +186,9 @@ class TestGenerateTags:
             for subtopic in ["microservices", "scalability"]
         )
 
-    def test_generate_tags_deterministic(self, generator_agent, sample_metadata) -> None:
+    def test_generate_tags_deterministic(
+        self, generator_agent, sample_metadata
+    ) -> None:
         """Test that tag generation is deterministic."""
         tags1 = generator_agent._generate_tags(sample_metadata, "en")
         tags2 = generator_agent._generate_tags(sample_metadata, "en")
@@ -206,7 +212,9 @@ class TestGenerateTags:
 
         assert "android" in tags
 
-    def test_generate_tags_with_difficulty(self, generator_agent, sample_metadata) -> None:
+    def test_generate_tags_with_difficulty(
+        self, generator_agent, sample_metadata
+    ) -> None:
         """Test tag generation includes difficulty."""
         tags = generator_agent._generate_tags(sample_metadata, "en")
 
@@ -233,7 +241,9 @@ class TestGenerateTags:
 class TestGenerateManifest:
     """Tests for _generate_manifest method."""
 
-    def test_generate_manifest_structure(self, generator_agent, sample_manifest) -> None:
+    def test_generate_manifest_structure(
+        self, generator_agent, sample_manifest
+    ) -> None:
         """Test manifest has correct structure."""
         tags = ["python", "testing", "pytest"]
         manifest_str = generator_agent._generate_manifest(
