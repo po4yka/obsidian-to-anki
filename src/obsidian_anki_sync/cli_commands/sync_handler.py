@@ -10,6 +10,7 @@ from ..config import Config
 from ..sync.engine import SyncEngine
 from ..sync.progress import ProgressTracker
 from ..sync.state_db import StateDB
+from ..utils.preflight import run_preflight_checks
 from .shared import console
 
 
@@ -42,6 +43,49 @@ def run_sync(
         incremental=incremental,
         vault=str(config.vault_path),
     )
+
+    # Run pre-flight checks
+    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+
+    # Skip Anki check for dry-run mode
+    check_anki = not dry_run
+    check_llm = True
+
+    passed, results = run_preflight_checks(config, check_anki=check_anki, check_llm=check_llm)
+
+    # Display results
+    for result in results:
+        if result.passed:
+            icon = "[green]✓[/green]"
+            color = "green"
+        elif result.severity == "warning":
+            icon = "[yellow]⚠[/yellow]"
+            color = "yellow"
+        else:
+            icon = "[red]✗[/red]"
+            color = "red"
+
+        console.print(f"{icon} {result.name}: {result.message}")
+
+        if not result.passed and result.fix_suggestion:
+            console.print(f"  [dim]{result.fix_suggestion}[/dim]")
+
+    console.print()
+
+    # Count errors and warnings
+    errors = [r for r in results if not r.passed and r.severity == "error"]
+    warnings = [r for r in results if not r.passed and r.severity == "warning"]
+
+    if errors:
+        console.print(f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+        console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
+        raise typer.Exit(code=1)
+
+    if warnings:
+        console.print(f"\n[bold yellow]Pre-flight checks passed with {len(warnings)} warning(s).[/bold yellow]")
+        console.print("[dim]You may proceed, but some features may not work as expected.[/dim]\n")
+    else:
+        console.print("[bold green]All pre-flight checks passed![/bold green]\n")
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:

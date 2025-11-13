@@ -92,7 +92,7 @@ def categorize_llm_error(
     # HTTP status errors
     if isinstance(error, httpx.HTTPStatusError):
         status_code = error.response.status_code
-        response_text = error.response.text[:200]
+        response_text = error.response.text
 
         # Model not found (404)
         if status_code == 404:

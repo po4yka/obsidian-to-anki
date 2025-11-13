@@ -316,8 +316,10 @@ class AnthropicProvider(BaseLLMProvider):
         except (KeyError, IndexError, TypeError, ValueError) as e:
             logger.error(
                 "anthropic_parse_error",
+                model=model,
                 error=str(e),
-                response_data=str(data)[:500] if "data" in locals() else "N/A",
+                response_data=str(data) if "data" in locals() else "N/A",
+                response_data_length=len(str(data)) if "data" in locals() else 0,
             )
             raise ValueError(f"Failed to parse Anthropic response: {e}")
         except Exception as e:

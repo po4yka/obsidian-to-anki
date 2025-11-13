@@ -383,7 +383,7 @@ class SyncEngine:
                             # Store sample errors (up to 3 per type)
                             if len(error_samples[error_type_name]) < 3:
                                 error_samples[error_type_name].append(
-                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message[:80]}"
+                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
                                 )
 
                             self.stats["errors"] += 1

@@ -97,7 +97,7 @@ def retry(
                         attempt=attempt,
                         max_attempts=max_attempts,
                         delay=delay,
-                        error=str(e)[:200],  # Limit error message length
+                        error=str(e),
                         error_type=type(e).__name__,
                         attempt_duration=round(attempt_duration, 2),
                         cumulative_wait_time=round(cumulative_wait_time, 2),

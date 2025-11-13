@@ -210,7 +210,7 @@ Always respond in valid JSON format with the exact structure requested."""
             metadata = parse_frontmatter(temp_content_for_parse, file_path)
 
             # Parse Q/A pairs from repaired content
-            qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata)
+            qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata, file_path)
 
             if not qa_pairs:
                 logger.warning(
