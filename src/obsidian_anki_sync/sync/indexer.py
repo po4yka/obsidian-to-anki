@@ -158,7 +158,7 @@ class VaultIndexer:
                 # Store sample errors (up to 3 per type)
                 if len(error_samples[error_type_name]) < 3:
                     error_samples[error_type_name].append(
-                        f"{relative_path}: {error_message[:100]}"
+                        f"{relative_path}: {error_message}"
                     )
 
                 stats["errors"] += 1
