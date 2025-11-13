@@ -15,12 +15,51 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Global flag to control whether to use LLM-based extraction
+_USE_LLM_EXTRACTION = False
+_QA_EXTRACTOR_AGENT = None
+
 # Configure ruamel.yaml for preserving comments and order
 # This is available for future write operations
 ruamel_yaml = YAML()
 ruamel_yaml.preserve_quotes = True
 ruamel_yaml.default_flow_style = False
 ruamel_yaml.width = 4096  # Prevent line wrapping
+
+
+def configure_llm_extraction(
+    llm_provider: BaseLLMProvider | None,
+    model: str = "qwen3:8b",
+    temperature: float = 0.0,
+) -> None:
+    """Configure LLM-based Q&A extraction.
+
+    Args:
+        llm_provider: LLM provider instance (None to disable)
+        model: Model to use for extraction
+        temperature: Sampling temperature
+    """
+    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
+
+    if llm_provider is None:
+        _USE_LLM_EXTRACTION = False
+        _QA_EXTRACTOR_AGENT = None
+        logger.info("llm_extraction_disabled")
+        return
+
+    from ..agents.qa_extractor import QAExtractorAgent
+
+    _QA_EXTRACTOR_AGENT = QAExtractorAgent(
+        llm_provider=llm_provider,
+        model=model,
+        temperature=temperature,
+    )
+    _USE_LLM_EXTRACTION = True
+    logger.info(
+        "llm_extraction_enabled",
+        model=model,
+        temperature=temperature,
+    )
 
 
 def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
@@ -232,9 +271,12 @@ def parse_qa_pairs(
     """
     Parse Q/A pairs from note content.
 
+    Uses LLM-based extraction if configured, otherwise falls back to rigid parsing.
+
     Args:
         content: Full note content
         metadata: Parsed metadata
+        file_path: Optional file path for logging
 
     Returns:
         List of Q/A pairs
@@ -242,6 +284,55 @@ def parse_qa_pairs(
     Raises:
         ParserError: If structure is invalid
     """
+    # Try LLM-based extraction first if enabled
+    if _USE_LLM_EXTRACTION and _QA_EXTRACTOR_AGENT is not None:
+        logger.info(
+            "attempting_llm_extraction",
+            note_id=metadata.id,
+            title=metadata.title,
+            file=str(file_path) if file_path else "unknown",
+        )
+
+        try:
+            qa_pairs = _QA_EXTRACTOR_AGENT.extract_qa_pairs(
+                note_content=content,
+                metadata=metadata,
+                file_path=file_path,
+            )
+
+            if qa_pairs:
+                logger.info(
+                    "llm_extraction_succeeded",
+                    note_id=metadata.id,
+                    title=metadata.title,
+                    file=str(file_path) if file_path else "unknown",
+                    pairs_count=len(qa_pairs),
+                )
+                return qa_pairs
+            else:
+                logger.warning(
+                    "llm_extraction_returned_empty_falling_back",
+                    note_id=metadata.id,
+                    title=metadata.title,
+                    file=str(file_path) if file_path else "unknown",
+                )
+        except Exception as e:
+            logger.warning(
+                "llm_extraction_failed_falling_back",
+                note_id=metadata.id,
+                title=metadata.title,
+                file=str(file_path) if file_path else "unknown",
+                error=str(e),
+            )
+
+    # Fall back to rigid pattern-based parsing
+    logger.debug(
+        "using_rigid_parser",
+        note_id=metadata.id,
+        title=metadata.title,
+        file=str(file_path) if file_path else "unknown",
+    )
+
     # Strip frontmatter
     content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
 
@@ -523,36 +614,72 @@ def _parse_single_qa_block(
     )
 
 
-def discover_notes(vault_path: Path, source_dir: Path) -> list[tuple[Path, str]]:
+def discover_notes(
+    vault_path: Path, source_dir: Path | list[Path] | None = None
+) -> list[tuple[Path, str]]:
     """
     Discover Q&A notes in the vault.
 
     Args:
         vault_path: Root vault path
-        source_dir: Relative source directory
+        source_dir: Single relative source directory, or list of relative directories.
+                   If None, searches the entire vault.
 
     Returns:
         List of (absolute_path, relative_path) tuples
     """
-    full_source = vault_path / source_dir
+    # Convert single path to list for uniform handling
+    if source_dir is None:
+        source_dirs = [Path(".")]
+    elif isinstance(source_dir, list):
+        source_dirs = source_dir
+    else:
+        source_dirs = [source_dir]
 
-    if not full_source.exists():
-        logger.error("source_dir_not_found", path=str(full_source))
-        return []
+    all_notes = []
+    total_searched = 0
 
-    # Find all q-*.md files recursively
-    notes = []
-    for md_file in full_source.rglob("q-*.md"):
-        # Ignore certain patterns
-        if any(part.startswith(("c-", "moc-", "template")) for part in md_file.parts):
+    for src_dir in source_dirs:
+        full_source = vault_path / src_dir
+
+        if not full_source.exists():
+            logger.warning(
+                "source_dir_not_found",
+                path=str(full_source),
+                relative_path=str(src_dir),
+            )
             continue
 
-        # Calculate relative path from source_dir
-        relative = md_file.relative_to(full_source)
-        notes.append((md_file, str(relative)))
+        # Find all q-*.md files recursively in this directory
+        dir_notes = []
+        for md_file in full_source.rglob("q-*.md"):
+            # Ignore certain patterns
+            if any(
+                part.startswith(("c-", "moc-", "template")) for part in md_file.parts
+            ):
+                continue
 
-    logger.info("discovered_notes", count=len(notes), path=str(full_source))
-    return notes
+            # Calculate relative path from the source_dir root
+            relative = md_file.relative_to(full_source)
+            # Prepend source dir to relative path for clarity
+            full_relative = src_dir / relative
+            dir_notes.append((md_file, str(full_relative)))
+
+        logger.info(
+            "discovered_notes_in_dir",
+            count=len(dir_notes),
+            path=str(full_source),
+            relative_path=str(src_dir),
+        )
+        all_notes.extend(dir_notes)
+        total_searched += 1
+
+    logger.info(
+        "discovered_notes_total",
+        count=len(all_notes),
+        directories_searched=total_searched,
+    )
+    return all_notes
 
 
 def _parse_date(value: Any) -> datetime:
