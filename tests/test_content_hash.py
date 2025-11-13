@@ -8,7 +8,7 @@ from obsidian_anki_sync.apf.generator import compute_content_hash
 class TestContentHash:
     """Validate that content hash captures all relevant sections."""
 
-    def test_hash_changes_with_followups(self, sample_qa_pair, sample_metadata):
+    def test_hash_changes_with_followups(self, sample_qa_pair, sample_metadata) -> None:
         """Modifying follow-ups should change the hash."""
         hash_original = compute_content_hash(sample_qa_pair, sample_metadata, "en")
 
@@ -17,7 +17,7 @@ class TestContentHash:
 
         assert hash_original != hash_modified
 
-    def test_hash_changes_with_references(self, sample_qa_pair, sample_metadata):
+    def test_hash_changes_with_references(self, sample_qa_pair, sample_metadata) -> None:
         """References contribute to hash."""
         hash_original = compute_content_hash(sample_qa_pair, sample_metadata, "en")
 
@@ -26,7 +26,7 @@ class TestContentHash:
 
         assert hash_original != hash_modified
 
-    def test_hash_differs_by_language(self, sample_qa_pair, sample_metadata):
+    def test_hash_differs_by_language(self, sample_qa_pair, sample_metadata) -> None:
         """Different language surfaces should yield distinct hashes."""
         hash_en = compute_content_hash(sample_qa_pair, sample_metadata, "en")
         hash_ru = compute_content_hash(sample_qa_pair, sample_metadata, "ru")

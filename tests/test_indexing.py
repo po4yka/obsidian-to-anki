@@ -13,14 +13,14 @@ class TestNoteIndex:
     """Test note index functionality."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_upsert_note_index(self, temp_db):
+    def test_upsert_note_index(self, temp_db) -> None:
         """Test inserting and updating note index."""
         # Insert note
         temp_db.upsert_note_index(
@@ -43,7 +43,7 @@ class TestNoteIndex:
         assert note["language_tags"] == "en,ru"
         assert note["qa_pair_count"] == 3
 
-    def test_upsert_note_index_update(self, temp_db):
+    def test_upsert_note_index_update(self, temp_db) -> None:
         """Test updating existing note index."""
         # Insert initial
         temp_db.upsert_note_index(
@@ -73,7 +73,7 @@ class TestNoteIndex:
         assert note["topic"] == "Topic2"
         assert note["qa_pair_count"] == 3
 
-    def test_update_note_sync_status(self, temp_db):
+    def test_update_note_sync_status(self, temp_db) -> None:
         """Test updating note sync status."""
         # Insert note
         temp_db.upsert_note_index(
@@ -96,7 +96,7 @@ class TestNoteIndex:
         assert note["error_message"] is None
         assert note["last_synced_at"] is not None
 
-    def test_update_note_sync_status_with_error(self, temp_db):
+    def test_update_note_sync_status_with_error(self, temp_db) -> None:
         """Test updating note sync status with error."""
         temp_db.upsert_note_index(
             source_path="notes/test.md",
@@ -116,7 +116,7 @@ class TestNoteIndex:
         assert note["sync_status"] == "failed"
         assert note["error_message"] == "Parse error"
 
-    def test_get_all_notes_index(self, temp_db):
+    def test_get_all_notes_index(self, temp_db) -> None:
         """Test getting all notes from index."""
         # Insert multiple notes
         for i in range(5):
@@ -133,7 +133,7 @@ class TestNoteIndex:
         notes = temp_db.get_all_notes_index()
         assert len(notes) == 5
 
-    def test_get_notes_by_status(self, temp_db):
+    def test_get_notes_by_status(self, temp_db) -> None:
         """Test filtering notes by status."""
         # Insert notes with different statuses
         for i in range(3):
@@ -171,14 +171,14 @@ class TestCardIndex:
     """Test card index functionality."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_upsert_card_index(self, temp_db):
+    def test_upsert_card_index(self, temp_db) -> None:
         """Test inserting and updating card index."""
         # Insert card
         temp_db.upsert_card_index(
@@ -204,7 +204,7 @@ class TestCardIndex:
         assert card["in_obsidian"] == 1
         assert card["in_anki"] == 0
 
-    def test_upsert_card_index_update(self, temp_db):
+    def test_upsert_card_index_update(self, temp_db) -> None:
         """Test updating existing card index."""
         # Insert
         temp_db.upsert_card_index(
@@ -237,7 +237,7 @@ class TestCardIndex:
         assert card["in_anki"] == 1
         assert card["in_database"] == 1
 
-    def test_get_card_index_by_source(self, temp_db):
+    def test_get_card_index_by_source(self, temp_db) -> None:
         """Test getting all cards for a note."""
         # Insert multiple cards for one note
         for i in range(3):
@@ -253,7 +253,7 @@ class TestCardIndex:
         cards = temp_db.get_card_index_by_source("notes/test.md")
         assert len(cards) == 6  # 3 Q/A pairs × 2 languages
 
-    def test_card_index_unique_constraint(self, temp_db):
+    def test_card_index_unique_constraint(self, temp_db) -> None:
         """Test unique constraint on (source_path, card_index, lang)."""
         temp_db.upsert_card_index(
             source_path="notes/test.md",
@@ -279,14 +279,14 @@ class TestIndexStatistics:
     """Test index statistics functionality."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_get_index_statistics_empty(self, temp_db):
+    def test_get_index_statistics_empty(self, temp_db) -> None:
         """Test statistics on empty index."""
         stats = temp_db.get_index_statistics()
 
@@ -296,7 +296,7 @@ class TestIndexStatistics:
         assert stats["cards_in_anki"] == 0
         assert stats["cards_in_database"] == 0
 
-    def test_get_index_statistics_with_data(self, temp_db):
+    def test_get_index_statistics_with_data(self, temp_db) -> None:
         """Test statistics with data."""
         # Add notes
         for i in range(5):
@@ -349,7 +349,7 @@ class TestIndexStatistics:
         assert stats["cards_in_anki"] == 2
         assert stats["cards_in_database"] == 1
 
-    def test_note_status_breakdown(self, temp_db):
+    def test_note_status_breakdown(self, temp_db) -> None:
         """Test note status breakdown in statistics."""
         # Add notes with different statuses
         for i in range(3):
@@ -380,7 +380,7 @@ class TestIndexStatistics:
         assert stats["note_status"]["completed"] == 3
         assert stats["note_status"]["pending"] == 2
 
-    def test_card_status_breakdown(self, temp_db):
+    def test_card_status_breakdown(self, temp_db) -> None:
         """Test card status breakdown in statistics."""
         temp_db.upsert_card_index(
             source_path="note1.md",
@@ -412,7 +412,7 @@ class TestIndexStatistics:
         assert stats["card_status"]["synced"] == 1
         assert stats["card_status"]["orphaned"] == 1
 
-    def test_clear_index(self, temp_db):
+    def test_clear_index(self, temp_db) -> None:
         """Test clearing index."""
         # Add data
         temp_db.upsert_note_index(
@@ -450,14 +450,14 @@ class TestIndexIntegration:
     """Test integration between note and card indexes."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_note_with_multiple_cards(self, temp_db):
+    def test_note_with_multiple_cards(self, temp_db) -> None:
         """Test indexing note with multiple cards."""
         # Index note
         temp_db.upsert_note_index(
@@ -489,7 +489,7 @@ class TestIndexIntegration:
         assert note["qa_pair_count"] == 3
         assert len(cards) == 6
 
-    def test_orphaned_card_detection(self, temp_db):
+    def test_orphaned_card_detection(self, temp_db) -> None:
         """Test detecting orphaned cards."""
         # Card exists in Anki but not in vault
         temp_db.upsert_card_index(

@@ -45,7 +45,7 @@ def patch_logging(monkeypatch):
     )
 
 
-def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None):
+def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None) -> None:
     monkeypatch.setattr(
         "obsidian_anki_sync.cli_commands.shared.load_config",
         lambda path=None: test_config,
@@ -55,26 +55,26 @@ def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None)
     )
 
     class DummyAnki:
-        def __init__(self, url):
+        def __init__(self, url) -> None:
             self.url = url
 
-        def __enter__(self):
+        def __enter__(self) -> None:
             return self
 
-        def __exit__(self, exc_type, exc_val, exc_tb):
+        def __exit__(self, exc_type, exc_val, exc_tb) -> None:
             return False
 
-        def get_deck_names(self):
+        def get_deck_names(self) -> None:
             if decks is not None:
                 return decks
             return []
 
-        def get_model_names(self):
+        def get_model_names(self) -> None:
             if models is not None:
                 return models
             return []
 
-        def get_model_field_names(self, model_name):
+        def get_model_field_names(self, model_name) -> None:
             if fields is None:
                 return []
             return fields.get(model_name, [])
@@ -82,7 +82,7 @@ def _patch_setup(monkeypatch, test_config, decks=None, models=None, fields=None)
     monkeypatch.setattr("obsidian_anki_sync.anki.client.AnkiClient", DummyAnki)
 
 
-def test_decks_command_lists_names(runner, test_config, monkeypatch):
+def test_decks_command_lists_names(runner, test_config, monkeypatch) -> None:
     _patch_setup(monkeypatch, test_config, decks=["Deck B", "Deck A"])
     result = runner.invoke(app, ["decks"])
     assert result.exit_code == 0
@@ -90,7 +90,7 @@ def test_decks_command_lists_names(runner, test_config, monkeypatch):
     assert "Deck B" in result.output
 
 
-def test_models_command_lists_names(runner, test_config, monkeypatch):
+def test_models_command_lists_names(runner, test_config, monkeypatch) -> None:
     _patch_setup(monkeypatch, test_config, models=["ModelB", "ModelA"])
     result = runner.invoke(app, ["models"])
     assert result.exit_code == 0
@@ -98,7 +98,7 @@ def test_models_command_lists_names(runner, test_config, monkeypatch):
     assert "ModelB" in result.output
 
 
-def test_model_fields_command_shows_fields(runner, test_config, monkeypatch):
+def test_model_fields_command_shows_fields(runner, test_config, monkeypatch) -> None:
     _patch_setup(monkeypatch, test_config, fields={"Basic": ["Front", "Back"]})
     result = runner.invoke(app, ["model-fields", "--model", "Basic"])
     assert result.exit_code == 0
@@ -106,12 +106,12 @@ def test_model_fields_command_shows_fields(runner, test_config, monkeypatch):
     assert "Back" in result.output
 
 
-def test_format_command_runs_subprocess(runner, test_config, monkeypatch):
+def test_format_command_runs_subprocess(runner, test_config, monkeypatch) -> None:
     _patch_setup(monkeypatch, test_config)
 
     calls = []
 
-    def fake_run(cmd, check):
+    def fake_run(cmd, check) -> None:
         calls.append((tuple(cmd), check))
         return MagicMock()
 

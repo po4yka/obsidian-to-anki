@@ -17,7 +17,7 @@ from obsidian_anki_sync.obsidian.parser import (
 class TestYAMLParsing:
     """Test YAML frontmatter parsing (UNIT-yaml-01)."""
 
-    def test_parse_valid_frontmatter(self, temp_dir, sample_note_content):
+    def test_parse_valid_frontmatter(self, temp_dir, sample_note_content) -> None:
         """Test parsing valid YAML frontmatter."""
         note_file = temp_dir / "test.md"
         note_file.write_text(sample_note_content)
@@ -38,14 +38,14 @@ class TestYAMLParsing:
             {"url": "https://docs.pytest.org"},
         ]
 
-    def test_missing_frontmatter(self, temp_dir):
+    def test_missing_frontmatter(self, temp_dir) -> None:
         """Test error when frontmatter is missing."""
         content = "# Just a title\n\nNo frontmatter here."
 
         with pytest.raises(ParserError, match="No frontmatter found"):
             parse_frontmatter(content, temp_dir / "test.md")
 
-    def test_missing_required_fields(self, temp_dir):
+    def test_missing_required_fields(self, temp_dir) -> None:
         """Test error when required fields are missing."""
         content = """---
 id: test-001
@@ -57,7 +57,7 @@ Content here.
         with pytest.raises(ParserError, match="Missing required fields"):
             parse_frontmatter(content, temp_dir / "test.md")
 
-    def test_invalid_yaml(self, temp_dir):
+    def test_invalid_yaml(self, temp_dir) -> None:
         """Test error on invalid YAML syntax."""
         content = """---
 id: test-001
@@ -74,7 +74,7 @@ Content.
 class TestQAParsing:
     """Test Q/A pair extraction (UNIT-parse-01, UNIT-parse-02)."""
 
-    def test_parse_single_qa_pair(self, sample_note_content, sample_metadata):
+    def test_parse_single_qa_pair(self, sample_note_content, sample_metadata) -> None:
         """Test parsing a single Q/A pair."""
         qa_pairs = parse_qa_pairs(sample_note_content, sample_metadata)
 
@@ -85,7 +85,7 @@ class TestQAParsing:
         assert "Unit testing is testing" in qa_pairs[0].answer_en
         assert "Юнит-тестирование" in qa_pairs[0].answer_ru
 
-    def test_parse_multiple_qa_pairs(self, sample_metadata):
+    def test_parse_multiple_qa_pairs(self, sample_metadata) -> None:
         """Test parsing multiple Q/A pairs (UNIT-parse-02)."""
         content = """---
 id: test-001
@@ -136,7 +136,7 @@ Second answer.
         assert "First question" in qa_pairs[0].question_en
         assert "Second question" in qa_pairs[1].question_en
 
-    def test_parse_ru_first_order(self, sample_metadata):
+    def test_parse_ru_first_order(self, sample_metadata) -> None:
         """Test parsing when Russian sections precede English sections."""
         content = """---
 id: test-ru-first
@@ -170,7 +170,7 @@ It is a system check.
         assert pair.answer_ru.startswith("Это проверка системы")
         assert pair.answer_en.startswith("It is a system check")
 
-    def test_parse_with_followups(self, sample_note_content, sample_metadata):
+    def test_parse_with_followups(self, sample_note_content, sample_metadata) -> None:
         """Test parsing Q/A with follow-ups and references."""
         qa_pairs = parse_qa_pairs(sample_note_content, sample_metadata)
 
@@ -179,7 +179,7 @@ It is a system check.
         assert "pytest.org" in qa_pairs[0].references
         assert "Integration testing" in qa_pairs[0].related
 
-    def test_missing_separator(self, sample_metadata):
+    def test_missing_separator(self, sample_metadata) -> None:
         """Test handling of missing separator."""
         content = """---
 id: test
@@ -206,7 +206,7 @@ Answer without separator.
 class TestFileDiscovery:
     """Test file discovery."""
 
-    def test_discover_valid_notes(self, temp_dir):
+    def test_discover_valid_notes(self, temp_dir) -> None:
         """Test discovering q-*.md files."""
         vault = temp_dir / "vault"
         source = vault / "questions"
@@ -226,7 +226,7 @@ class TestFileDiscovery:
         assert len(notes) == 2
         assert all("q-test" in str(path) for path, _ in notes)
 
-    def test_discover_recursive(self, temp_dir):
+    def test_discover_recursive(self, temp_dir) -> None:
         """Test recursive discovery in subdirectories."""
         vault = temp_dir / "vault"
         source = vault / "questions"
@@ -244,7 +244,7 @@ class TestFileDiscovery:
 class TestFullNoteParsing:
     """Test complete note parsing."""
 
-    def test_parse_complete_note(self, temp_dir, sample_note_content):
+    def test_parse_complete_note(self, temp_dir, sample_note_content) -> None:
         """Test parsing a complete note file."""
         note_file = temp_dir / "q-test.md"
         note_file.write_text(sample_note_content)
@@ -256,7 +256,7 @@ class TestFullNoteParsing:
         assert len(qa_pairs) == 1
         assert qa_pairs[0].card_index == 1
 
-    def test_parse_nonexistent_file(self, temp_dir):
+    def test_parse_nonexistent_file(self, temp_dir) -> None:
         """Test error on nonexistent file."""
         with pytest.raises(ParserError, match="File does not exist"):
             parse_note(temp_dir / "nonexistent.md")

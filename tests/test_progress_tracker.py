@@ -18,7 +18,7 @@ from obsidian_anki_sync.sync.state_db import StateDB
 class TestSyncProgress:
     """Test SyncProgress dataclass."""
 
-    def test_is_complete(self):
+    def test_is_complete(self) -> None:
         """Test is_complete property."""
         progress = SyncProgress(
             session_id="test",
@@ -34,7 +34,7 @@ class TestSyncProgress:
         progress.phase = SyncPhase.SCANNING
         assert not progress.is_complete
 
-    def test_progress_pct(self):
+    def test_progress_pct(self) -> None:
         """Test progress percentage calculation."""
         progress = SyncProgress(
             session_id="test",
@@ -57,14 +57,14 @@ class TestProgressTracker:
     """Test ProgressTracker class."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_create_new_session(self, temp_db):
+    def test_create_new_session(self, temp_db) -> None:
         """Test creating new progress tracker session."""
         tracker = ProgressTracker(temp_db)
 
@@ -73,7 +73,7 @@ class TestProgressTracker:
         assert tracker.progress.total_notes == 0
         assert tracker.progress.notes_processed == 0
 
-    def test_resume_session(self, temp_db):
+    def test_resume_session(self, temp_db) -> None:
         """Test resuming existing session."""
         # Create initial session
         tracker1 = ProgressTracker(temp_db)
@@ -87,12 +87,12 @@ class TestProgressTracker:
         assert tracker2.progress.total_notes == 10
         assert tracker2.progress.notes_processed == 1
 
-    def test_resume_nonexistent_session(self, temp_db):
+    def test_resume_nonexistent_session(self, temp_db) -> None:
         """Test resuming non-existent session raises error."""
         with pytest.raises(ValueError, match="No progress found"):
             ProgressTracker(temp_db, session_id="nonexistent")
 
-    def test_set_phase(self, temp_db):
+    def test_set_phase(self, temp_db) -> None:
         """Test setting sync phase."""
         tracker = ProgressTracker(temp_db)
 
@@ -102,14 +102,14 @@ class TestProgressTracker:
         tracker.set_phase(SyncPhase.APPLYING_CHANGES)
         assert tracker.progress.phase == SyncPhase.APPLYING_CHANGES
 
-    def test_set_total_notes(self, temp_db):
+    def test_set_total_notes(self, temp_db) -> None:
         """Test setting total notes."""
         tracker = ProgressTracker(temp_db)
 
         tracker.set_total_notes(100)
         assert tracker.progress.total_notes == 100
 
-    def test_note_tracking(self, temp_db):
+    def test_note_tracking(self, temp_db) -> None:
         """Test tracking note processing."""
         tracker = ProgressTracker(temp_db)
         tracker.set_total_notes(5)
@@ -126,7 +126,7 @@ class TestProgressTracker:
         assert tracker.progress.notes_processed == 1
         assert tracker.progress.cards_generated == 1
 
-    def test_note_failure(self, temp_db):
+    def test_note_failure(self, temp_db) -> None:
         """Test tracking note failure."""
         tracker = ProgressTracker(temp_db)
 
@@ -138,7 +138,7 @@ class TestProgressTracker:
         assert tracker.progress.note_progress[key].error == "Parse error"
         assert tracker.progress.errors == 1
 
-    def test_is_note_completed(self, temp_db):
+    def test_is_note_completed(self, temp_db) -> None:
         """Test checking if note is completed."""
         tracker = ProgressTracker(temp_db)
 
@@ -150,7 +150,7 @@ class TestProgressTracker:
         tracker.complete_note("note1.md", 1, "en", 1)
         assert tracker.is_note_completed("note1.md", 1, "en")
 
-    def test_increment_stat(self, temp_db):
+    def test_increment_stat(self, temp_db) -> None:
         """Test incrementing statistics."""
         tracker = ProgressTracker(temp_db)
 
@@ -163,7 +163,7 @@ class TestProgressTracker:
         tracker.increment_stat("deleted")
         assert tracker.progress.cards_deleted == 1
 
-    def test_complete_sync(self, temp_db):
+    def test_complete_sync(self, temp_db) -> None:
         """Test completing sync."""
         tracker = ProgressTracker(temp_db)
 
@@ -175,7 +175,7 @@ class TestProgressTracker:
         tracker2.complete(success=False)
         assert tracker2.progress.phase == SyncPhase.FAILED
 
-    def test_get_stats(self, temp_db):
+    def test_get_stats(self, temp_db) -> None:
         """Test getting statistics."""
         tracker = ProgressTracker(temp_db)
         tracker.set_total_notes(10)
@@ -188,7 +188,7 @@ class TestProgressTracker:
         assert stats["created"] == 2
         assert stats["errors"] == 1
 
-    def test_get_pending_notes(self, temp_db):
+    def test_get_pending_notes(self, temp_db) -> None:
         """Test getting pending notes."""
         tracker = ProgressTracker(temp_db)
 
@@ -200,7 +200,7 @@ class TestProgressTracker:
         assert len(pending) == 1
         assert pending[0].source_path == "note2.md"
 
-    def test_interruption_flag(self, temp_db):
+    def test_interruption_flag(self, temp_db) -> None:
         """Test interruption flag."""
         tracker = ProgressTracker(temp_db)
 
@@ -209,7 +209,7 @@ class TestProgressTracker:
         tracker._interrupted = True
         assert tracker.is_interrupted()
 
-    def test_signal_handler_installation(self, temp_db):
+    def test_signal_handler_installation(self, temp_db) -> None:
         """Test signal handler installation."""
         tracker = ProgressTracker(temp_db)
 
@@ -223,7 +223,7 @@ class TestProgressTracker:
 class TestNoteProgress:
     """Test NoteProgress dataclass."""
 
-    def test_creation(self):
+    def test_creation(self) -> None:
         """Test creating note progress."""
         progress = NoteProgress(
             source_path="test.md",
@@ -245,14 +245,14 @@ class TestProgressPersistence:
     """Test progress persistence to database."""
 
     @pytest.fixture
-    def temp_db(self):
+    def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             with StateDB(db_path) as db:
                 yield db
 
-    def test_save_and_load_progress(self, temp_db):
+    def test_save_and_load_progress(self, temp_db) -> None:
         """Test saving and loading progress."""
         # Create and save progress
         tracker1 = ProgressTracker(temp_db)
@@ -270,7 +270,7 @@ class TestProgressPersistence:
         assert tracker2.progress.phase == SyncPhase.SCANNING
         assert len(tracker2.progress.note_progress) == 1
 
-    def test_multiple_sessions(self, temp_db):
+    def test_multiple_sessions(self, temp_db) -> None:
         """Test multiple concurrent sessions."""
         tracker1 = ProgressTracker(temp_db)
         tracker2 = ProgressTracker(temp_db)

@@ -90,7 +90,9 @@ class WorkflowError(AgentError):
 class RetryExhaustedError(AgentError):
     """Raised when max retries are exhausted."""
 
-    def __init__(self, message: str, retry_count: int, last_error: Exception | None = None):
+    def __init__(
+        self, message: str, retry_count: int, last_error: Exception | None = None
+    ):
         """Initialize retry exhausted error.
 
         Args:
