@@ -11,7 +11,7 @@ class TestSyncDeterminism:
     """Test sync determinism (REGR-det-01)."""
 
     @pytest.mark.skip(reason="Requires full integration setup")
-    def test_deterministic_output(self, test_config, temp_dir):
+    def test_deterministic_output(self, test_config, temp_dir) -> None:
         """Test that same input produces same output."""
         # This would require:
         # 1. Creating identical test notes
@@ -21,7 +21,7 @@ class TestSyncDeterminism:
         pass
 
     @pytest.mark.skip(reason="Requires full integration setup")
-    def test_idempotency(self, test_config, temp_dir):
+    def test_idempotency(self, test_config, temp_dir) -> None:
         """Test that repeated sync with no changes produces no updates."""
         # This would require:
         # 1. Running initial sync
@@ -33,7 +33,7 @@ class TestSyncDeterminism:
 class TestSyncFlow:
     """Test sync orchestration flow (INT-02)."""
 
-    def test_create_flow(self, test_config, temp_dir, sample_metadata, sample_qa_pair):
+    def test_create_flow(self, test_config, temp_dir, sample_metadata, sample_qa_pair) -> None:
         """Test create card flow."""
         # Setup mocks
         from obsidian_anki_sync.anki.client import AnkiClient

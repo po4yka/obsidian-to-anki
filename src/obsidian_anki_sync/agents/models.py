@@ -107,7 +107,9 @@ class CardSplittingResult(BaseModel):
 
     should_split: bool
     card_count: int = Field(ge=1)
-    splitting_strategy: Literal["none", "concept", "list", "example", "hierarchical", "step"]
+    splitting_strategy: Literal[
+        "none", "concept", "list", "example", "hierarchical", "step"
+    ]
     split_plan: list[CardSplitPlan] = Field(default_factory=list)
     reasoning: str = ""
     decision_time: float = 0.0
@@ -152,7 +154,8 @@ class DuplicateDetectionResult(BaseModel):
     all_matches: list[DuplicateMatch] = Field(default_factory=list)
     recommendation: Literal["delete", "merge", "keep_both", "review_manually"]
     better_card: Optional[str] = Field(
-        default=None, description="Slug of better card if duplicate ('new' or existing slug)"
+        default=None,
+        description="Slug of better card if duplicate ('new' or existing slug)",
     )
     merge_suggestion: Optional[str] = None
     detection_time: float = 0.0

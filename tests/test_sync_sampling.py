@@ -50,7 +50,7 @@ def _make_fake_card(
 
 def test_scan_sampling_limits_number_of_notes(
     sample_note_list, sample_metadata, sample_qa_pair, test_config
-):
+) -> None:
     """Ensure only the requested number of notes are parsed when sampling."""
     from obsidian_anki_sync.anki.client import AnkiClient
     from obsidian_anki_sync.sync.state_db import StateDB
@@ -83,7 +83,7 @@ def test_scan_sampling_limits_number_of_notes(
             existing_slugs,
             note_content="",
             all_qa_pairs=None,
-        ):
+        ) -> None:
             card = _make_fake_card(
                 relative_path,
                 lang,

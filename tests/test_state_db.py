@@ -9,7 +9,7 @@ from obsidian_anki_sync.sync.state_db import StateDB
 class TestStateDB:
     """Test state database operations."""
 
-    def test_create_database(self, temp_dir):
+    def test_create_database(self, temp_dir) -> None:
         """Test database initialization."""
         db_path = temp_dir / "test.db"
 
@@ -21,7 +21,7 @@ class TestStateDB:
 
             assert "cards" in tables
 
-    def test_insert_card(self, temp_dir):
+    def test_insert_card(self, temp_dir) -> None:
         """Test inserting a card."""
         card = self._make_test_card("test-slug-en")
 
@@ -36,7 +36,7 @@ class TestStateDB:
             assert result["lang"] == "en"
             assert result["card_guid"] == card.guid
 
-    def test_update_card(self, temp_dir):
+    def test_update_card(self, temp_dir) -> None:
         """Test updating a card."""
         card = self._make_test_card("test-slug-en")
 
@@ -53,7 +53,7 @@ class TestStateDB:
             assert result["content_hash"] == "new-hash-456"
             assert result["card_guid"] == "updated-guid"
 
-    def test_get_by_guid(self, temp_dir):
+    def test_get_by_guid(self, temp_dir) -> None:
         """Test retrieving card by Anki GUID."""
         card = self._make_test_card("test-slug-en")
 
@@ -64,7 +64,7 @@ class TestStateDB:
             assert result is not None
             assert result["slug"] == "test-slug-en"
 
-    def test_get_by_source(self, temp_dir):
+    def test_get_by_source(self, temp_dir) -> None:
         """Test retrieving all cards from a source."""
         card1 = self._make_test_card("test-p01-en", card_index=1)
         card2 = self._make_test_card("test-p01-ru", card_index=1, lang="ru")
@@ -78,7 +78,7 @@ class TestStateDB:
             results = db.get_by_source("test.md")
             assert len(results) == 3
 
-    def test_delete_card(self, temp_dir):
+    def test_delete_card(self, temp_dir) -> None:
         """Test deleting a card."""
         card = self._make_test_card("test-slug-en")
 
@@ -92,7 +92,7 @@ class TestStateDB:
             result = db.get_by_slug("test-slug-en")
             assert result is None
 
-    def test_get_all_cards(self, temp_dir):
+    def test_get_all_cards(self, temp_dir) -> None:
         """Test retrieving all cards."""
         with StateDB(temp_dir / "test.db") as db:
             for i in range(5):
@@ -103,7 +103,7 @@ class TestStateDB:
             all_cards = db.get_all_cards()
             assert len(all_cards) == 5
 
-    def test_unique_constraints(self, temp_dir):
+    def test_unique_constraints(self, temp_dir) -> None:
         """Test unique constraints on slug and guid."""
         card1 = self._make_test_card("duplicate-slug")
         card2 = self._make_test_card("duplicate-slug")
