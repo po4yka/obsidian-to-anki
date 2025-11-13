@@ -15,12 +15,51 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Global flag to control whether to use LLM-based extraction
+_USE_LLM_EXTRACTION = False
+_QA_EXTRACTOR_AGENT = None
+
 # Configure ruamel.yaml for preserving comments and order
 # This is available for future write operations
 ruamel_yaml = YAML()
 ruamel_yaml.preserve_quotes = True
 ruamel_yaml.default_flow_style = False
 ruamel_yaml.width = 4096  # Prevent line wrapping
+
+
+def configure_llm_extraction(
+    llm_provider: BaseLLMProvider | None,
+    model: str = "qwen3:8b",
+    temperature: float = 0.0,
+) -> None:
+    """Configure LLM-based Q&A extraction.
+
+    Args:
+        llm_provider: LLM provider instance (None to disable)
+        model: Model to use for extraction
+        temperature: Sampling temperature
+    """
+    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
+
+    if llm_provider is None:
+        _USE_LLM_EXTRACTION = False
+        _QA_EXTRACTOR_AGENT = None
+        logger.info("llm_extraction_disabled")
+        return
+
+    from ..agents.qa_extractor import QAExtractorAgent
+
+    _QA_EXTRACTOR_AGENT = QAExtractorAgent(
+        llm_provider=llm_provider,
+        model=model,
+        temperature=temperature,
+    )
+    _USE_LLM_EXTRACTION = True
+    logger.info(
+        "llm_extraction_enabled",
+        model=model,
+        temperature=temperature,
+    )
 
 
 def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
@@ -232,9 +271,12 @@ def parse_qa_pairs(
     """
     Parse Q/A pairs from note content.
 
+    Uses LLM-based extraction if configured, otherwise falls back to rigid parsing.
+
     Args:
         content: Full note content
         metadata: Parsed metadata
+        file_path: Optional file path for logging
 
     Returns:
         List of Q/A pairs
@@ -242,6 +284,55 @@ def parse_qa_pairs(
     Raises:
         ParserError: If structure is invalid
     """
+    # Try LLM-based extraction first if enabled
+    if _USE_LLM_EXTRACTION and _QA_EXTRACTOR_AGENT is not None:
+        logger.info(
+            "attempting_llm_extraction",
+            note_id=metadata.id,
+            title=metadata.title,
+            file=str(file_path) if file_path else "unknown",
+        )
+
+        try:
+            qa_pairs = _QA_EXTRACTOR_AGENT.extract_qa_pairs(
+                note_content=content,
+                metadata=metadata,
+                file_path=file_path,
+            )
+
+            if qa_pairs:
+                logger.info(
+                    "llm_extraction_succeeded",
+                    note_id=metadata.id,
+                    title=metadata.title,
+                    file=str(file_path) if file_path else "unknown",
+                    pairs_count=len(qa_pairs),
+                )
+                return qa_pairs
+            else:
+                logger.warning(
+                    "llm_extraction_returned_empty_falling_back",
+                    note_id=metadata.id,
+                    title=metadata.title,
+                    file=str(file_path) if file_path else "unknown",
+                )
+        except Exception as e:
+            logger.warning(
+                "llm_extraction_failed_falling_back",
+                note_id=metadata.id,
+                title=metadata.title,
+                file=str(file_path) if file_path else "unknown",
+                error=str(e),
+            )
+
+    # Fall back to rigid pattern-based parsing
+    logger.debug(
+        "using_rigid_parser",
+        note_id=metadata.id,
+        title=metadata.title,
+        file=str(file_path) if file_path else "unknown",
+    )
+
     # Strip frontmatter
     content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
 

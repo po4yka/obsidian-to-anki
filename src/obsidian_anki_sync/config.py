@@ -92,6 +92,10 @@ class Config:
     parser_repair_model: str = "qwen3:8b"
     parser_repair_temperature: float = 0.0
 
+    # Q&A Extractor Agent (flexible LLM-based Q&A extraction)
+    qa_extractor_model: str = "qwen3:8b"
+    qa_extractor_temperature: float = 0.0
+
     # Pre-Validator Agent
     pre_validator_model: str = "qwen3:8b"
     pre_validator_temperature: float = 0.0
