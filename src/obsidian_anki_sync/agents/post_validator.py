@@ -14,6 +14,7 @@ from ..apf.linter import validate_apf
 from ..models import NoteMetadata
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .json_schemas import get_post_validation_schema
 from .llm_errors import (
     categorize_llm_error,
     format_llm_error_for_user,
@@ -230,15 +231,57 @@ class PostValidatorAgent:
         # Build validation prompt
         prompt = self._build_semantic_prompt(cards, metadata, strict_mode)
 
-        system_prompt = """You are a quality validation agent for Anki flashcards.
-Your job is to check:
-1. Factual accuracy - no information loss or hallucinations
-2. Semantic coherence - questions and answers are well-matched
-3. Template compliance - follows APF v2.1 format
-4. Card quality - atomic, clear, answerable
+        system_prompt = """<role>
+You are an expert quality validation agent for Anki flashcards using the APF v2.1 format. Your expertise includes educational content design, factual verification, semantic analysis, and template compliance checking.
+</role>
 
-Always respond in valid JSON format.
-Be thorough but constructive - suggest fixes when possible."""
+<approach>
+Think step by step through validation:
+1. First, assess factual accuracy against source material
+2. Second, analyze semantic coherence of Q&A pairs
+3. Third, verify APF v2.1 template compliance
+4. Fourth, evaluate overall card quality for learning
+5. Finally, provide specific, actionable feedback
+
+Be thorough and systematic in your analysis.
+</approach>
+
+<validation_priorities>
+Critical (must pass):
+- Factual accuracy: No hallucinations or information loss
+- Answerability: Questions can be answered from context
+- Template compliance: Strict APF v2.1 format adherence
+- Semantic coherence: Q&A pairs are logically matched
+
+Important (context-dependent):
+- Card atomicity: One concept per card
+- Clarity: Clear, unambiguous language
+- Completeness: All important details preserved
+</validation_priorities>
+
+<output_requirements>
+- Always respond in valid JSON format matching the schema
+- Be specific about errors: identify card numbers and exact issues
+- Be constructive: suggest fixes when issues are correctable
+- Be thorough: check all cards systematically
+- Provide corrected_cards only if fixes are deterministic
+</output_requirements>
+
+<constraints>
+NEVER approve cards with:
+- Factual hallucinations or inaccuracies
+- Question-answer semantic mismatches
+- Missing or malformed APF structure
+- Unanswerable questions
+
+DO suggest auto-fixes for:
+- Minor formatting issues
+- Correctable template compliance problems
+- Structural improvements
+</constraints>"""
+
+        # Get JSON schema for structured output
+        json_schema = get_post_validation_schema()
 
         # Call LLM
         result = self.ollama_client.generate_json(
@@ -246,6 +289,7 @@ Be thorough but constructive - suggest fixes when possible."""
             prompt=prompt,
             system=system_prompt,
             temperature=self.temperature,
+            json_schema=json_schema,
         )
 
         # Parse LLM response
@@ -316,46 +360,171 @@ Be thorough but constructive - suggest fixes when possible."""
 
         cards_summary = "\n".join(card_summaries)
 
-        return f"""Validate these APF flashcards for quality and correctness.
+        return f"""<task>
+Validate generated APF flashcards for quality, correctness, and template compliance. Think step by step to identify any issues with factual accuracy, semantic coherence, or format compliance.
+</task>
 
-NOTE METADATA:
-- Title: {metadata.title}
-- Topic: {metadata.topic}
-- Subtopics: {", ".join(metadata.subtopics)}
-- Total Cards: {len(cards)}
+<input>
+<note_metadata>
+Title: {metadata.title}
+Topic: {metadata.topic}
+Subtopics: {", ".join(metadata.subtopics)}
+Total Cards Generated: {len(cards)}
+</note_metadata>
 
-GENERATED CARDS SUMMARY:
+<cards_summary>
 {cards_summary}
+</cards_summary>
 
-VALIDATION REQUIREMENTS:
-1. Factual Accuracy: Cards must accurately reflect the source material
-2. Semantic Coherence: Questions and answers should be well-matched
-3. Template Compliance: Must follow APF v2.1 format strictly
-4. Card Quality: Each card should be atomic (one concept), clear, and answerable
-5. No Information Loss: All important details preserved
-6. No Hallucinations: No invented or incorrect information
+<validation_mode>
+Strict Mode: {"ENABLED" if strict_mode else "DISABLED"}
+{"- Reject cards with ANY quality issues" if strict_mode else "- Only reject cards with CRITICAL errors"}
+{"- Minor issues should result in validation failure" if strict_mode else "- Minor issues are acceptable"}
+</validation_mode>
+</input>
 
-STRICT MODE: {"ENABLED" if strict_mode else "DISABLED"}
-{"In strict mode, reject cards with any quality issues." if strict_mode else "In lenient mode, only reject cards with critical errors."}
+<validation_steps>
+Step 1: Factual Accuracy Assessment
+- Verify cards accurately reflect source material
+- Check for information loss or distortion
+- Identify any hallucinated or invented information
+- Confirm all important details are preserved
 
-ANALYZE AND RESPOND IN JSON FORMAT:
+Step 2: Semantic Coherence Analysis
+- Verify questions are well-formed and clear
+- Ensure answers directly address their questions
+- Check that context is relevant and helpful
+- Confirm language consistency (en/ru matching)
+
+Step 3: Template Compliance Check
+- Validate APF v2.1 format is followed strictly
+- Verify all required sections are present
+- Check HTML structure is valid
+- Ensure card headers match required format
+
+Step 4: Card Quality Evaluation
+- Confirm each card is atomic (single concept)
+- Verify questions are answerable from provided context
+- Check clarity and specificity
+- Assess overall card usefulness for learning
+
+Step 5: Technical Validation
+- Verify slugs are properly formatted
+- Check language codes are correct
+- Validate confidence scores are reasonable
+- Ensure no duplicate cards
+</validation_steps>
+
+<validation_criteria>
+FACTUAL ACCURACY:
+- No information from source material is lost
+- No hallucinated or invented details
+- All facts are correctly represented
+- Context is preserved accurately
+
+SEMANTIC COHERENCE:
+- Question-answer pairs are logically matched
+- Language versions (en/ru) are semantically equivalent
+- Context enhances understanding
+- No ambiguous or unclear phrasing
+
+TEMPLATE COMPLIANCE:
+- Strict adherence to APF v2.1 format
+- All required HTML sections present
+- Card headers properly formatted
+- Valid HTML structure
+
+CARD QUALITY:
+- Atomic: Each card tests one concept
+- Clear: Question is unambiguous
+- Answerable: Can be answered from context
+- Useful: Aids learning and retention
+
+WHAT CONSTITUTES AN ERROR:
+Critical errors (always reject):
+- Factual inaccuracies or hallucinations
+- Missing or malformed APF structure
+- Unanswerable questions
+- Information loss from source
+
+Minor issues ({"reject in strict mode" if strict_mode else "acceptable in lenient mode"}):
+- Suboptimal wording choices
+- Minor formatting inconsistencies
+- Less-than-ideal context presentation
+</validation_criteria>
+
+<output_format>
+Respond with valid JSON matching this structure:
+
 {{
     "is_valid": true/false,
     "error_type": "syntax" | "factual" | "semantic" | "template" | "none",
-    "error_details": "Detailed description of any errors",
+    "error_details": "Specific description of errors found, or empty string if valid",
     "corrected_cards": null or [
         {{
             "card_index": 1,
-            "slug": "slug-here",
+            "slug": "example-slug",
             "lang": "en",
-            "apf_html": "corrected HTML if auto-fix possible",
+            "apf_html": "complete corrected HTML",
             "confidence": 0.9
         }}
     ]
 }}
 
-If you can auto-fix issues, provide corrected_cards with the fixes applied.
-Be specific about errors. If everything is valid, set error_type to "none"."""
+error_type values:
+- "syntax": APF format or HTML syntax errors
+- "factual": Information inaccuracies or hallucinations
+- "semantic": Question-answer mismatch or coherence issues
+- "template": APF v2.1 template compliance failures
+- "none": No errors found (is_valid = true)
+
+If you can auto-fix issues:
+- Set corrected_cards to array of corrected card objects
+- Include COMPLETE apf_html for each corrected card
+- Maintain all original content, only fix format/structure
+</output_format>
+
+<examples>
+<example_1>
+Input: Card with factual hallucination
+
+Analysis: Card claims Android was released in 2009, but source material states 2008.
+
+Output:
+{{
+    "is_valid": false,
+    "error_type": "factual",
+    "error_details": "Card 1 contains factual error: states Android released in 2009, but source indicates 2008. This is a hallucination.",
+    "corrected_cards": null
+}}
+</example_1>
+
+<example_2>
+Input: Card with question-answer mismatch
+
+Analysis: Question asks "What is polymorphism?" but answer describes inheritance.
+
+Output:
+{{
+    "is_valid": false,
+    "error_type": "semantic",
+    "error_details": "Card 2 semantic error: question asks about polymorphism, but answer describes inheritance. Question and answer are not semantically matched.",
+    "corrected_cards": null
+}}
+</example_2>
+
+<example_3>
+Input: All cards valid and well-formed
+
+Output:
+{{
+    "is_valid": true,
+    "error_type": "none",
+    "error_details": "",
+    "corrected_cards": null
+}}
+</example_3>
+</examples>"""
 
     def _rule_based_header_fix(
         self, cards: list[GeneratedCard]
@@ -526,52 +695,151 @@ Be specific about errors. If everything is valid, set error_type to "none"."""
 
             cards_info = "\n\n".join(card_details)
 
-            prompt = f"""Fix the APF card validation errors and return the corrected cards.
+            prompt = f"""<task>
+Fix APF card validation errors and return the corrected cards. Diagnose the specific issues and apply targeted corrections while preserving all original content.
+</task>
 
-VALIDATION ERRORS:
+<input>
+<validation_errors>
 {error_details}
+</validation_errors>
 
-CARDS TO FIX (with full HTML):
+<cards_to_fix>
 {cards_info}
+</cards_to_fix>
+</input>
 
-COMMON FIXES:
-1. Card header format: Ensure "<!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->"
-2. Ensure spaces before and after pipe characters |
-3. CardType must be exactly: Simple, Missing, or Draw (case-sensitive)
-4. Tags must be space-separated, not comma-separated
-5. Slug must be lowercase with only letters, numbers, hyphens
+<diagnostic_approach>
+Think step by step:
+1. Analyze the validation errors to understand what's wrong
+2. Identify the specific cards and fields that need correction
+3. Determine the appropriate fix for each error
+4. Apply corrections while preserving all original content
+5. Verify the fix resolves the validation error
+</diagnostic_approach>
 
-EXAMPLE VALID HEADER:
+<common_fixes>
+Card Header Format Issues:
+- Required format: "<!-- Card N | slug: name | CardType: Type | Tags: tag1 tag2 tag3 -->"
+- MUST have spaces before and after each pipe character |
+- Card number N must be sequential (1, 2, 3, ...)
+- Slug must be lowercase with only letters, numbers, and hyphens (no underscores)
+- CardType must be exactly one of: Simple, Missing, Draw (case-sensitive, capital C and T)
+- Tags must be space-separated, NOT comma-separated
+
+Slug Format Issues:
+- Convert to lowercase
+- Replace underscores with hyphens
+- Remove invalid characters (keep only a-z, 0-9, hyphen)
+- Remove multiple consecutive hyphens
+- Remove leading/trailing hyphens
+
+Tag Format Issues:
+- Change from comma-separated to space-separated
+- Remove extra whitespace
+- Ensure tags are lowercase with underscores for multi-word tags
+
+CardType Issues:
+- Ensure exact capitalization: Simple, Missing, or Draw
+- No variations like "simple", "SIMPLE", or "SimplE"
+</common_fixes>
+
+<examples>
+<example_1_invalid_header>
+Before: <!-- Card 1|slug:android_lifecycle|cardtype:simple|Tags:android, lifecycle -->
+After: <!-- Card 1 | slug: android-lifecycle | CardType: Simple | Tags: android lifecycle -->
+
+Fixes applied:
+- Added spaces around pipe characters
+- Converted slug underscores to hyphens
+- Fixed CardType capitalization
+- Changed tags from comma-separated to space-separated
+</example_1_invalid_header>
+
+<example_2_valid_header>
 <!-- Card 1 | slug: android-lifecycle-methods | CardType: Simple | Tags: android lifecycle architecture -->
+</example_2_valid_header>
+</examples>
 
-OUTPUT FORMAT (return ONLY this JSON structure):
+<output_format>
+Return ONLY valid JSON matching this EXACT structure:
+
 {{
     "corrected_cards": [
         {{
             "card_index": 1,
             "slug": "android-lifecycle-methods",
             "lang": "en",
-            "apf_html": "<!-- PROMPT_VERSION: apf-v2.1 -->\\n<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: android-lifecycle-methods | CardType: Simple | Tags: android lifecycle architecture -->\\n... rest of HTML ...",
+            "apf_html": "<!-- PROMPT_VERSION: apf-v2.1 -->\\n<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: android-lifecycle-methods | CardType: Simple | Tags: android lifecycle architecture -->\\n... complete HTML content ...",
             "confidence": 0.9
         }}
     ]
 }}
+</output_format>
 
-CRITICAL INSTRUCTIONS:
-- Return the COMPLETE corrected apf_html for each card
-- Include all cards that need fixing in the corrected_cards array
-- Do NOT return an empty object {{}}
-- Do NOT omit the corrected_cards array
-- Ensure all JSON is properly escaped"""
+<critical_requirements>
+MUST include:
+- The COMPLETE corrected apf_html for each card (not truncated)
+- ALL cards that need fixing in the corrected_cards array
+- The corrected_cards array (never omit it)
+- Properly escaped JSON strings
 
-            system_prompt = """You are an expert APF card correction agent. Your task is to fix syntax and format errors in APF flashcards.
+MUST NOT:
+- Return an empty object {{}}
+- Omit the corrected_cards array
+- Return incomplete or truncated apf_html
+- Change the semantic content of cards (only fix format/syntax)
+- Add or remove cards (only correct existing ones)
 
-CRITICAL RULES:
-1. Always return valid JSON with a "corrected_cards" array
-2. Never return an empty object or incomplete response
-3. Include the FULL corrected HTML for each card
-4. Maintain all content, only fix format/syntax issues
-5. Be precise with card header format requirements"""
+PRESERVE:
+- All original content and meaning
+- All HTML sections
+- All metadata fields
+- Card ordering
+</critical_requirements>"""
+
+            system_prompt = """<role>
+You are an expert APF card correction agent specializing in fixing syntax and format errors in APF v2.1 flashcards. Your expertise includes HTML structure validation, APF format compliance, and diagnostic problem-solving.
+</role>
+
+<approach>
+Think step by step to fix errors:
+1. Diagnose the specific error from validation feedback
+2. Locate the problematic section in the card HTML
+3. Determine the correct format based on APF v2.1 spec
+4. Apply minimal, targeted corrections
+5. Verify the fix resolves the error
+6. Preserve all original semantic content
+</approach>
+
+<critical_rules>
+MUST always:
+- Return valid JSON with a "corrected_cards" array
+- Include the FULL corrected HTML for each card (no truncation)
+- Maintain all original content and meaning
+- Only fix format/syntax issues, never change semantics
+- Be precise with APF v2.1 format requirements
+- Include ALL cards that need fixing
+
+MUST NEVER:
+- Return an empty object {{}} or incomplete response
+- Omit the corrected_cards array
+- Truncate or abbreviate the apf_html field
+- Change the semantic content of cards
+- Add or remove cards
+- Skip cards that have errors
+</critical_rules>
+
+<format_requirements>
+APF v2.1 Card Header Format:
+<!-- Card N | slug: lowercase-slug | CardType: Simple|Missing|Draw | Tags: tag1 tag2 tag3 -->
+
+Requirements:
+- Spaces before and after each | pipe character
+- CardType with capital C and T, followed by: Simple, Missing, or Draw
+- Slug: lowercase, letters/numbers/hyphens only
+- Tags: space-separated (not comma-separated)
+</format_requirements>"""
 
             # Call LLM with error handling
             try:

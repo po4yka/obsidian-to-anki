@@ -107,6 +107,7 @@ class LMStudioProvider(BaseLLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from LM Studio.
@@ -117,6 +118,7 @@ class LMStudioProvider(BaseLLMProvider):
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
             format: Response format ("json" for structured output)
+            json_schema: JSON schema for structured output (optional, not yet used)
             stream: Enable streaming (not implemented)
 
         Returns:

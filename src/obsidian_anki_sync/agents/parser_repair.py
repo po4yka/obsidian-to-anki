@@ -14,6 +14,7 @@ from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .json_schemas import get_parser_repair_schema
 
 logger = get_logger(__name__)
 
@@ -53,25 +54,68 @@ class ParserRepairAgent:
         Returns:
             Formatted prompt string
         """
-        return f"""You are a note repair agent. Analyze this Obsidian note that failed parsing and suggest fixes.
+        return f"""<task>
+Diagnose and repair an Obsidian note that failed parsing. Think step by step to identify the root cause and provide targeted fixes.
+</task>
 
-PARSING ERROR:
+<input>
+<parsing_error>
 {error}
+</parsing_error>
 
-NOTE CONTENT:
+<note_content>
 {content[:3000]}
+</note_content>
+</input>
 
-COMMON ISSUES TO CHECK:
-1. Empty or missing language_tags (should be [en, ru] if both languages present)
-2. Missing required frontmatter fields: id, title, topic, language_tags, created, updated
-3. Invalid YAML syntax in frontmatter
-4. Missing section headers: # Question (EN), # Вопрос (RU), ## Answer (EN), ## Ответ (RU)
-5. Incorrect section ordering (both RU-first and EN-first are valid)
-6. Missing content in question or answer sections
+<diagnostic_steps>
+Step 1: Analyze the parsing error message
+- Identify what the parser expected vs. what it found
+- Determine which parsing stage failed (frontmatter, Q&A extraction, etc.)
 
-EXPECTED FORMAT (both orderings supported):
+Step 2: Inspect the frontmatter
+- Check for missing required fields: id, title, topic, language_tags, created, updated
+- Validate YAML syntax (proper indentation, array notation, no quotes issues)
+- Verify language_tags contains valid values: 'en', 'ru', or both
+
+Step 3: Check Q&A structure
+- Verify presence of question headers: # Question (EN), # Вопрос (RU)
+- Verify presence of answer headers: ## Answer (EN), ## Ответ (RU)
+- Confirm questions and answers have actual content (not empty)
+- Check section ordering is logical (both RU-first and EN-first are valid)
+
+Step 4: Validate markdown syntax
+- Check for malformed headers (missing #, incorrect spacing)
+- Verify proper YAML frontmatter delimiters (---)
+- Look for special characters that might break parsing
+
+Step 5: Determine repairability
+- If fixable: prepare complete repaired content
+- If fundamentally broken: explain why it cannot be repaired
+</diagnostic_steps>
+
+<common_issues>
+Frontmatter issues:
+1. Empty or missing language_tags → should be [en, ru] or [en] or [ru]
+2. Missing required fields → add: id, title, topic, language_tags, created, updated
+3. Invalid YAML syntax → fix indentation, array notation, quote issues
+4. Wrong date format → use YYYY-MM-DD format
+
+Content structure issues:
+5. Missing section headers → add: # Question (EN), # Вопрос (RU), ## Answer (EN), ## Ответ (RU)
+6. Incorrect header levels → Questions use #, Answers use ##
+7. Empty question or answer sections → flag as unrepairable if truly empty
+8. Language mismatch → ensure content exists for all languages in language_tags
+
+Ordering issues:
+9. Section ordering → both RU-first and EN-first are valid, just needs to be consistent
+</common_issues>
+
+<expected_format>
+Valid note format (both language orderings supported):
+
 ---
-id: note-id
+id: unique-note-id
 title: Note Title
 topic: topic-name
 language_tags: [en, ru]
@@ -80,33 +124,107 @@ updated: 2025-01-01
 ---
 
 # Вопрос (RU) OR # Question (EN)
-> Question text
+> Question text in Russian or English
 
 # Question (EN) OR # Вопрос (RU)
-> Question text
+> Question text in English or Russian
 
 ## Ответ (RU) OR ## Answer (EN)
-Answer text
+Answer text in Russian or English
 
 ## Answer (EN) OR ## Ответ (RU)
-Answer text
+Answer text in English or Russian
+</expected_format>
 
-RESPOND IN JSON FORMAT:
+<output_format>
+Respond with valid JSON matching this structure:
+
 {{
-    "diagnosis": "Brief description of what's wrong",
+    "diagnosis": "Brief description of the root cause",
     "repairs": [
         {{
-            "issue": "Description of issue",
-            "fix": "What to fix"
+            "issue": "Specific issue found",
+            "fix": "How to fix it"
         }}
     ],
-    "repaired_content": "Full repaired content (only if fixable, otherwise null)",
+    "repaired_content": "FULL repaired content including frontmatter, or null if unrepairable",
     "is_repairable": true/false
 }}
 
-If the note is fundamentally broken (missing all content, corrupted, etc.), set is_repairable to false.
-If repairable, provide the FULL repaired content including frontmatter.
-"""
+is_repairable:
+- true: Issues can be fixed programmatically
+- false: Note is fundamentally broken (missing all content, corrupted beyond repair, etc.)
+
+repaired_content:
+- If is_repairable is true: provide the COMPLETE repaired note content
+- If is_repairable is false: set to null
+</output_format>
+
+<examples>
+<example_1>
+Input: Missing language_tags field
+
+Diagnosis: "Frontmatter missing required language_tags field"
+
+Output:
+{{
+    "diagnosis": "Frontmatter missing required language_tags field",
+    "repairs": [
+        {{
+            "issue": "Missing language_tags in frontmatter",
+            "fix": "Add language_tags: [en, ru] based on detected content"
+        }}
+    ],
+    "repaired_content": "---\\nid: note-1\\ntitle: Example\\ntopic: example\\nlanguage_tags: [en, ru]\\ncreated: 2025-01-01\\nupdated: 2025-01-01\\n---\\n\\n# Question (EN)\\n...",
+    "is_repairable": true
+}}
+</example_1>
+
+<example_2>
+Input: Malformed YAML frontmatter
+
+Diagnosis: "Invalid YAML syntax: improper array notation"
+
+Output:
+{{
+    "diagnosis": "Invalid YAML syntax: improper array notation for language_tags",
+    "repairs": [
+        {{
+            "issue": "language_tags uses (en, ru) instead of [en, ru]",
+            "fix": "Change language_tags: (en, ru) to language_tags: [en, ru]"
+        }}
+    ],
+    "repaired_content": "---\\nid: note-1\\ntitle: Example\\nlanguage_tags: [en, ru]\\n...",
+    "is_repairable": true
+}}
+</example_2>
+
+<example_3>
+Input: Completely empty file
+
+Output:
+{{
+    "diagnosis": "Note is completely empty with no content",
+    "repairs": [],
+    "repaired_content": null,
+    "is_repairable": false
+}}
+</example_3>
+</examples>
+
+<constraints>
+DO repair:
+- Missing frontmatter fields (can infer reasonable defaults)
+- YAML syntax errors
+- Malformed headers
+- Minor formatting issues
+
+DO NOT repair (mark as unrepairable):
+- Completely empty notes
+- Notes with no Q&A content at all
+- Corrupted files with no recognizable structure
+- Notes missing both questions AND answers
+</constraints>"""
 
     def repair_and_parse(
         self, file_path: Path, original_error: Exception
@@ -140,17 +258,59 @@ If repairable, provide the FULL repaired content including frontmatter.
         prompt = self._build_repair_prompt(content, str(original_error))
 
         # System prompt for note repair agent
-        system_prompt = """You are a note repair agent for Obsidian notes.
-Analyze structural and formatting issues in notes and provide fixes when possible.
-Always respond in valid JSON format with the exact structure requested."""
+        system_prompt = """<role>
+You are a diagnostic and repair agent for Obsidian educational notes. Your expertise includes YAML syntax, markdown structure, parsing error analysis, and programmatic content repair.
+</role>
+
+<approach>
+Think step by step through the diagnostic process:
+1. Carefully analyze the parsing error message to understand what failed
+2. Inspect the note content to identify the root cause
+3. Determine if the issue is fixable programmatically
+4. If fixable, construct the minimal repair needed
+5. Provide the complete repaired content
+
+Be methodical and thorough in your diagnosis.
+</approach>
+
+<repair_philosophy>
+- Fix only what is broken, preserve all valid content
+- Infer reasonable defaults for missing required fields
+- Be conservative: mark as unrepairable if content is fundamentally missing
+- Provide clear explanations of what was fixed and why
+</repair_philosophy>
+
+<output_requirements>
+- Always respond in valid JSON format with the exact structure requested
+- Provide specific, actionable diagnosis of the problem
+- List all repairs applied in the repairs array
+- Include COMPLETE repaired content (no truncation) if repairable
+- Set is_repairable to false only when truly unrepairable
+</output_requirements>
+
+<constraints>
+NEVER repair by:
+- Inventing question or answer content that doesn't exist
+- Making up frontmatter values that can't be inferred
+- Drastically changing the structure or meaning
+
+ALWAYS:
+- Preserve all existing content and semantic meaning
+- Only fix syntax, structure, and format issues
+- Provide complete repaired content, not partial fixes
+</constraints>"""
 
         # Call LLM for repair analysis
         try:
+            # Get JSON schema for structured output
+            json_schema = get_parser_repair_schema()
+
             repair_result = self.ollama_client.generate_json(
                 model=self.model,
                 prompt=prompt,
                 system=system_prompt,
                 temperature=self.temperature,
+                json_schema=json_schema,
             )
 
         except json.JSONDecodeError as e:

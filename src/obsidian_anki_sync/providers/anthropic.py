@@ -161,6 +161,7 @@ class AnthropicProvider(BaseLLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from Claude.
@@ -171,6 +172,7 @@ class AnthropicProvider(BaseLLMProvider):
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
             format: Response format ("json" for JSON mode - enforced via system prompt)
+            json_schema: JSON schema for structured output (optional, not yet used)
             stream: Enable streaming (not implemented)
 
         Returns:

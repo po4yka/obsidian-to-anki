@@ -315,7 +315,7 @@ def load_config(config_path: Path | None = None) -> Config:
 
     # Get vault and source paths
     vault_path_str = get_str("vault_path", "")
-    source_dir_str = get_str("source_dir", "interview_questions/InterviewQuestions")
+    source_dir_str = get_str("source_dir", ".")
 
     # Get source subdirs if configured (overrides source_dir)
     source_subdirs_raw = config_data.get("source_subdirs")
