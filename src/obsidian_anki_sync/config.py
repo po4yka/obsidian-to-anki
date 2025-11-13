@@ -41,6 +41,10 @@ class Config:
     log_level: str
 
     # Optional fields (with defaults) - MUST come after required fields
+    # Obsidian source directories (optional - overrides source_dir if provided)
+    # List of relative paths from vault_path to search for Q&A notes
+    # Example: [".", "Interviews", "CS/Algorithms"]
+    source_subdirs: list[Path] | None = None
     # LLM Provider Configuration
     # Unified provider system - choose one: 'ollama', 'lm_studio', 'openrouter'
     llm_provider: str = "ollama"
@@ -313,6 +317,16 @@ def load_config(config_path: Path | None = None) -> Config:
     vault_path_str = get_str("vault_path", "")
     source_dir_str = get_str("source_dir", "interview_questions/InterviewQuestions")
 
+    # Get source subdirs if configured (overrides source_dir)
+    source_subdirs_raw = config_data.get("source_subdirs")
+    source_subdirs: list[Path] | None = None
+    if source_subdirs_raw is not None:
+        if isinstance(source_subdirs_raw, list):
+            source_subdirs = [Path(str(d)) for d in source_subdirs_raw]
+        elif isinstance(source_subdirs_raw, str):
+            # Support single string (convert to list)
+            source_subdirs = [Path(source_subdirs_raw)]
+
     # Get export output path if configured
     export_output_str = config_data.get("export_output_path") or os.getenv(
         "EXPORT_OUTPUT_PATH"
@@ -324,6 +338,7 @@ def load_config(config_path: Path | None = None) -> Config:
     config = Config(
         vault_path=Path(vault_path_str).expanduser().resolve(),
         source_dir=Path(source_dir_str),
+        source_subdirs=source_subdirs,
         anki_connect_url=get_str("anki_connect_url", "http://127.0.0.1:8765"),
         anki_deck_name=deck_name,
         anki_note_type=get_str("anki_note_type", "APF::Simple"),
@@ -380,6 +395,8 @@ def load_config(config_path: Path | None = None) -> Config:
         log_level=get_str("log_level", "INFO"),
         # Agent system settings
         use_agent_system=get_bool("use_agent_system", False),
+        qa_extractor_model=get_str("qa_extractor_model", "qwen3:8b"),
+        qa_extractor_temperature=get_float("qa_extractor_temperature", 0.0),
         pre_validator_model=get_str("pre_validator_model", "qwen3:8b"),
         pre_validator_temperature=get_float("pre_validator_temperature", 0.0),
         pre_validation_enabled=get_bool("pre_validation_enabled", True),

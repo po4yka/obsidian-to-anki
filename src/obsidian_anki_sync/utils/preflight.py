@@ -152,48 +152,76 @@ class PreflightChecker:
             )
 
     def _check_source_dir(self) -> None:
-        """Check if source directory exists within vault."""
+        """Check if source directory/directories exist within vault."""
         vault_path = self.config.vault_path
-        source_dir = self.config.source_dir
 
-        if not vault_path or not source_dir:
+        if not vault_path:
             # Already handled by vault path check
             return
 
-        full_path = Path(vault_path) / source_dir
+        # Use source_subdirs if configured, otherwise use source_dir
+        if self.config.source_subdirs:
+            source_dirs = self.config.source_subdirs
+            dir_description = f"{len(source_dirs)} source directories"
+        else:
+            source_dirs = [self.config.source_dir]
+            dir_description = "source directory"
 
-        if not full_path.exists():
+        # Check each directory
+        total_notes = 0
+        missing_dirs = []
+        invalid_dirs = []
+
+        for source_dir in source_dirs:
+            if not source_dir:
+                continue
+
+            full_path = Path(vault_path) / source_dir
+
+            if not full_path.exists():
+                missing_dirs.append(str(source_dir))
+                continue
+
+            if not full_path.is_dir():
+                invalid_dirs.append(str(source_dir))
+                continue
+
+            # Count notes in directory
+            note_files = list(full_path.glob("**/*.md"))
+            total_notes += len(note_files)
+
+        # Report results
+        if missing_dirs:
             self.results.append(
                 CheckResult(
                     name="Source Directory",
                     passed=False,
-                    message=f"Source directory not found: {full_path}",
+                    message=f"Source directories not found: {', '.join(missing_dirs)}",
                     severity="error",
                     fixable=True,
-                    fix_suggestion=f"Create the directory or update SOURCE_DIR in .env",
+                    fix_suggestion="Create the directories or update source_subdirs in config.yaml",
                 )
             )
             return
 
-        if not full_path.is_dir():
+        if invalid_dirs:
             self.results.append(
                 CheckResult(
                     name="Source Directory",
                     passed=False,
-                    message=f"Source path is not a directory: {full_path}",
+                    message=f"Source paths are not directories: {', '.join(invalid_dirs)}",
                     severity="error",
                     fixable=False,
                 )
             )
             return
 
-        # Count notes in directory
-        note_files = list(full_path.glob("**/*.md"))
+        # Success
         self.results.append(
             CheckResult(
                 name="Source Directory",
                 passed=True,
-                message=f"Found {len(note_files)} markdown files in {source_dir}",
+                message=f"Found {total_notes} markdown files in {dir_description}",
                 severity="info",
             )
         )
