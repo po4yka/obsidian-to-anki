@@ -14,7 +14,12 @@ from ..apf.html_validator import validate_card_html
 from ..apf.linter import validate_apf
 from ..config import Config
 from ..models import Card, NoteMetadata, QAPair, SyncAction
-from ..obsidian.parser import ParserError, discover_notes, parse_note
+from ..obsidian.parser import (
+    ParserError,
+    configure_llm_extraction,
+    discover_notes,
+    parse_note,
+)
 from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
@@ -86,10 +91,29 @@ class SyncEngine:
             )  # type: ignore
             self.apf_gen = APFGenerator(config)  # Still keep for backward compat
             self.use_agents = True
+
+            # Configure LLM-based Q&A extraction when using agents
+            # Use the same provider as the orchestrator
+            qa_extractor_model = getattr(config, "qa_extractor_model", "qwen3:8b")
+            qa_extractor_temp = getattr(config, "qa_extractor_temperature", 0.0)
+
+            logger.info(
+                "configuring_llm_qa_extraction",
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+            )
+            configure_llm_extraction(
+                llm_provider=self.agent_orchestrator.provider,
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+            )
         else:
             self.apf_gen = APFGenerator(config)
             self.agent_orchestrator: AgentOrchestrator | None = None  # type: ignore
             self.use_agents = False
+
+            # Disable LLM extraction when not using agents
+            configure_llm_extraction(llm_provider=None)
 
         self.changes: list[SyncAction] = []
         self.stats = {
