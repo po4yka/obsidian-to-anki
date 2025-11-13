@@ -50,6 +50,7 @@ class BaseLLMProvider(ABC):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
         """Generate a completion from the LLM.
@@ -60,6 +61,7 @@ class BaseLLMProvider(ABC):
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
             format: Response format ("json" for structured output)
+            json_schema: JSON schema for structured output (OpenRouter, OpenAI)
             stream: Enable streaming (if supported by provider)
 
         Returns:
@@ -73,7 +75,12 @@ class BaseLLMProvider(ABC):
         pass
 
     def generate_json(
-        self, model: str, prompt: str, system: str = "", temperature: float = 0.7
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        json_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM.
 
@@ -86,6 +93,7 @@ class BaseLLMProvider(ABC):
             prompt: User prompt (should request JSON format)
             system: System prompt (optional)
             temperature: Sampling temperature
+            json_schema: JSON schema for structured output (recommended for reliability)
 
         Returns:
             Parsed JSON response as a dictionary
@@ -99,6 +107,7 @@ class BaseLLMProvider(ABC):
             system=system,
             temperature=temperature,
             format="json",
+            json_schema=json_schema,
         )
 
         response_text = result.get("response", "{}")

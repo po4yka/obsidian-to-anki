@@ -155,6 +155,7 @@ class OpenRouterProvider(BaseLLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from OpenRouter.
@@ -164,7 +165,8 @@ class OpenRouterProvider(BaseLLMProvider):
             prompt: User prompt
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
-            format: Response format ("json" for structured output)
+            format: Response format ("json" for basic JSON mode, ignored if json_schema provided)
+            json_schema: JSON schema for structured output (recommended over format="json")
             stream: Enable streaming (not implemented)
 
         Returns:
@@ -192,8 +194,18 @@ class OpenRouterProvider(BaseLLMProvider):
             "stream": False,
         }
 
-        # Handle JSON format request
-        if format == "json":
+        # Handle structured output with JSON schema (preferred method)
+        if json_schema:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": json_schema.get("name", "response"),
+                    "strict": json_schema.get("strict", True),
+                    "schema": json_schema.get("schema", {}),
+                },
+            }
+        # Fallback to basic JSON mode if format="json" and no schema
+        elif format == "json":
             payload["response_format"] = {"type": "json_object"}
 
         logger.info(
@@ -203,6 +215,7 @@ class OpenRouterProvider(BaseLLMProvider):
             system_length=len(system),
             temperature=temperature,
             format=format,
+            has_json_schema=bool(json_schema),
         )
 
         try:
@@ -262,17 +275,24 @@ class OpenRouterProvider(BaseLLMProvider):
             raise
 
     def generate_json(
-        self, model: str, prompt: str, system: str = "", temperature: float = 0.7
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        json_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from OpenRouter.
 
         Overrides base implementation to use OpenAI's response_format parameter.
+        Supports structured outputs via JSON schema for guaranteed valid responses.
 
         Args:
             model: Model identifier
             prompt: User prompt (should request JSON format)
             system: System prompt (optional)
             temperature: Sampling temperature
+            json_schema: JSON schema for structured output (recommended for reliability)
 
         Returns:
             Parsed JSON response as a dictionary
@@ -285,7 +305,8 @@ class OpenRouterProvider(BaseLLMProvider):
             prompt=prompt,
             system=system,
             temperature=temperature,
-            format="json",
+            format="json" if not json_schema else "",
+            json_schema=json_schema,
         )
 
         response_text = result.get("response", "{}")
@@ -299,5 +320,6 @@ class OpenRouterProvider(BaseLLMProvider):
                 error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
                 response_text=response_text,
                 response_length=len(response_text),
+                had_schema=bool(json_schema),
             )
             raise

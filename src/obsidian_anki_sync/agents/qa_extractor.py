@@ -11,6 +11,7 @@ from pathlib import Path
 from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
+from .json_schemas import get_qa_extraction_schema
 from .llm_errors import (
     categorize_llm_error,
     format_llm_error_for_user,
@@ -60,42 +61,63 @@ class QAExtractorAgent:
         languages = metadata.language_tags
         language_list = ", ".join(languages)
 
-        return f"""You are an expert at extracting question-answer pairs from educational notes.
+        return f"""<task>
+Extract all question-answer pairs from the provided educational note. Identify questions and their corresponding answers regardless of markdown format.
+</task>
 
-TASK: Extract all question-answer pairs from this note, regardless of their format.
+<input>
+<metadata>
+Title: {metadata.title}
+Topic: {metadata.topic}
+Languages: {language_list}
+Expected Languages per Q&A: {language_list}
+</metadata>
 
-NOTE METADATA:
-- Title: {metadata.title}
-- Topic: {metadata.topic}
-- Languages: {language_list}
-- Expected Languages: Each Q&A should have content in: {language_list}
-
-FULL NOTE CONTENT:
+<note_content>
 {note_content}
+</note_content>
+</input>
 
-EXTRACTION RULES:
-1. Look for questions and their corresponding answers throughout the note
-2. Questions might be in various formats:
-   - Explicit headers like "# Question (EN)" or "## What is..."
+<rules>
+1. ONLY extract Q&A pairs where BOTH the question AND answer are explicitly present in the note
+2. SKIP sections labeled "Follow-up Questions", "Additional Questions", or any questions without answers
+3. Do NOT create separate Q&A pairs for unanswered questions
+4. Questions may appear in various formats:
+   - Explicit headers: "# Question (EN)", "## What is...", "# Вопрос (RU)"
    - Numbered or bulleted lists
-   - Implicit questions within text
    - Q&A formatted blocks
-3. Extract answers that correspond to each question
-4. For bilingual notes (en, ru), extract both language versions of questions/answers
-5. Preserve the semantic relationship between questions and answers
-6. Include all Q&A pairs found, number them sequentially starting from 1
-7. For each Q&A pair, extract:
-   - question_en: Question in English (if language includes 'en')
-   - question_ru: Question in Russian (if language includes 'ru')
-   - answer_en: Answer in English (if language includes 'en')
-   - answer_ru: Answer in Russian (if language includes 'ru')
-   - context: Any contextual information before the Q&A
-   - followups: Any follow-up questions mentioned
-   - references: Any references or citations
-   - related: Related topics or questions
+   - Implicit questions within text
+5. Extract answers that directly correspond to each question
+6. For bilingual notes (en, ru), extract BOTH language versions of questions and answers
+7. Preserve the semantic relationship between questions and answers
+8. Number all Q&A pairs sequentially starting from 1
+9. Maintain the order of Q&A pairs as they appear in the note
+10. Preserve markdown formatting in questions and answers
 
-OUTPUT FORMAT:
-Respond with a JSON object containing a list of extracted Q&A pairs:
+<field_extraction>
+For each Q&A pair, extract these fields:
+- card_index: Sequential number (1, 2, 3, ...)
+- question_en: Question in English (if 'en' in language_tags, otherwise empty string)
+- question_ru: Question in Russian (if 'ru' in language_tags, otherwise empty string)
+- answer_en: Answer in English (if 'en' in language_tags, otherwise empty string)
+- answer_ru: Answer in Russian (if 'ru' in language_tags, otherwise empty string)
+- context: Any contextual information before the Q&A (optional)
+- followups: Follow-up questions mentioned (for reference only, NOT as separate cards)
+- references: References or citations (optional)
+- related: Related topics or questions (optional)
+</field_extraction>
+
+<constraints>
+- NEVER extract Q&A pairs with missing questions or answers
+- NEVER create cards from "Follow-up Questions" or "Additional Questions" sections
+- If a language is not in language_tags, leave that field as empty string
+- If no complete Q&A pairs exist, return empty list with explanation in extraction_notes
+- Follow-up questions go in the 'followups' field, NOT as separate Q&A pairs
+</constraints>
+</rules>
+
+<output_format>
+Respond with valid JSON matching this exact structure:
 
 {{
   "qa_pairs": [
@@ -111,16 +133,61 @@ Respond with a JSON object containing a list of extracted Q&A pairs:
       "related": "Optional related topics"
     }}
   ],
-  "extraction_notes": "Any notes about the extraction process",
+  "extraction_notes": "Notes about the extraction process or why certain pairs were skipped",
   "total_pairs": 1
 }}
+</output_format>
 
-IMPORTANT:
-- If a language is not in the language_tags, leave that field empty
-- Preserve markdown formatting in questions and answers
-- Be thorough - extract ALL Q&A pairs you can identify
-- If no clear Q&A pairs exist, return an empty list with explanation in extraction_notes
-- Maintain the order of Q&A pairs as they appear in the note
+<examples>
+<example_1>
+Input note with explicit headers:
+```
+# Question (EN)
+What is polymorphism?
+
+## Answer (EN)
+Polymorphism is the ability of objects to take on multiple forms.
+```
+
+Expected extraction:
+{{
+  "qa_pairs": [{{
+    "card_index": 1,
+    "question_en": "What is polymorphism?",
+    "question_ru": "",
+    "answer_en": "Polymorphism is the ability of objects to take on multiple forms.",
+    "answer_ru": ""
+  }}],
+  "total_pairs": 1
+}}
+</example_1>
+
+<example_2>
+Input note with unanswered follow-up section:
+```
+# Question (EN)
+What is inheritance?
+
+## Answer (EN)
+Inheritance allows classes to derive properties from other classes.
+
+## Follow-up Questions
+- What about multiple inheritance?
+```
+
+Expected extraction:
+{{
+  "qa_pairs": [{{
+    "card_index": 1,
+    "question_en": "What is inheritance?",
+    "answer_en": "Inheritance allows classes to derive properties from other classes.",
+    "followups": "What about multiple inheritance?"
+  }}],
+  "extraction_notes": "Skipped 1 unanswered follow-up question",
+  "total_pairs": 1
+}}
+</example_2>
+</examples>
 """
 
     def extract_qa_pairs(
@@ -153,11 +220,32 @@ IMPORTANT:
         try:
             prompt = self._build_extraction_prompt(note_content, metadata)
 
-            system_prompt = """You are an expert Q&A extraction system.
-Your job is to identify and extract question-answer pairs from educational notes.
-Be flexible and intelligent - recognize Q&A patterns regardless of formatting.
-Always respond in valid JSON format.
-Be thorough and extract all Q&A pairs you can find."""
+            system_prompt = """<role>
+You are an expert Q&A extraction system specializing in educational note analysis. Your purpose is to identify and extract complete question-answer pairs from structured and unstructured markdown notes.
+</role>
+
+<capabilities>
+- Pattern recognition across diverse markdown formatting styles
+- Semantic understanding of question-answer relationships
+- Multilingual content extraction (English and Russian)
+- Distinction between answered and unanswered questions
+</capabilities>
+
+<critical_rules>
+1. ONLY extract Q&A pairs where BOTH question AND answer are explicitly present
+2. SKIP any sections labeled "Follow-up Questions", "Additional Questions", or similar
+3. NEVER create Q&A pairs for unanswered questions
+4. Unanswered questions may be noted in the 'followups' field for context only
+5. Always respond in valid JSON format matching the provided schema
+6. Be flexible in recognizing Q&A patterns regardless of markdown formatting
+</critical_rules>
+
+<output_requirements>
+- Valid JSON structure only
+- Complete extraction of all answerable Q&A pairs
+- Accurate language field population based on language_tags
+- Sequential card_index numbering starting from 1
+</output_requirements>"""
 
             llm_start_time = time.time()
 
@@ -170,11 +258,15 @@ Be thorough and extract all Q&A pairs you can find."""
                 prompt_length=len(prompt),
             )
 
+            # Get JSON schema for structured output
+            json_schema = get_qa_extraction_schema()
+
             result = self.llm_provider.generate_json(
                 model=self.model,
                 prompt=prompt,
                 system=system_prompt,
                 temperature=self.temperature,
+                json_schema=json_schema,
             )
 
             llm_duration = time.time() - llm_start_time

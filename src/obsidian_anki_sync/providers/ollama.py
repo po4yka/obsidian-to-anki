@@ -129,6 +129,7 @@ class OllamaProvider(BaseLLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from Ollama.
