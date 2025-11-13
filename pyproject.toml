@@ -7,7 +7,7 @@ name = "obsidian-anki-sync"
 version = "0.1.0"
 description = "Synchronize Obsidian Q&A notes to Anki APF cards via LLM"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Obsidian Anki Sync Contributors"}
@@ -17,34 +17,34 @@ dependencies = [
     "rich>=14.2.0",
     "pyyaml>=6.0.3",
     "httpx>=0.28.1",
-    "openai>=2.7.1",
+    "openai>=2.7.2",
     "python-dotenv>=1.2.1",
-    "loguru>=0.7.0",
+    "loguru>=0.7.3",
     "ruamel.yaml>=0.18.16",
     "python-frontmatter>=1.1.0",
     "obsidiantools>=0.10.0",
     "beautifulsoup4>=4.14.2",
     "html5lib>=1.1",
-    "pydantic>=2.0.0",
-    "autogen-agentchat>=0.4.0",
-    "autogen-ext[ollama]>=0.4.8",
+    "pydantic>=2.12.4",
+    "autogen-agentchat>=0.7.5",
+    "autogen-ext[ollama]>=0.7.5",
     "genanki>=0.13.0",
-    "pydantic-ai>=0.0.14",
-    "langgraph>=0.2.60",
-    "langgraph-checkpoint>=2.0.10",
+    "pydantic-ai>=1.14.1",
+    "langgraph>=1.0.3",
+    "langgraph-checkpoint>=3.0.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.4.2",
+    "pytest>=9.0.0",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "respx>=0.22.0",
-    "black>=25.9.0",
-    "isort>=5.13.2",
-    "ruff>=0.14.3",
+    "black>=25.11.0",
+    "isort>=7.0.0",
+    "ruff>=0.14.4",
     "mypy>=1.18.2",
-    "pre-commit>=3.7.0",
+    "pre-commit>=4.4.0",
 ]
 
 [project.scripts]
@@ -55,7 +55,7 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py311"]
+target-version = ["py313"]
 
 [tool.isort]
 profile = "black"
@@ -64,10 +64,10 @@ src_paths = ["src", "tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py313"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

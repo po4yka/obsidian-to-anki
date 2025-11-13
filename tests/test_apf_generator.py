@@ -101,7 +101,9 @@ def test_code_language_hint_detects_known_language(
     assert gen._code_language_hint(sample_metadata_for_code) == "kotlin"
 
 
-def test_code_language_hint_falls_back_to_plaintext(dummy_config, plain_metadata) -> None:
+def test_code_language_hint_falls_back_to_plaintext(
+    dummy_config, plain_metadata
+) -> None:
     gen = APFGenerator(dummy_config)
     assert gen._code_language_hint(plain_metadata) == "plaintext"
 
