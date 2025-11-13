@@ -58,7 +58,7 @@ def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
     metadata = parse_frontmatter(content, file_path)
 
     # Parse Q/A pairs
-    qa_pairs = parse_qa_pairs(content, metadata)
+    qa_pairs = parse_qa_pairs(content, metadata, file_path)
 
     logger.debug(
         "parsed_note",
@@ -226,7 +226,9 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     return metadata
 
 
-def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
+def parse_qa_pairs(
+    content: str, metadata: NoteMetadata, file_path: Path | None = None
+) -> list[QAPair]:
     """
     Parse Q/A pairs from note content.
 
@@ -295,7 +297,7 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
 
         # Try to parse this block as a Q/A pair
         try:
-            qa_pair = _parse_single_qa_block(block, card_index, metadata)
+            qa_pair = _parse_single_qa_block(block, card_index, metadata, file_path)
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
@@ -303,7 +305,12 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
                 # Block was skipped (incomplete or invalid)
                 failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
-            logger.error("qa_parse_error", card_index=card_index, error=str(e))
+            logger.error(
+                "qa_parse_error",
+                card_index=card_index,
+                file=str(file_path) if file_path else "unknown",
+                error=str(e),
+            )
             failed_blocks.append((card_index, str(e)))
             # Continue processing other blocks
 
@@ -311,6 +318,8 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
     if failed_blocks:
         logger.warning(
             "qa_parsing_incomplete",
+            file=str(file_path) if file_path else "unknown",
+            note_title=metadata.title,
             total_blocks=len(blocks),
             successful=len(qa_pairs),
             failed=len(failed_blocks),
@@ -318,16 +327,25 @@ def parse_qa_pairs(content: str, metadata: NoteMetadata) -> list[QAPair]:
         )
         # Log details of first few failures
         for idx, error in failed_blocks[:3]:
-            logger.debug("qa_parse_failure_detail", card_index=idx, error=error)
+            logger.debug(
+                "qa_parse_failure_detail",
+                file=str(file_path) if file_path else "unknown",
+                card_index=idx,
+                error=error,
+            )
 
     if not qa_pairs:
-        logger.warning("no_qa_pairs_found")
+        logger.warning(
+            "no_qa_pairs_found",
+            file=str(file_path) if file_path else "unknown",
+            note_title=metadata.title,
+        )
 
     return qa_pairs
 
 
 def _parse_single_qa_block(
-    block: str, card_index: int, metadata: NoteMetadata
+    block: str, card_index: int, metadata: NoteMetadata, file_path: Path | None = None
 ) -> QAPair | None:
     """Parse a single Q/A block."""
     lines = block.split("\n")
@@ -407,14 +425,46 @@ def _parse_single_qa_block(
     # Check if we have all required sections
     if not question_en or not question_ru:
         if state != "INIT":  # Only warn if we started parsing
-            logger.warning("incomplete_qa_block", card_index=card_index, state=state)
+            missing_sections = []
+            if not question_en:
+                missing_sections.append("Question (EN)")
+            if not question_ru:
+                missing_sections.append("Вопрос (RU)")
+
+            # Show a preview of the block (first 200 chars)
+            block_preview = block[:200].replace("\n", " ")
+            if len(block) > 200:
+                block_preview += "..."
+
+            logger.warning(
+                "incomplete_qa_block",
+                file=str(file_path) if file_path else "unknown",
+                note_title=metadata.title,
+                card_index=card_index,
+                state=state,
+                missing_sections=missing_sections,
+                block_preview=block_preview,
+            )
         return None
 
     # Check if we have at least one answer section
     # Note: Separator (---) between questions and answers is optional
     if not answer_en and not answer_ru:
         if state != "INIT":
-            logger.warning("no_answers_found", card_index=card_index, state=state)
+            missing_sections = []
+            if not answer_en:
+                missing_sections.append("Answer (EN)")
+            if not answer_ru:
+                missing_sections.append("Ответ (RU)")
+
+            logger.warning(
+                "no_answers_found",
+                file=str(file_path) if file_path else "unknown",
+                note_title=metadata.title,
+                card_index=card_index,
+                state=state,
+                missing_sections=missing_sections,
+            )
         return None
 
     # Validate language tags
@@ -424,6 +474,8 @@ def _parse_single_qa_block(
     if has_en and not (question_en and answer_en):
         logger.error(
             "missing_en_content",
+            file=str(file_path) if file_path else "unknown",
+            note_title=metadata.title,
             card_index=card_index,
             has_question=bool(question_en),
             has_answer=bool(answer_en),
@@ -433,6 +485,8 @@ def _parse_single_qa_block(
     if has_ru and not (question_ru and answer_ru):
         logger.error(
             "missing_ru_content",
+            file=str(file_path) if file_path else "unknown",
+            note_title=metadata.title,
             card_index=card_index,
             has_question=bool(question_ru),
             has_answer=bool(answer_ru),

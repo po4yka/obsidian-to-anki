@@ -156,8 +156,12 @@ Be strict but helpful - suggest fixes when possible."""
             logger.info(
                 "pre_validation_llm_start",
                 model=self.model,
+                note_id=metadata.id,
                 title=metadata.title,
+                file=str(file_path) if file_path else "unknown",
                 content_length=len(note_content),
+                prompt_length=len(prompt),
+                qa_pairs_count=len(qa_pairs),
             )
 
             result = self.ollama_client.generate_json(
@@ -210,13 +214,20 @@ Be strict but helpful - suggest fixes when possible."""
 
             log_llm_error(
                 llm_error,
+                note_id=metadata.id,
                 title=metadata.title,
+                file=str(file_path) if file_path else "unknown",
                 qa_pairs_count=len(qa_pairs),
                 content_length=len(note_content),
+                prompt_length=len(prompt) if "prompt" in locals() else 0,
             )
 
             logger.error(
                 "pre_validation_llm_error",
+                note_id=metadata.id,
+                title=metadata.title,
+                file=str(file_path) if file_path else "unknown",
+                model=self.model,
                 error_type=llm_error.error_type.value,
                 error=str(llm_error),
                 user_message=format_llm_error_for_user(llm_error),

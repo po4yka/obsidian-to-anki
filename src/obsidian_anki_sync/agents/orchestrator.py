@@ -133,11 +133,19 @@ class AgentOrchestrator:
         start_time = time.time()
         stage_times: dict[str, float] = {}
 
+        # Generate correlation ID for tracking this note through the pipeline
+        correlation_id = hashlib.sha256(
+            f"{metadata.id}:{int(start_time * 1000)}".encode()
+        ).hexdigest()[:12]
+
         logger.info(
             "pipeline_start",
+            correlation_id=correlation_id,
+            note_id=metadata.id,
             title=metadata.title,
             qa_pairs_count=len(qa_pairs),
             languages=metadata.language_tags,
+            file=str(file_path) if file_path else "unknown",
         )
 
         # Stage 1: Pre-validation
@@ -156,7 +164,11 @@ class AgentOrchestrator:
                 total_time = time.time() - start_time
                 logger.warning(
                     "pipeline_failed_pre_validation",
+                    correlation_id=correlation_id,
+                    note_id=metadata.id,
+                    title=metadata.title,
                     error_type=pre_result.error_type,
+                    error_details=pre_result.error_details,
                     time=total_time,
                 )
 
@@ -172,7 +184,11 @@ class AgentOrchestrator:
             # Use fixed content if auto-fix was applied
             if pre_result.auto_fix_applied and pre_result.fixed_content:
                 note_content = pre_result.fixed_content
-                logger.info("using_auto_fixed_content")
+                logger.info(
+                    "using_auto_fixed_content",
+                    correlation_id=correlation_id,
+                    note_id=metadata.id,
+                )
         else:
             # Skip pre-validation, create dummy result
             from .models import PreValidationResult
@@ -207,6 +223,9 @@ class AgentOrchestrator:
             total_time = time.time() - start_time
             logger.error(
                 "pipeline_failed_generation",
+                correlation_id=correlation_id,
+                note_id=metadata.id,
+                title=metadata.title,
                 error=str(e),
                 time=total_time,
                 stage_times=stage_times,
@@ -241,6 +260,9 @@ class AgentOrchestrator:
                 total_time = time.time() - start_time
                 logger.info(
                     "pipeline_success",
+                    correlation_id=correlation_id,
+                    note_id=metadata.id,
+                    title=metadata.title,
                     cards_generated=len(current_cards),
                     retry_count=retry_count,
                     time=total_time,
@@ -269,21 +291,30 @@ class AgentOrchestrator:
             # Validation failed
             logger.warning(
                 "post_validation_failed",
+                correlation_id=correlation_id,
+                note_id=metadata.id,
                 attempt=attempt + 1,
                 error_type=post_result.error_type,
-                error_details=post_result.error_details[:200],
+                error_details=post_result.error_details,
             )
 
             # Try auto-fix if enabled
             if auto_fix and post_result.corrected_cards:
                 logger.info(
-                    "applying_auto_fix", cards_count=len(post_result.corrected_cards)
+                    "applying_auto_fix",
+                    correlation_id=correlation_id,
+                    note_id=metadata.id,
+                    cards_count=len(post_result.corrected_cards),
                 )
                 current_cards = post_result.corrected_cards
                 retry_count = attempt + 1
             elif auto_fix:
                 # Attempt auto-fix manually
-                logger.info("attempting_manual_auto_fix")
+                logger.info(
+                    "attempting_manual_auto_fix",
+                    correlation_id=correlation_id,
+                    note_id=metadata.id,
+                )
                 fixed_cards = self.post_validator.attempt_auto_fix(
                     cards=current_cards, error_details=post_result.error_details
                 )
@@ -303,6 +334,9 @@ class AgentOrchestrator:
         total_time = time.time() - start_time
         logger.error(
             "pipeline_failed_post_validation",
+            correlation_id=correlation_id,
+            note_id=metadata.id,
+            title=metadata.title,
             retry_count=retry_count,
             time=total_time,
             stage_times=stage_times,
