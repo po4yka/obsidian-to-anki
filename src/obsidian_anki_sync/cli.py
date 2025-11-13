@@ -10,6 +10,7 @@ from rich.table import Table
 
 from .cli_commands.shared import get_config_and_logger
 from .cli_commands.sync_handler import run_sync
+from .utils.preflight import run_preflight_checks
 
 app = typer.Typer(
     name="obsidian-anki-sync",
@@ -122,6 +123,37 @@ def test_run(
         logger.info("agent_system_override", use_agents=use_agents)
 
     logger.info("test_run_started", sample_count=count)
+
+    # Run pre-flight checks (skip Anki since it's a dry-run)
+    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+
+    passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
+
+    # Display results
+    for result in results:
+        if result.passed:
+            icon = "[green]✓[/green]"
+        elif result.severity == "warning":
+            icon = "[yellow]⚠[/yellow]"
+        else:
+            icon = "[red]✗[/red]"
+
+        console.print(f"{icon} {result.name}: {result.message}")
+
+        if not result.passed and result.fix_suggestion:
+            console.print(f"  [dim]{result.fix_suggestion}[/dim]")
+
+    console.print()
+
+    # Check for errors
+    errors = [r for r in results if not r.passed and r.severity == "error"]
+
+    if errors:
+        console.print(f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+        console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]All pre-flight checks passed![/bold green]\n")
 
     from .anki.client import AnkiClient
     from .sync.engine import SyncEngine
@@ -441,6 +473,37 @@ def export(
         deck_name=final_deck_name,
         sample_size=sample_size,
     )
+
+    # Run pre-flight checks (skip Anki since we're exporting to file)
+    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+
+    passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
+
+    # Display results
+    for result in results:
+        if result.passed:
+            icon = "[green]✓[/green]"
+        elif result.severity == "warning":
+            icon = "[yellow]⚠[/yellow]"
+        else:
+            icon = "[red]✗[/red]"
+
+        console.print(f"{icon} {result.name}: {result.message}")
+
+        if not result.passed and result.fix_suggestion:
+            console.print(f"  [dim]{result.fix_suggestion}[/dim]")
+
+    console.print()
+
+    # Check for errors
+    errors = [r for r in results if not r.passed and r.severity == "error"]
+
+    if errors:
+        console.print(f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+        console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]All pre-flight checks passed![/bold green]\n")
 
     from .anki.exporter import export_cards_to_apkg
     from .obsidian.parser import discover_notes, parse_note
@@ -788,6 +851,86 @@ def clean_progress(
         logger.error("clean_progress_failed", error=str(e))
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
+
+
+@app.command(name="check")
+def check_setup(
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+    skip_anki: Annotated[
+        bool,
+        typer.Option("--skip-anki", help="Skip Anki connectivity check"),
+    ] = False,
+    skip_llm: Annotated[
+        bool,
+        typer.Option("--skip-llm", help="Skip LLM provider connectivity check"),
+    ] = False,
+) -> None:
+    """Run pre-flight checks to validate your setup."""
+    config, logger = get_config_and_logger(config_path, log_level)
+
+    logger.info("check_setup_started")
+
+    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+
+    passed, results = run_preflight_checks(
+        config, check_anki=not skip_anki, check_llm=not skip_llm
+    )
+
+    # Display results with detailed formatting
+    for result in results:
+        if result.passed:
+            icon = "[green]✓[/green]"
+            color = "green"
+        elif result.severity == "warning":
+            icon = "[yellow]⚠[/yellow]"
+            color = "yellow"
+        else:
+            icon = "[red]✗[/red]"
+            color = "red"
+
+        console.print(f"{icon} [bold]{result.name}[/bold]: {result.message}")
+
+        if not result.passed and result.fix_suggestion:
+            console.print(f"  [dim]💡 {result.fix_suggestion}[/dim]")
+
+    console.print()
+
+    # Count errors and warnings
+    errors = [r for r in results if not r.passed and r.severity == "error"]
+    warnings = [r for r in results if not r.passed and r.severity == "warning"]
+    passed_checks = [r for r in results if r.passed]
+
+    # Display summary table
+    summary_table = Table(title="Check Summary", show_header=True, header_style="bold magenta")
+    summary_table.add_column("Status", style="cyan")
+    summary_table.add_column("Count", style="green")
+
+    summary_table.add_row("✓ Passed", str(len(passed_checks)))
+    summary_table.add_row("⚠ Warnings", str(len(warnings)))
+    summary_table.add_row("✗ Errors", str(len(errors)))
+
+    console.print(summary_table)
+    console.print()
+
+    if errors:
+        console.print("[bold red]❌ Setup validation failed![/bold red]")
+        console.print("[yellow]Fix the errors above before running sync.[/yellow]\n")
+        logger.error("check_setup_failed", errors=len(errors), warnings=len(warnings))
+        raise typer.Exit(code=1)
+    elif warnings:
+        console.print("[bold yellow]⚠️  Setup validation passed with warnings.[/bold yellow]")
+        console.print("[dim]You may proceed, but some features may not work as expected.[/dim]\n")
+        logger.info("check_setup_passed_with_warnings", warnings=len(warnings))
+    else:
+        console.print("[bold green]✅ All checks passed! Your setup is ready.[/bold green]\n")
+        logger.info("check_setup_passed")
 
 
 @app.command()
