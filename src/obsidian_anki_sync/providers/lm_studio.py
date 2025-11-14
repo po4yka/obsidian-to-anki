@@ -109,6 +109,7 @@ class LMStudioProvider(BaseLLMProvider):
         format: str = "",
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from LM Studio.
 
@@ -215,7 +216,13 @@ class LMStudioProvider(BaseLLMProvider):
             raise
 
     def generate_json(
-        self, model: str, prompt: str, system: str = "", temperature: float = 0.7
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        json_schema: dict[str, Any] | None = None,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate a JSON response from LM Studio.
 
@@ -226,6 +233,8 @@ class LMStudioProvider(BaseLLMProvider):
             prompt: User prompt (should request JSON format)
             system: System prompt (optional)
             temperature: Sampling temperature
+            json_schema: JSON schema for structured output (not used by LM Studio)
+            reasoning_enabled: Enable reasoning mode (not used by LM Studio)
 
         Returns:
             Parsed JSON response as a dictionary
@@ -239,6 +248,8 @@ class LMStudioProvider(BaseLLMProvider):
             system=system,
             temperature=temperature,
             format="json",
+            json_schema=json_schema,
+            reasoning_enabled=reasoning_enabled,
         )
 
         response_text = result.get("response", "{}")

@@ -110,6 +110,105 @@ class OpenRouterProvider(BaseLLMProvider):
         if hasattr(self, "client"):
             self.client.close()
 
+    def _clean_json_response(self, text: str, model: str) -> str:
+        """Clean JSON response from DeepSeek and similar models.
+
+        DeepSeek often wraps JSON in markdown fences, adds reasoning text,
+        or appends special tokens. This method extracts the clean JSON.
+
+        Args:
+            text: Raw response text
+            model: Model identifier for logging
+
+        Returns:
+            Cleaned JSON text
+        """
+        cleaned = text.strip()
+
+        # Remove markdown code fences if present (must be done first)
+        if cleaned.startswith("```json"):
+            end_fence = cleaned.rfind("```")
+            if end_fence > 6:  # Found closing fence after opening
+                cleaned = cleaned[7:end_fence].strip()
+                logger.debug(
+                    "removed_json_markdown_fence",
+                    model=model,
+                    original_length=len(text),
+                    cleaned_length=len(cleaned),
+                )
+        elif cleaned.startswith("```"):
+            end_fence = cleaned.rfind("```")
+            if end_fence > 3:
+                cleaned = cleaned[3:end_fence].strip()
+                logger.debug(
+                    "removed_generic_markdown_fence",
+                    model=model,
+                    original_length=len(text),
+                    cleaned_length=len(cleaned),
+                )
+
+        # Remove DeepSeek special tokens like <｜begin▁of▁sentence｜>
+        if "<｜" in cleaned:
+            token_pos = cleaned.find("<｜")
+            if token_pos > 0:
+                cleaned = cleaned[:token_pos].strip()
+                logger.debug(
+                    "removed_special_tokens",
+                    model=model,
+                    cleaned_length=len(cleaned),
+                )
+
+        # Extract JSON if response contains reasoning/explanatory text before JSON
+        if not cleaned.startswith("{"):
+            first_brace = cleaned.find("{")
+            if first_brace != -1:
+                cleaned = cleaned[first_brace:]
+                logger.debug(
+                    "extracted_json_from_text",
+                    model=model,
+                    original_length=len(text),
+                    cleaned_length=len(cleaned),
+                )
+
+        # Find the actual end of the JSON object by counting braces
+        # This handles cases where there's extra text after the JSON closes
+        if cleaned.startswith("{"):
+            brace_count = 0
+            in_string = False
+            escape_next = False
+
+            for i, char in enumerate(cleaned):
+                if escape_next:
+                    escape_next = False
+                    continue
+
+                if char == '\\':
+                    escape_next = True
+                    continue
+
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+
+                if not in_string:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            # Found the end of the JSON object
+                            if i + 1 < len(cleaned):
+                                cleaned = cleaned[:i + 1]
+                                logger.debug(
+                                    "trimmed_extra_data_after_json",
+                                    model=model,
+                                    original_length=len(text),
+                                    cleaned_length=len(cleaned),
+                                )
+                            break
+
+        return cleaned
+
     def check_connection(self) -> bool:
         """Check if OpenRouter is accessible.
 
@@ -157,6 +256,7 @@ class OpenRouterProvider(BaseLLMProvider):
         format: str = "",
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from OpenRouter.
 
@@ -168,6 +268,7 @@ class OpenRouterProvider(BaseLLMProvider):
             format: Response format ("json" for basic JSON mode, ignored if json_schema provided)
             json_schema: JSON schema for structured output (recommended over format="json")
             stream: Enable streaming (not implemented)
+            reasoning_enabled: Enable reasoning mode for DeepSeek models (default: False)
 
         Returns:
             Response dictionary with 'response' key containing the completion
@@ -193,6 +294,23 @@ class OpenRouterProvider(BaseLLMProvider):
             "max_tokens": self.max_tokens,
             "stream": False,
         }
+
+        # Enable reasoning mode for DeepSeek models if requested
+        # Note: Reasoning mode is incompatible with strict JSON schema mode
+        # If JSON schema is provided, we disable reasoning mode
+        if reasoning_enabled and not json_schema:
+            payload["reasoning_enabled"] = True
+            logger.debug(
+                "reasoning_mode_enabled",
+                model=model,
+                note="Reasoning mode disabled when using JSON schema",
+            )
+        elif reasoning_enabled and json_schema:
+            logger.warning(
+                "reasoning_mode_disabled_for_json_schema",
+                model=model,
+                reason="Reasoning mode is incompatible with strict JSON schema structured output",
+            )
 
         # Handle structured output with JSON schema (preferred method)
         if json_schema:
@@ -229,11 +347,49 @@ class OpenRouterProvider(BaseLLMProvider):
             result = response.json()
 
             # Extract completion from OpenAI format
-            completion = result["choices"][0]["message"]["content"]
+            message = result["choices"][0]["message"]
+            completion = message.get("content")
+
+            # Handle reasoning models (like DeepSeek) that may return content in different fields
+            # When using reasoning mode with structured output, the content might be null
+            # but the actual response might be in refusal, reasoning, or other fields
+            if completion is None or completion == "":
+                # Check for reasoning field (DeepSeek V3.1 puts structured output here)
+                if "reasoning" in message and message["reasoning"]:
+                    completion = message["reasoning"]
+                    logger.debug(
+                        "extracted_from_reasoning_field",
+                        model=model,
+                        reasoning_length=len(completion),
+                    )
+                # Check for refusal field (some models use this)
+                elif "refusal" in message and message["refusal"]:
+                    completion = message["refusal"]
+                # Check for tool_calls or function_call (structured output alternative)
+                elif "tool_calls" in message and message["tool_calls"]:
+                    # Extract from tool calls if present
+                    tool_call = message["tool_calls"][0]
+                    if "function" in tool_call and "arguments" in tool_call["function"]:
+                        completion = tool_call["function"]["arguments"]
+                else:
+                    # Log the full response for debugging
+                    logger.warning(
+                        "empty_completion_from_openrouter",
+                        model=model,
+                        message_keys=list(message.keys()),
+                        finish_reason=result["choices"][0].get("finish_reason"),
+                        full_message=message,
+                    )
+                    completion = ""
+
+            # Clean up completion text (especially important for DeepSeek responses)
+            # DeepSeek may add markdown fences, reasoning text, or special tokens
+            if completion and json_schema:
+                completion = self._clean_json_response(completion, model)
 
             # Convert to standard format
             standardized_result = {
-                "response": completion,
+                "response": completion if completion else "",
                 "model": result.get("model"),
                 "finish_reason": result["choices"][0].get("finish_reason"),
                 "usage": result.get("usage", {}),
@@ -281,6 +437,7 @@ class OpenRouterProvider(BaseLLMProvider):
         system: str = "",
         temperature: float = 0.7,
         json_schema: dict[str, Any] | None = None,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate a JSON response from OpenRouter.
 
@@ -293,6 +450,7 @@ class OpenRouterProvider(BaseLLMProvider):
             system: System prompt (optional)
             temperature: Sampling temperature
             json_schema: JSON schema for structured output (recommended for reliability)
+            reasoning_enabled: Enable reasoning mode for models that support it
 
         Returns:
             Parsed JSON response as a dictionary
@@ -307,11 +465,17 @@ class OpenRouterProvider(BaseLLMProvider):
             temperature=temperature,
             format="json" if not json_schema else "",
             json_schema=json_schema,
+            reasoning_enabled=reasoning_enabled,
         )
 
         response_text = result.get("response", "{}")
+
+        # Clean up response text before parsing (already cleaned in generate() if using json_schema)
+        # But also clean here for cases where format="json" is used without schema
+        cleaned_text = self._clean_json_response(response_text, model) if response_text else "{}"
+
         try:
-            return cast(dict[str, Any], json.loads(response_text))
+            return cast(dict[str, Any], json.loads(cleaned_text))
         except json.JSONDecodeError as e:
             logger.error(
                 "openrouter_json_parse_error",
@@ -319,7 +483,9 @@ class OpenRouterProvider(BaseLLMProvider):
                 error=str(e),
                 error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
                 response_text=response_text,
+                cleaned_text=cleaned_text,
                 response_length=len(response_text),
+                cleaned_length=len(cleaned_text),
                 had_schema=bool(json_schema),
             )
             raise

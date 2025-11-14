@@ -44,6 +44,8 @@ htmlcov/
 # Project-specific
 .env
 .sync_state.db
+.sync_state.db-shm
+.sync_state.db-wal
 *.log
 logs/
 .logs/

@@ -54,6 +54,7 @@ class Config:
     llm_top_p: float = 0.3
     llm_timeout: float = 900.0  # 15 minutes default for large models
     llm_max_tokens: int = 2048
+    llm_reasoning_enabled: bool = False  # Enable reasoning mode for models that support it (e.g., DeepSeek)
 
     # Ollama provider settings (local or cloud)
     ollama_base_url: str = "http://localhost:11434"

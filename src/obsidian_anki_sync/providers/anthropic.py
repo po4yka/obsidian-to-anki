@@ -163,6 +163,7 @@ class AnthropicProvider(BaseLLMProvider):
         format: str = "",
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate completion from Claude.
 

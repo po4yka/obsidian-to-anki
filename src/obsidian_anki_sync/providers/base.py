@@ -52,6 +52,7 @@ class BaseLLMProvider(ABC):
         format: str = "",
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate a completion from the LLM.
 
@@ -63,6 +64,7 @@ class BaseLLMProvider(ABC):
             format: Response format ("json" for structured output)
             json_schema: JSON schema for structured output (OpenRouter, OpenAI)
             stream: Enable streaming (if supported by provider)
+            reasoning_enabled: Enable reasoning mode for models that support it (e.g., DeepSeek)
 
         Returns:
             Response dictionary with at least a 'response' key containing the text.
@@ -81,6 +83,7 @@ class BaseLLMProvider(ABC):
         system: str = "",
         temperature: float = 0.7,
         json_schema: dict[str, Any] | None = None,
+        reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM.
 
@@ -94,6 +97,7 @@ class BaseLLMProvider(ABC):
             system: System prompt (optional)
             temperature: Sampling temperature
             json_schema: JSON schema for structured output (recommended for reliability)
+            reasoning_enabled: Enable reasoning mode for models that support it
 
         Returns:
             Parsed JSON response as a dictionary
@@ -108,6 +112,7 @@ class BaseLLMProvider(ABC):
             temperature=temperature,
             format="json",
             json_schema=json_schema,
+            reasoning_enabled=reasoning_enabled,
         )
 
         response_text = result.get("response", "{}")
