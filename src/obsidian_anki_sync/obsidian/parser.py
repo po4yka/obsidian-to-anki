@@ -31,6 +31,7 @@ def configure_llm_extraction(
     llm_provider: BaseLLMProvider | None,
     model: str = "qwen3:8b",
     temperature: float = 0.0,
+    reasoning_enabled: bool = False,
 ) -> None:
     """Configure LLM-based Q&A extraction.
 
@@ -38,6 +39,7 @@ def configure_llm_extraction(
         llm_provider: LLM provider instance (None to disable)
         model: Model to use for extraction
         temperature: Sampling temperature
+        reasoning_enabled: Enable reasoning mode for models that support it
     """
     global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
 
@@ -53,6 +55,7 @@ def configure_llm_extraction(
         llm_provider=llm_provider,
         model=model,
         temperature=temperature,
+        reasoning_enabled=reasoning_enabled,
     )
     _USE_LLM_EXTRACTION = True
     logger.info(

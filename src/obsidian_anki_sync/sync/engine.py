@@ -97,16 +97,19 @@ class SyncEngine:
             # Use the same provider as the orchestrator
             qa_extractor_model = getattr(config, "qa_extractor_model", "qwen3:8b")
             qa_extractor_temp = getattr(config, "qa_extractor_temperature", 0.0)
+            reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
             logger.info(
                 "configuring_llm_qa_extraction",
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
             )
             configure_llm_extraction(
                 llm_provider=self.agent_orchestrator.provider,
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
             )
         else:
             self.apf_gen = APFGenerator(config)
@@ -310,10 +313,31 @@ class SyncEngine:
         batch_start_time = time.time()
         notes_processed = 0
 
+        # Consecutive error tracking for early termination
+        consecutive_errors = 0
+        max_consecutive_errors = 3
+
         for file_path, relative_path in note_files:
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
                 break
+
+            # Check for too many consecutive errors
+            if consecutive_errors >= max_consecutive_errors:
+                logger.error(
+                    "too_many_consecutive_errors",
+                    consecutive_errors=consecutive_errors,
+                    max_allowed=max_consecutive_errors,
+                    last_file=relative_path,
+                )
+                logger.error(
+                    "terminating_sync_due_to_errors",
+                    message=f"Stopping sync after {consecutive_errors} consecutive errors. "
+                    f"This usually indicates a systemic issue (e.g., model unavailable, API errors). "
+                    f"Please check the logs and fix the underlying problem before retrying.",
+                )
+                break
+
             try:
                 # Parse note
                 metadata, qa_pairs = parse_note(file_path)
@@ -349,6 +373,7 @@ class SyncEngine:
                     error_type=type(e).__name__,
                 )
                 self.stats["errors"] += 1
+                consecutive_errors += 1
                 continue
             except Exception as e:
                 # Catch any unexpected errors during parsing to prevent full sync failure
@@ -359,6 +384,7 @@ class SyncEngine:
                     error_msg=str(e),
                 )
                 self.stats["errors"] += 1
+                consecutive_errors += 1
                 continue
 
             try:
@@ -398,6 +424,9 @@ class SyncEngine:
                             obsidian_cards[card.slug] = card
                             existing_slugs.add(card.slug)
 
+                            # Reset consecutive errors on success
+                            consecutive_errors = 0
+
                             # Mark as completed
                             if self.progress:
                                 self.progress.complete_note(
@@ -418,6 +447,8 @@ class SyncEngine:
                                 )
 
                             self.stats["errors"] += 1
+                            consecutive_errors += 1
+
                             if self.progress:
                                 self.progress.fail_note(
                                     relative_path, qa_pair.card_index, lang, str(e)
@@ -434,6 +465,7 @@ class SyncEngine:
                     error_msg=str(e),
                 )
                 self.stats["errors"] += 1
+                consecutive_errors += 1
 
             # Progress indicator (log every 10 notes or on completion)
             notes_processed += 1
@@ -455,6 +487,17 @@ class SyncEngine:
                     estimated_remaining_seconds=round(estimated_remaining, 1),
                     cards_generated=len(obsidian_cards),
                 )
+
+        # Log if sync was terminated early due to consecutive errors
+        if consecutive_errors >= max_consecutive_errors:
+            logger.error(
+                "sync_terminated_early",
+                reason="too_many_consecutive_errors",
+                consecutive_errors=consecutive_errors,
+                notes_processed=notes_processed,
+                total_notes=len(note_files),
+                notes_remaining=len(note_files) - notes_processed,
+            )
 
         # Log aggregated error summary
         if error_by_type:

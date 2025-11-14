@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from .progress import SyncProgress
 
 from ..models import Card
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class StateDB:

@@ -33,6 +33,7 @@ class QAExtractorAgent:
         llm_provider: BaseLLMProvider,
         model: str = "qwen3:8b",
         temperature: float = 0.0,
+        reasoning_enabled: bool = False,
     ):
         """Initialize Q&A extractor agent.
 
@@ -40,10 +41,12 @@ class QAExtractorAgent:
             llm_provider: LLM provider instance
             model: Model to use for extraction
             temperature: Sampling temperature (0.0 for deterministic)
+            reasoning_enabled: Enable reasoning mode for models that support it
         """
         self.llm_provider = llm_provider
         self.model = model
         self.temperature = temperature
+        self.reasoning_enabled = reasoning_enabled
         logger.info("qa_extractor_agent_initialized", model=model)
 
     def _build_extraction_prompt(
@@ -267,6 +270,7 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 system=system_prompt,
                 temperature=self.temperature,
                 json_schema=json_schema,
+                reasoning_enabled=self.reasoning_enabled,
             )
 
             llm_duration = time.time() - llm_start_time
