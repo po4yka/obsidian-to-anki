@@ -23,6 +23,7 @@ from ..obsidian.parser import (
 from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
+from ..sync.transactions import CardOperationError, CardTransaction
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
 
@@ -940,37 +941,96 @@ class SyncEngine:
                     self.progress.increment_stat("errors")
 
     def _create_card(self, card: Card) -> None:
-        """Create card in Anki."""
+        """Create card in Anki with atomic transaction."""
         logger.info("creating_card", slug=card.slug)
 
         # Map fields
         fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
-        # Add note to Anki
-        note_id = self.anki.add_note(
-            deck=self.config.anki_deck_name,
-            note_type=card.note_type,
-            fields=fields,
-            tags=card.tags,
-            guid=card.guid,
-        )
+        try:
+            with CardTransaction(self.anki, self.db) as txn:
+                # Step 1: Add to Anki
+                note_id = self.anki.add_note(
+                    deck=self.config.anki_deck_name,
+                    note_type=card.note_type,
+                    fields=fields,
+                    tags=card.tags,
+                    guid=card.guid,
+                )
 
-        # Save to database
-        self.db.insert_card(card, anki_guid=note_id)
+                # Register rollback action
+                txn.rollback_actions.append(("delete_anki_note", note_id))
+
+                # Step 2: Save to database with full content
+                self.db.insert_card_extended(
+                    card=card,
+                    anki_guid=note_id,
+                    fields=fields,
+                    tags=card.tags,
+                    deck_name=self.config.anki_deck_name,
+                    apf_html=card.apf_html
+                )
+
+                # Mark as committed (no rollback needed)
+                txn.commit()
+
+                logger.info("card_created_successfully", slug=card.slug, anki_guid=note_id)
+
+        except AnkiConnectError as e:
+            logger.error("anki_create_failed", slug=card.slug, error=str(e))
+            self.db.update_card_status(card.slug, 'failed', str(e))
+            raise
+
+        except Exception as e:
+            logger.error("card_create_failed", slug=card.slug, error=str(e))
+            self.db.update_card_status(card.slug, 'failed', str(e))
+            raise CardOperationError(f"Failed to create card {card.slug}: {e}")
 
     def _update_card(self, card: Card, anki_guid: int) -> None:
-        """Update card in Anki."""
+        """Update card in Anki with atomic transaction."""
         logger.info("updating_card", slug=card.slug, anki_guid=anki_guid)
 
         # Map fields
         fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
-        # Update note in Anki
-        self.anki.update_note_fields(anki_guid, fields)
-        self.anki.update_note_tags(anki_guid, card.tags)
+        try:
+            with CardTransaction(self.anki, self.db) as txn:
+                # Get current state for potential rollback
+                current_info = self.anki.notes_info([anki_guid])
+                old_fields = {}
+                old_tags = []
+                if current_info:
+                    old_fields = current_info[0].get('fields', {})
+                    old_tags = current_info[0].get('tags', [])
 
-        # Update database
-        self.db.update_card(card)
+                # Step 1: Update in Anki
+                self.anki.update_note_fields(anki_guid, fields)
+                self.anki.update_note_tags(anki_guid, card.tags)
+
+                # Register rollback (restore old state)
+                if current_info:
+                    txn.rollback_actions.append(("restore_anki_note", anki_guid, old_fields, old_tags))
+
+                # Step 2: Update database with full content
+                self.db.update_card_extended(
+                    card=card,
+                    fields=fields,
+                    tags=card.tags,
+                    apf_html=card.apf_html
+                )
+
+                txn.commit()
+                logger.info("card_updated_successfully", slug=card.slug)
+
+        except AnkiConnectError as e:
+            logger.error("anki_update_failed", slug=card.slug, error=str(e))
+            self.db.update_card_status(card.slug, 'failed', str(e))
+            raise
+
+        except Exception as e:
+            logger.error("card_update_failed", slug=card.slug, error=str(e))
+            self.db.update_card_status(card.slug, 'failed', str(e))
+            raise CardOperationError(f"Failed to update card {card.slug}: {e}")
 
     def _delete_card(self, card: Card, anki_guid: int) -> None:
         """Delete card from Anki."""

@@ -188,7 +188,38 @@ class StateDB:
         """
         )
 
+        # Add extended schema columns for atomicity support
+        self._add_extended_schema_columns(cursor)
+
         self.conn.commit()
+
+    def _add_extended_schema_columns(self, cursor) -> None:
+        """Add extended columns for full card tracking and atomicity.
+
+        These columns store complete card content for recovery and enable
+        tracking of creation/update status for better error handling.
+        """
+        # Define columns to add with their SQL types
+        columns_to_add = {
+            'apf_html': 'TEXT',
+            'fields_json': 'TEXT',
+            'tags_json': 'TEXT',
+            'deck_name': 'TEXT',
+            'creation_status': 'TEXT DEFAULT "success"',
+            'last_error': 'TEXT',
+            'retry_count': 'INTEGER DEFAULT 0',
+            'synced_at': 'TIMESTAMP'
+        }
+
+        # Get existing columns
+        cursor.execute("PRAGMA table_info(cards)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+
+        # Add missing columns
+        for col_name, col_type in columns_to_add.items():
+            if col_name not in existing_columns:
+                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                logger.debug("added_column_to_cards_table", column=col_name)
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
         """Insert a new card record."""
@@ -281,6 +312,141 @@ class StateDB:
         """Delete a card record."""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
+        self.conn.commit()
+
+    def insert_card_extended(
+        self,
+        card: Card,
+        anki_guid: int,
+        fields: dict[str, str],
+        tags: list[str],
+        deck_name: str,
+        apf_html: str
+    ) -> None:
+        """Insert card with full content storage for atomicity support.
+
+        Args:
+            card: Card object to insert
+            anki_guid: Anki note ID
+            fields: Mapped fields dict
+            tags: List of tags
+            deck_name: Target deck name
+            apf_html: Full APF HTML content
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO cards (
+                slug, slug_base, lang, source_path, source_anchor,
+                card_index, anki_guid, content_hash, note_id, note_title,
+                note_type, card_guid, apf_html, fields_json, tags_json,
+                deck_name, creation_status, synced_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                card.slug,
+                card.manifest.slug_base,
+                card.lang,
+                card.manifest.source_path,
+                card.manifest.source_anchor,
+                card.manifest.card_index,
+                anki_guid,
+                card.content_hash,
+                card.manifest.note_id,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+                apf_html,
+                json.dumps(fields),
+                json.dumps(tags),
+                deck_name,
+                'success'
+            ),
+        )
+        self.conn.commit()
+
+    def update_card_extended(
+        self,
+        card: Card,
+        fields: dict[str, str],
+        tags: list[str],
+        apf_html: str
+    ) -> None:
+        """Update card with full content for atomicity support.
+
+        Args:
+            card: Card object to update
+            fields: Mapped fields dict
+            tags: List of tags
+            apf_html: Full APF HTML content
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            UPDATE cards
+            SET content_hash = ?,
+                note_title = ?,
+                note_type = ?,
+                card_guid = ?,
+                apf_html = ?,
+                fields_json = ?,
+                tags_json = ?,
+                updated_at = CURRENT_TIMESTAMP,
+                synced_at = CURRENT_TIMESTAMP
+            WHERE slug = ?
+            """,
+            (
+                card.content_hash,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+                apf_html,
+                json.dumps(fields),
+                json.dumps(tags),
+                card.slug,
+            ),
+        )
+        self.conn.commit()
+
+    def update_card_status(
+        self,
+        slug: str,
+        status: str,
+        error_message: str | None = None,
+        increment_retry: bool = False
+    ) -> None:
+        """Update card creation/update status for error tracking.
+
+        Args:
+            slug: Card slug
+            status: Status value (e.g., 'success', 'failed', 'pending')
+            error_message: Optional error message
+            increment_retry: Whether to increment retry counter
+        """
+        cursor = self.conn.cursor()
+        if increment_retry:
+            cursor.execute(
+                """
+                UPDATE cards
+                SET creation_status = ?,
+                    last_error = ?,
+                    retry_count = retry_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE slug = ?
+                """,
+                (status, error_message, slug),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE cards
+                SET creation_status = ?,
+                    last_error = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE slug = ?
+                """,
+                (status, error_message, slug),
+            )
         self.conn.commit()
 
     def save_progress(self, progress: "SyncProgress") -> None:
