@@ -1,8 +1,9 @@
 # Multi-Agent System Summary
 
-**Last Updated**: 2025-01-12
+**Last Updated**: 2025-11-16
 **System**: PydanticAI + LangGraph orchestration
 **Total Agents**: 7 specialized agents
+**Models**: Optimized for 2025 (MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5)
 
 ## Overview
 
@@ -17,7 +18,7 @@ These agents form the main card generation workflow:
 #### 1. Pre-Validation Agent
 **Status**: ✅ Production
 **Purpose**: Validate note structure before generation
-**Model**: openrouter/polaris-alpha
+**Model**: qwen/qwen-2.5-32b-instruct (fast, efficient validation)
 
 **Checks**:
 - Frontmatter structure
@@ -31,7 +32,7 @@ These agents form the main card generation workflow:
 #### 2. Generator Agent
 **Status**: ✅ Production
 **Purpose**: Convert Q&A pairs to APF cards
-**Model**: openrouter/polaris-alpha
+**Model**: qwen/qwen-2.5-72b-instruct (powerful content creation)
 
 **Generates**:
 - APF 2.1 format HTML
@@ -45,7 +46,7 @@ These agents form the main card generation workflow:
 #### 3. Post-Validation Agent
 **Status**: ✅ Production
 **Purpose**: Validate generated cards for quality
-**Model**: openrouter/polaris-alpha
+**Model**: deepseek/deepseek-chat (DeepSeek V3 - strong reasoning)
 
 **Checks**:
 - Syntax errors
@@ -63,7 +64,7 @@ These agents improve card quality and effectiveness:
 #### 4. Memorization Quality Agent
 **Status**: ✅ Production
 **Purpose**: Ensure cards follow SRS best practices
-**Model**: openrouter/polaris-alpha
+**Model**: moonshotai/kimi-k2 (strong reasoning and analysis)
 
 **Evaluates**:
 - Atomic principle
@@ -82,7 +83,7 @@ These agents improve card quality and effectiveness:
 #### 5. Context Enrichment Agent
 **Status**: ✅ Production
 **Purpose**: Add examples, mnemonics, and context
-**Model**: openrouter/polaris-alpha (temperature=0.3)
+**Model**: minimax/minimax-m2 (excellent for code generation and creative tasks)
 
 **Adds**:
 - Concrete examples (code, scenarios)
@@ -102,7 +103,7 @@ These agents handle workflow decisions and optimization:
 #### 6. Card Splitting Agent
 **Status**: ✅ Production
 **Purpose**: Decide if note should generate 1 or N cards
-**Model**: openrouter/polaris-alpha
+**Model**: moonshotai/kimi-k2-thinking (advanced reasoning for decision making)
 
 **Strategies**:
 - Concept splitting (multiple topics)
@@ -118,7 +119,7 @@ These agents handle workflow decisions and optimization:
 #### 7. Duplicate Detection Agent
 **Status**: ✅ Production
 **Purpose**: Identify redundant/overlapping cards
-**Model**: openrouter/polaris-alpha
+**Model**: qwen/qwen-2.5-32b-instruct (efficient comparison)
 
 **Detects**:
 - Exact duplicates (≥95% similar)
@@ -277,4 +278,10 @@ All agents are now integrated into the production LangGraph pipeline. See [LANGG
 
 **Total Agents**: 7
 **Status**: 7/7 in Production (100%)
-**Model**: openrouter/polaris-alpha (unified configuration)
+**Models**: Optimized 2025 configuration with task-specific models:
+- **Qwen 2.5 72B**: Generator (powerful content creation)
+- **Qwen 2.5 32B**: Pre-validator, Duplicate Detection (fast, efficient)
+- **DeepSeek V3**: Post-validator (strong reasoning)
+- **MiniMax M2**: Context Enrichment (excellent for code and creative tasks)
+- **Kimi K2**: Memorization Quality (analytical capabilities)
+- **Kimi K2 Thinking**: Card Splitting (advanced reasoning)
