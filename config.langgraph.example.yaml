@@ -61,18 +61,28 @@ use_langgraph: true
 use_pydantic_ai: true
 
 # Model selection for each agent (OpenRouter model identifiers)
-# Pre-validator: Fast, cheap model for structural validation
-pydantic_ai_pre_validator_model: openai/gpt-4o-mini
+# Optimized 2025 models: MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5
 
-# Generator: Powerful model for high-quality card generation
-pydantic_ai_generator_model: anthropic/claude-3-5-sonnet
-# Alternatives:
-#   - openai/gpt-4-turbo
-#   - anthropic/claude-3-opus
-#   - google/gemini-pro-1.5
+# Pre-validator: Fast, efficient validation
+pydantic_ai_pre_validator_model: qwen/qwen-2.5-32b-instruct
 
-# Post-validator: Moderate model for quality checking
-pydantic_ai_post_validator_model: openai/gpt-4o-mini
+# Generator: Powerful content creation
+pydantic_ai_generator_model: qwen/qwen-2.5-72b-instruct
+
+# Post-validator: Strong reasoning and quality checks
+pydantic_ai_post_validator_model: deepseek/deepseek-chat
+
+# Card Splitting: Advanced reasoning for decision making
+card_splitting_model: moonshotai/kimi-k2-thinking
+
+# Context Enrichment: Excellent for code generation and creative examples
+context_enrichment_model: minimax/minimax-m2
+
+# Memorization Quality: Strong analytical capabilities
+memorization_quality_model: moonshotai/kimi-k2
+
+# Duplicate Detection: Efficient comparison
+duplicate_detection_model: qwen/qwen-2.5-32b-instruct
 
 # LangGraph workflow settings
 langgraph_max_retries: 3  # Maximum post-validation retry attempts
@@ -119,16 +129,26 @@ export_output_path: ./exports/interview_questions.apkg
 #    - Type-safe structured outputs via PydanticAI
 #    - Better error handling and debugging
 #
-# 3. Recommended model combinations:
-#    - Fast/Cheap: gpt-4o-mini for all agents
-#    - Balanced: gpt-4o-mini for validators, claude-3-5-sonnet for generator
-#    - High-Quality: claude-3-opus for all agents (expensive!)
+# 3. Recommended model combinations (2025 optimized):
+#    - Cost-Optimized: qwen-2.5-32b for all agents
+#    - Balanced (default): Qwen 2.5 for core tasks, specialized models for enhancements
+#    - High-Quality: qwen-2.5-72b for all agents + DeepSeek V3 for validation
 #
-# 4. Cost optimization tips:
-#    - Use gpt-4o-mini for pre/post validation (cheap)
-#    - Reserve expensive models (claude-opus) for generation only
+# 4. Latest OpenRouter models (2025):
+#    - MiniMax M2: Excellent for coding and agentic workflows (minimax/minimax-m2)
+#    - Kimi K2: Strong reasoning and tool use (moonshotai/kimi-k2)
+#    - Kimi K2 Thinking: Advanced reasoning (moonshotai/kimi-k2-thinking)
+#    - DeepSeek V3: Latest stable version (deepseek/deepseek-chat)
+#    - DeepSeek V3.2-Exp: Experimental long-context (deepseek/deepseek-v3.2-exp)
+#    - Qwen 2.5 72B: Large general model (qwen/qwen-2.5-72b-instruct)
+#    - Qwen 2.5 32B: Medium general model (qwen/qwen-2.5-32b-instruct)
+#
+# 5. Cost optimization tips:
+#    - Use qwen-2.5-32b for validators (fast and cost-effective)
+#    - Reserve qwen-2.5-72b for generation only
 #    - Set langgraph_max_retries=1 to reduce API calls
 #    - Use strict_mode=false for more lenient validation
+#    - Enable OpenRouter's :floor suffix for lowest-price routing
 #
 # 5. For local models (Ollama/LM Studio):
 #    - Set llm_provider: ollama or lm_studio

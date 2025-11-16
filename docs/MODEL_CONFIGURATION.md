@@ -1,15 +1,16 @@
 # Unified Model Configuration Guide
 
-**Last Updated**: 2025-01-12
+**Last Updated**: 2025-11-16
 **Feature**: Single place to configure LLM models for all agents
+**Models**: Optimized for latest 2025 models (MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5)
 
 ## Overview
 
 All LLM model configuration is now **unified in one place** in your `config.yaml`:
 
 ```yaml
-# Set this ONCE for all agents
-default_llm_model: "openrouter/polaris-alpha"
+# Set this ONCE for all agents (optimized 2025 default)
+default_llm_model: "qwen/qwen-2.5-72b-instruct"
 ```
 
 That's it! All 5 agents will use this model.
@@ -21,15 +22,17 @@ That's it! All 5 agents will use this model.
 Edit `config.yaml`:
 
 ```yaml
-# Unified model configuration
-default_llm_model: "openrouter/polaris-alpha"
+# Unified model configuration (2025 optimized)
+default_llm_model: "qwen/qwen-2.5-72b-instruct"
 
-# Leave individual agent models EMPTY to use default
-pydantic_ai_pre_validator_model: ""
-pydantic_ai_generator_model: ""
-pydantic_ai_post_validator_model: ""
-context_enrichment_model: ""
-memorization_quality_model: ""
+# Individual agent overrides (optimized for each task)
+pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"
+pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"
+pydantic_ai_post_validator_model: "deepseek/deepseek-chat"
+context_enrichment_model: "minimax/minimax-m2"
+memorization_quality_model: "moonshotai/kimi-k2"
+card_splitting_model: "moonshotai/kimi-k2-thinking"
+duplicate_detection_model: "qwen/qwen-2.5-32b-instruct"
 ```
 
 ### Step 2: Set API Key
@@ -42,7 +45,7 @@ export OPENROUTER_API_KEY="your_key_here"
 
 ### Step 3: Done!
 
-All agents now use `openrouter/polaris-alpha`.
+All agents now use optimized 2025 models for their specific tasks.
 
 ## How It Works
 
@@ -91,16 +94,24 @@ model = create_openrouter_model_from_env(model_name=model_name)
 
 ### OpenRouter (Recommended)
 
-OpenRouter provides access to many models through one API:
+OpenRouter provides access to many models through one API. Here are the latest 2025 optimized models:
 
 ```yaml
-default_llm_model: "openrouter/polaris-alpha"  # OpenRouter's own model
+# 2025 Optimized Models (Recommended)
+default_llm_model: "qwen/qwen-2.5-72b-instruct"  # Powerful general model
+default_llm_model: "qwen/qwen-2.5-32b-instruct"  # Efficient medium model
+default_llm_model: "deepseek/deepseek-chat"  # DeepSeek V3 - strong reasoning
+default_llm_model: "deepseek/deepseek-v3.2-exp"  # Experimental long-context
+default_llm_model: "moonshotai/kimi-k2"  # Excellent reasoning and tool use
+default_llm_model: "moonshotai/kimi-k2-thinking"  # Advanced reasoning mode
+default_llm_model: "minimax/minimax-m2"  # Great for coding and agentic tasks
+
+# Other Popular Models
 default_llm_model: "openai/gpt-4o"  # OpenAI via OpenRouter
 default_llm_model: "openai/gpt-4o-mini"  # Cheaper option
 default_llm_model: "anthropic/claude-3-5-sonnet"  # Anthropic via OpenRouter
 default_llm_model: "google/gemini-pro-1.5"  # Google via OpenRouter
-default_llm_model: "meta-llama/llama-3.1-70b-instruct"  # Meta via OpenRouter
-default_llm_model: "mistralai/mistral-large"  # Mistral via OpenRouter
+default_llm_model: "qwen/qwen-2.5-coder-32b-instruct"  # Code-focused Qwen
 ```
 
 **Advantages**:
@@ -108,6 +119,8 @@ default_llm_model: "mistralai/mistral-large"  # Mistral via OpenRouter
 - Easy model switching
 - Competitive pricing
 - No vendor lock-in
+- Latest 2025 models available
+- Automatic routing optimizations
 
 **Browse models**: https://openrouter.ai/models
 
@@ -129,32 +142,36 @@ anthropic_api_key: "${ANTHROPIC_API_KEY}"
 
 ## Common Configurations
 
-### Configuration 1: Single Model for Everything
+### Configuration 1: Optimized 2025 Setup (Recommended)
+
+**Use case**: Best balance of quality, cost, and specialization
+
+```yaml
+default_llm_model: "qwen/qwen-2.5-72b-instruct"
+pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"  # Fast validation
+pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"  # High quality
+pydantic_ai_post_validator_model: "deepseek/deepseek-chat"  # Strong reasoning
+context_enrichment_model: "minimax/minimax-m2"  # Creative examples
+memorization_quality_model: "moonshotai/kimi-k2"  # Analytical
+card_splitting_model: "moonshotai/kimi-k2-thinking"  # Advanced reasoning
+duplicate_detection_model: "qwen/qwen-2.5-32b-instruct"  # Efficient
+```
+
+---
+
+### Configuration 2: Single Model for Everything
 
 **Use case**: Simplest setup, consistent quality
 
 ```yaml
-default_llm_model: "openrouter/polaris-alpha"
+default_llm_model: "qwen/qwen-2.5-72b-instruct"
 pydantic_ai_pre_validator_model: ""
 pydantic_ai_generator_model: ""
 pydantic_ai_post_validator_model: ""
 context_enrichment_model: ""
 memorization_quality_model: ""
-```
-
----
-
-### Configuration 2: High-Quality Generation, Fast Validation
-
-**Use case**: Balance quality with speed
-
-```yaml
-default_llm_model: "openai/gpt-4o-mini"  # Fast default
-pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"  # High quality
-pydantic_ai_pre_validator_model: ""  # Use fast default
-pydantic_ai_post_validator_model: ""  # Use fast default
-context_enrichment_model: ""  # Use fast default
-memorization_quality_model: ""  # Use fast default
+card_splitting_model: ""
+duplicate_detection_model: ""
 ```
 
 ---
@@ -171,17 +188,19 @@ enable_memorization_quality: false
 
 ---
 
-### Configuration 4: Maximum Quality
+### Configuration 4: Budget-Conscious Setup
 
-**Use case**: Production quality
+**Use case**: Cost-optimized with good quality
 
 ```yaml
-default_llm_model: "anthropic/claude-3-5-sonnet"  # Best quality
-pydantic_ai_pre_validator_model: "openai/gpt-4o"
-pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"
-pydantic_ai_post_validator_model: "openai/gpt-4o"
-context_enrichment_model: "anthropic/claude-3-5-sonnet"
-memorization_quality_model: "openai/gpt-4o"
+default_llm_model: "qwen/qwen-2.5-32b-instruct"  # Use 32B for all
+pydantic_ai_pre_validator_model: ""
+pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"  # Only upgrade generator
+pydantic_ai_post_validator_model: ""
+context_enrichment_model: ""
+memorization_quality_model: ""
+card_splitting_model: ""
+duplicate_detection_model: ""
 enable_context_enrichment: true
 enable_memorization_quality: true
 ```
@@ -192,21 +211,24 @@ enable_memorization_quality: true
 
 | Use Case | Recommended Model | Why |
 |----------|-------------------|-----|
-| **General use** | `openrouter/polaris-alpha` | Good balance |
-| **High quality** | `anthropic/claude-3-5-sonnet` | Best reasoning, accuracy |
-| **Fast responses** | `openai/gpt-4o-mini` | Quick, efficient |
-| **Speed** | `openai/gpt-4o-mini` | Fast responses |
-| **Complex reasoning** | `anthropic/claude-3-5-sonnet` | Superior logic |
+| **General use** | `qwen/qwen-2.5-72b-instruct` | Best balance (2025) |
+| **High quality** | `qwen/qwen-2.5-72b-instruct` | Powerful, cost-effective |
+| **Fast responses** | `qwen/qwen-2.5-32b-instruct` | Quick, efficient |
+| **Complex reasoning** | `moonshotai/kimi-k2-thinking` | Advanced reasoning |
+| **Coding tasks** | `minimax/minimax-m2` | Optimized for code |
+| **Long context** | `deepseek/deepseek-v3.2-exp` | Up to 256K tokens |
 
-### By Agent
+### By Agent (2025 Optimized)
 
 | Agent | Best Model | Why |
 |-------|------------|-----|
-| **Pre-Validator** | `gpt-4o-mini` | Simple checks, fast |
-| **Generator** | `claude-3-5-sonnet` | Main quality bottleneck |
-| **Post-Validator** | `gpt-4o-mini` | Validation logic, fast |
-| **Context Enrichment** | `polaris-alpha` | Good creativity balance |
-| **Memorization Quality** | `gpt-4o-mini` | Pattern matching, fast |
+| **Pre-Validator** | `qwen/qwen-2.5-32b-instruct` | Fast structural checks |
+| **Generator** | `qwen/qwen-2.5-72b-instruct` | High-quality content creation |
+| **Post-Validator** | `deepseek/deepseek-chat` | Strong reasoning for validation |
+| **Card Splitting** | `moonshotai/kimi-k2-thinking` | Advanced decision making |
+| **Context Enrichment** | `minimax/minimax-m2` | Creative examples, code |
+| **Memorization Quality** | `moonshotai/kimi-k2` | Analytical assessment |
+| **Duplicate Detection** | `qwen/qwen-2.5-32b-instruct` | Efficient comparison |
 
 ## Migration from Old Config
 
@@ -365,13 +387,19 @@ memorization_quality_model: "openai/gpt-4o-mini"
 card_splitting_model: "openai/gpt-4o-mini"
 ```
 
-### New Way (Simple)
+### New Way (Simple - 2025 Optimized)
 ```yaml
-# 1 place to maintain
-default_llm_model: "openrouter/polaris-alpha"
+# Specialized models for optimal performance
+default_llm_model: "qwen/qwen-2.5-72b-instruct"
+pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"
+pydantic_ai_post_validator_model: "deepseek/deepseek-chat"
+context_enrichment_model: "minimax/minimax-m2"
+memorization_quality_model: "moonshotai/kimi-k2"
+card_splitting_model: "moonshotai/kimi-k2-thinking"
+duplicate_detection_model: "qwen/qwen-2.5-32b-instruct"
 ```
 
-**Result**: Easier configuration, fewer errors, faster model switching! 🎉
+**Result**: Latest 2025 models, task-optimized, better performance! 🎉
 
 ## Related Documentation
 
@@ -388,5 +416,5 @@ default_llm_model: "openrouter/polaris-alpha"
 ---
 
 **Feature Status**: ✅ Complete
-**Default Model**: `openrouter/polaris-alpha`
-**Recommended**: Use default for all agents unless specific needs require optimization
+**Default Model**: `qwen/qwen-2.5-72b-instruct` (2025 optimized)
+**Recommended**: Use task-specific models for optimal performance with latest 2025 models

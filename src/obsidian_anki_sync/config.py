@@ -125,18 +125,24 @@ class Config:
     # Unified Model Configuration (OpenRouter)
     # ============================================================================
     # Default model used by ALL agents unless specifically overridden
-    # Examples: "openrouter/polaris-alpha", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
-    default_llm_model: str = "openrouter/polaris-alpha"
+    # Optimized 2025 models: MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5
+    default_llm_model: str = "qwen/qwen-2.5-72b-instruct"
 
-    # Individual agent model overrides (optional - leave empty to use default_llm_model)
-    # Only set these if you want a specific agent to use a different model
-    pydantic_ai_pre_validator_model: str = ""  # Empty = use default_llm_model
-    pydantic_ai_generator_model: str = ""  # Empty = use default_llm_model
-    pydantic_ai_post_validator_model: str = ""  # Empty = use default_llm_model
-    context_enrichment_model: str = ""  # Empty = use default_llm_model
-    memorization_quality_model: str = ""  # Empty = use default_llm_model
-    card_splitting_model: str = ""  # Empty = use default_llm_model
-    duplicate_detection_model: str = ""  # Empty = use default_llm_model
+    # Individual agent model overrides (optimized for each task)
+    # Pre-validator: Fast, efficient validation
+    pydantic_ai_pre_validator_model: str = "qwen/qwen-2.5-32b-instruct"
+    # Generator: Powerful content creation
+    pydantic_ai_generator_model: str = "qwen/qwen-2.5-72b-instruct"
+    # Post-validator: Strong reasoning and quality checks
+    pydantic_ai_post_validator_model: str = "deepseek/deepseek-chat"
+    # Context Enrichment: Excellent for code generation and creative examples
+    context_enrichment_model: str = "minimax/minimax-m2"
+    # Memorization Quality: Strong analytical capabilities
+    memorization_quality_model: str = "moonshotai/kimi-k2"
+    # Card Splitting: Advanced reasoning for decision making
+    card_splitting_model: str = "moonshotai/kimi-k2-thinking"
+    # Duplicate Detection: Efficient comparison
+    duplicate_detection_model: str = "qwen/qwen-2.5-32b-instruct"
 
     # LangGraph Workflow Configuration
     langgraph_max_retries: int = 3
