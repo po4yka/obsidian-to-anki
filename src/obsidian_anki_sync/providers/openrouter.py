@@ -655,17 +655,27 @@ class OpenRouterProvider(BaseLLMProvider):
                     elif char == ']':
                         bracket_count -= 1
                         last_valid_pos = i + 1
-                        # If we close a bracket but still have open braces, that's a problem
-                        # This indicates truncation - object wasn't closed before array
+                        # If we close a bracket but still have open braces, check if we're near the end
+                        # This could indicate truncation, but only warn if we're close to the end of text
+                        # (Arrays can legitimately close before their containing objects in valid JSON)
                         if bracket_count == 0 and brace_count > 0:
-                            # Array closed but object(s) still open - this is truncation
-                            logger.warning(
-                                "detected_premature_array_close",
-                                model=model,
-                                brace_count=brace_count,
-                                position=i,
-                            )
-                            # Don't break here - let repair handle it
+                            # Only warn if we're in the last 10% of the text (likely truncation)
+                            # or if there's very little text remaining
+                            remaining_chars = len(cleaned) - i - 1
+                            is_near_end = remaining_chars < max(100, len(cleaned) * 0.1)
+
+                            if is_near_end:
+                                # Array closed but object(s) still open near end of text - likely truncation
+                                logger.warning(
+                                    "detected_premature_array_close",
+                                    model=model,
+                                    brace_count=brace_count,
+                                    position=i,
+                                    remaining_chars=remaining_chars,
+                                    total_length=len(cleaned),
+                                    note="Array closed before containing object near end of text - likely truncation",
+                                )
+                            # Don't break here - let repair handle it if needed
                     else:
                         last_valid_pos = i + 1
 
