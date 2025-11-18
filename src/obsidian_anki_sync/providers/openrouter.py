@@ -23,6 +23,10 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "deepseek/deepseek-chat-v3.1",
     "deepseek/deepseek-chat-v3.1:free",
     "moonshotai/kimi-k2-thinking",
+    # Qwen models may have issues with strict structured outputs
+    "qwen/qwen-2.5-72b-instruct",
+    "qwen/qwen-2.5-32b-instruct",
+    "qwen/qwen3-max",
 }
 
 # Model context window sizes (in tokens)
@@ -1078,14 +1082,24 @@ class OpenRouterProvider(BaseLLMProvider):
                         completion = tool_call["function"]["arguments"]
                 else:
                     # Log the full response for debugging
+                    finish_reason = result["choices"][0].get("finish_reason", "unknown")
                     logger.warning(
                         "empty_completion_from_openrouter",
                         model=model,
                         message_keys=list(message.keys()),
-                        finish_reason=result["choices"][0].get("finish_reason"),
+                        finish_reason=finish_reason,
                         full_message=message,
+                        has_json_schema=bool(json_schema),
+                        schema_name=json_schema.get("name") if json_schema else None,
+                        note="Model returned empty content. This may indicate structured output compatibility issues.",
                     )
-                    completion = ""
+                    # Raise error instead of silently continuing with empty string
+                    raise ValueError(
+                        f"Model {model} returned empty completion. "
+                        f"Finish reason: {finish_reason}. "
+                        f"This may indicate the model doesn't support structured outputs properly. "
+                        f"Consider using a different model or non-strict mode."
+                    )
 
             # Extract detailed usage information
             usage = result.get("usage", {})
