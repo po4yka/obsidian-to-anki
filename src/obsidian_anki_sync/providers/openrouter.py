@@ -7,6 +7,12 @@ from typing import Any, cast
 import httpx
 
 from ..utils.logging import get_logger
+from ..utils.llm_logging import (
+    log_llm_error,
+    log_llm_request,
+    log_llm_retry,
+    log_llm_success,
+)
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
@@ -17,6 +23,20 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "deepseek/deepseek-chat-v3.1:free",
     "moonshotai/kimi-k2-thinking",
 }
+
+# Model context window sizes (in tokens)
+# Default: 131072 (128k) for most modern models
+MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    "moonshotai/kimi-k2": 131072,
+    "moonshotai/kimi-k2-thinking": 131072,
+    "qwen/qwen-2.5-72b-instruct": 131072,
+    "qwen/qwen-2.5-32b-instruct": 131072,
+    "deepseek/deepseek-chat-v3.1": 131072,
+    "deepseek/deepseek-chat": 131072,
+    "minimax/minimax-m2": 131072,
+}
+DEFAULT_CONTEXT_WINDOW = 131072  # 128k tokens
+CONTEXT_SAFETY_MARGIN = 1000  # Reserve tokens for safety
 
 # Models that support structured outputs well
 MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
@@ -184,14 +204,40 @@ class OpenRouterProvider(BaseLLMProvider):
         prompt_tokens_estimate = (len(prompt) + len(system)) // 4
         schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
 
+        # Get model's context window (default to 128k)
+        context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+
         if json_schema:
             estimated_needed = int(prompt_tokens_estimate * 3.5) + schema_overhead
-            effective_max_tokens = min(
-                max(self.max_tokens, estimated_needed),
-                128000
-            )
+            desired_max_tokens = max(self.max_tokens, estimated_needed)
+            # Respect context window limits
+            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context)
+
+            # Log if we had to reduce max_tokens due to context window limits
+            if effective_max_tokens < desired_max_tokens:
+                logger.debug(
+                    "reduced_max_tokens_for_context_window",
+                    model=model,
+                    desired_max_tokens=desired_max_tokens,
+                    effective_max_tokens=effective_max_tokens,
+                    prompt_tokens_estimate=prompt_tokens_estimate,
+                    context_window=context_window,
+                    max_allowed_by_context=max_allowed_by_context,
+                )
+
+            if effective_max_tokens < 1000:
+                logger.warning(
+                    "max_tokens_too_low_after_context_check",
+                    model=model,
+                    effective_max_tokens=effective_max_tokens,
+                    prompt_tokens_estimate=prompt_tokens_estimate,
+                    context_window=context_window,
+                    suggestion="Consider reducing input size or using a model with larger context window",
+                )
         else:
-            effective_max_tokens = self.max_tokens
+            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            effective_max_tokens = min(self.max_tokens, max_allowed_by_context)
 
         # Build payload (same as sync version)
         payload: dict[str, Any] = {
@@ -226,6 +272,19 @@ class OpenRouterProvider(BaseLLMProvider):
         elif format == "json":
             payload["response_format"] = {"type": "json_object"}
 
+        # Use enhanced logging for async request
+        request_start_time = log_llm_request(
+            model=model,
+            operation="openrouter_generate_async",
+            prompt_length=len(prompt),
+            system_length=len(system),
+            prompt_tokens_estimate=prompt_tokens_estimate,
+            temperature=temperature,
+            max_tokens=effective_max_tokens,
+            has_json_schema=bool(json_schema),
+            format=format,
+        )
+
         try:
             response = await async_client.post(
                 f"{self.base_url}/chat/completions",
@@ -252,16 +311,42 @@ class OpenRouterProvider(BaseLLMProvider):
                 completion = self._clean_json_response(completion, model)
 
             usage = result.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
             finish_reason = result["choices"][0].get("finish_reason", "stop")
+
+            # Use enhanced logging for async success
+            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            log_llm_success(
+                model=model,
+                operation="openrouter_generate_async",
+                start_time=request_start_time,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                response_length=len(completion),
+                finish_reason=finish_reason,
+                context_window=context_window,
+                estimate_cost_flag=True,
+            )
 
             return {
                 "response": completion,
-                "tokens": usage.get("completion_tokens", 0),
+                "tokens": completion_tokens,
                 "finish_reason": finish_reason,
             }
 
         except Exception as e:
-            logger.error("async_generate_failed", model=model, error=str(e))
+            log_llm_error(
+                model=model,
+                operation="openrouter_generate_async",
+                start_time=request_start_time,
+                error=e,
+                error_type=type(e).__name__,
+                retryable=isinstance(e, httpx.HTTPStatusError)
+                and e.response.status_code in (429, 500, 502, 503, 504),
+            )
             raise
 
     def __del__(self) -> None:
@@ -673,18 +758,47 @@ class OpenRouterProvider(BaseLLMProvider):
         prompt_tokens_estimate = (len(prompt) + len(system)) // 4  # Rough estimate: 1 token ≈ 4 chars
         schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
 
+        # Get model's context window (default to 128k)
+        context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+
         # For structured outputs, ensure we have enough tokens for complete responses
         # Use at least 3x input size for bilingual content, but respect configured max
         if json_schema:
             # For structured outputs, be more generous with tokens
             estimated_needed = int(prompt_tokens_estimate * 3.5) + schema_overhead
-            # Use the larger of: configured max, or estimated needed (capped at 128k)
-            effective_max_tokens = min(
-                max(self.max_tokens, estimated_needed),
-                128000  # Cap at 128k tokens (reasonable for most models)
-            )
+            # Use the larger of: configured max, or estimated needed
+            desired_max_tokens = max(self.max_tokens, estimated_needed)
+            # But ensure we don't exceed the model's context window
+            # Reserve space for input tokens and safety margin
+            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context)
+
+            # Log if we had to reduce max_tokens due to context window limits
+            if effective_max_tokens < desired_max_tokens:
+                logger.debug(
+                    "reduced_max_tokens_for_context_window",
+                    model=model,
+                    desired_max_tokens=desired_max_tokens,
+                    effective_max_tokens=effective_max_tokens,
+                    prompt_tokens_estimate=prompt_tokens_estimate,
+                    context_window=context_window,
+                    max_allowed_by_context=max_allowed_by_context,
+                )
+
+            # Ensure we don't go below a reasonable minimum (but respect context limits)
+            if effective_max_tokens < 1000:
+                logger.warning(
+                    "max_tokens_too_low_after_context_check",
+                    model=model,
+                    effective_max_tokens=effective_max_tokens,
+                    prompt_tokens_estimate=prompt_tokens_estimate,
+                    context_window=context_window,
+                    suggestion="Consider reducing input size or using a model with larger context window",
+                )
         else:
-            effective_max_tokens = self.max_tokens
+            # For non-structured outputs, still respect context window
+            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            effective_max_tokens = min(self.max_tokens, max_allowed_by_context)
 
         # Build payload
         payload: dict[str, Any] = {
@@ -775,14 +889,18 @@ class OpenRouterProvider(BaseLLMProvider):
         elif format == "json":
             payload["response_format"] = {"type": "json_object"}
 
-        logger.info(
-            "openrouter_generate_request",
+        # Use enhanced logging for request start
+        request_start_time = log_llm_request(
             model=model,
+            operation="openrouter_generate",
             prompt_length=len(prompt),
             system_length=len(system),
+            prompt_tokens_estimate=prompt_tokens_estimate,
             temperature=temperature,
-            format=format,
+            max_tokens=effective_max_tokens,
             has_json_schema=bool(json_schema),
+            format=format,
+            schema_name=json_schema.get("name") if json_schema else None,
         )
 
         try:
@@ -851,85 +969,94 @@ class OpenRouterProvider(BaseLLMProvider):
             retry_usage: dict[str, Any] | None = None
             retry_finish_reason: str | None = None
 
-            logger.info(
-                "openrouter_generate_success",
+            # Use enhanced logging for success
+            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            log_llm_success(
                 model=model,
-                response_length=len(completion),
-                tokens_used=total_tokens,
+                operation="openrouter_generate",
+                start_time=request_start_time,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                response_length=len(completion),
                 finish_reason=finish_reason,
+                context_window=context_window,
+                estimate_cost_flag=True,
                 had_json_schema=bool(json_schema),
-                schema_name=json_schema.get("name", None) if json_schema else None,
+                schema_name=json_schema.get("name") if json_schema else None,
+                max_tokens_used=effective_max_tokens,
             )
 
             # Warn if response was truncated (length limit reached)
-            if finish_reason == "length":
-                logger.warning(
-                    "structured_output_truncated",
+            # For structured outputs, truncation is critical - retry with increased max_tokens
+            if finish_reason == "length" and json_schema and effective_max_tokens < 128000:
+                # Increase max_tokens significantly and retry once
+                retry_max_tokens = min(effective_max_tokens * 2, 128000)
+                log_llm_retry(
                     model=model,
-                    response_length=len(completion),
-                    max_tokens=effective_max_tokens,
-                    completion_tokens=completion_tokens,
-                    prompt_tokens=prompt_tokens,
-                    suggestion="Response was truncated. Will retry with increased max_tokens.",
+                    operation="openrouter_generate",
+                    attempt=1,
+                    max_attempts=2,
+                    reason="response_truncated",
+                    original_max_tokens=effective_max_tokens,
+                    retry_max_tokens=retry_max_tokens,
                 )
-                # For structured outputs, truncation is critical
-                # Retry with increased max_tokens if we haven't already maxed out
-                if json_schema and effective_max_tokens < 128000:
-                    # Increase max_tokens significantly and retry once
-                    retry_max_tokens = min(effective_max_tokens * 2, 128000)
-                    logger.info(
-                        "retrying_with_increased_max_tokens",
-                        model=model,
-                        original_max_tokens=effective_max_tokens,
-                        retry_max_tokens=retry_max_tokens,
-                    )
-                    # Update payload and retry
-                    payload["max_tokens"] = retry_max_tokens
-                    retry_response = self.client.post(
-                        f"{self.base_url}/chat/completions",
-                        json=payload,
-                        timeout=self.timeout,
-                    )
-                    retry_response.raise_for_status()
-                    retry_result = retry_response.json()
-                    retry_message = retry_result["choices"][0]["message"]
-                    retry_completion = retry_message.get("content")
+                # Update payload and retry
+                payload["max_tokens"] = retry_max_tokens
+                retry_response = self.client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                retry_response.raise_for_status()
+                retry_result = retry_response.json()
+                retry_message = retry_result["choices"][0]["message"]
+                retry_completion = retry_message.get("content")
 
-                    # Handle reasoning field if needed
-                    if retry_completion is None or retry_completion == "":
-                        if "reasoning" in retry_message and retry_message["reasoning"]:
-                            retry_completion = retry_message["reasoning"]
+                # Handle reasoning field if needed
+                if retry_completion is None or retry_completion == "":
+                    if "reasoning" in retry_message and retry_message["reasoning"]:
+                        retry_completion = retry_message["reasoning"]
 
-                    # Clean up retry completion
-                    if retry_completion and json_schema:
-                        retry_completion = self._clean_json_response(retry_completion, model)
+                # Clean up retry completion
+                if retry_completion and json_schema:
+                    retry_completion = self._clean_json_response(retry_completion, model)
 
-                    retry_finish_reason = retry_result["choices"][0].get("finish_reason", "unknown")
-                    retry_usage = retry_result.get("usage", {})
-                    retry_completion_tokens = retry_usage.get("completion_tokens", 0)
+                retry_finish_reason = retry_result["choices"][0].get("finish_reason", "unknown")
+                retry_usage = retry_result.get("usage", {})
+                retry_completion_tokens = retry_usage.get("completion_tokens", 0)
 
-                    if retry_finish_reason == "length":
-                        # Still truncated even with increased tokens - this is a problem
-                        raise ValueError(
-                            f"Response still truncated at {retry_completion_tokens} tokens (max: {retry_max_tokens}). "
-                            f"The response is too large. Consider simplifying the request or splitting into smaller parts."
-                        )
-
-                    # Store retry values for use in standardized_result (already set above)
-                    logger.info(
-                        "retry_success_with_increased_tokens",
-                        model=model,
-                        retry_max_tokens=retry_max_tokens,
-                        completion_tokens=retry_completion_tokens,
-                    )
-                elif json_schema:
-                    # Already at max, can't retry
+                if retry_finish_reason == "length":
+                    # Still truncated even with increased tokens - this is a problem
                     raise ValueError(
-                        f"Response truncated at {completion_tokens} tokens (max: {effective_max_tokens}). "
-                        f"Cannot increase further. Consider simplifying the request or splitting into smaller parts."
+                        f"Response still truncated at {retry_completion_tokens} tokens (max: {retry_max_tokens}). "
+                        f"The response is too large. Consider simplifying the request or splitting into smaller parts."
                     )
+
+                # Log retry success with enhanced metrics
+                retry_total_tokens = retry_usage.get("total_tokens", 0)
+                retry_prompt_tokens = retry_usage.get("prompt_tokens", prompt_tokens)
+                log_llm_success(
+                    model=model,
+                    operation="openrouter_generate_retry",
+                    start_time=request_start_time,
+                    prompt_tokens=retry_prompt_tokens,
+                    completion_tokens=retry_completion_tokens,
+                    total_tokens=retry_total_tokens,
+                    response_length=len(retry_completion or ""),
+                    finish_reason=retry_finish_reason or "unknown",
+                    context_window=context_window,
+                    estimate_cost_flag=True,
+                    is_retry=True,
+                    original_max_tokens=effective_max_tokens,
+                    retry_max_tokens=retry_max_tokens,
+                )
+            elif json_schema:
+                # Already at max, can't retry
+                raise ValueError(
+                    f"Response truncated at {completion_tokens} tokens (max: {effective_max_tokens}). "
+                    f"Cannot increase further. Consider simplifying the request or splitting into smaller parts."
+                )
 
             # Convert to standard format - use retry values if available
             final_completion = retry_completion if retry_completion else completion
@@ -949,6 +1076,9 @@ class OpenRouterProvider(BaseLLMProvider):
         except httpx.HTTPStatusError as e:
             # Parse response for structured error details if available
             error_details = {}
+            error_type = None
+            error_message = str(e)
+
             try:
                 error_json = e.response.json()
                 error_details = error_json
@@ -981,14 +1111,18 @@ class OpenRouterProvider(BaseLLMProvider):
             except Exception:
                 error_details = {"raw_response": e.response.text[:500]}
 
-            logger.error(
-                "openrouter_http_error",
-                status_code=e.response.status_code,
+            # Use enhanced error logging
+            log_llm_error(
                 model=model,
+                operation="openrouter_generate",
+                start_time=request_start_time,
+                error=e,
+                error_type=error_type or "HTTPStatusError",
+                status_code=e.response.status_code,
+                retryable=e.response.status_code in (429, 500, 502, 503, 504),
                 prompt_length=len(prompt),
-                error=str(e),
+                system_length=len(system),
                 error_details=error_details,
-                response_headers=dict(e.response.headers),
                 had_json_schema=bool(json_schema),
             )
 
@@ -1002,10 +1136,24 @@ class OpenRouterProvider(BaseLLMProvider):
 
             raise
         except httpx.RequestError as e:
-            logger.error("openrouter_request_error", error=str(e))
+            log_llm_error(
+                model=model,
+                operation="openrouter_generate",
+                start_time=request_start_time,
+                error=e,
+                error_type="RequestError",
+                retryable=True,
+            )
             raise
         except Exception as e:
-            logger.error("openrouter_unexpected_error", error=str(e))
+            log_llm_error(
+                model=model,
+                operation="openrouter_generate",
+                start_time=request_start_time,
+                error=e,
+                error_type=type(e).__name__,
+                retryable=False,
+            )
             raise
 
     def generate_json(
