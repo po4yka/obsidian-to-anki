@@ -611,6 +611,7 @@ class SyncEngine:
         )
 
         # Run agent pipeline
+        import asyncio
         from pathlib import Path
 
         file_path = self.config.vault_path / relative_path
@@ -624,12 +625,29 @@ class SyncEngine:
             )
             # Continue with None file_path, agent can handle it
 
-        result = self.agent_orchestrator.process_note(
-            note_content=note_content,
-            metadata=metadata,
-            qa_pairs=qa_pairs,
-            file_path=Path(file_path) if file_path.exists() else None,
-        )
+        # Handle both sync (AgentOrchestrator) and async (LangGraphOrchestrator) orchestrators
+        if hasattr(self.agent_orchestrator, "process_note"):
+            import inspect
+            if inspect.iscoroutinefunction(self.agent_orchestrator.process_note):
+                # Async orchestrator (LangGraphOrchestrator)
+                result = asyncio.run(
+                    self.agent_orchestrator.process_note(
+                        note_content=note_content,
+                        metadata=metadata,
+                        qa_pairs=qa_pairs,
+                        file_path=Path(file_path) if file_path.exists() else None,
+                    )
+                )
+            else:
+                # Sync orchestrator (AgentOrchestrator)
+                result = self.agent_orchestrator.process_note(
+                    note_content=note_content,
+                    metadata=metadata,
+                    qa_pairs=qa_pairs,
+                    file_path=Path(file_path) if file_path.exists() else None,
+                )
+        else:
+            raise RuntimeError("Orchestrator does not have process_note method")
 
         if not result.success or not result.generation:
             error_msg = (
