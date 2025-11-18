@@ -1,12 +1,11 @@
 """Configuration management for the sync service."""
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
-from dotenv import load_dotenv
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
 
 from .exceptions import ConfigurationError
 from .utils.path_validator import (
@@ -16,35 +15,89 @@ from .utils.path_validator import (
 )
 
 
-@dataclass
-class Config:
-    """Service configuration."""
+class Config(BaseSettings):
+    """Service configuration using pydantic-settings."""
 
-    # Required fields (no defaults) - MUST come first in dataclasses
-    # Obsidian paths
-    vault_path: Path
-    source_dir: Path
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Required fields
+    # Obsidian paths - vault_path can be empty string from env, will be validated
+    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    source_dir: Path = Field(default=Path("."), description="Source directory within vault")
+
+    @field_validator("vault_path", mode="before")
+    @classmethod
+    def parse_vault_path(cls, v: Any) -> Path:
+        """Convert string to Path for vault_path."""
+        if isinstance(v, str):
+            if not v:
+                # Empty string means not set - will be caught by validation
+                return Path("")
+            return Path(v).expanduser().resolve()
+        if isinstance(v, Path):
+            return v.expanduser().resolve()
+        return v
+
+    @field_validator("source_dir", "db_path", mode="before")
+    @classmethod
+    def parse_path(cls, v: Any) -> Path:
+        """Convert string to Path."""
+        if isinstance(v, str):
+            return Path(v).expanduser()
+        return v
+
+    @field_validator("source_subdirs", mode="before")
+    @classmethod
+    def parse_source_subdirs(cls, v: Any) -> list[Path] | None:
+        """Convert source_subdirs to list of Paths."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return [Path(v)]
+        if isinstance(v, list):
+            return [Path(str(d)) for d in v]
+        return v
 
     # Anki settings
-    anki_connect_url: str
-    anki_deck_name: str
-    anki_note_type: str
+    anki_connect_url: str = Field(
+        default="http://127.0.0.1:8765", description="AnkiConnect URL"
+    )
+    anki_deck_name: str = Field(
+        default="Interview Questions", description="Anki deck name"
+    )
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type"
+    )
 
     # Runtime settings
-    run_mode: str  # 'apply' or 'dry-run'
-    delete_mode: str  # 'delete' or 'archive'
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'"
+    )
+    delete_mode: str = Field(
+        default="delete", description="Delete mode: 'delete' or 'archive'"
+    )
 
     # Database
-    db_path: Path
+    db_path: Path = Field(
+        default=Path(".sync_state.db"), description="Path to sync state database"
+    )
 
     # Logging
-    log_level: str
+    log_level: str = Field(default="INFO", description="Log level")
 
-    # Optional fields (with defaults) - MUST come after required fields
+    # Optional fields (with defaults)
     # Obsidian source directories (optional - overrides source_dir if provided)
     # List of relative paths from vault_path to search for Q&A notes
     # Example: [".", "Interviews", "CS/Algorithms"]
-    source_subdirs: list[Path] | None = None
+    source_subdirs: list[Path] | None = Field(
+        default=None, description="List of source subdirectories"
+    )
     # LLM Provider Configuration
     # Unified provider system - choose one: 'ollama', 'lm_studio', 'openrouter'
     llm_provider: str = "ollama"
@@ -188,6 +241,15 @@ class Config:
 
     def validate(self) -> None:
         """Validate configuration values."""
+        # Ensure vault_path is a Path object
+        if isinstance(self.vault_path, str):
+            if not self.vault_path:
+                raise ConfigurationError(
+                    "vault_path is required",
+                    suggestion="Set VAULT_PATH environment variable or vault_path in config.yaml",
+                )
+            self.vault_path = Path(self.vault_path).expanduser().resolve()
+
         # Validate vault path with security checks
         validated_vault = validate_vault_path(self.vault_path, allow_symlinks=False)
         self.vault_path = validated_vault  # Update with validated path
@@ -270,12 +332,10 @@ _config: Config | None = None
 
 
 def load_config(config_path: Path | None = None) -> Config:
-    """Load configuration from .env and config.yaml files."""
-    # Load .env
-    load_dotenv()
+    """Load configuration from .env and config.yaml files using pydantic-settings."""
+    import yaml  # type: ignore[import-untyped]
 
-    # Load config.yaml if exists
-    config_data: dict[str, Any] = {}
+    # Find config.yaml file
     candidate_paths: list[Path] = []
 
     if config_path:
@@ -294,153 +354,87 @@ def load_config(config_path: Path | None = None) -> Config:
             resolved_config_path = candidate
             break
 
+    # Load YAML data if file exists
+    yaml_data: dict[str, Any] = {}
     if resolved_config_path:
-        with open(resolved_config_path, encoding="utf-8") as f:
-            config_data = yaml.safe_load(f) or {}
+        try:
+            with open(resolved_config_path, encoding="utf-8") as f:
+                yaml_data = yaml.safe_load(f) or {}
+        except Exception as e:
+            from ..utils.logging import get_logger
 
-    # Helper to get string from config/env
-    def get_str(key: str, default: str) -> str:
-        val = config_data.get(key) or os.getenv(key.upper())
-        return str(val) if val is not None else default
+            logger = get_logger(__name__)
+            logger.warning("yaml_config_load_failed", path=str(resolved_config_path), error=str(e))
 
-    # Helper to get bool from config/env
-    def get_bool(key: str, default: bool) -> bool:
-        val = config_data.get(key) or os.getenv(key.upper())
-        if val is None:
-            return default
-        if isinstance(val, bool):
-            return val
-        return str(val).lower() in ("true", "1", "yes", "on")
+    # Convert YAML data to environment variable format for pydantic-settings
+    # pydantic-settings will automatically load from .env file via model_config
+    # We'll merge YAML data by setting environment variables temporarily
+    import contextlib
 
-    # Helper to get int from config/env
-    def get_int(key: str, default: int) -> int:
-        val = config_data.get(key) or os.getenv(key.upper())
-        return int(val) if val is not None else default
+    @contextlib.contextmanager
+    def yaml_as_env():
+        """Temporarily set environment variables from YAML data."""
+        # Store original env values
+        original_env: dict[str, str] = {}
+        try:
+            # Set env vars from YAML (YAML takes precedence over .env)
+            for key, value in yaml_data.items():
+                env_key = key.upper()
+                original_env[env_key] = os.environ.get(env_key, "")
+                if value is not None:
+                    # Handle special types
+                    if isinstance(value, (list, dict)):
+                        # For complex types, we'll handle them in the Config model
+                        continue
+                    elif isinstance(value, Path):
+                        os.environ[env_key] = str(value)
+                    else:
+                        os.environ[env_key] = str(value)
+            yield
+        finally:
+            # Restore original env values
+            for key, value in original_env.items():
+                if value:
+                    os.environ[key] = value
+                elif key in os.environ:
+                    del os.environ[key]
 
-    # Helper to get float from config/env
-    def get_float(key: str, default: float) -> float:
-        val = config_data.get(key) or os.getenv(key.upper())
-        return float(val) if val is not None else default
+    # Load config using pydantic-settings
+    # Handle special cases for Path and list types from YAML
+    with yaml_as_env():
+        # Process source_subdirs from YAML if present
+        source_subdirs: list[Path] | None = None
+        if "source_subdirs" in yaml_data:
+            source_subdirs_raw = yaml_data["source_subdirs"]
+            if isinstance(source_subdirs_raw, list):
+                source_subdirs = [Path(str(d)) for d in source_subdirs_raw]
+            elif isinstance(source_subdirs_raw, str):
+                source_subdirs = [Path(source_subdirs_raw)]
 
-    # Build config from environment and file
-    deck_name = get_str("anki_deck_name", "Interview Questions")
+        # Process export_output_path from YAML if present
+        export_output_path: Path | None = None
+        if "export_output_path" in yaml_data:
+            export_output_str = yaml_data["export_output_path"]
+            if export_output_str:
+                export_output_path = Path(str(export_output_str))
 
-    # Get vault and source paths
-    vault_path_str = get_str("vault_path", "")
-    source_dir_str = get_str("source_dir", ".")
+        # Create config instance - pydantic-settings will load from env vars
+        # We pass YAML-specific values directly
+        config_kwargs: dict[str, Any] = {}
+        if source_subdirs is not None:
+            config_kwargs["source_subdirs"] = source_subdirs
+        if export_output_path is not None:
+            config_kwargs["export_output_path"] = export_output_path
+        if "vault_path" in yaml_data:
+            config_kwargs["vault_path"] = Path(str(yaml_data["vault_path"])).expanduser().resolve()
+        if "source_dir" in yaml_data:
+            config_kwargs["source_dir"] = Path(str(yaml_data["source_dir"]))
+        if "db_path" in yaml_data:
+            config_kwargs["db_path"] = Path(str(yaml_data["db_path"]))
 
-    # Get source subdirs if configured (overrides source_dir)
-    source_subdirs_raw = config_data.get("source_subdirs")
-    source_subdirs: list[Path] | None = None
-    if source_subdirs_raw is not None:
-        if isinstance(source_subdirs_raw, list):
-            source_subdirs = [Path(str(d)) for d in source_subdirs_raw]
-        elif isinstance(source_subdirs_raw, str):
-            # Support single string (convert to list)
-            source_subdirs = [Path(source_subdirs_raw)]
+        config = Config(**config_kwargs)
 
-    # Get export output path if configured
-    export_output_str = config_data.get("export_output_path") or os.getenv(
-        "EXPORT_OUTPUT_PATH"
-    )
-    export_output_path: Path | None = (
-        Path(export_output_str) if export_output_str else None
-    )
-
-    config = Config(
-        vault_path=Path(vault_path_str).expanduser().resolve(),
-        source_dir=Path(source_dir_str),
-        source_subdirs=source_subdirs,
-        anki_connect_url=get_str("anki_connect_url", "http://127.0.0.1:8765"),
-        anki_deck_name=deck_name,
-        anki_note_type=get_str("anki_note_type", "APF::Simple"),
-        # Deck export settings
-        export_deck_name=get_str("export_deck_name", deck_name),
-        export_deck_description=get_str("export_deck_description", ""),
-        export_output_path=export_output_path,
-        # LLM Provider Configuration
-        llm_provider=get_str("llm_provider", "ollama"),
-        # Common LLM settings
-        llm_temperature=get_float("llm_temperature", 0.2),
-        llm_top_p=get_float("llm_top_p", 0.3),
-        llm_timeout=get_float(
-            "llm_timeout", 900.0
-        ),  # 15 minutes default for large models
-        llm_max_tokens=get_int("llm_max_tokens", 2048),
-        # Ollama settings
-        ollama_base_url=get_str("ollama_base_url", "http://localhost:11434"),
-        ollama_api_key=config_data.get("ollama_api_key") or os.getenv("OLLAMA_API_KEY"),
-        # LM Studio settings
-        lm_studio_base_url=get_str("lm_studio_base_url", "http://localhost:1234/v1"),
-        # OpenAI settings
-        openai_api_key=str(
-            config_data.get("openai_api_key") or os.getenv("OPENAI_API_KEY") or ""
-        ),
-        openai_base_url=get_str("openai_base_url", "https://api.openai.com/v1"),
-        openai_organization=config_data.get("openai_organization")
-        or os.getenv("OPENAI_ORGANIZATION"),
-        openai_max_retries=get_int("openai_max_retries", 3),
-        # Anthropic settings
-        anthropic_api_key=str(
-            config_data.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY") or ""
-        ),
-        anthropic_base_url=get_str("anthropic_base_url", "https://api.anthropic.com"),
-        anthropic_api_version=get_str("anthropic_api_version", "2023-06-01"),
-        anthropic_max_retries=get_int("anthropic_max_retries", 3),
-        # OpenRouter settings
-        openrouter_api_key=str(
-            config_data.get("openrouter_api_key")
-            or os.getenv("OPENROUTER_API_KEY")
-            or ""
-        ),
-        openrouter_base_url=get_str(
-            "openrouter_base_url", "https://openrouter.ai/api/v1"
-        ),
-        openrouter_site_url=config_data.get("openrouter_site_url")
-        or os.getenv("OPENROUTER_SITE_URL"),
-        openrouter_site_name=config_data.get("openrouter_site_name")
-        or os.getenv("OPENROUTER_SITE_NAME"),
-        openrouter_model=get_str("openrouter_model", "openai/gpt-4"),
-        run_mode=get_str("run_mode", "apply"),
-        delete_mode=get_str("delete_mode", "delete"),
-        db_path=Path(get_str("db_path", ".sync_state.db")),
-        log_level=get_str("log_level", "INFO"),
-        # Agent system settings
-        use_agent_system=get_bool("use_agent_system", False),
-        qa_extractor_model=get_str("qa_extractor_model", "qwen3:8b"),
-        qa_extractor_temperature=get_float("qa_extractor_temperature", 0.0),
-        pre_validator_model=get_str("pre_validator_model", "qwen3:8b"),
-        pre_validator_temperature=get_float("pre_validator_temperature", 0.0),
-        pre_validation_enabled=get_bool("pre_validation_enabled", True),
-        generator_model=get_str("generator_model", "qwen3:32b"),
-        generator_temperature=get_float("generator_temperature", 0.3),
-        post_validator_model=get_str("post_validator_model", "qwen3:14b"),
-        post_validator_temperature=get_float("post_validator_temperature", 0.0),
-        post_validation_max_retries=get_int("post_validation_max_retries", 3),
-        post_validation_auto_fix=get_bool("post_validation_auto_fix", True),
-        post_validation_strict_mode=get_bool("post_validation_strict_mode", True),
-        # LangGraph + PydanticAI settings
-        use_langgraph=get_bool("use_langgraph", False),
-        use_pydantic_ai=get_bool("use_pydantic_ai", False),
-        pydantic_ai_pre_validator_model=get_str(
-            "pydantic_ai_pre_validator_model", "openai/gpt-4o-mini"
-        ),
-        pydantic_ai_generator_model=get_str(
-            "pydantic_ai_generator_model", "anthropic/claude-3-5-sonnet"
-        ),
-        pydantic_ai_post_validator_model=get_str(
-            "pydantic_ai_post_validator_model", "openai/gpt-4o-mini"
-        ),
-        langgraph_max_retries=get_int("langgraph_max_retries", 3),
-        langgraph_auto_fix=get_bool("langgraph_auto_fix", True),
-        langgraph_strict_mode=get_bool("langgraph_strict_mode", True),
-        langgraph_checkpoint_enabled=get_bool("langgraph_checkpoint_enabled", True),
-        # Performance optimization settings
-        enable_batch_operations=get_bool("enable_batch_operations", True),
-        batch_size=get_int("batch_size", 50),
-        max_concurrent_generations=get_int("max_concurrent_generations", 5),
-    )
-
+    # Validate configuration
     config.validate()
     return config
 

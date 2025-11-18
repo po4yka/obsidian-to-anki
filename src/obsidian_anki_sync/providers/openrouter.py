@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from typing import Any, cast
 
 import httpx
@@ -561,6 +562,12 @@ class OpenRouterProvider(BaseLLMProvider):
         Returns:
             Cleaned JSON text
         """
+        # Track warnings per call to avoid duplicate warnings for the same text
+        # Use a simple identifier based on text start and length
+        text_id = f"{hash(text[:100])}:{len(text)}"
+        if not hasattr(self, '_warned_text_ids'):
+            self._warned_text_ids = set()
+
         cleaned = text.strip()
 
         # Remove markdown code fences if present (must be done first)
@@ -665,16 +672,20 @@ class OpenRouterProvider(BaseLLMProvider):
                             is_near_end = remaining_chars < max(100, len(cleaned) * 0.1)
 
                             if is_near_end:
-                                # Array closed but object(s) still open near end of text - likely truncation
-                                logger.warning(
-                                    "detected_premature_array_close",
-                                    model=model,
-                                    brace_count=brace_count,
-                                    position=i,
-                                    remaining_chars=remaining_chars,
-                                    total_length=len(cleaned),
-                                    note="Array closed before containing object near end of text - likely truncation",
-                                )
+                                # Only log warning once per unique text (avoid duplicates)
+                                warning_key = f"premature_array_close:{text_id}"
+                                if warning_key not in self._warned_text_ids:
+                                    # Array closed but object(s) still open near end of text - likely truncation
+                                    logger.warning(
+                                        "detected_premature_array_close",
+                                        model=model,
+                                        brace_count=brace_count,
+                                        position=i,
+                                        remaining_chars=remaining_chars,
+                                        total_length=len(cleaned),
+                                        note="Array closed before containing object near end of text - likely truncation",
+                                    )
+                                    self._warned_text_ids.add(warning_key)
                             # Don't break here - let repair handle it if needed
                     else:
                         last_valid_pos = i + 1
@@ -694,6 +705,11 @@ class OpenRouterProvider(BaseLLMProvider):
                 # Use text up to last_valid_pos, but if that's 0, use the whole cleaned text
                 text_to_repair = cleaned[:last_valid_pos] if last_valid_pos > 0 else cleaned
                 cleaned = self._repair_truncated_json(text_to_repair)
+
+        # Clear warning tracking for this text after processing
+        # This allows the same text to be processed again in future calls if needed
+        if hasattr(self, '_warned_text_ids'):
+            self._warned_text_ids.discard(f"premature_array_close:{text_id}")
 
         return cleaned
 
@@ -963,14 +979,55 @@ class OpenRouterProvider(BaseLLMProvider):
             schema_name=json_schema.get("name") if json_schema else None,
         )
 
-        try:
-            response = self.client.post(
-                f"{self.base_url}/chat/completions",
-                json=payload,
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
+        # Retry logic for network errors
+        max_retries = 3
+        last_exception: Exception | None = None
 
+        for attempt in range(max_retries):
+            try:
+                response = self.client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                break  # Success, exit retry loop
+            except httpx.RequestError as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 2^attempt seconds
+                    wait_time = 2 ** attempt
+                    log_llm_retry(
+                        model=model,
+                        operation="openrouter_generate",
+                        attempt=attempt + 1,
+                        max_attempts=max_retries,
+                        reason="network_error",
+                        error=str(e),
+                        wait_seconds=wait_time,
+                    )
+                    time.sleep(wait_time)
+                    continue
+                # Last attempt failed, will raise below
+                break
+            except httpx.HTTPStatusError:
+                # Don't retry HTTP status errors here, let the existing handler deal with them
+                raise
+
+        # If we exhausted retries, raise the last exception
+        if last_exception and isinstance(last_exception, httpx.RequestError):
+            log_llm_error(
+                model=model,
+                operation="openrouter_generate",
+                start_time=request_start_time,
+                error=last_exception,
+                error_type="RequestError",
+                retryable=False,  # Already retried max times
+            )
+            raise last_exception
+
+        # Continue with response processing
+        try:
             result = response.json()
 
             # Extract completion from OpenAI format
@@ -1238,13 +1295,15 @@ class OpenRouterProvider(BaseLLMProvider):
 
             raise
         except httpx.RequestError as e:
+            # This should not happen here since RequestError is handled in retry loop above
+            # But keep as fallback for any edge cases
             log_llm_error(
                 model=model,
                 operation="openrouter_generate",
                 start_time=request_start_time,
                 error=e,
                 error_type="RequestError",
-                retryable=True,
+                retryable=False,  # Already handled in retry loop
             )
             raise
         except Exception as e:

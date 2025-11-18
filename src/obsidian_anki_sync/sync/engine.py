@@ -4,8 +4,10 @@ import random
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import diskcache
 import yaml  # type: ignore
 
 from ..anki.client import AnkiClient
@@ -143,14 +145,38 @@ class SyncEngine:
             "errors": 0,
         }
 
+        # Initialize persistent disk caches
+        # Cache directory is placed next to the database file
+        cache_base_dir = config.db_path.parent / ".cache"
+        cache_base_dir.mkdir(parents=True, exist_ok=True)
+
         # Cache for agent-generated cards (cache_key -> list of Card)
         # Cache key format: f"{metadata.id}:{relative_path}:{content_hash}"
-        self._agent_card_cache: dict[str, list[Card]] = {}
+        agent_cache_dir = cache_base_dir / "agent_cards"
+        self._agent_card_cache = diskcache.Cache(
+            directory=str(agent_cache_dir),
+            size_limit=2**30,  # 1GB limit
+            eviction_policy="least-recently-used",
+        )
+
         # Cache for non-agent generated cards (cache_key -> Card)
         # Cache key format: f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
-        self._apf_card_cache: dict[str, Card] = {}
+        apf_cache_dir = cache_base_dir / "apf_cards"
+        self._apf_card_cache = diskcache.Cache(
+            directory=str(apf_cache_dir),
+            size_limit=2**30,  # 1GB limit
+            eviction_policy="least-recently-used",
+        )
+
         self._cache_hits = 0
         self._cache_misses = 0
+
+        logger.info(
+            "persistent_cache_initialized",
+            agent_cache_dir=str(agent_cache_dir),
+            apf_cache_dir=str(apf_cache_dir),
+            cache_size_limit_gb=1,
+        )
 
     def set_progress_display(self, progress_display: "ProgressDisplay | None") -> None:
         """Set progress display for real-time updates.
@@ -163,6 +189,24 @@ class SyncEngine:
         if self.progress_display and hasattr(self, 'agent_orchestrator') and self.agent_orchestrator:
             if hasattr(self.agent_orchestrator, 'set_progress_display'):
                 self.agent_orchestrator.set_progress_display(self.progress_display)
+
+    def _close_caches(self) -> None:
+        """Close disk caches to ensure data is flushed to disk."""
+        try:
+            self._agent_card_cache.close()
+            self._apf_card_cache.close()
+            logger.debug("caches_closed")
+        except Exception as e:
+            logger.warning("cache_close_error", error=str(e))
+            # Non-critical, continue
+
+    def __del__(self) -> None:
+        """Cleanup caches on destruction."""
+        try:
+            self._close_caches()
+        except Exception:
+            # Ignore errors during cleanup
+            pass
 
     def sync(
         self,
@@ -272,6 +316,9 @@ class SyncEngine:
             if self.progress:
                 self.progress.complete(success=False)
             raise
+        finally:
+            # Close caches to ensure data is flushed to disk
+            self._close_caches()
 
     def _scan_obsidian_notes(
         self, sample_size: int | None = None, incremental: bool = False
@@ -696,13 +743,16 @@ class SyncEngine:
                 if total_cache_requests > 0
                 else 0
             )
+            # Get cache sizes (diskcache provides volume() for size in bytes)
+            agent_cache_size_bytes = self._agent_card_cache.volume()
+            apf_cache_size_bytes = self._apf_card_cache.volume()
             logger.info(
                 "cache_statistics",
                 cache_hits=self._cache_hits,
                 cache_misses=self._cache_misses,
                 hit_rate=f"{hit_rate:.1f}%",
-                agent_cache_size=len(self._agent_card_cache),
-                apf_cache_size=len(self._apf_card_cache),
+                agent_cache_size_mb=f"{agent_cache_size_bytes / (1024 * 1024):.2f}",
+                apf_cache_size_mb=f"{apf_cache_size_bytes / (1024 * 1024):.2f}",
             )
 
         logger.info(
@@ -983,18 +1033,26 @@ class SyncEngine:
 
         # Check cache with content hash
         cache_key = f"{metadata.id}:{relative_path}:{note_content_hash}"
-        if cache_key in self._agent_card_cache:
-            cached_cards = self._agent_card_cache[cache_key]
-            # Verify content hash matches (double-check)
-            self._cache_hits += 1
-            logger.info(
-                "agent_cache_hit",
+        try:
+            cached_cards = self._agent_card_cache.get(cache_key)
+            if cached_cards is not None:
+                # Verify content hash matches (double-check)
+                self._cache_hits += 1
+                logger.info(
+                    "agent_cache_hit",
+                    cache_key=cache_key,
+                    note=relative_path,
+                    cards_returned=len(cached_cards),
+                    content_hash=note_content_hash,
+                )
+                return cached_cards
+        except Exception as e:
+            logger.warning(
+                "agent_cache_read_error",
                 cache_key=cache_key,
-                note=relative_path,
-                cards_returned=len(cached_cards),
-                content_hash=note_content_hash,
+                error=str(e),
             )
-            return cached_cards
+            # Continue with cache miss on error
 
         self._cache_misses += 1
         logger.info(
@@ -1063,7 +1121,15 @@ class SyncEngine:
             card.manifest.note_title = metadata.title
 
         # Cache the results
-        self._agent_card_cache[cache_key] = cards
+        try:
+            self._agent_card_cache.set(cache_key, cards)
+        except Exception as e:
+            logger.warning(
+                "agent_cache_write_error",
+                cache_key=cache_key,
+                error=str(e),
+            )
+            # Continue even if cache write fails
 
         logger.info(
             "agent_generation_success",
@@ -1123,18 +1189,26 @@ class SyncEngine:
         content_hash = compute_content_hash(qa_pair, metadata, lang)
         cache_key = f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
 
-        if cache_key in self._apf_card_cache:
-            cached_card = self._apf_card_cache[cache_key]
-            # Verify content hash matches
-            if cached_card.content_hash == content_hash:
-                self._cache_hits += 1
-                logger.info(
-                    "apf_cache_hit",
-                    cache_key=cache_key,
-                    slug=cached_card.slug,
-                    content_hash=content_hash[:8],
-                )
-                return cached_card
+        try:
+            cached_card = self._apf_card_cache.get(cache_key)
+            if cached_card is not None:
+                # Verify content hash matches
+                if cached_card.content_hash == content_hash:
+                    self._cache_hits += 1
+                    logger.info(
+                        "apf_cache_hit",
+                        cache_key=cache_key,
+                        slug=cached_card.slug,
+                        content_hash=content_hash[:8],
+                    )
+                    return cached_card
+        except Exception as e:
+            logger.warning(
+                "apf_cache_read_error",
+                cache_key=cache_key,
+                error=str(e),
+            )
+            # Continue with cache miss on error
 
         self._cache_misses += 1
 
@@ -1186,13 +1260,21 @@ class SyncEngine:
             raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
 
         # Cache the generated card
-        self._apf_card_cache[cache_key] = card
-        logger.debug(
-            "apf_cache_stored",
-            cache_key=cache_key,
-            slug=slug,
-            content_hash=content_hash[:8],
-        )
+        try:
+            self._apf_card_cache.set(cache_key, card)
+            logger.debug(
+                "apf_cache_stored",
+                cache_key=cache_key,
+                slug=slug,
+                content_hash=content_hash[:8],
+            )
+        except Exception as e:
+            logger.warning(
+                "apf_cache_write_error",
+                cache_key=cache_key,
+                error=str(e),
+            )
+            # Continue even if cache write fails
 
         return card
 
