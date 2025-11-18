@@ -135,8 +135,19 @@ class OpenRouterProvider(BaseLLMProvider):
         # Initialize HTTP client
         # Use synchronous httpx.Client for compatibility with existing sync code
         # This provider is used in sync contexts, so async client is not needed
+        # Configure timeout with separate values:
+        # - connect: 10s (quick connection establishment)
+        # - read: timeout (long for large model responses)
+        # - write: 30s (sufficient for request sending)
+        # - pool: 5s (connection pool timeout)
+        timeout_config = httpx.Timeout(
+            connect=10.0,
+            read=timeout,
+            write=30.0,
+            pool=5.0,
+        )
         self.client = httpx.Client(
-            timeout=httpx.Timeout(timeout),
+            timeout=timeout_config,
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
         )
@@ -156,8 +167,15 @@ class OpenRouterProvider(BaseLLMProvider):
     def _get_async_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client."""
         if self._async_client is None:
+            # Use same timeout configuration as sync client
+            timeout_config = httpx.Timeout(
+                connect=10.0,
+                read=self._timeout,
+                write=30.0,
+                pool=5.0,
+            )
             self._async_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self._timeout),
+                timeout=timeout_config,
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
@@ -906,10 +924,13 @@ class OpenRouterProvider(BaseLLMProvider):
                 note="Reasoning mode disabled when using JSON schema",
             )
         elif reasoning_enabled and json_schema:
-            logger.warning(
+            # Only log at debug level since this is expected behavior
+            # Reasoning mode is automatically disabled when JSON schema is used
+            logger.debug(
                 "reasoning_mode_disabled_for_json_schema",
                 model=model,
                 reason="Reasoning mode is incompatible with strict JSON schema structured output",
+                note="This is expected - reasoning is automatically disabled when using JSON schemas",
             )
 
         # Handle structured output with JSON schema (preferred method)
@@ -985,10 +1006,10 @@ class OpenRouterProvider(BaseLLMProvider):
 
         for attempt in range(max_retries):
             try:
+                # Client already has timeout configured, don't override it
                 response = self.client.post(
                     f"{self.base_url}/chat/completions",
                     json=payload,
-                    timeout=self.timeout,
                 )
                 response.raise_for_status()
                 break  # Success, exit retry loop
@@ -1155,10 +1176,10 @@ class OpenRouterProvider(BaseLLMProvider):
                 )
                 # Update payload and retry
                 payload["max_tokens"] = retry_max_tokens
+                # Client already has timeout configured, don't override it
                 retry_response = self.client.post(
                     f"{self.base_url}/chat/completions",
                     json=payload,
-                    timeout=self.timeout,
                 )
                 retry_response.raise_for_status()
                 retry_result = retry_response.json()
