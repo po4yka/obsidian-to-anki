@@ -76,6 +76,53 @@ class BaseLLMProvider(ABC):
         """
         pass
 
+    async def generate_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        format: str = "",
+        json_schema: dict[str, Any] | None = None,
+        stream: bool = False,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a completion from the LLM asynchronously.
+
+        Default implementation wraps sync generate() in asyncio.to_thread().
+        Providers can override for native async support.
+
+        Args:
+            model: Model identifier
+            prompt: User prompt/question
+            system: System prompt (optional)
+            temperature: Sampling temperature (0.0-1.0)
+            format: Response format ("json" for structured output)
+            json_schema: JSON schema for structured output
+            stream: Enable streaming (if supported by provider)
+            reasoning_enabled: Enable reasoning mode
+
+        Returns:
+            Response dictionary with at least a 'response' key containing the text.
+
+        Raises:
+            NotImplementedError: If the provider doesn't support this operation
+            Exception: Provider-specific errors
+        """
+        import asyncio
+
+        return await asyncio.to_thread(
+            self.generate,
+            model=model,
+            prompt=prompt,
+            system=system,
+            temperature=temperature,
+            format=format,
+            json_schema=json_schema,
+            stream=stream,
+            reasoning_enabled=reasoning_enabled,
+        )
+
     def generate_json(
         self,
         model: str,

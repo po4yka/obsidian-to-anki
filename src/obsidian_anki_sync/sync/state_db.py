@@ -435,6 +435,119 @@ class StateDB:
         )
         self.conn.commit()
 
+    def insert_cards_batch(
+        self,
+        cards_data: list[tuple[Card, int, dict[str, str], list[str], str]],
+        deck_name: str,
+    ) -> None:
+        """Insert multiple cards in a single batch operation.
+
+        Args:
+            cards_data: List of tuples (card, anki_guid, fields, tags, apf_html)
+            deck_name: Target deck name
+        """
+        if not cards_data:
+            return
+
+        cursor = self.conn.cursor()
+        insert_data = []
+        for card, anki_guid, fields, tags, apf_html in cards_data:
+            insert_data.append((
+                card.slug,
+                card.manifest.slug_base,
+                card.lang,
+                card.manifest.source_path,
+                card.manifest.source_anchor,
+                card.manifest.card_index,
+                anki_guid,
+                card.content_hash,
+                card.manifest.note_id,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+                apf_html,
+                json.dumps(fields),
+                json.dumps(tags),
+                deck_name,
+                'success'
+            ))
+
+        cursor.executemany(
+            """
+            INSERT INTO cards (
+                slug, slug_base, lang, source_path, source_anchor,
+                card_index, anki_guid, content_hash, note_id, note_title,
+                note_type, card_guid, apf_html, fields_json, tags_json,
+                deck_name, creation_status, synced_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            insert_data,
+        )
+        self.conn.commit()
+        logger.info("cards_inserted_batch", count=len(cards_data))
+
+    def update_cards_batch(
+        self,
+        cards_data: list[tuple[Card, dict[str, str], list[str]]],
+    ) -> None:
+        """Update multiple cards in a single batch operation.
+
+        Args:
+            cards_data: List of tuples (card, fields, tags)
+        """
+        if not cards_data:
+            return
+
+        cursor = self.conn.cursor()
+        update_data = []
+        for card, fields, tags in cards_data:
+            update_data.append((
+                card.content_hash,
+                card.manifest.note_title,
+                card.note_type,
+                card.guid,
+                card.apf_html,
+                json.dumps(fields),
+                json.dumps(tags),
+                card.slug,
+            ))
+
+        cursor.executemany(
+            """
+            UPDATE cards
+            SET content_hash = ?,
+                note_title = ?,
+                note_type = ?,
+                card_guid = ?,
+                apf_html = ?,
+                fields_json = ?,
+                tags_json = ?,
+                updated_at = CURRENT_TIMESTAMP,
+                synced_at = CURRENT_TIMESTAMP
+            WHERE slug = ?
+            """,
+            update_data,
+        )
+        self.conn.commit()
+        logger.info("cards_updated_batch", count=len(cards_data))
+
+    def delete_cards_batch(self, slugs: list[str]) -> None:
+        """Delete multiple cards in a single batch operation.
+
+        Args:
+            slugs: List of card slugs to delete
+        """
+        if not slugs:
+            return
+
+        cursor = self.conn.cursor()
+        cursor.executemany(
+            "DELETE FROM cards WHERE slug = ?",
+            [(slug,) for slug in slugs],
+        )
+        self.conn.commit()
+        logger.info("cards_deleted_batch", count=len(slugs))
+
     def update_card_status(
         self,
         slug: str,
