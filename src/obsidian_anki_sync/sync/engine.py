@@ -42,6 +42,15 @@ except ImportError:
     AgentOrchestrator = None  # type: ignore
     logger.warning("agent_system_not_available", reason="Import failed")
 
+# Import progress display (optional)
+try:
+    from ..utils.progress_display import ProgressDisplay
+
+    PROGRESS_DISPLAY_AVAILABLE = True
+except ImportError:
+    PROGRESS_DISPLAY_AVAILABLE = False
+    ProgressDisplay = None  # type: ignore
+
 
 class SyncEngine:
     """Orchestrate synchronization between Obsidian and Anki."""
@@ -66,6 +75,7 @@ class SyncEngine:
         self.db = state_db
         self.anki = anki_client
         self.progress = progress_tracker
+        self.progress_display = None  # Will be set via set_progress_display()
 
         # Log configuration at startup
         logger.info(
@@ -134,6 +144,18 @@ class SyncEngine:
         self._agent_card_cache: dict[str, list[Card]] = {}
         self._cache_hits = 0
         self._cache_misses = 0
+
+    def set_progress_display(self, progress_display: "ProgressDisplay | None") -> None:
+        """Set progress display for real-time updates.
+
+        Args:
+            progress_display: ProgressDisplay instance or None
+        """
+        self.progress_display = progress_display
+        # Pass to agents if available
+        if self.progress_display and hasattr(self, 'agent_orchestrator') and self.agent_orchestrator:
+            if hasattr(self.agent_orchestrator, 'set_progress_display'):
+                self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def sync(
         self,

@@ -248,7 +248,16 @@ You are an expert Q&A extraction system specializing in educational note analysi
 - Complete extraction of all answerable Q&A pairs
 - Accurate language field population based on language_tags
 - Sequential card_index numbering starting from 1
-</output_requirements>"""
+- Keep extraction_notes concise (max 500 characters)
+- Preserve original content verbatim - do not summarize or paraphrase answers
+</output_requirements>
+
+<efficiency_guidelines>
+- Extract only what is explicitly present in the note
+- Do not add explanations or commentary beyond what's needed
+- Keep field values concise but complete
+- Focus on accuracy over verbosity
+</efficiency_guidelines>"""
 
             llm_start_time = time.time()
 
@@ -264,14 +273,63 @@ You are an expert Q&A extraction system specializing in educational note analysi
             # Get JSON schema for structured output
             json_schema = get_qa_extraction_schema()
 
-            result = self.llm_provider.generate_json(
-                model=self.model,
-                prompt=prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=json_schema,
-                reasoning_enabled=self.reasoning_enabled,
+            # Calculate reasonable max_tokens based on input size
+            # For extraction, we typically need 2-3x the input size for bilingual content
+            # But cap it to prevent excessive generation and speed up processing
+            # Using character count as rough estimate (1 token ≈ 4 characters)
+            prompt_tokens_estimate = len(prompt) // 4
+            estimated_max_tokens = min(
+                prompt_tokens_estimate * 2,  # 2x input for bilingual extraction (more conservative)
+                16000,  # Cap at 16k tokens (reasonable for extraction, prevents excessive generation)
             )
+
+            # Temporarily adjust max_tokens for this extraction to speed up processing
+            # Store original max_tokens to restore later
+            original_max_tokens = None
+            if hasattr(self.llm_provider, 'max_tokens'):
+                original_max_tokens = self.llm_provider.max_tokens
+                # Only adjust if current max_tokens is much larger than needed
+                if original_max_tokens > estimated_max_tokens * 2:
+                    self.llm_provider.max_tokens = int(estimated_max_tokens)
+                    logger.debug(
+                        "adjusted_max_tokens_for_extraction",
+                        original_max_tokens=original_max_tokens,
+                        adjusted_max_tokens=int(estimated_max_tokens),
+                        prompt_length=len(prompt),
+                        prompt_tokens_estimate=prompt_tokens_estimate,
+                    )
+
+            # Update progress display if available
+            progress_display = getattr(self, 'progress_display', None)
+            if progress_display:
+                note_name = metadata.title[:50] if metadata.title else "Unknown"
+                progress_display.update_operation("Extracting Q&A pairs", note_name)
+
+            try:
+                result = self.llm_provider.generate_json(
+                    model=self.model,
+                    prompt=prompt,
+                    system=system_prompt,
+                    temperature=self.temperature,
+                    json_schema=json_schema,
+                    reasoning_enabled=self.reasoning_enabled,
+                )
+
+                # Extract and display reflections if available
+                if progress_display:
+                    from ..utils.progress_display import extract_reasoning_from_response
+                    reasoning = extract_reasoning_from_response(result, self.model)
+                    if reasoning:
+                        progress_display.add_reflection(f"Extraction reasoning: {reasoning[:200]}")
+
+                    # Also check extraction_notes
+                    extraction_notes = result.get("extraction_notes", "")
+                    if extraction_notes and len(extraction_notes) > 30:
+                        progress_display.add_reflection(f"Extraction notes: {extraction_notes[:200]}")
+            finally:
+                # Restore original max_tokens
+                if hasattr(self.llm_provider, 'max_tokens') and original_max_tokens is not None:
+                    self.llm_provider.max_tokens = original_max_tokens
 
             llm_duration = time.time() - llm_start_time
             total_duration = time.time() - start_time

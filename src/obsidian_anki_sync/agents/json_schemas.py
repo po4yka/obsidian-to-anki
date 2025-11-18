@@ -41,26 +41,32 @@ def get_qa_extraction_schema() -> dict[str, Any]:
                             "answer_en": {
                                 "type": "string",
                                 "description": "Answer in English (if applicable)",
+                                "maxLength": 10000,
                             },
                             "answer_ru": {
                                 "type": "string",
                                 "description": "Answer in Russian (if applicable)",
+                                "maxLength": 10000,
                             },
                             "context": {
                                 "type": "string",
                                 "description": "Contextual information before the Q&A",
+                                "maxLength": 2000,
                             },
                             "followups": {
                                 "type": "string",
                                 "description": "Follow-up questions or related queries",
+                                "maxLength": 1000,
                             },
                             "references": {
                                 "type": "string",
                                 "description": "References or citations",
+                                "maxLength": 1000,
                             },
                             "related": {
                                 "type": "string",
                                 "description": "Related topics or questions",
+                                "maxLength": 1000,
                             },
                         },
                         "required": [
@@ -79,7 +85,8 @@ def get_qa_extraction_schema() -> dict[str, Any]:
                 },
                 "extraction_notes": {
                     "type": "string",
-                    "description": "Notes about the extraction process",
+                    "description": "Brief notes about the extraction process (keep concise)",
+                    "maxLength": 500,
                 },
                 "total_pairs": {
                     "type": "integer",

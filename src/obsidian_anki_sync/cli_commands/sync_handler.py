@@ -11,6 +11,7 @@ from ..sync.engine import SyncEngine
 from ..sync.progress import ProgressTracker
 from ..sync.state_db import StateDB
 from ..utils.preflight import run_preflight_checks
+from ..utils.progress_display import ProgressDisplay
 from .shared import console
 
 
@@ -98,7 +99,13 @@ def run_sync(
                     f"\n[cyan]Incremental mode: Skipping {processed_count} already processed notes[/cyan]\n"
                 )
 
+            # Create progress display
+            progress_display = ProgressDisplay(show_reflections=True)
+
+            # Pass progress display to engine
             engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
+            engine.set_progress_display(progress_display)
+
             stats = engine.sync(
                 dry_run=dry_run, incremental=incremental, build_index=not no_index
             )
