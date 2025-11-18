@@ -199,7 +199,8 @@ class OpenRouterProvider(BaseLLMProvider):
         bracket_count = 0
         in_string = False
         escape_next = False
-        last_valid_pos = len(repaired)
+        last_valid_pos = 0
+        last_key_pos = -1  # Track where we last saw a key (before ':')
 
         for i, char in enumerate(repaired):
             if escape_next:
@@ -214,7 +215,12 @@ class OpenRouterProvider(BaseLLMProvider):
 
             if char == '"' and not escape_next:
                 in_string = not in_string
-                last_valid_pos = i + 1
+                if not in_string:
+                    # String closed, this is a valid position
+                    last_valid_pos = i + 1
+                else:
+                    # String opened
+                    last_valid_pos = i + 1
                 continue
 
             if not in_string:
@@ -230,26 +236,78 @@ class OpenRouterProvider(BaseLLMProvider):
                 elif char == ']':
                     bracket_count -= 1
                     last_valid_pos = i + 1
+                elif char == ':':
+                    # Found a key-value separator, mark this position
+                    last_key_pos = i
+                    last_valid_pos = i + 1
+                elif char == ',':
+                    # Found a separator, this is a valid position
+                    last_valid_pos = i + 1
                 elif char not in (' ', '\n', '\t', '\r'):
-                    # Valid JSON character (including ',' and ':')
+                    # Valid JSON character
                     last_valid_pos = i + 1
 
         # Truncate to last valid position
         repaired = repaired[:last_valid_pos]
 
-        # If we're still in a string, close it
+        # If we're in a string, we need to close it
         if in_string:
+            # Just close the string
             repaired += '"'
 
-        # Close any open brackets
-        while bracket_count > 0:
-            repaired += ']'
-            bracket_count -= 1
+        # Check for incomplete values after colons (common truncation pattern)
+        # Look for patterns like "key": "" or "key": "incomplete
+        if last_key_pos >= 0 and last_key_pos < len(repaired):
+            # Find the colon position
+            colon_pos = repaired.find(':', last_key_pos)
+            if colon_pos != -1:
+                # Get everything after the colon
+                after_colon = repaired[colon_pos + 1:].lstrip()
 
-        # Close any open braces
+                # Check if we have an incomplete string value
+                if after_colon.startswith('"'):
+                    # Count quotes in the value part
+                    quote_count = after_colon.count('"')
+                    # If odd number of quotes, string is not closed
+                    if quote_count % 2 == 1:
+                        # String is not closed, close it
+                        if not repaired.endswith('"'):
+                            repaired += '"'
+                    # If we have "" but nothing after, it's complete (empty string)
+                    elif after_colon == '""':
+                        pass  # Complete empty string
+                    # If we have "something but no closing quote
+                    elif quote_count == 1:
+                        # Only opening quote, close it
+                        if not repaired.endswith('"'):
+                            repaired += '"'
+                elif not after_colon:
+                    # No value after colon, add empty string
+                    repaired += ' ""'
+                elif after_colon and not (after_colon.startswith('"') or after_colon.startswith('[') or after_colon.startswith('{') or (after_colon and after_colon[0].isdigit()) or after_colon in ('true', 'false', 'null')):
+                    # Invalid value start, add empty string
+                    repaired += ' ""'
+
+        # Before closing structures, handle the case where we have patterns like "key": ""]}}
+        # This means an object inside an array is incomplete - we need to close the object first
+        # Check if the text ends with premature closing brackets/braces
+        trimmed_end = repaired.rstrip()
+        if trimmed_end.endswith(']') and brace_count > 0:
+            # We have a ] but still open braces - this means object wasn't closed before array
+            # Close the object(s) first
+            while brace_count > 0:
+                repaired += '}'
+                brace_count -= 1
+
+        # Close any open braces (objects) first - objects must be closed before arrays
         while brace_count > 0:
             repaired += '}'
             brace_count -= 1
+
+        # Then close any open brackets (arrays)
+        while bracket_count > 0:
+            repaired += ']'
+            bracket_count -= 1
 
         return repaired
 
@@ -343,8 +401,8 @@ class OpenRouterProvider(BaseLLMProvider):
                     elif char == '}':
                         brace_count -= 1
                         last_valid_pos = i + 1
-                        if brace_count == 0:
-                            # Found the end of the JSON object
+                        if brace_count == 0 and bracket_count == 0:
+                            # Found the end of the JSON object (all structures closed)
                             if i + 1 < len(cleaned):
                                 cleaned = cleaned[:i + 1]
                                 logger.debug(
@@ -360,10 +418,21 @@ class OpenRouterProvider(BaseLLMProvider):
                     elif char == ']':
                         bracket_count -= 1
                         last_valid_pos = i + 1
+                        # If we close a bracket but still have open braces, that's a problem
+                        # This indicates truncation - object wasn't closed before array
+                        if bracket_count == 0 and brace_count > 0:
+                            # Array closed but object(s) still open - this is truncation
+                            logger.warning(
+                                "detected_premature_array_close",
+                                model=model,
+                                brace_count=brace_count,
+                                position=i,
+                            )
+                            # Don't break here - let repair handle it
                     else:
                         last_valid_pos = i + 1
 
-            # If we ended while still in a string or with unclosed braces, try to repair
+            # If we ended while still in a string or with unclosed braces/brackets, try to repair
             if in_string or brace_count > 0 or bracket_count > 0:
                 logger.warning(
                     "detected_truncated_json",
@@ -375,7 +444,9 @@ class OpenRouterProvider(BaseLLMProvider):
                     cleaned_length=len(cleaned),
                 )
                 # Try to repair the truncated JSON
-                cleaned = self._repair_truncated_json(cleaned[:last_valid_pos])
+                # Use text up to last_valid_pos, but if that's 0, use the whole cleaned text
+                text_to_repair = cleaned[:last_valid_pos] if last_valid_pos > 0 else cleaned
+                cleaned = self._repair_truncated_json(text_to_repair)
 
         return cleaned
 
@@ -456,14 +527,43 @@ class OpenRouterProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        # Calculate appropriate max_tokens based on input size and schema complexity
+        # For structured outputs with JSON schema, we need more tokens to ensure completion
+        # Estimate: input tokens + (input tokens * 3) for bilingual content + schema overhead
+        prompt_tokens_estimate = (len(prompt) + len(system)) // 4  # Rough estimate: 1 token ≈ 4 chars
+        schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+
+        # For structured outputs, ensure we have enough tokens for complete responses
+        # Use at least 3x input size for bilingual content, but respect configured max
+        if json_schema:
+            # For structured outputs, be more generous with tokens
+            estimated_needed = int(prompt_tokens_estimate * 3.5) + schema_overhead
+            # Use the larger of: configured max, or estimated needed (capped at 128k)
+            effective_max_tokens = min(
+                max(self.max_tokens, estimated_needed),
+                128000  # Cap at 128k tokens (reasonable for most models)
+            )
+        else:
+            effective_max_tokens = self.max_tokens
+
         # Build payload
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": self.max_tokens,
+            "max_tokens": effective_max_tokens,
             "stream": False,
         }
+
+        if json_schema and effective_max_tokens > self.max_tokens:
+            logger.debug(
+                "adjusted_max_tokens_for_structured_output",
+                model=model,
+                original_max_tokens=self.max_tokens,
+                adjusted_max_tokens=effective_max_tokens,
+                prompt_tokens_estimate=prompt_tokens_estimate,
+                schema_overhead=schema_overhead,
+            )
 
         # Enable reasoning mode for DeepSeek models if requested
         # Note: Reasoning mode is incompatible with strict JSON schema mode
@@ -596,14 +696,6 @@ class OpenRouterProvider(BaseLLMProvider):
             if completion and json_schema:
                 completion = self._clean_json_response(completion, model)
 
-            # Convert to standard format
-            standardized_result = {
-                "response": completion if completion else "",
-                "model": result.get("model"),
-                "finish_reason": result["choices"][0].get("finish_reason"),
-                "usage": result.get("usage", {}),
-            }
-
             # Extract detailed usage information
             usage = result.get("usage", {})
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -612,6 +704,12 @@ class OpenRouterProvider(BaseLLMProvider):
 
             # Check finish reason for potential issues
             finish_reason = result["choices"][0].get("finish_reason", "unknown")
+
+            # Initialize retry variables (will be set if retry happens)
+            retry_completion: str | None = None
+            retry_result: dict[str, Any] | None = None
+            retry_usage: dict[str, Any] | None = None
+            retry_finish_reason: str | None = None
 
             logger.info(
                 "openrouter_generate_success",
@@ -626,14 +724,85 @@ class OpenRouterProvider(BaseLLMProvider):
             )
 
             # Warn if response was truncated (length limit reached)
-            if finish_reason == "length" and json_schema:
+            if finish_reason == "length":
                 logger.warning(
                     "structured_output_truncated",
                     model=model,
                     response_length=len(completion),
-                    max_tokens=self.max_tokens,
-                    suggestion="Consider increasing max_tokens or simplifying schema",
+                    max_tokens=effective_max_tokens,
+                    completion_tokens=completion_tokens,
+                    prompt_tokens=prompt_tokens,
+                    suggestion="Response was truncated. Will retry with increased max_tokens.",
                 )
+                # For structured outputs, truncation is critical
+                # Retry with increased max_tokens if we haven't already maxed out
+                if json_schema and effective_max_tokens < 128000:
+                    # Increase max_tokens significantly and retry once
+                    retry_max_tokens = min(effective_max_tokens * 2, 128000)
+                    logger.info(
+                        "retrying_with_increased_max_tokens",
+                        model=model,
+                        original_max_tokens=effective_max_tokens,
+                        retry_max_tokens=retry_max_tokens,
+                    )
+                    # Update payload and retry
+                    payload["max_tokens"] = retry_max_tokens
+                    retry_response = self.client.post(
+                        f"{self.base_url}/chat/completions",
+                        json=payload,
+                        timeout=self.timeout,
+                    )
+                    retry_response.raise_for_status()
+                    retry_result = retry_response.json()
+                    retry_message = retry_result["choices"][0]["message"]
+                    retry_completion = retry_message.get("content")
+
+                    # Handle reasoning field if needed
+                    if retry_completion is None or retry_completion == "":
+                        if "reasoning" in retry_message and retry_message["reasoning"]:
+                            retry_completion = retry_message["reasoning"]
+
+                    # Clean up retry completion
+                    if retry_completion and json_schema:
+                        retry_completion = self._clean_json_response(retry_completion, model)
+
+                    retry_finish_reason = retry_result["choices"][0].get("finish_reason", "unknown")
+                    retry_usage = retry_result.get("usage", {})
+                    retry_completion_tokens = retry_usage.get("completion_tokens", 0)
+
+                    if retry_finish_reason == "length":
+                        # Still truncated even with increased tokens - this is a problem
+                        raise ValueError(
+                            f"Response still truncated at {retry_completion_tokens} tokens (max: {retry_max_tokens}). "
+                            f"The response is too large. Consider simplifying the request or splitting into smaller parts."
+                        )
+
+                    # Store retry values for use in standardized_result (already set above)
+                    logger.info(
+                        "retry_success_with_increased_tokens",
+                        model=model,
+                        retry_max_tokens=retry_max_tokens,
+                        completion_tokens=retry_completion_tokens,
+                    )
+                elif json_schema:
+                    # Already at max, can't retry
+                    raise ValueError(
+                        f"Response truncated at {completion_tokens} tokens (max: {effective_max_tokens}). "
+                        f"Cannot increase further. Consider simplifying the request or splitting into smaller parts."
+                    )
+
+            # Convert to standard format - use retry values if available
+            final_completion = retry_completion if retry_completion else completion
+            final_result = retry_result if retry_result else result
+            final_usage = retry_usage if retry_usage else usage
+            final_finish_reason = retry_finish_reason if retry_finish_reason else finish_reason
+
+            standardized_result = {
+                "response": final_completion if final_completion else "",
+                "model": final_result.get("model"),
+                "finish_reason": final_finish_reason,
+                "usage": final_usage,
+            }
 
             return standardized_result
 
@@ -747,12 +916,22 @@ class OpenRouterProvider(BaseLLMProvider):
             return cast(dict[str, Any], json.loads(cleaned_text))
         except json.JSONDecodeError as e:
             # Try to repair truncated JSON before giving up
-            if "Unterminated string" in str(e) or "Expecting" in str(e):
+            # Check for common truncation errors
+            error_str = str(e)
+            is_truncation_error = (
+                "Unterminated string" in error_str
+                or "Expecting" in error_str
+                or "Unterminated" in error_str
+                or "Invalid" in error_str
+            )
+
+            if is_truncation_error:
                 logger.warning(
                     "attempting_json_repair",
                     model=model,
                     original_error=str(e),
                     error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
+                    cleaned_text_preview=cleaned_text[:200],
                 )
                 try:
                     repaired_text = self._repair_truncated_json(cleaned_text)
@@ -770,7 +949,26 @@ class OpenRouterProvider(BaseLLMProvider):
                         model=model,
                         repair_error=str(repair_error),
                         original_error=str(e),
+                        repaired_text_preview=repaired_text[:200] if 'repaired_text' in locals() else None,
                     )
+                    # If repair failed, try one more time with a more aggressive approach
+                    # Remove incomplete trailing structures and return partial result
+                    try:
+                        # Try to extract valid JSON up to the error position
+                        error_pos = getattr(e, "pos", None)
+                        if error_pos and error_pos > 0:
+                            partial_text = cleaned_text[:error_pos]
+                            # Try to close any open structures
+                            partial_repaired = self._repair_truncated_json(partial_text)
+                            partial_json = json.loads(partial_repaired)
+                            logger.warning(
+                                "partial_json_recovery",
+                                model=model,
+                                recovered_keys=list(partial_json.keys()) if isinstance(partial_json, dict) else "array",
+                            )
+                            return cast(dict[str, Any], partial_json)
+                    except Exception:
+                        pass  # Give up on partial recovery
 
             logger.error(
                 "openrouter_json_parse_error",

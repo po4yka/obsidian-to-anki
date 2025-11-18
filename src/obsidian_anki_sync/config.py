@@ -53,7 +53,7 @@ class Config:
     llm_temperature: float = 0.2
     llm_top_p: float = 0.3
     llm_timeout: float = 900.0  # 15 minutes default for large models
-    llm_max_tokens: int = 2048
+    llm_max_tokens: int = 128000  # Increased to 128k to prevent truncation for large bilingual content
     llm_reasoning_enabled: bool = False  # Enable reasoning mode for models that support it (e.g., DeepSeek)
 
     # Ollama provider settings (local or cloud)
