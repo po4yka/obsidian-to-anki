@@ -129,6 +129,231 @@ class APFGenerator:
             guid=manifest.guid,
         )
 
+    def generate_cards(
+        self,
+        qa_pairs: list[QAPair],
+        metadata: NoteMetadata,
+        manifests: list[Manifest],
+        lang: str,
+    ) -> list[Card]:
+        """
+        Generate multiple APF cards in a single batch request.
+
+        This method groups cards by note and language, generating them
+        together to reduce API calls. Falls back to individual generation
+        if batch fails.
+
+        Args:
+            qa_pairs: List of Q/A pairs to generate cards for
+            metadata: Note metadata (shared across all cards)
+            manifests: List of manifests (one per Q/A pair)
+            lang: Language code (en, ru)
+
+        Returns:
+            List of generated cards
+        """
+        if len(qa_pairs) == 1:
+            # Single card - use individual method
+            return [self.generate_card(qa_pairs[0], metadata, manifests[0], lang)]
+
+        if len(qa_pairs) != len(manifests):
+            raise ValueError("qa_pairs and manifests must have same length")
+
+        logger.info(
+            "batch_generation_start",
+            count=len(qa_pairs),
+            lang=lang,
+            note=metadata.title,
+        )
+
+        # Try batch generation
+        try:
+            return self._generate_cards_batch(qa_pairs, metadata, manifests, lang)
+        except Exception as e:
+            logger.warning(
+                "batch_generation_failed_fallback",
+                error=str(e),
+                falling_back_to_individual=True,
+            )
+            # Fall back to individual generation
+            cards = []
+            for qa_pair, manifest in zip(qa_pairs, manifests):
+                try:
+                    card = self.generate_card(qa_pair, metadata, manifest, lang)
+                    cards.append(card)
+                except Exception as card_error:
+                    logger.error(
+                        "individual_card_generation_failed",
+                        slug=manifest.slug,
+                        error=str(card_error),
+                    )
+                    # Continue with other cards
+            return cards
+
+    def _generate_cards_batch(
+        self,
+        qa_pairs: list[QAPair],
+        metadata: NoteMetadata,
+        manifests: list[Manifest],
+        lang: str,
+    ) -> list[Card]:
+        """Generate multiple cards in a single LLM call."""
+        # Build batch prompt
+        user_prompt = self._build_batch_prompt(qa_pairs, metadata, manifests, lang)
+
+        logger.debug(
+            "calling_llm_batch",
+            model=self.config.openrouter_model,
+            temp=self.config.llm_temperature,
+            card_count=len(qa_pairs),
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.config.openrouter_model,
+                temperature=self.config.llm_temperature,
+                top_p=self.config.llm_top_p,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            apf_html_batch = response.choices[0].message.content
+
+            if not apf_html_batch:
+                raise ValueError("LLM returned empty response")
+
+            # Parse batch response (expects multiple card blocks)
+            cards = self._parse_batch_response(
+                apf_html_batch, qa_pairs, metadata, manifests, lang
+            )
+
+            logger.info("batch_generation_success", cards_generated=len(cards))
+            return cards
+
+        except Exception as e:
+            logger.error("batch_llm_call_failed", error=str(e))
+            raise
+
+    def _build_batch_prompt(
+        self,
+        qa_pairs: list[QAPair],
+        metadata: NoteMetadata,
+        manifests: list[Manifest],
+        lang: str,
+    ) -> str:
+        """Build user prompt for batch card generation."""
+        prompt = f"""Generate {len(qa_pairs)} APF cards in HTML format.
+
+Metadata (shared for all cards):
+- Topic: {metadata.topic}
+- Subtopics: {", ".join(metadata.subtopics) if metadata.subtopics else "None"}
+- Difficulty: {metadata.difficulty or "Not specified"}
+- Language: {lang}
+
+Cards to generate:
+"""
+
+        for i, (qa_pair, manifest) in enumerate(zip(qa_pairs, manifests), 1):
+            question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
+            answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
+
+            prompt += f"""
+Card {i} (Slug: {manifest.slug}):
+Question: {question[:200]}{"..." if len(question) > 200 else ""}
+Answer: {answer[:300]}{"..." if len(answer) > 300 else ""}
+"""
+
+        prompt += f"""
+Requirements:
+- Generate {len(qa_pairs)} complete APF card HTML blocks
+- Each card must be separated by <!-- CARD_SEPARATOR -->
+- CardType: Simple (or Missing if {{{{c}}}} detected, or Draw if diagram marker present)
+- Tags: Derive from topic/subtopics, 3-6 snake_case tags, include primary language/tech
+- Primary language tag: {lang}
+- Topic-based tags: {metadata.topic.lower().replace(" ", "_")}
+- Include manifest at end of each card with correct slug
+- Follow APF v2.1 format strictly
+- Output ONLY the card HTML blocks separated by <!-- CARD_SEPARATOR -->, no explanations
+"""
+
+        return prompt
+
+    def _parse_batch_response(
+        self,
+        apf_html_batch: str,
+        qa_pairs: list[QAPair],
+        metadata: NoteMetadata,
+        manifests: list[Manifest],
+        lang: str,
+    ) -> list[Card]:
+        """Parse batch response into individual cards."""
+        # Split by separator
+        card_blocks = apf_html_batch.split("<!-- CARD_SEPARATOR -->")
+
+        # If no separator, try to split by BEGIN_CARDS markers
+        if len(card_blocks) == 1:
+            card_blocks = re.split(r"<!-- BEGIN_CARDS -->", apf_html_batch)
+            # Remove first empty block if present
+            if card_blocks and not card_blocks[0].strip():
+                card_blocks = card_blocks[1:]
+
+        cards = []
+        default_lang = self._code_language_hint(metadata)
+
+        for i, (card_html, qa_pair, manifest) in enumerate(
+            zip(card_blocks, qa_pairs, manifests)
+        ):
+            try:
+                # Clean up the HTML block
+                card_html = card_html.strip()
+
+                # Normalize code blocks
+                card_html = self._normalize_code_blocks(card_html, default_lang)
+
+                # Compute content hash
+                content_hash = compute_content_hash(qa_pair, metadata, lang)
+
+                # Determine note type
+                note_type = self._determine_note_type(metadata, card_html)
+
+                # Extract tags
+                tags = self._extract_tags(metadata, lang)
+
+                # Ensure manifest is correct
+                card_html = self._ensure_manifest(card_html, manifest, tags, note_type)
+
+                cards.append(
+                    Card(
+                        slug=manifest.slug,
+                        lang=lang,
+                        apf_html=card_html,
+                        manifest=manifest,
+                        content_hash=content_hash,
+                        note_type=note_type,
+                        tags=tags,
+                        guid=manifest.guid,
+                    )
+                )
+
+            except Exception as e:
+                logger.error(
+                    "batch_card_parse_failed",
+                    index=i,
+                    slug=manifest.slug,
+                    error=str(e),
+                )
+                # Skip this card, will be regenerated individually if needed
+                continue
+
+        if len(cards) != len(qa_pairs):
+            raise ValueError(
+                f"Expected {len(qa_pairs)} cards, got {len(cards)} from batch response"
+            )
+
+        return cards
+
     def _build_user_prompt(
         self,
         question: str,

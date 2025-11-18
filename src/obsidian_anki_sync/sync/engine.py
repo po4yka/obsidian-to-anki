@@ -3,6 +3,7 @@
 import random
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any, cast
 
 import yaml  # type: ignore
@@ -13,6 +14,7 @@ from ..apf.generator import APFGenerator
 from ..apf.html_validator import validate_card_html
 from ..apf.linter import validate_apf
 from ..config import Config
+from ..exceptions import AnkiConnectError
 from ..models import Card, NoteMetadata, QAPair, SyncAction
 from ..obsidian.parser import (
     ParserError,
@@ -24,6 +26,7 @@ from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
 from ..sync.transactions import CardOperationError, CardTransaction
+from ..utils.content_hash import compute_content_hash
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
 
@@ -140,8 +143,12 @@ class SyncEngine:
             "errors": 0,
         }
 
-        # Cache for agent-generated cards (note_id -> list of Card)
+        # Cache for agent-generated cards (cache_key -> list of Card)
+        # Cache key format: f"{metadata.id}:{relative_path}:{content_hash}"
         self._agent_card_cache: dict[str, list[Card]] = {}
+        # Cache for non-agent generated cards (cache_key -> Card)
+        # Cache key format: f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
+        self._apf_card_cache: dict[str, Card] = {}
         self._cache_hits = 0
         self._cache_misses = 0
 
@@ -335,6 +342,19 @@ class SyncEngine:
         batch_start_time = time.time()
         notes_processed = 0
 
+        # Use parallel processing if enabled and max_concurrent_generations > 1
+        use_parallel = (
+            self.config.max_concurrent_generations > 1
+            and len(note_files) > 1
+        )
+
+        if use_parallel:
+            return self._scan_obsidian_notes_parallel(
+                note_files, obsidian_cards, existing_slugs, topic_mismatches,
+                error_by_type, error_samples
+            )
+
+        # Sequential processing (original implementation)
         # Consecutive error tracking for early termination
         consecutive_errors = 0
         max_consecutive_errors = 3
@@ -412,69 +432,190 @@ class SyncEngine:
             try:
                 logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
-                # Generate cards for each Q/A pair and language
-                for qa_pair in qa_pairs:
+                # Use batch generation if multiple Q/A pairs and batch operations enabled
+                use_batch_generation = (
+                    self.config.enable_batch_operations
+                    and len(qa_pairs) > 1
+                    and not self.use_agents
+                )
+
+                if use_batch_generation:
+                    # Generate all cards for each language in batch
                     for lang in metadata.language_tags:
-                        # Check if already processed (for resume)
-                        if self.progress and self.progress.is_note_completed(
-                            relative_path, qa_pair.card_index, lang
-                        ):
-                            logger.debug(
-                                "skipping_completed_note",
-                                file=relative_path,
-                                card_index=qa_pair.card_index,
-                                lang=lang,
+                        # Prepare manifests for all Q/A pairs
+                        manifests = []
+                        lang_qa_pairs = []
+                        lang_slugs = []
+
+                        for qa_pair in qa_pairs:
+                            # Check if already processed
+                            if self.progress and self.progress.is_note_completed(
+                                relative_path, qa_pair.card_index, lang
+                            ):
+                                continue
+
+                            # Track progress
+                            if self.progress:
+                                self.progress.start_note(
+                                    relative_path, qa_pair.card_index, lang
+                                )
+
+                            # Generate slug
+                            slug, slug_base, hash6 = generate_slug(
+                                relative_path, qa_pair.card_index, lang, existing_slugs
                             )
+                            lang_slugs.append(slug)
+                            existing_slugs.add(slug)
+
+                            # Compute GUID
+                            guid = deterministic_guid(
+                                [metadata.id, relative_path, str(qa_pair.card_index), lang]
+                            )
+
+                            # Create manifest
+                            manifest = create_manifest(
+                                slug,
+                                slug_base,
+                                lang,
+                                relative_path,
+                                qa_pair.card_index,
+                                metadata,
+                                guid,
+                                hash6,
+                            )
+                            manifests.append(manifest)
+                            lang_qa_pairs.append(qa_pair)
+
+                        if not lang_qa_pairs:
                             continue
 
-                        # Track progress
-                        if self.progress:
-                            self.progress.start_note(
-                                relative_path, qa_pair.card_index, lang
-                            )
-
+                        # Generate cards in batch
                         try:
-                            card = self._generate_card(
-                                qa_pair=qa_pair,
-                                metadata=metadata,
-                                relative_path=relative_path,
-                                lang=lang,
-                                existing_slugs=existing_slugs,
-                                note_content=note_content,
-                                all_qa_pairs=qa_pairs,
+                            batch_cards = self.apf_gen.generate_cards(
+                                lang_qa_pairs, metadata, manifests, lang
                             )
-                            obsidian_cards[card.slug] = card
-                            existing_slugs.add(card.slug)
 
-                            # Reset consecutive errors on success
-                            consecutive_errors = 0
-
-                            # Mark as completed
-                            if self.progress:
-                                self.progress.complete_note(
-                                    relative_path, qa_pair.card_index, lang, 1
-                                )
+                            for card in batch_cards:
+                                obsidian_cards[card.slug] = card
+                                # Mark as completed
+                                if self.progress:
+                                    self.progress.complete_note(
+                                        relative_path,
+                                        card.manifest.card_index,
+                                        lang,
+                                        1,
+                                    )
 
                         except Exception as e:
-                            error_type_name = type(e).__name__
-                            error_message = str(e)
+                            logger.error(
+                                "batch_generation_failed",
+                                file=relative_path,
+                                lang=lang,
+                                error=str(e),
+                            )
+                            # Fall back to individual generation
+                            for qa_pair, manifest in zip(lang_qa_pairs, manifests):
+                                try:
+                                    card = self._generate_card(
+                                        qa_pair=qa_pair,
+                                        metadata=metadata,
+                                        relative_path=relative_path,
+                                        lang=lang,
+                                        existing_slugs=existing_slugs,
+                                        note_content=note_content,
+                                        all_qa_pairs=qa_pairs,
+                                    )
+                                    obsidian_cards[card.slug] = card
+                                    existing_slugs.add(card.slug)
 
-                            # Aggregate errors with defaultdict
-                            error_by_type[error_type_name] += 1
-
-                            # Store sample errors (up to 3 per type)
-                            if len(error_samples[error_type_name]) < 3:
-                                error_samples[error_type_name].append(
-                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
+                                    if self.progress:
+                                        self.progress.complete_note(
+                                            relative_path,
+                                            qa_pair.card_index,
+                                            lang,
+                                            1,
+                                        )
+                                except Exception as card_error:
+                                    error_type_name = type(card_error).__name__
+                                    error_message = str(card_error)
+                                    error_by_type[error_type_name] += 1
+                                    if len(error_samples[error_type_name]) < 3:
+                                        error_samples[error_type_name].append(
+                                            f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
+                                        )
+                                    self.stats["errors"] += 1
+                                    if self.progress:
+                                        self.progress.fail_note(
+                                            relative_path,
+                                            qa_pair.card_index,
+                                            lang,
+                                            str(card_error),
+                                        )
+                else:
+                    # Original sequential generation
+                    # Generate cards for each Q/A pair and language
+                    for qa_pair in qa_pairs:
+                        for lang in metadata.language_tags:
+                            # Check if already processed (for resume)
+                            if self.progress and self.progress.is_note_completed(
+                                relative_path, qa_pair.card_index, lang
+                            ):
+                                logger.debug(
+                                    "skipping_completed_note",
+                                    file=relative_path,
+                                    card_index=qa_pair.card_index,
+                                    lang=lang,
                                 )
+                                continue
 
-                            self.stats["errors"] += 1
-                            consecutive_errors += 1
-
+                            # Track progress
                             if self.progress:
-                                self.progress.fail_note(
-                                    relative_path, qa_pair.card_index, lang, str(e)
+                                self.progress.start_note(
+                                    relative_path, qa_pair.card_index, lang
                                 )
+
+                            try:
+                                card = self._generate_card(
+                                    qa_pair=qa_pair,
+                                    metadata=metadata,
+                                    relative_path=relative_path,
+                                    lang=lang,
+                                    existing_slugs=existing_slugs,
+                                    note_content=note_content,
+                                    all_qa_pairs=qa_pairs,
+                                )
+                                obsidian_cards[card.slug] = card
+                                existing_slugs.add(card.slug)
+
+                                # Reset consecutive errors on success
+                                consecutive_errors = 0
+
+                                # Mark as completed
+                                if self.progress:
+                                    self.progress.complete_note(
+                                        relative_path, qa_pair.card_index, lang, 1
+                                    )
+
+                            except Exception as e:
+                                error_type_name = type(e).__name__
+                                error_message = str(e)
+
+                                # Aggregate errors with defaultdict
+                                error_by_type[error_type_name] += 1
+
+                                # Store sample errors (up to 3 per type)
+                                if len(error_samples[error_type_name]) < 3:
+                                    error_samples[error_type_name].append(
+                                        f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
+                                    )
+
+                                self.stats["errors"] += 1
+                                consecutive_errors += 1
+
+                                if self.progress:
+                                    self.progress.fail_note(
+                                        relative_path, qa_pair.card_index, lang, str(e)
+                                    )
 
                 self.stats["processed"] += 1
 
@@ -547,8 +688,8 @@ class SyncEngine:
                 patterns=topic_mismatches,
             )
 
-        # Log cache statistics (if using agent system)
-        if self.use_agents and (self._cache_hits > 0 or self._cache_misses > 0):
+        # Log cache statistics
+        if self._cache_hits > 0 or self._cache_misses > 0:
             total_cache_requests = self._cache_hits + self._cache_misses
             hit_rate = (
                 (self._cache_hits / total_cache_requests * 100)
@@ -556,15 +697,250 @@ class SyncEngine:
                 else 0
             )
             logger.info(
-                "agent_cache_statistics",
+                "cache_statistics",
                 cache_hits=self._cache_hits,
                 cache_misses=self._cache_misses,
                 hit_rate=f"{hit_rate:.1f}%",
-                cache_size=len(self._agent_card_cache),
+                agent_cache_size=len(self._agent_card_cache),
+                apf_cache_size=len(self._apf_card_cache),
             )
 
         logger.info(
             "obsidian_scan_completed", notes=len(note_files), cards=len(obsidian_cards)
+        )
+
+        return obsidian_cards
+
+    def _process_single_note(
+        self,
+        file_path: Any,
+        relative_path: str,
+        existing_slugs: set[str],
+    ) -> tuple[dict[str, Card], set[str], dict[str, Any]]:
+        """Process a single note file and generate cards.
+
+        Args:
+            file_path: Path to note file
+            relative_path: Relative path to note
+            existing_slugs: Set of existing slugs (will be updated)
+
+        Returns:
+            Tuple of (cards_dict, new_slugs_set, result_info)
+        """
+        cards: dict[str, Card] = {}
+        new_slugs: set[str] = set()
+        result_info = {
+            "success": False,
+            "error": None,
+            "error_type": None,
+            "cards_count": 0,
+        }
+
+        try:
+            # Parse note
+            metadata, qa_pairs = parse_note(file_path)
+
+            # Read full note content if using agent system
+            note_content = ""
+            if self.use_agents:
+                try:
+                    note_content = file_path.read_text(encoding="utf-8")
+                except Exception as e:
+                    logger.warning(
+                        "failed_to_read_note_content",
+                        file=relative_path,
+                        error=str(e),
+                    )
+
+            # Generate cards for each Q/A pair and language
+            for qa_pair in qa_pairs:
+                for lang in metadata.language_tags:
+                    # Check if already processed (for resume)
+                    if self.progress and self.progress.is_note_completed(
+                        relative_path, qa_pair.card_index, lang
+                    ):
+                        continue
+
+                    # Track progress
+                    if self.progress:
+                        self.progress.start_note(
+                            relative_path, qa_pair.card_index, lang
+                        )
+
+                    try:
+                        card = self._generate_card(
+                            qa_pair=qa_pair,
+                            metadata=metadata,
+                            relative_path=relative_path,
+                            lang=lang,
+                            existing_slugs=existing_slugs.copy(),  # Copy to avoid race conditions
+                            note_content=note_content,
+                            all_qa_pairs=qa_pairs,
+                        )
+                        cards[card.slug] = card
+                        new_slugs.add(card.slug)
+
+                        # Mark as completed
+                        if self.progress:
+                            self.progress.complete_note(
+                                relative_path, qa_pair.card_index, lang, 1
+                            )
+
+                    except Exception as e:
+                        error_type_name = type(e).__name__
+                        error_message = str(e)
+
+                        if self.progress:
+                            self.progress.fail_note(
+                                relative_path, qa_pair.card_index, lang, error_message
+                            )
+
+                        result_info["error"] = error_message
+                        result_info["error_type"] = error_type_name
+                        # Continue processing other cards in this note
+
+            result_info["success"] = True
+            result_info["cards_count"] = len(cards)
+
+        except (
+            ParserError,
+            yaml.YAMLError,
+            OSError,
+            UnicodeDecodeError,
+        ) as e:
+            result_info["error"] = str(e)
+            result_info["error_type"] = type(e).__name__
+        except Exception as e:
+            result_info["error"] = str(e)
+            result_info["error_type"] = type(e).__name__
+
+        return cards, new_slugs, result_info
+
+    def _scan_obsidian_notes_parallel(
+        self,
+        note_files: list[tuple[Any, str]],
+        obsidian_cards: dict[str, Card],
+        existing_slugs: set[str],
+        topic_mismatches: defaultdict[str, int],
+        error_by_type: defaultdict[str, int],
+        error_samples: defaultdict[str, list[str]],
+    ) -> dict[str, Card]:
+        """Scan Obsidian notes using parallel processing.
+
+        Args:
+            note_files: List of (file_path, relative_path) tuples
+            obsidian_cards: Dict to populate with cards
+            existing_slugs: Set of existing slugs (thread-safe updates)
+            topic_mismatches: Dict to collect topic mismatches
+            error_by_type: Dict to aggregate errors by type
+            error_samples: Dict to store sample errors
+
+        Returns:
+            Dict of slug -> Card
+        """
+        max_workers = min(
+            self.config.max_concurrent_generations,
+            len(note_files)
+        )
+        logger.info(
+            "parallel_scan_started",
+            total_notes=len(note_files),
+            max_workers=max_workers,
+        )
+
+        # Thread-safe slug tracking using a lock
+        import threading
+        slugs_lock = threading.Lock()
+        shared_slugs = set(existing_slugs)
+
+        # Process notes in parallel
+        notes_processed = 0
+        batch_start_time = time.time()
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_note = {
+                executor.submit(
+                    self._process_single_note,
+                    file_path,
+                    relative_path,
+                    shared_slugs,
+                ): (file_path, relative_path)
+                for file_path, relative_path in note_files
+            }
+
+            # Process results as they complete
+            for future in as_completed(future_to_note):
+                # Check for interruption
+                if self.progress and self.progress.is_interrupted():
+                    # Cancel remaining tasks
+                    for f in future_to_note:
+                        f.cancel()
+                    break
+
+                file_path, relative_path = future_to_note[future]
+
+                try:
+                    cards, new_slugs, result_info = future.result()
+
+                    # Thread-safe update of shared state
+                    with slugs_lock:
+                        obsidian_cards.update(cards)
+                        shared_slugs.update(new_slugs)
+                        existing_slugs.update(new_slugs)
+
+                    if result_info["success"]:
+                        self.stats["processed"] += 1
+                    else:
+                        self.stats["errors"] += 1
+                        if result_info["error_type"]:
+                            error_by_type[result_info["error_type"]] += 1
+                            if len(error_samples[result_info["error_type"]]) < 3:
+                                error_samples[result_info["error_type"]].append(
+                                    f"{relative_path}: {result_info['error']}"
+                                )
+
+                except Exception as e:
+                    logger.exception(
+                        "parallel_note_processing_failed",
+                        file=relative_path,
+                        error=str(e),
+                    )
+                    self.stats["errors"] += 1
+                    error_type_name = type(e).__name__
+                    error_by_type[error_type_name] += 1
+                    if len(error_samples[error_type_name]) < 3:
+                        error_samples[error_type_name].append(
+                            f"{relative_path}: {str(e)}"
+                        )
+
+                # Progress indicator
+                notes_processed += 1
+                if notes_processed % 10 == 0 or notes_processed == len(note_files):
+                    elapsed_time = time.time() - batch_start_time
+                    avg_time_per_note = (
+                        elapsed_time / notes_processed if notes_processed > 0 else 0
+                    )
+                    remaining_notes = len(note_files) - notes_processed
+                    estimated_remaining = avg_time_per_note * remaining_notes
+
+                    logger.info(
+                        "parallel_batch_progress",
+                        processed=notes_processed,
+                        total=len(note_files),
+                        percent=f"{(notes_processed / len(note_files) * 100):.1f}%",
+                        elapsed_seconds=round(elapsed_time, 1),
+                        avg_seconds_per_note=round(avg_time_per_note, 2),
+                        estimated_remaining_seconds=round(estimated_remaining, 1),
+                        cards_generated=len(obsidian_cards),
+                        active_workers=max_workers,
+                    )
+
+        logger.info(
+            "parallel_scan_completed",
+            notes=len(note_files),
+            cards=len(obsidian_cards),
+            workers_used=max_workers,
         )
 
         return obsidian_cards
@@ -590,17 +966,35 @@ class SyncEngine:
         if not self.use_agents or not self.agent_orchestrator:
             raise RuntimeError("Agent system not initialized")
 
-        # Check cache first
-        cache_key = f"{metadata.id}:{relative_path}"
+        # Compute content hash for the entire note
+        # Use a hash of all Q/A pairs and metadata to detect changes
+        import hashlib
+        content_components = [
+            metadata.id,
+            metadata.title,
+            metadata.topic,
+            ",".join(sorted(metadata.subtopics)),
+            ",".join(sorted(metadata.tags)),
+            note_content,
+        ]
+        note_content_hash = hashlib.sha256(
+            "\n".join(str(c) for c in content_components).encode("utf-8")
+        ).hexdigest()[:16]  # Use first 16 chars for shorter keys
+
+        # Check cache with content hash
+        cache_key = f"{metadata.id}:{relative_path}:{note_content_hash}"
         if cache_key in self._agent_card_cache:
+            cached_cards = self._agent_card_cache[cache_key]
+            # Verify content hash matches (double-check)
             self._cache_hits += 1
             logger.info(
                 "agent_cache_hit",
                 cache_key=cache_key,
                 note=relative_path,
-                cards_returned=len(self._agent_card_cache[cache_key]),
+                cards_returned=len(cached_cards),
+                content_hash=note_content_hash,
             )
-            return self._agent_card_cache[cache_key]
+            return cached_cards
 
         self._cache_misses += 1
         logger.info(
@@ -725,6 +1119,25 @@ class SyncEngine:
                 f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
             )
 
+        # Check cache for non-agent generation
+        content_hash = compute_content_hash(qa_pair, metadata, lang)
+        cache_key = f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
+
+        if cache_key in self._apf_card_cache:
+            cached_card = self._apf_card_cache[cache_key]
+            # Verify content hash matches
+            if cached_card.content_hash == content_hash:
+                self._cache_hits += 1
+                logger.info(
+                    "apf_cache_hit",
+                    cache_key=cache_key,
+                    slug=cached_card.slug,
+                    content_hash=content_hash[:8],
+                )
+                return cached_card
+
+        self._cache_misses += 1
+
         # Original APFGenerator logic
         # Generate slug
         slug, slug_base, hash6 = generate_slug(
@@ -751,6 +1164,10 @@ class SyncEngine:
         # Generate APF card via LLM
         card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
 
+        # Ensure content hash is set
+        if not card.content_hash:
+            card.content_hash = content_hash
+
         # Validate APF format
         validation = validate_apf(card.apf_html, slug)
         if validation.errors:
@@ -767,6 +1184,15 @@ class SyncEngine:
         if html_errors:
             logger.error("apf_html_invalid", slug=slug, errors=html_errors)
             raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
+
+        # Cache the generated card
+        self._apf_card_cache[cache_key] = card
+        logger.debug(
+            "apf_cache_stored",
+            cache_key=cache_key,
+            slug=slug,
+            content_hash=content_hash[:8],
+        )
 
         return card
 
@@ -975,6 +1401,14 @@ class SyncEngine:
         """Apply sync actions to Anki."""
         logger.info("applying_changes", count=len(self.changes))
 
+        # Use batch operations if enabled
+        if self.config.enable_batch_operations:
+            self._apply_changes_batched()
+        else:
+            self._apply_changes_sequential()
+
+    def _apply_changes_sequential(self) -> None:
+        """Apply changes sequentially (original implementation)."""
         for action in self.changes:
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -1022,6 +1456,41 @@ class SyncEngine:
                 self.stats["errors"] += 1
                 if self.progress:
                     self.progress.increment_stat("errors")
+
+    def _apply_changes_batched(self) -> None:
+        """Apply changes using batch operations for better performance."""
+        # Group actions by type
+        creates: list[SyncAction] = []
+        updates: list[SyncAction] = []
+        deletes: list[SyncAction] = []
+        restores: list[SyncAction] = []
+
+        for action in self.changes:
+            if action.type == "create":
+                creates.append(action)
+            elif action.type == "update" and action.anki_guid:
+                updates.append(action)
+            elif action.type == "delete" and action.anki_guid:
+                deletes.append(action)
+            elif action.type == "restore":
+                restores.append(action)
+            elif action.type == "skip":
+                self.stats["skipped"] += 1
+                if self.progress:
+                    self.progress.increment_stat("skipped")
+
+        # Process creates in batches
+        if creates or restores:
+            all_creates = creates + restores
+            self._create_cards_batch(all_creates)
+
+        # Process updates in batches
+        if updates:
+            self._update_cards_batch(updates)
+
+        # Process deletes (already batched in delete_notes)
+        if deletes:
+            self._delete_cards_batch(deletes)
 
     def _create_card(self, card: Card) -> None:
         """Create card in Anki with atomic transaction."""
@@ -1126,3 +1595,287 @@ class SyncEngine:
 
         # Remove from database
         self.db.delete_card(card.slug)
+
+    def _create_cards_batch(self, actions: list[SyncAction]) -> None:
+        """Create multiple cards in batch."""
+        batch_size = self.config.batch_size
+        total = len(actions)
+
+        logger.info("creating_cards_batch", total=total, batch_size=batch_size)
+
+        for batch_start in range(0, total, batch_size):
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                break
+
+            batch_end = min(batch_start + batch_size, total)
+            batch_actions = actions[batch_start:batch_end]
+
+            # Prepare batch payloads
+            note_payloads = []
+            card_data = []  # Store card, fields, tags, apf_html for DB insertion
+
+            for action in batch_actions:
+                card = action.card
+                fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+                note_payload = {
+                    "deckName": self.config.anki_deck_name,
+                    "modelName": card.note_type,
+                    "fields": fields,
+                    "tags": card.tags,
+                    "options": {"allowDuplicate": False},
+                }
+                if card.guid:
+                    note_payload["guid"] = card.guid
+
+                note_payloads.append(note_payload)
+                card_data.append((card, fields, card.tags, card.apf_html))
+
+            # Batch create in Anki
+            try:
+                with CardTransaction(self.anki, self.db) as txn:
+                    note_ids = self.anki.add_notes(note_payloads)
+
+                    # Process results and handle partial failures
+                    successful_cards = []
+                    for i, (note_id, (card, fields, tags, apf_html)) in enumerate(
+                        zip(note_ids, card_data)
+                    ):
+                        if note_id is not None:
+                            # Register rollback
+                            txn.rollback_actions.append(("delete_anki_note", note_id))
+                            successful_cards.append((card, note_id, fields, tags, apf_html))
+                        else:
+                            # Failed card
+                            logger.error(
+                                "batch_create_failed",
+                                slug=card.slug,
+                                index=i,
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                            self.db.update_card_status(
+                                card.slug, "failed", "Anki batch create returned None"
+                            )
+
+                    # Batch insert into database
+                    if successful_cards:
+                        self.db.insert_cards_batch(successful_cards, self.config.anki_deck_name)
+
+                    txn.commit()
+
+                    # Update stats
+                    created_count = len(successful_cards)
+                    self.stats["created"] += created_count
+                    if self.progress:
+                        for _ in range(created_count):
+                            self.progress.increment_stat("created")
+
+                    logger.info(
+                        "batch_create_completed",
+                        batch_start=batch_start,
+                        batch_end=batch_end,
+                        successful=created_count,
+                        failed=len(batch_actions) - created_count,
+                    )
+
+            except Exception as e:
+                logger.error("batch_create_failed", error=str(e), batch_start=batch_start)
+                # Fall back to individual creates
+                for action in batch_actions:
+                    try:
+                        self._create_card(action.card)
+                        if action.type == "restore":
+                            self.stats["restored"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("restored")
+                        else:
+                            self.stats["created"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("created")
+                    except Exception as card_error:
+                        logger.error(
+                            "individual_create_failed_after_batch",
+                            slug=action.card.slug,
+                            error=str(card_error),
+                        )
+                        self.stats["errors"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("errors")
+
+    def _update_cards_batch(self, actions: list[SyncAction]) -> None:
+        """Update multiple cards in batch."""
+        batch_size = self.config.batch_size
+        total = len(actions)
+
+        logger.info("updating_cards_batch", total=total, batch_size=batch_size)
+
+        for batch_start in range(0, total, batch_size):
+            # Check for interruption
+            if self.progress and self.progress.is_interrupted():
+                break
+
+            batch_end = min(batch_start + batch_size, total)
+            batch_actions = actions[batch_start:batch_end]
+
+            # Prepare batch updates
+            field_updates = []
+            tag_updates = []
+            card_data = []  # Store card, fields, tags for DB update
+
+            for action in batch_actions:
+                if not action.anki_guid:
+                    continue
+
+                card = action.card
+                fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+                field_updates.append({"id": action.anki_guid, "fields": fields})
+                tag_updates.append((action.anki_guid, card.tags))
+                card_data.append((card, fields, card.tags))
+
+            if not field_updates:
+                continue
+
+            # Batch update in Anki
+            try:
+                with CardTransaction(self.anki, self.db) as txn:
+                    # Get current state for rollback
+                    anki_guids = [update["id"] for update in field_updates]
+                    current_info = self.anki.notes_info(anki_guids)
+
+                    # Register rollback actions
+                    for info in current_info:
+                        note_id = info["noteId"]
+                        old_fields = info.get("fields", {})
+                        old_tags = info.get("tags", [])
+                        txn.rollback_actions.append(
+                            ("restore_anki_note", note_id, old_fields, old_tags)
+                        )
+
+                    # Batch update fields
+                    field_results = self.anki.update_notes_fields(field_updates)
+
+                    # Batch update tags
+                    tag_results = self.anki.update_notes_tags(tag_updates)
+
+                    # Process results
+                    successful_cards = []
+                    for i, (field_success, tag_success, (card, fields, tags)) in enumerate(
+                        zip(field_results, tag_results, card_data)
+                    ):
+                        if field_success and tag_success:
+                            successful_cards.append((card, fields, tags))
+                        else:
+                            logger.error(
+                                "batch_update_failed",
+                                slug=card.slug,
+                                field_success=field_success,
+                                tag_success=tag_success,
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                            self.db.update_card_status(
+                                card.slug,
+                                "failed",
+                                f"Batch update failed: field={field_success}, tag={tag_success}",
+                            )
+
+                    # Batch update database
+                    if successful_cards:
+                        self.db.update_cards_batch(successful_cards)
+
+                    txn.commit()
+
+                    # Update stats
+                    updated_count = len(successful_cards)
+                    self.stats["updated"] += updated_count
+                    if self.progress:
+                        for _ in range(updated_count):
+                            self.progress.increment_stat("updated")
+
+                    logger.info(
+                        "batch_update_completed",
+                        batch_start=batch_start,
+                        batch_end=batch_end,
+                        successful=updated_count,
+                        failed=len(batch_actions) - updated_count,
+                    )
+
+            except Exception as e:
+                logger.error("batch_update_failed", error=str(e), batch_start=batch_start)
+                # Fall back to individual updates
+                for action in batch_actions:
+                    if action.anki_guid:
+                        try:
+                            self._update_card(action.card, action.anki_guid)
+                            self.stats["updated"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("updated")
+                        except Exception as card_error:
+                            logger.error(
+                                "individual_update_failed_after_batch",
+                                slug=action.card.slug,
+                                error=str(card_error),
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+
+    def _delete_cards_batch(self, actions: list[SyncAction]) -> None:
+        """Delete multiple cards in batch."""
+        if not actions:
+            return
+
+        # Group by delete mode
+        anki_guids_to_delete = []
+        slugs_to_delete = []
+
+        for action in actions:
+            if action.anki_guid:
+                slugs_to_delete.append(action.card.slug)
+                if self.config.delete_mode == "delete":
+                    anki_guids_to_delete.append(action.anki_guid)
+
+        # Batch delete from Anki
+        if anki_guids_to_delete:
+            try:
+                self.anki.delete_notes(anki_guids_to_delete)
+                logger.info("batch_delete_anki", count=len(anki_guids_to_delete))
+            except Exception as e:
+                logger.error("batch_delete_anki_failed", error=str(e))
+                # Fall back to individual deletes
+                for action in actions:
+                    if action.anki_guid:
+                        try:
+                            self._delete_card(action.card, action.anki_guid)
+                            self.stats["deleted"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("deleted")
+                        except Exception:
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                return
+
+        # Batch delete from database
+        if slugs_to_delete:
+            try:
+                self.db.delete_cards_batch(slugs_to_delete)
+                deleted_count = len(slugs_to_delete)
+                self.stats["deleted"] += deleted_count
+                if self.progress:
+                    for _ in range(deleted_count):
+                        self.progress.increment_stat("deleted")
+                logger.info("batch_delete_db", count=deleted_count)
+            except Exception as e:
+                logger.error("batch_delete_db_failed", error=str(e))
+                # Fall back to individual deletes
+                for slug in slugs_to_delete:
+                    try:
+                        self.db.delete_card(slug)
+                    except Exception:
+                        pass

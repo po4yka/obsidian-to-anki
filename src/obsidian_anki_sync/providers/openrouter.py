@@ -119,6 +119,10 @@ class OpenRouterProvider(BaseLLMProvider):
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
         )
+        # Async client for async operations (lazy initialization)
+        self._async_client: httpx.AsyncClient | None = None
+        self._headers = headers
+        self._timeout = timeout
 
         logger.info(
             "openrouter_provider_initialized",
@@ -128,10 +132,146 @@ class OpenRouterProvider(BaseLLMProvider):
             has_site_info=bool(site_url and site_name),
         )
 
+    def _get_async_client(self) -> httpx.AsyncClient:
+        """Get or create async HTTP client."""
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self._timeout),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                headers=self._headers,
+            )
+        return self._async_client
+
+    async def generate_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        format: str = "",
+        json_schema: dict[str, Any] | None = None,
+        stream: bool = False,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a completion asynchronously using AsyncClient.
+
+        Args:
+            model: Model identifier
+            prompt: User prompt
+            system: System prompt
+            temperature: Sampling temperature
+            format: Response format
+            json_schema: JSON schema for structured output
+            stream: Enable streaming
+            reasoning_enabled: Enable reasoning mode
+
+        Returns:
+            Response dictionary
+        """
+        if stream:
+            raise NotImplementedError("Streaming is not yet supported in async mode")
+
+        # Use async client for better performance
+        async_client = self._get_async_client()
+
+        # Build messages (same as sync version)
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        # Calculate max_tokens (same logic as sync)
+        prompt_tokens_estimate = (len(prompt) + len(system)) // 4
+        schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+
+        if json_schema:
+            estimated_needed = int(prompt_tokens_estimate * 3.5) + schema_overhead
+            effective_max_tokens = min(
+                max(self.max_tokens, estimated_needed),
+                128000
+            )
+        else:
+            effective_max_tokens = self.max_tokens
+
+        # Build payload (same as sync version)
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": effective_max_tokens,
+            "stream": False,
+        }
+
+        if reasoning_enabled and not json_schema:
+            payload["reasoning_enabled"] = True
+
+        # Handle structured output
+        if json_schema:
+            schema_dict = json_schema.get("schema", {})
+            schema_name = json_schema.get("name", "response")
+            if schema_dict and isinstance(schema_dict, dict):
+                default_strict = json_schema.get("strict", True)
+                use_strict = False if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES else default_strict
+                optimized_schema = self._optimize_schema_for_request(schema_dict)
+                payload["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema_name,
+                        "strict": use_strict,
+                        "schema": optimized_schema,
+                    },
+                }
+            else:
+                payload["response_format"] = {"type": "json_object"}
+        elif format == "json":
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            response = await async_client.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            message = result["choices"][0]["message"]
+            completion = message.get("content")
+
+            # Handle reasoning models
+            if completion is None or completion == "":
+                if "reasoning" in message and message["reasoning"]:
+                    completion = message["reasoning"]
+                elif "refusal" in message and message["refusal"]:
+                    completion = message["refusal"]
+                else:
+                    completion = ""
+
+            # Clean up completion
+            if json_schema or format == "json":
+                completion = self._clean_json_response(completion, model)
+
+            usage = result.get("usage", {})
+            finish_reason = result["choices"][0].get("finish_reason", "stop")
+
+            return {
+                "response": completion,
+                "tokens": usage.get("completion_tokens", 0),
+                "finish_reason": finish_reason,
+            }
+
+        except Exception as e:
+            logger.error("async_generate_failed", model=model, error=str(e))
+            raise
+
     def __del__(self) -> None:
         """Clean up client resources."""
         if hasattr(self, "client"):
             self.client.close()
+        if hasattr(self, "_async_client") and self._async_client:
+            # Note: Can't await in __del__, so we'll close sync
+            # Async client should be closed explicitly via async context manager
+            pass
 
     def _optimize_schema_for_request(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Optimize JSON schema for token efficiency.

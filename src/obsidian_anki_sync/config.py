@@ -158,6 +158,11 @@ class Config:
         False  # Check against existing cards (requires existing_cards)
     )
 
+    # Performance Optimization Settings
+    enable_batch_operations: bool = True  # Enable batch Anki and DB operations
+    batch_size: int = 50  # Cards per batch for Anki and DB operations
+    max_concurrent_generations: int = 5  # Max parallel card generations
+
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
 
@@ -430,6 +435,10 @@ def load_config(config_path: Path | None = None) -> Config:
         langgraph_auto_fix=get_bool("langgraph_auto_fix", True),
         langgraph_strict_mode=get_bool("langgraph_strict_mode", True),
         langgraph_checkpoint_enabled=get_bool("langgraph_checkpoint_enabled", True),
+        # Performance optimization settings
+        enable_batch_operations=get_bool("enable_batch_operations", True),
+        batch_size=get_int("batch_size", 50),
+        max_concurrent_generations=get_int("max_concurrent_generations", 5),
     )
 
     config.validate()

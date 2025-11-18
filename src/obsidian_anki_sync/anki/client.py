@@ -150,6 +150,42 @@ class AnkiClient:
         logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
         return result
 
+    def add_notes(
+        self,
+        notes: list[dict[str, Any]],
+    ) -> list[int | None]:
+        """
+        Add multiple notes in a single batch operation.
+
+        Args:
+            notes: List of note payloads, each containing:
+                - deckName: str
+                - modelName: str
+                - fields: dict[str, str]
+                - tags: list[str]
+                - options: dict (optional)
+                - guid: str (optional)
+
+        Returns:
+            List of note IDs (or None for failed notes)
+        """
+        if not notes:
+            return []
+
+        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
+
+        successful = sum(1 for note_id in result if note_id is not None)
+        failed = len(result) - successful
+
+        logger.info(
+            "notes_added_batch",
+            total=len(notes),
+            successful=successful,
+            failed=failed,
+        )
+
+        return result
+
     def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         """
         Update note fields.
@@ -161,6 +197,81 @@ class AnkiClient:
         self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
+
+    def update_notes_fields(
+        self, updates: list[dict[str, Any]]
+    ) -> list[bool]:
+        """
+        Update multiple notes' fields in a single batch operation using multi action.
+
+        Args:
+            updates: List of update dicts, each containing:
+                - id: int (note ID)
+                - fields: dict[str, str]
+
+        Returns:
+            List of booleans indicating success for each update
+        """
+        if not updates:
+            return []
+
+        # Use AnkiConnect's multi action to batch update operations
+        actions = [
+            {"action": "updateNoteFields", "params": {"note": update}}
+            for update in updates
+        ]
+
+        try:
+            # Execute all updates in a single multi request
+            results = cast(
+                list[dict[str, Any]],
+                self.invoke("multi", {"actions": actions}),
+            )
+
+            # Extract success status from results
+            success_list = []
+            for i, result in enumerate(results):
+                if result.get("error") is None:
+                    success_list.append(True)
+                else:
+                    logger.warning(
+                        "batch_update_failed",
+                        note_id=updates[i].get("id"),
+                        error=result.get("error"),
+                    )
+                    success_list.append(False)
+
+            successful = sum(1 for r in success_list if r)
+            logger.info(
+                "notes_updated_batch",
+                total=len(updates),
+                successful=successful,
+                failed=len(updates) - successful,
+            )
+
+            return success_list
+
+        except Exception as e:
+            # If multi fails, fall back to individual updates
+            logger.warning(
+                "batch_update_multi_failed",
+                error=str(e),
+                falling_back_to_individual=True,
+            )
+            results = []
+            for update in updates:
+                try:
+                    self.invoke("updateNoteFields", {"note": update})
+                    results.append(True)
+                except Exception as update_error:
+                    logger.warning(
+                        "batch_update_failed",
+                        note_id=update.get("id"),
+                        error=str(update_error),
+                    )
+                    results.append(False)
+
+            return results
 
     def update_note_tags(self, note_id: int, tags: list[str]) -> None:
         """
@@ -217,6 +328,80 @@ class AnkiClient:
         self.invoke("removeTags", {"notes": note_ids, "tags": tags})
 
         logger.info("tags_removed", note_ids=note_ids, tags=tags)
+
+    def update_notes_tags(
+        self, note_tag_pairs: list[tuple[int, list[str]]]
+    ) -> list[bool]:
+        """
+        Update tags for multiple notes in a batch operation.
+
+        Args:
+            note_tag_pairs: List of (note_id, tags) tuples
+
+        Returns:
+            List of booleans indicating success for each update
+        """
+        if not note_tag_pairs:
+            return []
+
+        # Group by operation type (add/remove) for efficiency
+        # For now, use multi action to batch tag updates
+        actions = []
+        for note_id, tags in note_tag_pairs:
+            # Get current tags first (we'll need to fetch them)
+            # For simplicity, use replaceTags action if available
+            # Otherwise, use addTags/removeTags combination
+            desired_tags = sorted({tag for tag in tags if tag})
+            if desired_tags:
+                actions.append(
+                    {
+                        "action": "replaceTags",
+                        "params": {
+                            "notes": [note_id],
+                            "tags": " ".join(desired_tags),
+                        },
+                    }
+                )
+
+        if not actions:
+            return [True] * len(note_tag_pairs)
+
+        try:
+            results = cast(
+                list[dict[str, Any]],
+                self.invoke("multi", {"actions": actions}),
+            )
+
+            success_list = []
+            for result in results:
+                success_list.append(result.get("error") is None)
+
+            successful = sum(1 for r in success_list if r)
+            logger.info(
+                "notes_tags_updated_batch",
+                total=len(note_tag_pairs),
+                successful=successful,
+                failed=len(note_tag_pairs) - successful,
+            )
+
+            return success_list
+
+        except Exception as e:
+            # Fall back to individual updates
+            logger.warning(
+                "batch_tags_update_failed",
+                error=str(e),
+                falling_back_to_individual=True,
+            )
+            results = []
+            for note_id, tags in note_tag_pairs:
+                try:
+                    self.update_note_tags(note_id, tags)
+                    results.append(True)
+                except Exception:
+                    results.append(False)
+
+            return results
 
     def delete_notes(self, note_ids: list[int]) -> None:
         """
