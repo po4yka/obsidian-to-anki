@@ -92,12 +92,20 @@ Expected Languages per Q&A: {language_list}
    - Numbered or bulleted lists
    - Q&A formatted blocks
    - Implicit questions within text
+   - **IMPORTANT**: Questions and answers may be in SEPARATE sections:
+     * Questions first: "# Question (EN)" and "# Вопрос (RU)" at the top
+     * Answers later: "## Answer (EN)" and "## Ответ (RU)" below
+     * In this case, pair the corresponding language versions together
 5. Extract answers that directly correspond to each question
-6. For bilingual notes (en, ru), extract BOTH language versions of questions and answers
+6. For bilingual notes (en, ru), extract BOTH language versions of questions and answers:
+   - If questions appear together (e.g., "# Question (EN)" then "# Вопрос (RU)"), they belong to the SAME Q&A pair
+   - If answers appear together (e.g., "## Answer (EN)" then "## Ответ (RU)"), they belong to the SAME Q&A pair
+   - Pair question_en with answer_en and question_ru with answer_ru
 7. Preserve the semantic relationship between questions and answers
 8. Number all Q&A pairs sequentially starting from 1
 9. Maintain the order of Q&A pairs as they appear in the note
 10. Preserve markdown formatting in questions and answers
+11. **CRITICAL**: When questions and answers are in separate sections, match them by semantic content and language, not just by position
 
 <field_extraction>
 For each Q&A pair, extract these fields:
@@ -147,6 +155,8 @@ CRITICAL REQUIREMENTS:
 - If a language is in language_tags, the corresponding answer field MUST contain the full answer
 - Do not cut off answers mid-sentence or mid-word
 - Ensure the JSON structure is complete and valid
+- **For notes with separated Q&A sections**: When you see "# Question (EN)" and "# Вопрос (RU)" followed later by "## Answer (EN)" and "## Ответ (RU)", these form ONE Q&A pair with bilingual content
+- **Pairing logic**: Match questions and answers by language (EN with EN, RU with RU) and semantic content
 </output_format>
 
 <examples>
@@ -174,6 +184,37 @@ Expected extraction:
 </example_1>
 
 <example_2>
+Input note with SEPARATED Q&A sections (questions first, answers later):
+```
+# Вопрос (RU)
+Как работают BFS и DFS? Когда следует использовать каждый?
+
+# Question (EN)
+How do BFS and DFS work? When should you use each?
+
+---
+
+## Ответ (RU)
+Графы — структуры данных...
+
+## Answer (EN)
+Graphs are data structures...
+```
+
+Expected extraction (ONE Q&A pair with bilingual content):
+{{
+  "qa_pairs": [{{
+    "card_index": 1,
+    "question_en": "How do BFS and DFS work? When should you use each?",
+    "question_ru": "Как работают BFS и DFS? Когда следует использовать каждый?",
+    "answer_en": "Graphs are data structures...",
+    "answer_ru": "Графы — структуры данных..."
+  }}],
+  "total_pairs": 1
+}}
+</example_2>
+
+<example_3>
 Input note with unanswered follow-up section:
 ```
 # Question (EN)
