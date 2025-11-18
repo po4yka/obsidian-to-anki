@@ -524,6 +524,18 @@ wheels = [
 ]
 
 [[package]]
+name = "deprecated"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/49/85/12f0a49a7c4ffb70572b6c2ef13c90c88fd190debda93b23f026b25f9634/deprecated-1.3.1.tar.gz", hash = "sha256:b1b50e0ff0c1fddaa5708a2c6b0a6588bb09b892825ab2b214ac9ea9d92a5223", size = 2932523, upload-time = "2025-10-30T08:19:02.757Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/d0/205d54408c08b13550c733c4b85429e7ead111c7f0014309637425520a9a/deprecated-1.3.1-py2.py3-none-any.whl", hash = "sha256:597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f", size = 11298, upload-time = "2025-10-30T08:19:00.758Z" },
+]
+
+[[package]]
 name = "diskcache"
 version = "5.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1260,6 +1272,20 @@ wheels = [
 ]
 
 [[package]]
+name = "limits"
+version = "5.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecated" },
+    { name = "packaging" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/e5/c968d43a65128cd54fb685f257aafb90cd5e4e1c67d084a58f0e4cbed557/limits-5.6.0.tar.gz", hash = "sha256:807fac75755e73912e894fdd61e2838de574c5721876a19f7ab454ae1fffb4b5", size = 182984, upload-time = "2025-09-29T17:15:22.689Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/96/4fcd44aed47b8fcc457653b12915fcad192cd646510ef3f29fd216f4b0ab/limits-5.6.0-py3-none-any.whl", hash = "sha256:b585c2104274528536a5b68864ec3835602b3c4a802cd6aa0b07419798394021", size = 60604, upload-time = "2025-09-29T17:15:18.419Z" },
+]
+
+[[package]]
 name = "logfire"
 version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1573,16 +1599,19 @@ dependencies = [
     { name = "autogen-agentchat" },
     { name = "autogen-ext", extra = ["ollama"] },
     { name = "beautifulsoup4" },
+    { name = "diskcache" },
     { name = "genanki" },
     { name = "html5lib" },
     { name = "httpx" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint" },
+    { name = "limits" },
     { name = "loguru" },
     { name = "obsidiantools" },
     { name = "openai" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
+    { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "python-frontmatter" },
     { name = "pyyaml" },
@@ -1615,12 +1644,14 @@ requires-dist = [
     { name = "autogen-ext", extras = ["ollama"], specifier = ">=0.7.5" },
     { name = "beautifulsoup4", specifier = ">=4.14.2" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.11.0" },
+    { name = "diskcache", specifier = ">=5.6.3" },
     { name = "genanki", specifier = ">=0.13.1" },
     { name = "html5lib", specifier = ">=1.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "langgraph", specifier = ">=1.0.3" },
     { name = "langgraph-checkpoint", specifier = ">=3.0.1" },
+    { name = "limits", specifier = ">=5.6.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.18.2" },
     { name = "obsidiantools", specifier = ">=0.11.0" },
@@ -1628,6 +1659,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.4.0" },
     { name = "pydantic", specifier = ">=2.12.4" },
     { name = "pydantic-ai", specifier = ">=1.19.0" },
+    { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.1" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
