@@ -66,6 +66,8 @@ class QAExtractorAgent:
 
         return f"""<task>
 Extract all question-answer pairs from the provided educational note. Identify questions and their corresponding answers regardless of markdown format.
+
+CRITICAL: Your response MUST be COMPLETE. Include ALL required fields for each Q&A pair with FULL answers. Do not truncate answers mid-sentence or mid-word. Ensure the JSON structure is valid and complete.
 </task>
 
 <input>
@@ -120,7 +122,7 @@ For each Q&A pair, extract these fields:
 </rules>
 
 <output_format>
-Respond with valid JSON matching this exact structure:
+Respond with valid JSON matching this exact structure. Ensure ALL fields are populated:
 
 {{
   "qa_pairs": [
@@ -128,8 +130,8 @@ Respond with valid JSON matching this exact structure:
       "card_index": 1,
       "question_en": "Question text in English",
       "question_ru": "Текст вопроса на русском",
-      "answer_en": "Answer text in English",
-      "answer_ru": "Текст ответа на русском",
+      "answer_en": "Answer text in English - MUST be complete, not truncated",
+      "answer_ru": "Текст ответа на русском - MUST be complete, not truncated",
       "context": "Optional context before Q&A",
       "followups": "Optional follow-up questions",
       "references": "Optional references",
@@ -139,6 +141,12 @@ Respond with valid JSON matching this exact structure:
   "extraction_notes": "Notes about the extraction process or why certain pairs were skipped",
   "total_pairs": 1
 }}
+
+CRITICAL REQUIREMENTS:
+- ALL answer fields (answer_en, answer_ru) MUST be complete and not truncated
+- If a language is in language_tags, the corresponding answer field MUST contain the full answer
+- Do not cut off answers mid-sentence or mid-word
+- Ensure the JSON structure is complete and valid
 </output_format>
 
 <examples>
@@ -274,29 +282,34 @@ You are an expert Q&A extraction system specializing in educational note analysi
             json_schema = get_qa_extraction_schema()
 
             # Calculate reasonable max_tokens based on input size
-            # For extraction, we typically need 2-3x the input size for bilingual content
-            # But cap it to prevent excessive generation and speed up processing
+            # For extraction, we typically need 3-4x the input size for bilingual content
             # Using character count as rough estimate (1 token ≈ 4 characters)
             prompt_tokens_estimate = len(prompt) // 4
-            estimated_max_tokens = min(
-                prompt_tokens_estimate * 2,  # 2x input for bilingual extraction (more conservative)
-                16000,  # Cap at 16k tokens (reasonable for extraction, prevents excessive generation)
-            )
+            # For bilingual Q&A extraction, we need more tokens (3.5x input is safer)
+            # Don't cap too low - let the provider handle it, but ensure we have enough
+            estimated_max_tokens = int(prompt_tokens_estimate * 3.5)
 
-            # Temporarily adjust max_tokens for this extraction to speed up processing
+            # Ensure we have at least 16k tokens for complex extractions
+            # But don't exceed 128k (provider limit for most models)
+            estimated_max_tokens = max(estimated_max_tokens, 16000)
+            estimated_max_tokens = min(estimated_max_tokens, 128000)
+
+            # Temporarily adjust max_tokens for this extraction to ensure complete responses
             # Store original max_tokens to restore later
             original_max_tokens = None
             if hasattr(self.llm_provider, 'max_tokens'):
                 original_max_tokens = self.llm_provider.max_tokens
-                # Only adjust if current max_tokens is much larger than needed
-                if original_max_tokens > estimated_max_tokens * 2:
-                    self.llm_provider.max_tokens = int(estimated_max_tokens)
-                    logger.debug(
-                        "adjusted_max_tokens_for_extraction",
+                # Always use the larger of: configured max or estimated needed
+                # This ensures we don't truncate responses
+                if estimated_max_tokens > original_max_tokens:
+                    self.llm_provider.max_tokens = estimated_max_tokens
+                    logger.info(
+                        "increased_max_tokens_for_extraction",
                         original_max_tokens=original_max_tokens,
-                        adjusted_max_tokens=int(estimated_max_tokens),
+                        increased_max_tokens=estimated_max_tokens,
                         prompt_length=len(prompt),
                         prompt_tokens_estimate=prompt_tokens_estimate,
+                        reason="Ensuring complete JSON responses without truncation",
                     )
 
             # Update progress display if available
