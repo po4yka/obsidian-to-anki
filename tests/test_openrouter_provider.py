@@ -133,3 +133,70 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
     second_payload = json.loads(route.calls[1].request.content.decode())
     assert second_payload["response_format"]["type"] == "json_object"
 
+
+@respx.mock
+def test_generate_retries_on_rate_limit_and_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+    openrouter_provider: OpenRouterProvider,
+) -> None:
+    """Provider waits according to Retry-After and retries 429 responses."""
+
+    recorded_sleeps: list[float] = []
+    monkeypatch.setattr(
+        "obsidian_anki_sync.providers.openrouter.time.sleep",
+        lambda seconds: recorded_sleeps.append(seconds),
+    )
+
+    responses = [
+        httpx.Response(
+            429,
+            json={
+                "error": {
+                    "type": "rate_limit",
+                    "message": "Too many requests",
+                }
+            },
+            headers={"Retry-After": "0.1"},
+        ),
+        httpx.Response(
+            200,
+            json=_build_openrouter_response(
+                content=json.dumps(
+                    {
+                        "qa_pairs": [
+                            {
+                                "card_index": 1,
+                                "question_en": "Q?",
+                                "question_ru": "",
+                                "answer_en": "Answer",
+                                "answer_ru": "",
+                                "context": "",
+                                "followups": "",
+                                "references": "",
+                                "related": "",
+                            }
+                        ],
+                        "extraction_notes": "",
+                        "total_pairs": 1,
+                    }
+                )
+            ),
+        ),
+    ]
+
+    route = respx.post(f"{BASE_URL}/chat/completions")
+    route.mock(side_effect=responses)
+
+    schema = get_qa_extraction_schema()
+    result = openrouter_provider.generate_json(
+        model="qwen/qwen-2.5-72b-instruct",
+        prompt="Extract QAs",
+        system="system prompt",
+        temperature=0.0,
+        json_schema=schema,
+    )
+
+    assert result["total_pairs"] == 1
+    assert route.call_count == 2
+    assert recorded_sleeps == [pytest.approx(0.1, rel=1e-2)]
+

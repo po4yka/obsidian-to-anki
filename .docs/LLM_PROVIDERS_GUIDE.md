@@ -254,6 +254,11 @@ obsidian-anki-sync test-run --count 1
 - The sync engine now detects this condition and **retries once without JSON schema**, logging `structured_output_retry_without_schema`. The fallback keeps QA extraction running without manual config changes.
 - If both the structured call and the fallback fail, the CLI surfaces a `empty_response` error so you can switch models or rerun later. Monitor `.logs/sync.log` for the warning to understand when the fallback triggered.
 
+#### Rate Limiting
+
+- OpenRouter frequently enforces per-minute limits on large models. When a `429 Rate Limit` response is returned, the sync engine now respects the provider’s `Retry-After` header (or applies exponential backoff) before retrying, up to three times.
+- You will see `llm_retry_attempt` entries with `reason=http_status_429` in `.logs/sync.log`. If all retries still fail, the run stops with a descriptive error so you can reduce concurrency or switch models as needed.
+
 ---
 
 ### 5. LM Studio (Recommended for Local GUI)
