@@ -95,9 +95,16 @@ def test_run(
         typer.Option(
             "--count",
             min=1,
-            help="Number of random notes to process (dry-run)",
+            help="Number of random notes to process",
         ),
     ] = 10,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run/--no-dry-run",
+            help="Preview changes without applying (default: --dry-run)",
+        ),
+    ] = True,
     use_agents: Annotated[
         bool | None,
         typer.Option(
@@ -114,7 +121,7 @@ def test_run(
         typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
-    """Run a sample dry-run by processing N random notes."""
+    """Run a sample by processing N random notes."""
     config, logger = get_config_and_logger(config_path, log_level)
 
     # Override agent system setting if CLI flag is provided
@@ -122,12 +129,12 @@ def test_run(
         config.use_agent_system = use_agents
         logger.info("agent_system_override", use_agents=use_agents)
 
-    logger.info("test_run_started", sample_count=count)
+    logger.info("test_run_started", sample_count=count, dry_run=dry_run)
 
-    # Run pre-flight checks (skip Anki since it's a dry-run)
+    # Run pre-flight checks (skip Anki if dry-run)
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
+    passed, results = run_preflight_checks(config, check_anki=not dry_run, check_llm=True)
 
     # Display results
     for result in results:
@@ -162,10 +169,11 @@ def test_run(
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
             engine = SyncEngine(config, db, anki)
-            stats = engine.sync(dry_run=True, sample_size=count)
+            stats = engine.sync(dry_run=dry_run, sample_size=count)
 
+            mode_text = "dry-run" if dry_run else "applied"
             console.print(
-                f"\n[cyan]Processed sample of {count} notes (dry-run).[/cyan]"
+                f"\n[cyan]Processed sample of {count} notes ({mode_text}).[/cyan]"
             )
 
             # Create a Rich table for results

@@ -11,6 +11,27 @@ from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
 
+# Models known to have issues with strict structured outputs
+MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
+    "deepseek/deepseek-chat-v3.1",
+    "deepseek/deepseek-chat-v3.1:free",
+    "moonshotai/kimi-k2-thinking",
+}
+
+# Models that support structured outputs well
+MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
+    "openai/gpt-4",
+    "openai/gpt-4o",
+    "openai/gpt-4-turbo",
+    "openai/gpt-3.5-turbo",
+    "google/gemini-pro",
+    "google/gemini-2.0-flash-exp",
+    "anthropic/claude-3-opus",
+    "anthropic/claude-3-sonnet",
+    "anthropic/claude-3-haiku",
+    "qwen/qwen3-max",
+}
+
 
 class OpenRouterProvider(BaseLLMProvider):
     """OpenRouter LLM provider using OpenAI-compatible API.
@@ -110,6 +131,126 @@ class OpenRouterProvider(BaseLLMProvider):
         if hasattr(self, "client"):
             self.client.close()
 
+    def _optimize_schema_for_request(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """Optimize JSON schema for token efficiency.
+
+        Removes verbose descriptions and metadata that don't affect validation
+        but consume tokens. Keeps essential validation rules.
+
+        Args:
+            schema: Original JSON schema dictionary
+
+        Returns:
+            Optimized schema dictionary
+        """
+        if not isinstance(schema, dict):
+            return schema
+
+        optimized = {}
+
+        # Keep essential fields
+        essential_fields = {
+            "type", "properties", "items", "required", "enum",
+            "minimum", "maximum", "minLength", "maxLength",
+            "pattern", "format", "additionalProperties", "anyOf", "oneOf", "allOf"
+        }
+
+        for key, value in schema.items():
+            if key in essential_fields:
+                if key == "properties" and isinstance(value, dict):
+                    # Recursively optimize nested properties
+                    optimized[key] = {
+                        k: self._optimize_schema_for_request(v)
+                        for k, v in value.items()
+                    }
+                elif key == "items" and isinstance(value, dict):
+                    # Optimize array items schema
+                    optimized[key] = self._optimize_schema_for_request(value)
+                elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
+                    # Optimize union types
+                    optimized[key] = [
+                        self._optimize_schema_for_request(item)
+                        if isinstance(item, dict) else item
+                        for item in value
+                    ]
+                else:
+                    optimized[key] = value
+
+        return optimized
+
+    def _repair_truncated_json(self, text: str) -> str:
+        """Attempt to repair truncated JSON by closing open structures.
+
+        Args:
+            text: Potentially truncated JSON text
+
+        Returns:
+            Repaired JSON text (may still be invalid if too corrupted)
+        """
+        if not text.strip():
+            return "{}"
+
+        repaired = text.rstrip()
+
+        # Track state
+        brace_count = 0
+        bracket_count = 0
+        in_string = False
+        escape_next = False
+        last_valid_pos = len(repaired)
+
+        for i, char in enumerate(repaired):
+            if escape_next:
+                escape_next = False
+                last_valid_pos = i + 1
+                continue
+
+            if char == '\\':
+                escape_next = True
+                last_valid_pos = i + 1
+                continue
+
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                last_valid_pos = i + 1
+                continue
+
+            if not in_string:
+                if char == '{':
+                    brace_count += 1
+                    last_valid_pos = i + 1
+                elif char == '}':
+                    brace_count -= 1
+                    last_valid_pos = i + 1
+                elif char == '[':
+                    bracket_count += 1
+                    last_valid_pos = i + 1
+                elif char == ']':
+                    bracket_count -= 1
+                    last_valid_pos = i + 1
+                elif char not in (' ', '\n', '\t', '\r'):
+                    # Valid JSON character (including ',' and ':')
+                    last_valid_pos = i + 1
+
+        # Truncate to last valid position
+        repaired = repaired[:last_valid_pos]
+
+        # If we're still in a string, close it
+        if in_string:
+            repaired += '"'
+
+        # Close any open brackets
+        while bracket_count > 0:
+            repaired += ']'
+            bracket_count -= 1
+
+        # Close any open braces
+        while brace_count > 0:
+            repaired += '}'
+            brace_count -= 1
+
+        return repaired
+
     def _clean_json_response(self, text: str, model: str) -> str:
         """Clean JSON response from DeepSeek and similar models.
 
@@ -174,8 +315,10 @@ class OpenRouterProvider(BaseLLMProvider):
         # This handles cases where there's extra text after the JSON closes
         if cleaned.startswith("{"):
             brace_count = 0
+            bracket_count = 0
             in_string = False
             escape_next = False
+            last_valid_pos = 0
 
             for i, char in enumerate(cleaned):
                 if escape_next:
@@ -188,13 +331,16 @@ class OpenRouterProvider(BaseLLMProvider):
 
                 if char == '"' and not escape_next:
                     in_string = not in_string
+                    last_valid_pos = i + 1
                     continue
 
                 if not in_string:
                     if char == '{':
                         brace_count += 1
+                        last_valid_pos = i + 1
                     elif char == '}':
                         brace_count -= 1
+                        last_valid_pos = i + 1
                         if brace_count == 0:
                             # Found the end of the JSON object
                             if i + 1 < len(cleaned):
@@ -206,6 +352,28 @@ class OpenRouterProvider(BaseLLMProvider):
                                     cleaned_length=len(cleaned),
                                 )
                             break
+                    elif char == '[':
+                        bracket_count += 1
+                        last_valid_pos = i + 1
+                    elif char == ']':
+                        bracket_count -= 1
+                        last_valid_pos = i + 1
+                    else:
+                        last_valid_pos = i + 1
+
+            # If we ended while still in a string or with unclosed braces, try to repair
+            if in_string or brace_count > 0 or bracket_count > 0:
+                logger.warning(
+                    "detected_truncated_json",
+                    model=model,
+                    in_string=in_string,
+                    brace_count=brace_count,
+                    bracket_count=bracket_count,
+                    original_length=len(text),
+                    cleaned_length=len(cleaned),
+                )
+                # Try to repair the truncated JSON
+                cleaned = self._repair_truncated_json(cleaned[:last_valid_pos])
 
         return cleaned
 
@@ -314,14 +482,53 @@ class OpenRouterProvider(BaseLLMProvider):
 
         # Handle structured output with JSON schema (preferred method)
         if json_schema:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": json_schema.get("name", "response"),
-                    "strict": json_schema.get("strict", True),
-                    "schema": json_schema.get("schema", {}),
-                },
-            }
+            schema_dict = json_schema.get("schema", {})
+            schema_name = json_schema.get("name", "response")
+
+            # Validate schema structure before sending
+            if not schema_dict or not isinstance(schema_dict, dict):
+                logger.warning(
+                    "invalid_json_schema_structure",
+                    model=model,
+                    schema_name=schema_name,
+                    schema_type=type(schema_dict).__name__,
+                )
+                # Fallback to basic JSON mode if schema is invalid
+                payload["response_format"] = {"type": "json_object"}
+            else:
+                # Determine strict mode based on model compatibility
+                default_strict = json_schema.get("strict", True)
+
+                # Some models have issues with strict mode, use non-strict as fallback
+                if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES:
+                    use_strict = False
+                    logger.debug(
+                        "using_non_strict_mode_for_model",
+                        model=model,
+                        reason="Model known to have structured output issues",
+                    )
+                else:
+                    use_strict = default_strict
+
+                # Optimize schema: remove unnecessary metadata for token efficiency
+                optimized_schema = self._optimize_schema_for_request(schema_dict)
+
+                payload["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": schema_name,
+                        "strict": use_strict,
+                        "schema": optimized_schema,
+                    },
+                }
+
+                logger.debug(
+                    "structured_output_configured",
+                    model=model,
+                    schema_name=schema_name,
+                    strict=use_strict,
+                    schema_size=len(json.dumps(optimized_schema)),
+                )
         # Fallback to basic JSON mode if format="json" and no schema
         elif format == "json":
             payload["response_format"] = {"type": "json_object"}
@@ -395,12 +602,36 @@ class OpenRouterProvider(BaseLLMProvider):
                 "usage": result.get("usage", {}),
             }
 
+            # Extract detailed usage information
+            usage = result.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
+
+            # Check finish reason for potential issues
+            finish_reason = result["choices"][0].get("finish_reason", "unknown")
+
             logger.info(
                 "openrouter_generate_success",
                 model=model,
                 response_length=len(completion),
-                tokens_used=result.get("usage", {}).get("total_tokens", 0),
+                tokens_used=total_tokens,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                finish_reason=finish_reason,
+                had_json_schema=bool(json_schema),
+                schema_name=json_schema.get("name", None) if json_schema else None,
             )
+
+            # Warn if response was truncated (length limit reached)
+            if finish_reason == "length" and json_schema:
+                logger.warning(
+                    "structured_output_truncated",
+                    model=model,
+                    response_length=len(completion),
+                    max_tokens=self.max_tokens,
+                    suggestion="Consider increasing max_tokens or simplifying schema",
+                )
 
             return standardized_result
 
@@ -410,8 +641,34 @@ class OpenRouterProvider(BaseLLMProvider):
             try:
                 error_json = e.response.json()
                 error_details = error_json
+
+                # Check for structured output specific errors
+                if "error" in error_json:
+                    error_msg = error_json.get("error", {})
+                    if isinstance(error_msg, dict):
+                        error_type = error_msg.get("type", "")
+                        error_message = error_msg.get("message", "")
+
+                        # If it's a schema validation error, provide helpful context
+                        if "schema" in error_type.lower() or "validation" in error_type.lower():
+                            logger.error(
+                                "openrouter_schema_validation_error",
+                                status_code=e.response.status_code,
+                                model=model,
+                                error_type=error_type,
+                                error_message=error_message,
+                                had_json_schema=bool(json_schema),
+                                schema_name=json_schema.get("name", "unknown") if json_schema else None,
+                            )
+                        elif "rate_limit" in error_type.lower():
+                            logger.error(
+                                "openrouter_rate_limit_error",
+                                status_code=e.response.status_code,
+                                model=model,
+                                error_message=error_message,
+                            )
             except Exception:
-                error_details = {"raw_response": e.response.text}
+                error_details = {"raw_response": e.response.text[:500]}
 
             logger.error(
                 "openrouter_http_error",
@@ -421,7 +678,17 @@ class OpenRouterProvider(BaseLLMProvider):
                 error=str(e),
                 error_details=error_details,
                 response_headers=dict(e.response.headers),
+                had_json_schema=bool(json_schema),
             )
+
+            # If structured output failed, suggest fallback
+            if json_schema and e.response.status_code == 400:
+                logger.warning(
+                    "structured_output_failed_suggestion",
+                    model=model,
+                    suggestion="Consider using non-strict mode or basic JSON format",
+                )
+
             raise
         except httpx.RequestError as e:
             logger.error("openrouter_request_error", error=str(e))
@@ -477,13 +744,39 @@ class OpenRouterProvider(BaseLLMProvider):
         try:
             return cast(dict[str, Any], json.loads(cleaned_text))
         except json.JSONDecodeError as e:
+            # Try to repair truncated JSON before giving up
+            if "Unterminated string" in str(e) or "Expecting" in str(e):
+                logger.warning(
+                    "attempting_json_repair",
+                    model=model,
+                    original_error=str(e),
+                    error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
+                )
+                try:
+                    repaired_text = self._repair_truncated_json(cleaned_text)
+                    repaired_json = json.loads(repaired_text)
+                    logger.info(
+                        "json_repair_success",
+                        model=model,
+                        original_length=len(cleaned_text),
+                        repaired_length=len(repaired_text),
+                    )
+                    return cast(dict[str, Any], repaired_json)
+                except json.JSONDecodeError as repair_error:
+                    logger.error(
+                        "json_repair_failed",
+                        model=model,
+                        repair_error=str(repair_error),
+                        original_error=str(e),
+                    )
+
             logger.error(
                 "openrouter_json_parse_error",
                 model=model,
                 error=str(e),
                 error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
-                response_text=response_text,
-                cleaned_text=cleaned_text,
+                response_text=response_text[:500] if len(response_text) > 500 else response_text,
+                cleaned_text=cleaned_text[:500] if len(cleaned_text) > 500 else cleaned_text,
                 response_length=len(response_text),
                 cleaned_length=len(cleaned_text),
                 had_schema=bool(json_schema),
