@@ -18,6 +18,7 @@ from ..utils.code_detection import (
 )
 from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
+from ..utils.skill_loader import SkillLoader
 from .debug_artifacts import save_failed_llm_call
 from .llm_errors import (
     categorize_llm_error,
@@ -55,13 +56,32 @@ class GeneratorAgent:
         self.model = model
         self.temperature = temperature
 
-        # Load system prompt from CARDS_PROMPT.md
-        prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
-        if prompt_path.exists():
-            self.system_prompt = prompt_path.read_text(encoding="utf-8")
-        else:
-            logger.warning("cards_prompt_not_found", path=str(prompt_path))
-            self.system_prompt = "Generate APF cards following strict APF v2.1 format."
+        # Initialize skill loader
+        self.skill_loader = SkillLoader()
+
+        # Load core skills for card generation
+        # Always load APF compliance and memorization principles
+        core_skills = ["apf_compliance", "memorization_principles"]
+
+        try:
+            self.system_prompt = self.skill_loader.combine(core_skills)
+            logger.info(
+                "skills_loaded",
+                skills=core_skills,
+                model=model,
+            )
+        except FileNotFoundError:
+            # Fallback to CARDS_PROMPT.md if Skills not available
+            logger.warning(
+                "skills_not_found_fallback",
+                message="Falling back to CARDS_PROMPT.md",
+            )
+            prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
+            if prompt_path.exists():
+                self.system_prompt = prompt_path.read_text(encoding="utf-8")
+            else:
+                logger.warning("cards_prompt_not_found", path=str(prompt_path))
+                self.system_prompt = "Generate APF cards following strict APF v2.1 format."
 
         logger.info("generator_agent_initialized", model=model)
 
@@ -278,6 +298,10 @@ class GeneratorAgent:
                 risk="Very high risk of context truncation",
             )
 
+        # Load additional skills based on note characteristics
+        additional_skills = self._determine_additional_skills(note_content, metadata)
+        system_prompt = self._build_system_prompt(additional_skills)
+
         # Retry logic for LLM calls
         max_retries = 3
         for attempt in range(1, max_retries + 1):
@@ -291,12 +315,13 @@ class GeneratorAgent:
                     attempt=attempt,
                     max_attempts=max_retries,
                     model=self.model,
+                    additional_skills=additional_skills,
                 )
 
                 result = self.ollama_client.generate(
                     model=self.model,
                     prompt=user_prompt,
-                    system=self.system_prompt,
+                    system=system_prompt,
                     temperature=self.temperature,
                 )
                 llm_duration = time.time() - llm_start_time
@@ -796,6 +821,63 @@ Now generate the card following this structure:
         apf_html = apf_html.strip()
 
         return apf_html
+
+    def _determine_additional_skills(
+        self, note_content: str, metadata: NoteMetadata
+    ) -> list[str]:
+        """Determine additional skills to load based on note characteristics.
+
+        Args:
+            note_content: Full note content
+            metadata: Note metadata
+
+        Returns:
+            List of additional skill names to load
+        """
+        additional_skills = []
+
+        # Check if note is bilingual
+        has_cyrillic = any("\u0400" <= char <= "\u04FF" for char in note_content)
+        has_latin = any(char.isalpha() and ord(char) < 128 for char in note_content)
+        if has_cyrillic and has_latin:
+            if self.skill_loader.skill_exists("bilingual_handling"):
+                additional_skills.append("bilingual_handling")
+
+        # Check if note might need splitting (multiple Q/A pairs or complex structure)
+        qa_count = note_content.count("Q:") + note_content.count("В:")
+        if qa_count > 1:
+            if self.skill_loader.skill_exists("card_splitting"):
+                additional_skills.append("card_splitting")
+
+        # Always consider context enrichment for better card quality
+        if self.skill_loader.skill_exists("context_enrichment"):
+            additional_skills.append("context_enrichment")
+
+        return additional_skills
+
+    def _build_system_prompt(self, additional_skills: list[str]) -> str:
+        """Build system prompt with core and additional skills.
+
+        Args:
+            additional_skills: List of additional skill names to load
+
+        Returns:
+            Combined system prompt
+        """
+        # Core skills are always loaded (set in __init__)
+        # Additional skills are loaded dynamically
+        all_skills = ["apf_compliance", "memorization_principles"] + additional_skills
+
+        try:
+            return self.skill_loader.combine(all_skills)
+        except FileNotFoundError:
+            # Fallback to base system prompt if skills not found
+            logger.warning(
+                "additional_skills_not_found",
+                skills=additional_skills,
+                message="Using base system prompt",
+            )
+            return self.system_prompt
 
     def _normalize_card_header(
         self, apf_html: str, manifest: Manifest, card_type: str, tags: list[str]
