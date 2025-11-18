@@ -248,6 +248,12 @@ echo 'openrouter_api_key: "sk-or-..."' >> config.yaml
 obsidian-anki-sync test-run --count 1
 ```
 
+#### Structured Output Compatibility
+
+- Some OpenRouter-hosted models (notably `qwen/qwen-2.5-72b-instruct` and `qwen/qwen-2.5-32b-instruct`) still return empty completions when `response_format.type="json_schema"` is enabled, despite marketing claims about JSON support ([OpenRouter model spec, retrieved 2025-11-18](https://openrouter.ai/qwen/qwen-2.5-72b-instruct)).
+- The sync engine now detects this condition and **retries once without JSON schema**, logging `structured_output_retry_without_schema`. The fallback keeps QA extraction running without manual config changes.
+- If both the structured call and the fallback fail, the CLI surfaces a `empty_response` error so you can switch models or rerun later. Monitor `.logs/sync.log` for the warning to understand when the fallback triggered.
+
 ---
 
 ### 5. LM Studio (Recommended for Local GUI)
@@ -297,15 +303,15 @@ pre_validator_model: "local-model"
 ```
 Do you need the HIGHEST quality?
  Yes  OpenAI (GPT-4) or Anthropic (Claude 3 Opus)
- No 
+ No
 
 Is privacy a top concern?
  Yes  Ollama (local) or LM Studio
- No 
+ No
 
 Do you want to minimize costs?
  Yes  Ollama (local, free) or OpenRouter (cheap models)
- No 
+ No
 
 Do you want access to many models?
  Yes  OpenRouter
