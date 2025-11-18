@@ -1093,6 +1093,34 @@ class OpenRouterProvider(BaseLLMProvider):
                         schema_name=json_schema.get("name") if json_schema else None,
                         note="Model returned empty content. This may indicate structured output compatibility issues.",
                     )
+                    # Retry once without structured output to handle models that reject JSON schemas
+                    if json_schema:
+                        log_llm_retry(
+                            model=model,
+                            operation="openrouter_generate",
+                            attempt=1,
+                            max_attempts=2,
+                            reason="empty_completion_structured_output",
+                            schema_name=json_schema.get("name"),
+                            note="Retrying without JSON schema",
+                        )
+                        logger.info(
+                            "structured_output_retry_without_schema",
+                            model=model,
+                            schema_name=json_schema.get("name"),
+                            finish_reason=finish_reason,
+                        )
+                        return self.generate(
+                            model=model,
+                            prompt=prompt,
+                            system=system,
+                            temperature=temperature,
+                            format="json",
+                            json_schema=None,
+                            stream=stream,
+                            reasoning_enabled=reasoning_enabled,
+                        )
+
                     # Raise error instead of silently continuing with empty string
                     raise ValueError(
                         f"Model {model} returned empty completion. "
