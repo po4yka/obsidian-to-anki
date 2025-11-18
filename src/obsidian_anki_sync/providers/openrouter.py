@@ -3,6 +3,8 @@
 import json
 import os
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, cast
 
 import httpx
@@ -56,6 +58,8 @@ MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
     "anthropic/claude-3-haiku",
     "qwen/qwen3-max",
 }
+
+HTTP_STATUS_RETRYABLE = {429, 500, 502, 503, 504}
 
 
 class OpenRouterProvider(BaseLLMProvider):
@@ -735,6 +739,37 @@ class OpenRouterProvider(BaseLLMProvider):
 
         return cleaned
 
+    @staticmethod
+    def _calculate_retry_wait_seconds(
+        status_code: int,
+        attempt: int,
+        response: httpx.Response | None = None,
+    ) -> float:
+        """Determine wait time before retrying based on status code and headers."""
+        if status_code == 429 and response is not None:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    wait_seconds = float(retry_after)
+                    if wait_seconds > 0:
+                        return wait_seconds
+                except ValueError:
+                    try:
+                        retry_datetime = parsedate_to_datetime(retry_after)
+                        if retry_datetime.tzinfo is None:
+                            retry_datetime = retry_datetime.replace(tzinfo=timezone.utc)
+                        now = datetime.now(timezone.utc)
+                        delta = (retry_datetime - now).total_seconds()
+                        if delta > 0:
+                            return delta
+                    except Exception:
+                        pass
+            # Default for 429 when Retry-After missing or invalid
+            return min(60.0, float(2 ** attempt))
+
+        # Generic exponential backoff for other retryable statuses
+        return min(60.0, float(2 ** attempt))
+
     def check_connection(self) -> bool:
         """Check if OpenRouter is accessible.
 
@@ -1004,7 +1039,7 @@ class OpenRouterProvider(BaseLLMProvider):
             schema_name=json_schema.get("name") if json_schema else None,
         )
 
-        # Retry logic for network errors
+        # Retry logic for network and HTTP status errors
         max_retries = 3
         last_exception: Exception | None = None
 
@@ -1016,12 +1051,12 @@ class OpenRouterProvider(BaseLLMProvider):
                     json=payload,
                 )
                 response.raise_for_status()
+                last_exception = None
                 break  # Success, exit retry loop
             except httpx.RequestError as e:
                 last_exception = e
                 if attempt < max_retries - 1:
-                    # Exponential backoff: 2^attempt seconds
-                    wait_time = 2 ** attempt
+                    wait_time = float(2 ** attempt)
                     log_llm_retry(
                         model=model,
                         operation="openrouter_generate",
@@ -1033,21 +1068,41 @@ class OpenRouterProvider(BaseLLMProvider):
                     )
                     time.sleep(wait_time)
                     continue
-                # Last attempt failed, will raise below
                 break
-            except httpx.HTTPStatusError:
-                # Don't retry HTTP status errors here, let the existing handler deal with them
+            except httpx.HTTPStatusError as e:
+                last_exception = e
+                status_code = e.response.status_code
+                if status_code in HTTP_STATUS_RETRYABLE and attempt < max_retries - 1:
+                    wait_time = self._calculate_retry_wait_seconds(
+                        status_code=status_code,
+                        attempt=attempt,
+                        response=e.response,
+                    )
+                    log_llm_retry(
+                        model=model,
+                        operation="openrouter_generate",
+                        attempt=attempt + 1,
+                        max_attempts=max_retries,
+                        reason=f"http_status_{status_code}",
+                        error=str(e),
+                        status_code=status_code,
+                        wait_seconds=wait_time,
+                    )
+                    time.sleep(wait_time)
+                    continue
                 raise
 
         # If we exhausted retries, raise the last exception
-        if last_exception and isinstance(last_exception, httpx.RequestError):
+        if last_exception:
             log_llm_error(
                 model=model,
                 operation="openrouter_generate",
                 start_time=request_start_time,
                 error=last_exception,
-                error_type="RequestError",
-                retryable=False,  # Already retried max times
+                error_type=type(last_exception).__name__,
+                retryable=isinstance(last_exception, httpx.HTTPStatusError)
+                and getattr(last_exception.response, "status_code", None)
+                in HTTP_STATUS_RETRYABLE,
             )
             raise last_exception
 
