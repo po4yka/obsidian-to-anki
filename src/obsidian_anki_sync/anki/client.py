@@ -12,7 +12,13 @@ logger = get_logger(__name__)
 
 
 class AnkiClient:
-    """Client for AnkiConnect HTTP API."""
+    """Client for AnkiConnect HTTP API.
+
+    Note: This client uses synchronous httpx.Client for compatibility with
+    existing sync code paths. It should only be used in synchronous contexts.
+    For async contexts, consider using asyncio.run() wrapper or migrating to
+    async HTTP client in the future.
+    """
 
     def __init__(self, url: str, timeout: float = 30.0):
         """
@@ -21,9 +27,15 @@ class AnkiClient:
         Args:
             url: AnkiConnect URL
             timeout: Request timeout in seconds
+
+        Note:
+            Uses synchronous httpx.Client. This is intentional for compatibility
+            with existing sync code. Do not use in async contexts without proper
+            synchronization (e.g., asyncio.run() wrapper).
         """
         self.url = url
         # Configure connection pooling for better performance
+        # Using sync client for compatibility with existing sync code paths
         self.session = httpx.Client(
             timeout=timeout,
             limits=httpx.Limits(

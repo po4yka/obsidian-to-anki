@@ -7,6 +7,7 @@ model interface, enabling type-safe structured outputs and better agent capabili
 import os
 from typing import Any
 
+import httpx
 from pydantic_ai.models.openai import OpenAIModel
 
 from ..config import Config
@@ -69,12 +70,24 @@ class PydanticAIModelFactory:
         if site_name:
             http_headers["X-Title"] = site_name
 
+        # Create explicitly configured async HTTP client
+        # This ensures proper timeout and connection pooling configuration
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10,
+                keepalive_expiry=30.0,
+            ),
+            headers=http_headers if http_headers else None,
+        )
+
         # Create OpenAI-compatible model pointing to OpenRouter
         model = OpenAIModel(  # type: ignore[call-overload]
             model_name,
             base_url=base_url,
             api_key=api_key,
-            http_client=None,  # Will use default httpx client
+            http_client=http_client,
             **kwargs,
         )
 
@@ -137,10 +150,21 @@ class PydanticAIModelFactory:
                 base_url=base_url,
             )
 
+            # Create explicitly configured async HTTP client for local providers
+            http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0, connect=10.0),
+                limits=httpx.Limits(
+                    max_keepalive_connections=5,
+                    max_connections=10,
+                    keepalive_expiry=30.0,
+                ),
+            )
+
             return OpenAIModel(  # type: ignore[call-overload,no-any-return]
                 model_name,
                 base_url=base_url,
                 api_key=api_key,
+                http_client=http_client,
             )
         else:
             raise ValueError(

@@ -28,10 +28,34 @@ logger = get_logger(__name__)
 
 
 class StateDB:
-    """SQLite database for tracking card state."""
+    """SQLite database for tracking card state.
+
+    Thread Safety:
+        SQLite connections are not thread-safe. This class should be used from
+        a single thread or with proper synchronization. The connection is created
+        once and reused for all operations.
+
+    Async Compatibility:
+        This class uses synchronous sqlite3. If used in async contexts, it will
+        block the event loop. For async usage, consider using aiosqlite or
+        running database operations in a thread pool executor.
+
+    WAL Mode:
+        The database uses WAL (Write-Ahead Logging) mode for better concurrency.
+        WAL mode allows concurrent reads while writes are in progress, but still
+        requires proper synchronization for multi-threaded access.
+    """
 
     def __init__(self, db_path: Path):
-        """Initialize database connection."""
+        """Initialize database connection.
+
+        Args:
+            db_path: Path to SQLite database file
+
+        Note:
+            Creates a synchronous SQLite connection. For async contexts, consider
+            using aiosqlite or running operations in a thread pool executor.
+        """
         self.db_path = db_path
         self.conn = sqlite3.connect(str(db_path))
         self.conn.row_factory = sqlite3.Row

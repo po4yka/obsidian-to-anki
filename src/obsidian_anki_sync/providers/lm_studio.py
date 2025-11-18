@@ -47,6 +47,8 @@ class LMStudioProvider(BaseLLMProvider):
         self.max_tokens = max_tokens
 
         # Initialize HTTP client
+        # Use synchronous httpx.Client for compatibility with existing sync code
+        # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),

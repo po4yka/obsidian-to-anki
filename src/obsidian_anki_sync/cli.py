@@ -548,6 +548,8 @@ def export(
 
             if config.use_agent_system:
                 console.print("[cyan]Using multi-agent system for generation...[/cyan]")
+                import asyncio
+                import inspect
                 from .agents.orchestrator import AgentOrchestrator
 
                 orchestrator = AgentOrchestrator(config)
@@ -556,9 +558,17 @@ def export(
                     try:
                         note_path, note_content = note_path_tuple
                         metadata, qa_pairs = parse_note(note_path)
-                        result = orchestrator.process_note(
-                            note_content, metadata, qa_pairs, note_path
-                        )
+                        # Handle both sync and async orchestrators
+                        if inspect.iscoroutinefunction(orchestrator.process_note):
+                            result = asyncio.run(
+                                orchestrator.process_note(
+                                    note_content, metadata, qa_pairs, note_path
+                                )
+                            )
+                        else:
+                            result = orchestrator.process_note(
+                                note_content, metadata, qa_pairs, note_path
+                            )
 
                         if result.success and result.generation:
                             generated_cards = result.generation.cards
