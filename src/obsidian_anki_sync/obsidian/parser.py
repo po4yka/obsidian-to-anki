@@ -3,7 +3,7 @@
 import re
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import frontmatter
 from ruamel.yaml import YAML
@@ -13,11 +13,10 @@ from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 
-logger = get_logger(__name__)
+if TYPE_CHECKING:
+    from ..agents.qa_extractor import QAExtractorAgent
 
-# Global flag to control whether to use LLM-based extraction
-_USE_LLM_EXTRACTION = False
-_QA_EXTRACTOR_AGENT = None
+logger = get_logger(__name__)
 
 # Configure ruamel.yaml for preserving comments and order
 # This is available for future write operations
@@ -27,13 +26,21 @@ ruamel_yaml.default_flow_style = False
 ruamel_yaml.width = 4096  # Prevent line wrapping
 
 
+# Backward compatibility - global state (deprecated)
+_USE_LLM_EXTRACTION = False
+_QA_EXTRACTOR_AGENT = None
+
+
 def configure_llm_extraction(
     llm_provider: BaseLLMProvider | None,
     model: str = "qwen3:8b",
     temperature: float = 0.0,
     reasoning_enabled: bool = False,
 ) -> None:
-    """Configure LLM-based Q&A extraction.
+    """Configure LLM-based Q&A extraction using global state (deprecated).
+
+    DEPRECATED: Use create_qa_extractor() and pass the extractor to parse functions instead.
+    This function remains for backward compatibility but sets global state which is not thread-safe.
 
     Args:
         llm_provider: LLM provider instance (None to disable)
@@ -65,12 +72,45 @@ def configure_llm_extraction(
     )
 
 
-def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
+def create_qa_extractor(
+    llm_provider: BaseLLMProvider,
+    model: str = "qwen3:8b",
+    temperature: float = 0.0,
+    reasoning_enabled: bool = False,
+) -> "QAExtractorAgent":
+    """Create a QA extractor agent for LLM-based extraction.
+
+    This is the preferred way to use LLM extraction instead of configure_llm_extraction().
+
+    Args:
+        llm_provider: LLM provider instance
+        model: Model to use for extraction
+        temperature: Sampling temperature
+        reasoning_enabled: Enable reasoning mode for models that support it
+
+    Returns:
+        Configured QAExtractorAgent instance
+    """
+    from ..agents.qa_extractor import QAExtractorAgent
+
+    return QAExtractorAgent(
+        llm_provider=llm_provider,
+        model=model,
+        temperature=temperature,
+        reasoning_enabled=reasoning_enabled,
+    )
+
+
+def parse_note(
+    file_path: Path, qa_extractor: Optional["QAExtractorAgent"] = None
+) -> tuple[NoteMetadata, list[QAPair]]:
     """
     Parse an Obsidian note and extract metadata and Q/A pairs.
 
     Args:
         file_path: Path to the markdown file
+        qa_extractor: Optional QA extractor agent for LLM-based extraction.
+                     If None, uses global state for backward compatibility.
 
     Returns:
         Tuple of (metadata, qa_pairs)
@@ -100,7 +140,7 @@ def parse_note(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
     metadata = parse_frontmatter(content, file_path)
 
     # Parse Q/A pairs
-    qa_pairs = parse_qa_pairs(content, metadata, file_path)
+    qa_pairs = parse_qa_pairs(content, metadata, file_path, qa_extractor=qa_extractor)
 
     logger.debug(
         "parsed_note",
@@ -269,17 +309,22 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
 
 
 def parse_qa_pairs(
-    content: str, metadata: NoteMetadata, file_path: Path | None = None
+    content: str,
+    metadata: NoteMetadata,
+    file_path: Path | None = None,
+    qa_extractor: Optional["QAExtractorAgent"] = None,
 ) -> list[QAPair]:
     """
     Parse Q/A pairs from note content.
 
-    Uses LLM-based extraction if configured, otherwise falls back to rigid parsing.
+    Uses LLM-based extraction if qa_extractor provided, otherwise falls back to rigid parsing.
 
     Args:
         content: Full note content
         metadata: Parsed metadata
         file_path: Optional file path for logging
+        qa_extractor: Optional QA extractor agent for LLM-based extraction.
+                     If None, checks global state for backward compatibility.
 
     Returns:
         List of Q/A pairs
@@ -287,8 +332,13 @@ def parse_qa_pairs(
     Raises:
         ParserError: If structure is invalid
     """
+    # Determine which extractor to use (parameter takes precedence over global)
+    extractor_to_use = qa_extractor
+    if extractor_to_use is None and _USE_LLM_EXTRACTION:
+        extractor_to_use = _QA_EXTRACTOR_AGENT
+
     # Try LLM-based extraction first if enabled
-    if _USE_LLM_EXTRACTION and _QA_EXTRACTOR_AGENT is not None:
+    if extractor_to_use is not None:
         logger.info(
             "attempting_llm_extraction",
             note_id=metadata.id,
@@ -297,7 +347,7 @@ def parse_qa_pairs(
         )
 
         try:
-            qa_pairs = _QA_EXTRACTOR_AGENT.extract_qa_pairs(
+            qa_pairs = extractor_to_use.extract_qa_pairs(
                 note_content=content,
                 metadata=metadata,
                 file_path=file_path,
