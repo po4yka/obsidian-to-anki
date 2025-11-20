@@ -255,9 +255,7 @@ class TestEventLoopCompatibility:
     """Test event loop compatibility."""
 
     @pytest.mark.asyncio
-    async def test_node_function_in_existing_event_loop(
-        self, sample_pipeline_state
-    ):
+    async def test_node_function_in_existing_event_loop(self, sample_pipeline_state):
         """Test that node functions work in an existing event loop."""
         from obsidian_anki_sync.agents.langgraph_orchestrator import (
             pre_validation_node,
@@ -285,9 +283,7 @@ class TestEventLoopCompatibility:
             assert result is not None
 
     @pytest.mark.asyncio
-    async def test_process_note_in_existing_event_loop(
-        self, test_config_with_models
-    ):
+    async def test_process_note_in_existing_event_loop(self, test_config_with_models):
         """Test that process_note works in an existing event loop."""
         # Verify we're in an event loop
         loop = asyncio.get_running_loop()
@@ -397,4 +393,3 @@ class TestModelCaching:
             mock_validator_class.assert_called_once()
             call_args = mock_validator_class.call_args
             assert call_args[1]["model"] is mock_model
-

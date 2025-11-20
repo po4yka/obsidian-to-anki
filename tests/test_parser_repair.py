@@ -96,10 +96,11 @@ class TestParserRepairAgent:
             malformed_note_empty_language_tags, error
         )
 
-        assert "PARSING ERROR:" in prompt
+        # Check for updated prompt format
+        assert "<parsing_error>" in prompt
         assert error in prompt
         assert "language_tags" in prompt.lower()
-        assert "RESPOND IN JSON FORMAT:" in prompt
+        assert "<output_format>" in prompt or "JSON" in prompt
 
     def test_repair_and_parse_success(
         self,

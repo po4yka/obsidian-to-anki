@@ -121,9 +121,7 @@ class TestSyncEngineWithAsyncOrchestrator:
                 engine = SyncEngine(test_config_for_integration, db, anki)
 
                 # Mock convert_to_cards
-                engine.agent_orchestrator.convert_to_cards = MagicMock(
-                    return_value=[]
-                )
+                engine.agent_orchestrator.convert_to_cards = MagicMock(return_value=[])
 
                 metadata = NoteMetadata(
                     id="test-001",
@@ -224,8 +222,8 @@ class TestCLIWithAsyncOrchestrator:
         # else:
         #     result = orchestrator.process_note(...)
 
-        import inspect
         import asyncio
+        import inspect
 
         # Verify the pattern components exist
         assert hasattr(inspect, "iscoroutinefunction")
@@ -237,6 +235,7 @@ class TestEventLoopCompatibility:
 
     def test_asyncio_run_creates_new_event_loop(self):
         """Test that asyncio.run() creates a new event loop."""
+
         # This is important for sync contexts calling async code
         async def async_function():
             loop = asyncio.get_running_loop()
@@ -270,6 +269,7 @@ class TestOrchestratorTypeDetection:
 
     def test_inspect_iscoroutinefunction_detects_async(self):
         """Test that inspect.iscoroutinefunction correctly detects async functions."""
+
         async def async_func():
             pass
 
@@ -281,6 +281,7 @@ class TestOrchestratorTypeDetection:
 
     def test_method_detection(self):
         """Test detection of async methods."""
+
         class SyncClass:
             def sync_method(self):
                 pass
@@ -294,4 +295,3 @@ class TestOrchestratorTypeDetection:
 
         assert not inspect.iscoroutinefunction(sync_obj.sync_method)
         assert inspect.iscoroutinefunction(async_obj.async_method)
-
