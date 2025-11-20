@@ -153,12 +153,9 @@ class SyncEngine:
             "errors": 0,
         }
 
-        # Event loop management for async operations
-        self._event_loop: Any = None
-        self._owns_event_loop = False
-
         # Thread-safe slug generation
         import threading
+
         self._slug_counter_lock = threading.Lock()
         self._slug_counters: dict[str, int] = {}  # base_slug -> next_index
 
@@ -189,11 +186,7 @@ class SyncEngine:
         self._cache_misses = 0
 
         # Cache statistics tracking
-        self._cache_stats = {
-            'hits': 0,
-            'misses': 0,
-            'generation_times': []
-        }
+        self._cache_stats = {"hits": 0, "misses": 0, "generation_times": []}
 
         logger.info(
             "persistent_cache_initialized",
@@ -210,8 +203,12 @@ class SyncEngine:
         """
         self.progress_display = progress_display
         # Pass to agents if available
-        if self.progress_display and hasattr(self, 'agent_orchestrator') and self.agent_orchestrator:
-            if hasattr(self.agent_orchestrator, 'set_progress_display'):
+        if (
+            self.progress_display
+            and hasattr(self, "agent_orchestrator")
+            and self.agent_orchestrator
+        ):
+            if hasattr(self.agent_orchestrator, "set_progress_display"):
                 self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def _close_caches(self) -> None:
@@ -228,7 +225,6 @@ class SyncEngine:
         """Cleanup caches on destruction."""
         try:
             self._close_caches()
-            self._cleanup_event_loop()
         except Exception:
             # Ignore errors during cleanup
             pass
@@ -270,32 +266,6 @@ class SyncEngine:
             )
             return None
 
-    def _get_event_loop(self) -> Any:
-        """Get or create event loop for async operations.
-
-        Returns:
-            Event loop instance
-        """
-        import asyncio
-
-        try:
-            loop = asyncio.get_running_loop()
-            self._owns_event_loop = False
-            return loop
-        except RuntimeError:
-            # No running loop, create one
-            if self._event_loop is None or self._event_loop.is_closed():
-                self._event_loop = asyncio.new_event_loop()
-                self._owns_event_loop = True
-            return self._event_loop
-
-    def _cleanup_event_loop(self) -> None:
-        """Close event loop if we created it."""
-        if self._owns_event_loop and self._event_loop and not self._event_loop.is_closed():
-            self._event_loop.close()
-            self._event_loop = None
-            self._owns_event_loop = False
-
     @contextlib.contextmanager
     def _get_progress_bar(self, total: int, description: str = "Processing"):
         """Yield progress bar context manager.
@@ -321,10 +291,7 @@ class SyncEngine:
             pass
 
     def _generate_thread_safe_slug(
-        self,
-        base_slug: str,
-        card_index: int,
-        lang: str
+        self, base_slug: str, card_index: int, lang: str
     ) -> str:
         """Generate unique slug using thread-safe counter.
 
@@ -453,20 +420,25 @@ class SyncEngine:
 
             # Log LLM session summary
             from ..utils.llm_logging import log_session_summary
+
             if self.progress:
                 log_session_summary(session_id=self.progress.session_id)
 
             # Log final cache statistics
-            if self._cache_stats['hits'] + self._cache_stats['misses'] > 0:
-                cache_hit_ratio = self._cache_stats['hits'] / (self._cache_stats['hits'] + self._cache_stats['misses'])
+            if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:
+                cache_hit_ratio = self._cache_stats["hits"] / (
+                    self._cache_stats["hits"] + self._cache_stats["misses"]
+                )
                 avg_generation_time = (
-                    sum(self._cache_stats['generation_times']) / len(self._cache_stats['generation_times'])
-                    if self._cache_stats['generation_times'] else 0
+                    sum(self._cache_stats["generation_times"])
+                    / len(self._cache_stats["generation_times"])
+                    if self._cache_stats["generation_times"]
+                    else 0
                 )
                 logger.info(
                     "cache_statistics",
-                    hits=self._cache_stats['hits'],
-                    misses=self._cache_stats['misses'],
+                    hits=self._cache_stats["hits"],
+                    misses=self._cache_stats["misses"],
                     hit_ratio=round(cache_hit_ratio, 3),
                     avg_generation_seconds=round(avg_generation_time, 2),
                 )
@@ -486,8 +458,6 @@ class SyncEngine:
         finally:
             # Close caches to ensure data is flushed to disk
             self._close_caches()
-            # Close event loop if we created it
-            self._cleanup_event_loop()
 
     def _scan_obsidian_notes(
         self, sample_size: int | None = None, incremental: bool = False
@@ -560,14 +530,17 @@ class SyncEngine:
 
         # Use parallel processing if enabled and max_concurrent_generations > 1
         use_parallel = (
-            self.config.max_concurrent_generations > 1
-            and len(note_files) > 1
+            self.config.max_concurrent_generations > 1 and len(note_files) > 1
         )
 
         if use_parallel:
             return self._scan_obsidian_notes_parallel(
-                note_files, obsidian_cards, existing_slugs, topic_mismatches,
-                error_by_type, error_samples
+                note_files,
+                obsidian_cards,
+                existing_slugs,
+                topic_mismatches,
+                error_by_type,
+                error_samples,
             )
 
         # Sequential processing (original implementation)
@@ -576,7 +549,9 @@ class SyncEngine:
         max_consecutive_errors = 3
 
         # Use context manager for progress bar
-        with self._get_progress_bar(len(note_files), "Processing notes") as progress_context:
+        with self._get_progress_bar(
+            len(note_files), "Processing notes"
+        ) as progress_context:
             if progress_context:
                 progress_bar, progress_task_id = progress_context
             else:
@@ -653,7 +628,9 @@ class SyncEngine:
                     continue
 
                 try:
-                    logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
+                    logger.debug(
+                        "processing_note", file=relative_path, pairs=len(qa_pairs)
+                    )
 
                     # Use batch generation if multiple Q/A pairs and batch operations enabled
                     use_batch_generation = (
@@ -685,14 +662,22 @@ class SyncEngine:
 
                                 # Generate slug
                                 slug, slug_base, hash6 = generate_slug(
-                                    relative_path, qa_pair.card_index, lang, existing_slugs
+                                    relative_path,
+                                    qa_pair.card_index,
+                                    lang,
+                                    existing_slugs,
                                 )
                                 lang_slugs.append(slug)
                                 existing_slugs.add(slug)
 
                                 # Compute GUID
                                 guid = deterministic_guid(
-                                    [metadata.id, relative_path, str(qa_pair.card_index), lang]
+                                    [
+                                        metadata.id,
+                                        relative_path,
+                                        str(qa_pair.card_index),
+                                        lang,
+                                    ]
                                 )
 
                                 # Create manifest
@@ -837,7 +822,10 @@ class SyncEngine:
 
                                     if self.progress:
                                         self.progress.fail_note(
-                                            relative_path, qa_pair.card_index, lang, str(e)
+                                            relative_path,
+                                            qa_pair.card_index,
+                                            lang,
+                                            str(e),
                                         )
 
                     self.stats["processed"] += 1
@@ -859,14 +847,14 @@ class SyncEngine:
                 progress_bar.update(
                     progress_task_id,
                     advance=1,
-                    description=f"[cyan]Processing notes... ({notes_processed}/{len(note_files)})"
+                    description=f"[cyan]Processing notes... ({notes_processed}/{len(note_files)})",
                 )
                 # Update status panel
                 if self.progress_display:
                     note_name = Path(relative_path).stem
                     self.progress_display.update_operation(
                         f"Processing note {notes_processed}/{len(note_files)}",
-                        note_name
+                        note_name,
                     )
                     # Update stats
                     current_stats = {
@@ -878,7 +866,7 @@ class SyncEngine:
                     if self.progress_display:
                         self.progress_display.update_operation(
                             f"Processing note {notes_processed}/{len(note_files)}",
-                            Path(relative_path).stem
+                            Path(relative_path).stem,
                         )
 
             # Progress indicator (log every 10 notes or on completion)
@@ -900,7 +888,6 @@ class SyncEngine:
                     estimated_remaining_seconds=round(estimated_remaining, 1),
                     cards_generated=len(obsidian_cards),
                 )
-
 
         # Log if sync was terminated early due to consecutive errors
         if consecutive_errors >= max_consecutive_errors:
@@ -1092,10 +1079,7 @@ class SyncEngine:
         Returns:
             Dict of slug -> Card
         """
-        max_workers = min(
-            self.config.max_concurrent_generations,
-            len(note_files)
-        )
+        max_workers = min(self.config.max_concurrent_generations, len(note_files))
         logger.info(
             "parallel_scan_started",
             total_notes=len(note_files),
@@ -1109,6 +1093,7 @@ class SyncEngine:
 
         # Thread-safe slug tracking using a lock
         import threading
+
         slugs_lock = threading.Lock()
         shared_slugs = set(existing_slugs)
 
@@ -1117,7 +1102,9 @@ class SyncEngine:
         batch_start_time = time.time()
 
         # Use context manager for progress bar (parallel processing)
-        with self._get_progress_bar(len(note_files), f"Processing notes (parallel, {max_workers} workers)") as progress_context:
+        with self._get_progress_bar(
+            len(note_files), f"Processing notes (parallel, {max_workers} workers)"
+        ) as progress_context:
             if progress_context:
                 progress_bar, progress_task_id = progress_context
             else:
@@ -1207,16 +1194,17 @@ class SyncEngine:
                         progress_bar.update(
                             progress_task_id,
                             advance=1,
-                            description=f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, {max_workers} workers)..."
+                            description=f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, {max_workers} workers)...",
                         )
                         # Update status panel
                         if self.progress_display:
-                            note_name = Path(relative_path).stem if relative_path else "unknown"
+                            note_name = (
+                                Path(relative_path).stem if relative_path else "unknown"
+                            )
                             self.progress_display.update_operation(
                                 f"Processing note {notes_processed}/{len(note_files)} (parallel)",
-                                note_name
+                                note_name,
                             )
-
 
         logger.info(
             "parallel_scan_completed",
@@ -1251,6 +1239,7 @@ class SyncEngine:
         # Compute content hash for the entire note
         # Use a hash of all Q/A pairs and metadata to detect changes
         import hashlib
+
         content_components = [
             metadata.id,
             metadata.title,
@@ -1261,7 +1250,9 @@ class SyncEngine:
         ]
         note_content_hash = hashlib.sha256(
             "\n".join(str(c) for c in content_components).encode("utf-8")
-        ).hexdigest()[:16]  # Use first 16 chars for shorter keys
+        ).hexdigest()[
+            :16
+        ]  # Use first 16 chars for shorter keys
 
         # Check cache with content hash
         cache_key = f"{metadata.id}:{relative_path}:{note_content_hash}"
@@ -1311,12 +1302,13 @@ class SyncEngine:
 
         # Handle both sync (AgentOrchestrator) and async (LangGraphOrchestrator) orchestrators
         if hasattr(self.agent_orchestrator, "process_note"):
+            import asyncio
             import inspect
+
             if inspect.iscoroutinefunction(self.agent_orchestrator.process_note):
                 # Async orchestrator (LangGraphOrchestrator)
-                # Use reusable event loop instead of creating new one each time
-                loop = self._get_event_loop()
-                result = loop.run_until_complete(
+                # Use asyncio.run() for clean loop management
+                result = asyncio.run(
                     self.agent_orchestrator.process_note(
                         note_content=note_content,
                         metadata=metadata,
@@ -1421,7 +1413,7 @@ class SyncEngine:
                     logger.debug(
                         "card_generation_cache_hit_agent",
                         slug=card.slug,
-                        elapsed_ms=elapsed_ms
+                        elapsed_ms=elapsed_ms,
                     )
                     return card
 
@@ -1444,7 +1436,7 @@ class SyncEngine:
                     logger.debug(
                         "card_generation_cache_hit",
                         slug=cached_card.slug,
-                        elapsed_ms=elapsed_ms
+                        elapsed_ms=elapsed_ms,
                     )
                     return cached_card
         except Exception as e:
@@ -1462,9 +1454,9 @@ class SyncEngine:
         # Generate slug - use thread-safe method in parallel mode if counters are initialized
         if self._slug_counters:
             # Thread-safe mode - compute base slug from path
-            from pathlib import Path
             import re
             import unicodedata
+            from pathlib import Path
 
             # Normalize path to slug base (same logic as slug_generator)
             path_parts = Path(relative_path).with_suffix("").parts
@@ -1550,11 +1542,7 @@ class SyncEngine:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info(
-            "card_generated",
-            slug=slug,
-            elapsed_seconds=round(elapsed, 2)
-        )
+        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
 
         return card
 
@@ -1577,7 +1565,7 @@ class SyncEngine:
                 "anki_query_failed",
                 deck=self.config.anki_deck_name,
                 error=str(e),
-                elapsed_seconds=round(elapsed, 2)
+                elapsed_seconds=round(elapsed, 2),
             )
             return {}
 
@@ -1586,7 +1574,7 @@ class SyncEngine:
             logger.info(
                 "no_anki_notes_found",
                 deck=self.config.anki_deck_name,
-                elapsed_seconds=round(elapsed, 2)
+                elapsed_seconds=round(elapsed, 2),
             )
             return {}
 
@@ -1600,7 +1588,7 @@ class SyncEngine:
                 "anki_notes_info_failed",
                 note_count=len(note_ids),
                 error=str(e),
-                elapsed_seconds=round(elapsed, 2)
+                elapsed_seconds=round(elapsed, 2),
             )
             return {}
 
@@ -1631,7 +1619,7 @@ class SyncEngine:
             cards_found=len(anki_cards),
             notes_processed=len(notes_info),
             invalid_manifests=invalid_manifest_count,
-            elapsed_seconds=round(elapsed, 2)
+            elapsed_seconds=round(elapsed, 2),
         )
         return anki_cards
 
@@ -1906,22 +1894,24 @@ class SyncEngine:
                     fields=fields,
                     tags=card.tags,
                     deck_name=self.config.anki_deck_name,
-                    apf_html=card.apf_html
+                    apf_html=card.apf_html,
                 )
 
                 # Mark as committed (no rollback needed)
                 txn.commit()
 
-                logger.info("card_created_successfully", slug=card.slug, anki_guid=note_id)
+                logger.info(
+                    "card_created_successfully", slug=card.slug, anki_guid=note_id
+                )
 
         except AnkiConnectError as e:
             logger.error("anki_create_failed", slug=card.slug, error=str(e))
-            self.db.update_card_status(card.slug, 'failed', str(e))
+            self.db.update_card_status(card.slug, "failed", str(e))
             raise
 
         except Exception as e:
             logger.error("card_create_failed", slug=card.slug, error=str(e))
-            self.db.update_card_status(card.slug, 'failed', str(e))
+            self.db.update_card_status(card.slug, "failed", str(e))
             raise CardOperationError(f"Failed to create card {card.slug}: {e}")
 
     def _update_card(self, card: Card, anki_guid: int) -> None:
@@ -1938,8 +1928,8 @@ class SyncEngine:
                 old_fields = {}
                 old_tags = []
                 if current_info:
-                    old_fields = current_info[0].get('fields', {})
-                    old_tags = current_info[0].get('tags', [])
+                    old_fields = current_info[0].get("fields", {})
+                    old_tags = current_info[0].get("tags", [])
 
                 # Step 1: Update in Anki
                 self.anki.update_note_fields(anki_guid, fields)
@@ -1947,14 +1937,13 @@ class SyncEngine:
 
                 # Register rollback (restore old state)
                 if current_info:
-                    txn.rollback_actions.append(("restore_anki_note", anki_guid, old_fields, old_tags))
+                    txn.rollback_actions.append(
+                        ("restore_anki_note", anki_guid, old_fields, old_tags)
+                    )
 
                 # Step 2: Update database with full content
                 self.db.update_card_extended(
-                    card=card,
-                    fields=fields,
-                    tags=card.tags,
-                    apf_html=card.apf_html
+                    card=card, fields=fields, tags=card.tags, apf_html=card.apf_html
                 )
 
                 txn.commit()
@@ -1962,12 +1951,12 @@ class SyncEngine:
 
         except AnkiConnectError as e:
             logger.error("anki_update_failed", slug=card.slug, error=str(e))
-            self.db.update_card_status(card.slug, 'failed', str(e))
+            self.db.update_card_status(card.slug, "failed", str(e))
             raise
 
         except Exception as e:
             logger.error("card_update_failed", slug=card.slug, error=str(e))
-            self.db.update_card_status(card.slug, 'failed', str(e))
+            self.db.update_card_status(card.slug, "failed", str(e))
             raise CardOperationError(f"Failed to update card {card.slug}: {e}")
 
     def _delete_card(self, card: Card, anki_guid: int) -> None:
@@ -2031,7 +2020,9 @@ class SyncEngine:
                         if note_id is not None:
                             # Register rollback
                             txn.rollback_actions.append(("delete_anki_note", note_id))
-                            successful_cards.append((card, note_id, fields, tags, apf_html))
+                            successful_cards.append(
+                                (card, note_id, fields, tags, apf_html)
+                            )
                         else:
                             # Failed card
                             logger.error(
@@ -2048,7 +2039,9 @@ class SyncEngine:
 
                     # Batch insert into database
                     if successful_cards:
-                        self.db.insert_cards_batch(successful_cards, self.config.anki_deck_name)
+                        self.db.insert_cards_batch(
+                            successful_cards, self.config.anki_deck_name
+                        )
 
                     txn.commit()
 
@@ -2068,7 +2061,9 @@ class SyncEngine:
                     )
 
             except Exception as e:
-                logger.error("batch_create_failed", error=str(e), batch_start=batch_start)
+                logger.error(
+                    "batch_create_failed", error=str(e), batch_start=batch_start
+                )
                 # Fall back to individual creates
                 for action in batch_actions:
                     try:
@@ -2149,9 +2144,11 @@ class SyncEngine:
 
                     # Process results
                     successful_cards = []
-                    for i, (field_success, tag_success, (card, fields, tags)) in enumerate(
-                        zip(field_results, tag_results, card_data)
-                    ):
+                    for i, (
+                        field_success,
+                        tag_success,
+                        (card, fields, tags),
+                    ) in enumerate(zip(field_results, tag_results, card_data)):
                         if field_success and tag_success:
                             successful_cards.append((card, fields, tags))
                         else:
@@ -2192,7 +2189,9 @@ class SyncEngine:
                     )
 
             except Exception as e:
-                logger.error("batch_update_failed", error=str(e), batch_start=batch_start)
+                logger.error(
+                    "batch_update_failed", error=str(e), batch_start=batch_start
+                )
                 # Fall back to individual updates
                 for action in batch_actions:
                     if action.anki_guid:
