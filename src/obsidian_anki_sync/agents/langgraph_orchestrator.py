@@ -1261,8 +1261,9 @@ class LangGraphOrchestrator:
         # Execute workflow with async invocation
         # Use unique thread ID with UUID to avoid collisions
         thread_id = f"note-{metadata.title}-{uuid.uuid4().hex[:8]}"
+        # LangGraph's ainvoke type checking is imperfect with TypedDict states
         final_state = await self.app.ainvoke(
-            initial_state,  # type: ignore[arg-type]
+            initial_state,
             config={"configurable": {"thread_id": thread_id}},
         )
 

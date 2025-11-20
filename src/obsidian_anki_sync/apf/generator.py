@@ -5,8 +5,8 @@ import json
 import re
 from pathlib import Path
 
-import httpx  # type: ignore
-from openai import OpenAI  # type: ignore
+import httpx
+from openai import OpenAI
 
 from ..config import Config
 from ..models import Card, Manifest, NoteMetadata, QAPair

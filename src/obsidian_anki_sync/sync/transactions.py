@@ -94,6 +94,44 @@ class CardTransaction:
                     self.anki.update_note_tags(note_id, old_tags)
                     logger.info("rolled_back_anki_note_update", note_id=note_id)
 
+                elif action_type == "recreate_deleted_note":
+                    # Attempt to recreate a deleted note
+                    # Note: This is best-effort and may not preserve all note state
+                    # (e.g., scheduling data, review history)
+                    old_note_id, fields, tags, model_name, deck_name, guid = args
+                    try:
+                        # Convert field values from note_info format to add_note format
+                        # note_info fields: {"FieldName": {"value": "content", "order": 0}}
+                        # add_note fields: {"FieldName": "content"}
+                        field_dict = {}
+                        for field_name, field_data in fields.items():
+                            if isinstance(field_data, dict):
+                                field_dict[field_name] = field_data.get("value", "")
+                            else:
+                                field_dict[field_name] = field_data
+
+                        # Recreate note in Anki
+                        new_note_id = self.anki.add_note(
+                            deck=deck_name,
+                            note_type=model_name,
+                            fields=field_dict,
+                            tags=tags,
+                            guid=guid
+                        )
+                        logger.info(
+                            "rolled_back_deleted_note",
+                            old_note_id=old_note_id,
+                            new_note_id=new_note_id,
+                            note="Scheduling data and review history not preserved"
+                        )
+                    except Exception as recreate_error:
+                        logger.error(
+                            "rollback_recreate_failed",
+                            old_note_id=old_note_id,
+                            error=str(recreate_error),
+                            note="Unable to restore deleted note"
+                        )
+
             except Exception as e:
                 logger.error("rollback_failed", action=action_type, error=str(e))
 

@@ -24,6 +24,8 @@ class Config(BaseSettings):
         env_ignore_empty=True,
         case_sensitive=False,
         extra="ignore",
+        frozen=True,
+        validate_assignment=True,
     )
 
     # Required fields
@@ -385,30 +387,26 @@ class Config(BaseSettings):
             "reasoning_enabled": config.reasoning_enabled or self.llm_reasoning_enabled,
         }
 
-    def validate(self) -> None:
-        """Validate configuration values."""
-        # Ensure vault_path is a Path object
-        if isinstance(self.vault_path, str):
-            if not self.vault_path:
+    @model_validator(mode="after")
+    def validate_config(self) -> "Config":
+        """Validate configuration values after initialization.
+
+        Note: This runs during initialization, before the model is frozen.
+        Since frozen=True is set, we use object.__setattr__ to update validated paths.
+        """
+        vault_path = self.vault_path
+        if isinstance(vault_path, str):
+            if not vault_path:
                 raise ConfigurationError(
                     "vault_path is required",
                     suggestion="Set VAULT_PATH environment variable or vault_path in config.yaml",
                 )
-            self.vault_path = Path(self.vault_path).expanduser().resolve()
+            vault_path = Path(vault_path).expanduser().resolve()
 
-        # Validate vault path with security checks
-        validated_vault = validate_vault_path(self.vault_path, allow_symlinks=False)
-        self.vault_path = validated_vault  # Update with validated path
-
-        # Validate source directory with path traversal protection
+        validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        # Keep source_dir as relative for consistency
-        # but we've verified it exists and is safe
-
-        # Validate database path
         validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
 
-        # Verify parent directory is writable
         parent_dir = validated_db.parent
         if not parent_dir.exists():
             try:
@@ -419,14 +417,12 @@ class Config(BaseSettings):
                     suggestion=f"Ensure you have write permissions to {parent_dir.parent}. Error: {e}"
                 )
 
-        # Check parent directory is writable
         if not os.access(parent_dir, os.W_OK):
             raise ConfigurationError(
                 f"Database directory is not writable: {parent_dir}",
                 suggestion=f"Check directory permissions: chmod 755 {parent_dir}"
             )
 
-        # Check if database exists and is readable/writable
         if validated_db.exists():
             if not os.access(validated_db, os.R_OK):
                 raise ConfigurationError(
@@ -439,9 +435,6 @@ class Config(BaseSettings):
                     suggestion=f"Check file permissions: chmod 644 {validated_db}"
                 )
 
-        self.db_path = validated_db  # Update with validated path
-
-        # Validate LLM provider
         valid_providers = [
             "ollama",
             "lm_studio",
@@ -458,7 +451,6 @@ class Config(BaseSettings):
                 suggestion=f"Set llm_provider to one of: {', '.join(valid_providers)}",
             )
 
-        # Provider-specific API key validation
         provider_lower = self.llm_provider.lower()
 
         if provider_lower == "openrouter" and not self.openrouter_api_key:
@@ -505,13 +497,20 @@ class Config(BaseSettings):
                 suggestion="Set llm_top_p to a value between 0.0 and 1.0",
             )
 
+        if validated_vault != self.vault_path:
+            object.__setattr__(self, "vault_path", validated_vault)
+        if validated_db != self.db_path:
+            object.__setattr__(self, "db_path", validated_db)
+
+        return self
+
 
 _config: Config | None = None
 
 
 def load_config(config_path: Path | None = None) -> Config:
     """Load configuration from .env and config.yaml files using pydantic-settings."""
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     # Find config.yaml file
     candidate_paths: list[Path] = []
@@ -612,8 +611,6 @@ def load_config(config_path: Path | None = None) -> Config:
 
         config = Config(**config_kwargs)
 
-    # Validate configuration
-    config.validate()
     return config
 
 
@@ -629,3 +626,14 @@ def set_config(config: Config) -> None:
     """Set singleton config instance (for testing)."""
     global _config
     _config = config
+
+
+def reset_config() -> None:
+    """Reset global config instance (for testing only).
+
+    Warning:
+        This should only be used in tests. In production, config
+        should be loaded once and never changed.
+    """
+    global _config
+    _config = None

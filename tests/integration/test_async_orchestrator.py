@@ -153,9 +153,8 @@ class TestSyncEngineWithAsyncOrchestrator:
         from obsidian_anki_sync.anki.client import AnkiClient
         from obsidian_anki_sync.sync.state_db import StateDB
 
-        # Use sync orchestrator
-        config = test_config_for_integration
-        config.use_langgraph = False
+        # Use sync orchestrator - create new config with use_langgraph=False
+        config = test_config_for_integration.model_copy(update={"use_langgraph": False})
 
         db = StateDB(config.db_path)
         anki = MagicMock(spec=AnkiClient)

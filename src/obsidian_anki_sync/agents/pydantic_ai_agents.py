@@ -225,7 +225,7 @@ class PreValidatorAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent with structured output
-        self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
             result_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
@@ -284,7 +284,8 @@ Validate the structure, frontmatter, and content quality."""
             result = await self.agent.run(prompt, deps=deps)
 
             # Convert to PreValidationResult
-            output = result.data  # type: ignore[attr-defined]
+            # result.data is typed as PreValidationOutput by pydantic-ai
+            output: PreValidationOutput = result.data
             validation_result = PreValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
@@ -342,7 +343,7 @@ class GeneratorAgentAI:
         self.system_prompt = CARD_GENERATION_SYSTEM_PROMPT
 
         # Create PydanticAI agent
-        self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
             model=self.model,
             result_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
@@ -402,7 +403,7 @@ Q&A Pairs ({len(qa_pairs)}):
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: CardGenerationOutput = result.data
 
             # Convert cards to GeneratedCard instances
             generated_cards: list[GeneratedCard] = []
@@ -494,7 +495,7 @@ class PostValidatorAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
             result_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
@@ -550,7 +551,7 @@ Cards to validate:
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: PostValidationOutput = result.data
 
             # Convert suggested corrections to GeneratedCard list
             corrected_cards: list[GeneratedCard] | None = None
@@ -617,7 +618,7 @@ class MemorizationQualityAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[PostValidationDeps, MemorizationQualityOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[PostValidationDeps, MemorizationQualityOutput] = Agent(
             model=self.model,
             result_type=MemorizationQualityOutput,
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
@@ -671,7 +672,7 @@ Cards to assess:
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: MemorizationQualityOutput = result.data
 
             # Convert to MemorizationQualityResult
             issues_list = [issue.model_dump() for issue in output.issues]
@@ -737,7 +738,7 @@ class CardSplittingAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(
             model=self.model,
             result_type=CardSplittingOutput,
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
@@ -798,7 +799,7 @@ Questions:
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: CardSplittingOutput = result.data
 
             # Convert split plan
             split_plans = []
@@ -923,7 +924,7 @@ class DuplicateDetectionAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[DuplicateDetectionDeps, DuplicateDetectionOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[DuplicateDetectionDeps, DuplicateDetectionOutput] = Agent(
             model=self.model,
             result_type=DuplicateDetectionOutput,
             system_prompt=DUPLICATE_DETECTION_PROMPT,
@@ -984,7 +985,7 @@ Analyze similarity and provide your assessment."""
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: DuplicateDetectionOutput = result.data
 
             elapsed = time.time() - start_time
 
@@ -1188,7 +1189,7 @@ class ContextEnrichmentAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent
-        self.agent: Agent[ContextEnrichmentDeps, ContextEnrichmentOutput] = Agent(  # type: ignore[call-overload]
+        self.agent: Agent[ContextEnrichmentDeps, ContextEnrichmentOutput] = Agent(
             model=self.model,
             result_type=ContextEnrichmentOutput,
             system_prompt=CONTEXT_ENRICHMENT_PROMPT,
@@ -1251,7 +1252,7 @@ Provide your enrichment assessment."""
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output = result.data  # type: ignore[attr-defined]
+            output: ContextEnrichmentOutput = result.data
 
             # If enrichment recommended, create enriched card
             enriched_card = None

@@ -187,6 +187,13 @@ class SyncEngine:
         self._cache_hits = 0
         self._cache_misses = 0
 
+        # Cache statistics tracking
+        self._cache_stats = {
+            'hits': 0,
+            'misses': 0,
+            'generation_times': []
+        }
+
         logger.info(
             "persistent_cache_initialized",
             agent_cache_dir=str(agent_cache_dir),
@@ -287,6 +294,30 @@ class SyncEngine:
             self._event_loop.close()
             self._event_loop = None
             self._owns_event_loop = False
+
+    @contextlib.contextmanager
+    def _get_progress_bar(self, total: int, description: str = "Processing"):
+        """Yield progress bar context manager.
+
+        Args:
+            total: Total number of items
+            description: Progress bar description
+
+        Yields:
+            Tuple of (progress_bar, task_id) or None if progress display unavailable
+        """
+        if not self.progress_display or not PROGRESS_DISPLAY_AVAILABLE:
+            yield None
+            return
+
+        progress_bar = self.progress_display.create_progress_bar(total)
+        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
+
+        try:
+            with progress_bar:
+                yield (progress_bar, progress_task_id)
+        finally:
+            pass
 
     def _generate_thread_safe_slug(
         self,
@@ -424,6 +455,21 @@ class SyncEngine:
             if self.progress:
                 log_session_summary(session_id=self.progress.session_id)
 
+            # Log final cache statistics
+            if self._cache_stats['hits'] + self._cache_stats['misses'] > 0:
+                cache_hit_ratio = self._cache_stats['hits'] / (self._cache_stats['hits'] + self._cache_stats['misses'])
+                avg_generation_time = (
+                    sum(self._cache_stats['generation_times']) / len(self._cache_stats['generation_times'])
+                    if self._cache_stats['generation_times'] else 0
+                )
+                logger.info(
+                    "cache_statistics",
+                    hits=self._cache_stats['hits'],
+                    misses=self._cache_stats['misses'],
+                    hit_ratio=round(cache_hit_ratio, 3),
+                    avg_generation_seconds=round(avg_generation_time, 2),
+                )
+
             # Build result dict
             result = self.progress.get_stats() if self.progress else self.stats
             if index_stats:
@@ -528,19 +574,13 @@ class SyncEngine:
         consecutive_errors = 0
         max_consecutive_errors = 3
 
-        # Setup Rich progress bar if available
-        if self.progress_display and PROGRESS_DISPLAY_AVAILABLE:
-            progress_bar = self.progress_display.create_progress_bar(len(note_files))
-            progress_task_id = progress_bar.add_task(
-                "[cyan]Processing notes...",
-                total=len(note_files)
-            )
-            progress_bar.__enter__()
-        else:
-            progress_bar = None
-            progress_task_id = None
-
-        try:
+        # Use context manager for progress bar
+        with self._get_progress_bar(len(note_files), "Processing notes") as progress_context:
+            if progress_context:
+                progress_bar, progress_task_id = progress_context
+            else:
+                progress_bar = None
+                progress_task_id = None
             for file_path, relative_path in note_files:
                 # Check for interruption
                 if self.progress and self.progress.is_interrupted():
@@ -860,10 +900,6 @@ class SyncEngine:
                     cards_generated=len(obsidian_cards),
                 )
 
-        finally:
-            # Clean up progress bar
-            if progress_bar:
-                progress_bar.__exit__(None, None, None)
 
         # Log if sync was terminated early due to consecutive errors
         if consecutive_errors >= max_consecutive_errors:
@@ -1079,19 +1115,13 @@ class SyncEngine:
         notes_processed = 0
         batch_start_time = time.time()
 
-        # Setup Rich progress bar for parallel processing
-        if self.progress_display and PROGRESS_DISPLAY_AVAILABLE:
-            progress_bar = self.progress_display.create_progress_bar(len(note_files))
-            progress_task_id = progress_bar.add_task(
-                f"[cyan]Processing notes (parallel, {max_workers} workers)...",
-                total=len(note_files)
-            )
-            progress_bar.__enter__()
-        else:
-            progress_bar = None
-            progress_task_id = None
-
-        try:
+        # Use context manager for progress bar (parallel processing)
+        with self._get_progress_bar(len(note_files), f"Processing notes (parallel, {max_workers} workers)") as progress_context:
+            if progress_context:
+                progress_bar, progress_task_id = progress_context
+            else:
+                progress_bar = None
+                progress_task_id = None
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks
                 future_to_note = {
@@ -1186,10 +1216,6 @@ class SyncEngine:
                                 note_name
                             )
 
-        finally:
-            # Clean up progress bar
-            if progress_bar:
-                progress_bar.__exit__(None, None, None)
 
         logger.info(
             "parallel_scan_completed",
@@ -1371,6 +1397,8 @@ class SyncEngine:
         Returns:
             Generated card
         """
+        start_time = time.time()
+
         # Use agent system if enabled
         if self.use_agents:
             if not note_content or all_qa_pairs is None:
@@ -1386,6 +1414,14 @@ class SyncEngine:
             # Find the specific card for this qa_pair and lang
             for card in all_cards:
                 if card.manifest.card_index == qa_pair.card_index and card.lang == lang:
+                    # Track cache hit for agent system (already counted in _generate_cards_with_agents)
+                    elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                    self._cache_stats["hits"] += 1
+                    logger.debug(
+                        "card_generation_cache_hit_agent",
+                        slug=card.slug,
+                        elapsed_ms=elapsed_ms
+                    )
                     return card
 
             raise ValueError(
@@ -1401,12 +1437,13 @@ class SyncEngine:
             if cached_card is not None:
                 # Verify content hash matches
                 if cached_card.content_hash == content_hash:
+                    elapsed_ms = round((time.time() - start_time) * 1000, 2)
                     self._cache_hits += 1
-                    logger.info(
-                        "apf_cache_hit",
-                        cache_key=cache_key,
+                    self._cache_stats["hits"] += 1
+                    logger.debug(
+                        "card_generation_cache_hit",
                         slug=cached_card.slug,
-                        content_hash=content_hash[:8],
+                        elapsed_ms=elapsed_ms
                     )
                     return cached_card
         except Exception as e:
@@ -1418,6 +1455,7 @@ class SyncEngine:
             # Continue with cache miss on error
 
         self._cache_misses += 1
+        self._cache_stats["misses"] += 1
 
         # Original APFGenerator logic
         # Generate slug - use thread-safe method in parallel mode if counters are initialized
@@ -1508,37 +1546,66 @@ class SyncEngine:
             )
             # Continue even if cache write fails
 
+        # Log generation time
+        elapsed = time.time() - start_time
+        self._cache_stats["generation_times"].append(elapsed)
+        logger.info(
+            "card_generated",
+            slug=slug,
+            elapsed_seconds=round(elapsed, 2)
+        )
+
         return card
 
     def _fetch_anki_state(self) -> dict[str, int]:
         """
-        Fetch current Anki state.
+        Fetch current Anki state with detailed logging.
 
         Returns:
             Dict of slug -> anki_note_id
         """
+        start_time = time.time()
         logger.info("fetching_anki_state", deck=self.config.anki_deck_name)
 
         # Find all notes in target deck
         try:
             note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
         except Exception as e:
-            logger.error("anki_query_failed", error=str(e))
+            elapsed = time.time() - start_time
+            logger.error(
+                "anki_query_failed",
+                deck=self.config.anki_deck_name,
+                error=str(e),
+                elapsed_seconds=round(elapsed, 2)
+            )
             return {}
 
         if not note_ids:
-            logger.info("no_anki_notes_found")
+            elapsed = time.time() - start_time
+            logger.info(
+                "no_anki_notes_found",
+                deck=self.config.anki_deck_name,
+                elapsed_seconds=round(elapsed, 2)
+            )
             return {}
 
-        # Get note info (batch fetch to avoid N+1)
+        # Fetch info with progress
+        logger.info("fetching_note_info", note_count=len(note_ids))
         try:
             notes_info = self.anki.notes_info(note_ids)
         except Exception as e:
-            logger.error("anki_notes_info_failed", error=str(e))
+            elapsed = time.time() - start_time
+            logger.error(
+                "anki_notes_info_failed",
+                note_count=len(note_ids),
+                error=str(e),
+                elapsed_seconds=round(elapsed, 2)
+            )
             return {}
 
         # Extract slugs from manifests
         anki_cards = {}
+        invalid_manifest_count = 0
         for note_info in notes_info:
             # Look for Manifest field
             fields = note_info.get("fields", {})
@@ -1546,6 +1613,7 @@ class SyncEngine:
 
             manifest = self._parse_manifest_field(manifest_field)
             if manifest is None:
+                invalid_manifest_count += 1
                 logger.warning(
                     "skipping_card_invalid_manifest",
                     note_id=note_info.get("noteId"),
@@ -1555,7 +1623,15 @@ class SyncEngine:
             slug = manifest.slug  # Now guaranteed to be a valid string
             anki_cards[slug] = note_info["noteId"]
 
-        logger.info("anki_state_fetched", count=len(anki_cards))
+        elapsed = time.time() - start_time
+        logger.info(
+            "anki_state_fetched",
+            deck=self.config.anki_deck_name,
+            cards_found=len(anki_cards),
+            notes_processed=len(notes_info),
+            invalid_manifests=invalid_manifest_count,
+            elapsed_seconds=round(elapsed, 2)
+        )
         return anki_cards
 
     def _determine_actions(

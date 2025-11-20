@@ -544,13 +544,10 @@ def export(
             console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
 
             # Generate cards using the sync engine's generation logic
-            from typing import Any
-
             from .apf.generator import APFGenerator
+            from .models import Card
 
-            cards: list[Any] = (
-                []
-            )  # Can be list[Card] or list[GeneratedCard] depending on path
+            cards: list[Card] = []
 
             if config.use_agent_system:
                 console.print("[cyan]Using multi-agent system for generation...[/cyan]")
@@ -578,7 +575,11 @@ def export(
 
                         if result.success and result.generation:
                             generated_cards = result.generation.cards
-                            cards.extend(generated_cards)
+                            # Convert GeneratedCard to Card using orchestrator's method
+                            converted_cards = orchestrator.convert_to_cards(
+                                generated_cards, metadata, qa_pairs
+                            )
+                            cards.extend(converted_cards)
                             console.print(
                                 f"  [green][/green] {metadata.title} "
                                 f"({len(generated_cards)} cards)"
@@ -628,7 +629,7 @@ def export(
             )
 
             export_cards_to_apkg(
-                cards=cards,  # type: ignore[arg-type]
+                cards=cards,
                 output_path=output_path,
                 deck_name=final_deck_name,
                 deck_description=final_description,
