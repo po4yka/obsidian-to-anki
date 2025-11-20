@@ -22,8 +22,14 @@ from obsidian_anki_sync.sync.state_db import StateDB
 @pytest.fixture
 def test_config_for_resources(temp_dir):
     """Create test config for resource management tests."""
+    # Create necessary directories for config validation
+    vault_path = temp_dir / "vault"
+    source_path = vault_path / "test"
+    vault_path.mkdir(parents=True, exist_ok=True)
+    source_path.mkdir(parents=True, exist_ok=True)
+
     return Config(
-        vault_path=temp_dir / "vault",
+        vault_path=vault_path,
         source_dir=Path("test"),
         anki_connect_url="http://localhost:8765",
         anki_deck_name="Test Deck",
@@ -121,8 +127,7 @@ class TestHTTPClientPooling:
         assert hasattr(httpx, "Limits")
         assert hasattr(httpx, "AsyncClient")
 
-    @pytest.mark.asyncio
-    async def test_client_reuse_across_requests(self):
+    def test_client_reuse_across_requests(self, test_config_for_resources):
         """Test that HTTP clients are reused across requests."""
         # This is tested implicitly through model reuse
         # If models are reused, their HTTP clients are also reused
@@ -130,19 +135,10 @@ class TestHTTPClientPooling:
             LangGraphOrchestrator,
         )
 
-        config = Config(
-            vault_path=Path("/tmp"),
-            source_dir=Path("test"),
-            anki_connect_url="http://localhost:8765",
-            anki_deck_name="Test Deck",
-            openrouter_api_key="test-key",
-            openrouter_model="openai/gpt-4",
-            llm_max_tokens=128000,
-            db_path=Path("/tmp/test.db"),
-        )
+        config = test_config_for_resources
 
         with patch(
-            "obsidian_anki_sync.agents.langgraph_orchestrator.PydanticAIModelFactory.create_from_config"
+            "obsidian_anki_sync.providers.pydantic_ai_models.PydanticAIModelFactory.create_from_config"
         ) as mock_create:
             # Create a mock model with an HTTP client
             mock_client = MagicMock()
@@ -220,8 +216,7 @@ class TestSQLiteConnectionLifecycle:
 
         db.close()
 
-    @pytest.mark.asyncio
-    async def test_state_db_thread_safety_note(self, temp_dir):
+    def test_state_db_thread_safety_note(self, temp_dir):
         """Test note about SQLite thread safety."""
         # SQLite with WAL mode is thread-safe for reads
         # But writes should be serialized
@@ -242,6 +237,8 @@ class TestSQLiteConnectionLifecycle:
 
     def test_multiple_state_db_instances(self, temp_dir):
         """Test that multiple StateDB instances work correctly."""
+        from obsidian_anki_sync.models import Card, Manifest
+
         db_path = temp_dir / "test.db"
 
         # Create first instance
@@ -255,30 +252,59 @@ class TestSQLiteConnectionLifecycle:
         # Verify different connection instances
         assert conn1 is not conn2
 
-        # Both should work
-        db1.insert_card(
+        # Create test cards
+        card1 = Card(
             slug="test-1",
-            guid="guid-1",
-            source_file="test1.md",
+            lang="en",
+            apf_html="<!-- test 1 -->",
+            manifest=Manifest(
+                slug="test-1",
+                slug_base="test",
+                lang="en",
+                source_path="test1.md",
+                source_anchor="p01",
+                note_id="id1",
+                note_title="Test 1",
+                card_index=1,
+                guid="guid-1",
+            ),
             content_hash="hash1",
-            card_content="Content 1",
+            note_type="APF::Simple",
+            tags=["test"],
+            guid="guid-1",
         )
 
-        db2.insert_card(
+        card2 = Card(
             slug="test-2",
-            guid="guid-2",
-            source_file="test2.md",
+            lang="en",
+            apf_html="<!-- test 2 -->",
+            manifest=Manifest(
+                slug="test-2",
+                slug_base="test",
+                lang="en",
+                source_path="test2.md",
+                source_anchor="p01",
+                note_id="id2",
+                note_title="Test 2",
+                card_index=1,
+                guid="guid-2",
+            ),
             content_hash="hash2",
-            card_content="Content 2",
+            note_type="APF::Simple",
+            tags=["test"],
+            guid="guid-2",
         )
+
+        # Both should work
+        db1.insert_card(card1, anki_guid=1001)
+        db2.insert_card(card2, anki_guid=1002)
 
         # Verify both can read
-        card1 = db1.get_card_by_slug("test-1")
-        card2 = db2.get_card_by_slug("test-2")
+        card1_read = db1.get_by_slug("test-1")
+        card2_read = db2.get_by_slug("test-2")
 
         assert card1 is not None
         assert card2 is not None
 
         db1.close()
         db2.close()
-

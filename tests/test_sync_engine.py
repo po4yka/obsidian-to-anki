@@ -49,5 +49,8 @@ def test_update_card_updates_fields_and_tags(test_config) -> None:
     anki.update_note_tags.assert_called_once_with(12345, card.tags)
     # Updated to match new db.update_card_extended signature
     db.update_card_extended.assert_called_once_with(
-        card=card, fields={"Front": "Q", "Back": "A"}, tags=card.tags, apf_html=card.apf_html
+        card=card,
+        fields={"Front": "Q", "Back": "A"},
+        tags=card.tags,
+        apf_html=card.apf_html,
     )
