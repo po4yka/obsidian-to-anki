@@ -51,6 +51,7 @@ htmlcov/
 logs/
 .logs/
 config.yaml
+settings.local.json
 
 # macOS
 .DS_Store

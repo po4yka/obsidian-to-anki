@@ -9,13 +9,13 @@ from typing import Any, cast
 
 import httpx
 
-from ..utils.logging import get_logger
 from ..utils.llm_logging import (
     log_llm_error,
     log_llm_request,
     log_llm_retry,
     log_llm_success,
 )
+from ..utils.logging import get_logger
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
@@ -264,7 +264,9 @@ class OpenRouterProvider(BaseLLMProvider):
 
         # Calculate max_tokens (same logic as sync)
         prompt_tokens_estimate = (len(prompt) + len(system)) // 4
-        schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+        schema_overhead = (
+            len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+        )
 
         # Get model's context window (default to 128k)
         context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
@@ -275,11 +277,16 @@ class OpenRouterProvider(BaseLLMProvider):
         if json_schema:
             # Use same improved logic as sync version
             multiplier = 4.5 if prompt_tokens_estimate > 3000 else 4.0
-            estimated_needed = int(prompt_tokens_estimate * multiplier) + schema_overhead
+            estimated_needed = (
+                int(prompt_tokens_estimate * multiplier) + schema_overhead
+            )
 
             schema_name = json_schema.get("name", "")
             # Set reasonable minimums that respect model output limits
-            if "qa_extraction" in schema_name.lower() or "extraction" in schema_name.lower():
+            if (
+                "qa_extraction" in schema_name.lower()
+                or "extraction" in schema_name.lower()
+            ):
                 min_tokens_for_schema = 4096  # QA extraction needs reasonable tokens
             elif "validation" in schema_name.lower():
                 min_tokens_for_schema = 2048  # Validation schemas are simpler
@@ -287,14 +294,16 @@ class OpenRouterProvider(BaseLLMProvider):
                 min_tokens_for_schema = 3072  # Default for other structured outputs
 
             desired_max_tokens = max(
-                self.max_tokens,
-                estimated_needed,
-                min_tokens_for_schema
+                self.max_tokens, estimated_needed, min_tokens_for_schema
             )
 
-            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            max_allowed_by_context = (
+                context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            )
             # Respect both context window and model output limits
-            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context, model_max_output)
+            effective_max_tokens = min(
+                desired_max_tokens, max_allowed_by_context, model_max_output
+            )
 
             if effective_max_tokens < desired_max_tokens:
                 reduction_reason = []
@@ -314,7 +323,11 @@ class OpenRouterProvider(BaseLLMProvider):
                         prompt_tokens_estimate=prompt_tokens_estimate,
                         context_window=context_window,
                         model_max_output=model_max_output,
-                        reduction_reason=", ".join(reduction_reason) if reduction_reason else "unknown",
+                        reduction_reason=(
+                            ", ".join(reduction_reason)
+                            if reduction_reason
+                            else "unknown"
+                        ),
                     )
                 else:
                     # Log at debug level when only model output limit applies (expected behavior)
@@ -336,9 +349,15 @@ class OpenRouterProvider(BaseLLMProvider):
                     prompt_tokens_estimate=prompt_tokens_estimate,
                 )
         else:
-            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
-            effective_max_tokens = min(self.max_tokens, max_allowed_by_context, model_max_output)
+            max_allowed_by_context = (
+                context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            )
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
+                model, DEFAULT_MAX_OUTPUT_TOKENS
+            )
+            effective_max_tokens = min(
+                self.max_tokens, max_allowed_by_context, model_max_output
+            )
 
         # Build payload (same as sync version)
         payload: dict[str, Any] = {
@@ -396,9 +415,11 @@ class OpenRouterProvider(BaseLLMProvider):
         )
 
         try:
+            # Explicitly pass headers to ensure they're included (fixes connection pooling issue)
             response = await async_client.post(
                 f"{self.base_url}/chat/completions",
                 json=payload,
+                headers=self._headers,
                 timeout=self.timeout,
             )
             response.raise_for_status()
@@ -534,9 +555,21 @@ class OpenRouterProvider(BaseLLMProvider):
 
         # Keep essential fields
         essential_fields = {
-            "type", "properties", "items", "required", "enum",
-            "minimum", "maximum", "minLength", "maxLength",
-            "pattern", "format", "additionalProperties", "anyOf", "oneOf", "allOf"
+            "type",
+            "properties",
+            "items",
+            "required",
+            "enum",
+            "minimum",
+            "maximum",
+            "minLength",
+            "maxLength",
+            "pattern",
+            "format",
+            "additionalProperties",
+            "anyOf",
+            "oneOf",
+            "allOf",
         }
 
         for key, value in schema.items():
@@ -553,8 +586,11 @@ class OpenRouterProvider(BaseLLMProvider):
                 elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
                     # Optimize union types
                     optimized[key] = [
-                        self._optimize_schema_for_request(item)
-                        if isinstance(item, dict) else item
+                        (
+                            self._optimize_schema_for_request(item)
+                            if isinstance(item, dict)
+                            else item
+                        )
                         for item in value
                     ]
                 else:
@@ -590,7 +626,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 last_valid_pos = i + 1
                 continue
 
-            if char == '\\':
+            if char == "\\":
                 escape_next = True
                 last_valid_pos = i + 1
                 continue
@@ -606,26 +642,26 @@ class OpenRouterProvider(BaseLLMProvider):
                 continue
 
             if not in_string:
-                if char == '{':
+                if char == "{":
                     brace_count += 1
                     last_valid_pos = i + 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     last_valid_pos = i + 1
-                elif char == '[':
+                elif char == "[":
                     bracket_count += 1
                     last_valid_pos = i + 1
-                elif char == ']':
+                elif char == "]":
                     bracket_count -= 1
                     last_valid_pos = i + 1
-                elif char == ':':
+                elif char == ":":
                     # Found a key-value separator, mark this position
                     last_key_pos = i
                     last_valid_pos = i + 1
-                elif char == ',':
+                elif char == ",":
                     # Found a separator, this is a valid position
                     last_valid_pos = i + 1
-                elif char not in (' ', '\n', '\t', '\r'):
+                elif char not in (" ", "\n", "\t", "\r"):
                     # Valid JSON character
                     last_valid_pos = i + 1
 
@@ -641,10 +677,10 @@ class OpenRouterProvider(BaseLLMProvider):
         # Look for patterns like "key": "" or "key": "incomplete
         if last_key_pos >= 0 and last_key_pos < len(repaired):
             # Find the colon position
-            colon_pos = repaired.find(':', last_key_pos)
+            colon_pos = repaired.find(":", last_key_pos)
             if colon_pos != -1:
                 # Get everything after the colon
-                after_colon = repaired[colon_pos + 1:].lstrip()
+                after_colon = repaired[colon_pos + 1 :].lstrip()
 
                 # Check if we have an incomplete string value
                 if after_colon.startswith('"'):
@@ -666,7 +702,13 @@ class OpenRouterProvider(BaseLLMProvider):
                 elif not after_colon:
                     # No value after colon, add empty string
                     repaired += ' ""'
-                elif after_colon and not (after_colon.startswith('"') or after_colon.startswith('[') or after_colon.startswith('{') or (after_colon and after_colon[0].isdigit()) or after_colon in ('true', 'false', 'null')):
+                elif after_colon and not (
+                    after_colon.startswith('"')
+                    or after_colon.startswith("[")
+                    or after_colon.startswith("{")
+                    or (after_colon and after_colon[0].isdigit())
+                    or after_colon in ("true", "false", "null")
+                ):
                     # Invalid value start, add empty string
                     repaired += ' ""'
 
@@ -674,21 +716,21 @@ class OpenRouterProvider(BaseLLMProvider):
         # This means an object inside an array is incomplete - we need to close the object first
         # Check if the text ends with premature closing brackets/braces
         trimmed_end = repaired.rstrip()
-        if trimmed_end.endswith(']') and brace_count > 0:
+        if trimmed_end.endswith("]") and brace_count > 0:
             # We have a ] but still open braces - this means object wasn't closed before array
             # Close the object(s) first
             while brace_count > 0:
-                repaired += '}'
+                repaired += "}"
                 brace_count -= 1
 
         # Close any open braces (objects) first - objects must be closed before arrays
         while brace_count > 0:
-            repaired += '}'
+            repaired += "}"
             brace_count -= 1
 
         # Then close any open brackets (arrays)
         while bracket_count > 0:
-            repaired += ']'
+            repaired += "]"
             bracket_count -= 1
 
         return repaired
@@ -709,7 +751,7 @@ class OpenRouterProvider(BaseLLMProvider):
         # Track warnings per call to avoid duplicate warnings for the same text
         # Use a simple identifier based on text start and length
         text_id = f"{hash(text[:100])}:{len(text)}"
-        if not hasattr(self, '_warned_text_ids'):
+        if not hasattr(self, "_warned_text_ids"):
             self._warned_text_ids = set()
 
         cleaned = text.strip()
@@ -773,7 +815,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     escape_next = False
                     continue
 
-                if char == '\\':
+                if char == "\\":
                     escape_next = True
                     continue
 
@@ -783,16 +825,16 @@ class OpenRouterProvider(BaseLLMProvider):
                     continue
 
                 if not in_string:
-                    if char == '{':
+                    if char == "{":
                         brace_count += 1
                         last_valid_pos = i + 1
-                    elif char == '}':
+                    elif char == "}":
                         brace_count -= 1
                         last_valid_pos = i + 1
                         if brace_count == 0 and bracket_count == 0:
                             # Found the end of the JSON object (all structures closed)
                             if i + 1 < len(cleaned):
-                                cleaned = cleaned[:i + 1]
+                                cleaned = cleaned[: i + 1]
                                 logger.debug(
                                     "trimmed_extra_data_after_json",
                                     model=model,
@@ -800,10 +842,10 @@ class OpenRouterProvider(BaseLLMProvider):
                                     cleaned_length=len(cleaned),
                                 )
                             break
-                    elif char == '[':
+                    elif char == "[":
                         bracket_count += 1
                         last_valid_pos = i + 1
-                    elif char == ']':
+                    elif char == "]":
                         bracket_count -= 1
                         last_valid_pos = i + 1
                         # If we close a bracket but still have open braces, check if we're near the end
@@ -847,12 +889,14 @@ class OpenRouterProvider(BaseLLMProvider):
                 )
                 # Try to repair the truncated JSON
                 # Use text up to last_valid_pos, but if that's 0, use the whole cleaned text
-                text_to_repair = cleaned[:last_valid_pos] if last_valid_pos > 0 else cleaned
+                text_to_repair = (
+                    cleaned[:last_valid_pos] if last_valid_pos > 0 else cleaned
+                )
                 cleaned = self._repair_truncated_json(text_to_repair)
 
         # Clear warning tracking for this text after processing
         # This allows the same text to be processed again in future calls if needed
-        if hasattr(self, '_warned_text_ids'):
+        if hasattr(self, "_warned_text_ids"):
             self._warned_text_ids.discard(f"premature_array_close:{text_id}")
 
         return cleaned
@@ -883,10 +927,10 @@ class OpenRouterProvider(BaseLLMProvider):
                     except Exception:
                         pass
             # Default for 429 when Retry-After missing or invalid
-            return min(60.0, float(2 ** attempt))
+            return min(60.0, float(2**attempt))
 
         # Generic exponential backoff for other retryable statuses
-        return min(60.0, float(2 ** attempt))
+        return min(60.0, float(2**attempt))
 
     def check_connection(self) -> bool:
         """Check if OpenRouter is accessible.
@@ -968,8 +1012,12 @@ class OpenRouterProvider(BaseLLMProvider):
         # Calculate appropriate max_tokens based on input size and schema complexity
         # For structured outputs with JSON schema, we need more tokens to ensure completion
         # Estimate: input tokens + (input tokens * 3) for bilingual content + schema overhead
-        prompt_tokens_estimate = (len(prompt) + len(system)) // 4  # Rough estimate: 1 token ≈ 4 chars
-        schema_overhead = len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+        prompt_tokens_estimate = (
+            len(prompt) + len(system)
+        ) // 4  # Rough estimate: 1 token ≈ 4 chars
+        schema_overhead = (
+            len(json.dumps(json_schema.get("schema", {}))) // 4 if json_schema else 0
+        )
 
         # Get model's context window (default to 128k)
         context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
@@ -985,14 +1033,19 @@ class OpenRouterProvider(BaseLLMProvider):
             # - Code examples and formatting (1x)
             # - Safety margin (0.5-1x)
             multiplier = 4.5 if prompt_tokens_estimate > 3000 else 4.0
-            estimated_needed = int(prompt_tokens_estimate * multiplier) + schema_overhead
+            estimated_needed = (
+                int(prompt_tokens_estimate * multiplier) + schema_overhead
+            )
 
             # For structured outputs, ensure minimum floor to prevent truncation
             # Complex schemas (like QA extraction) need more tokens
             schema_name = json_schema.get("name", "")
             # Set reasonable minimums that respect model output limits
             # These will be capped by model_max_output anyway
-            if "qa_extraction" in schema_name.lower() or "extraction" in schema_name.lower():
+            if (
+                "qa_extraction" in schema_name.lower()
+                or "extraction" in schema_name.lower()
+            ):
                 min_tokens_for_schema = 4096  # QA extraction needs reasonable tokens
             elif "validation" in schema_name.lower():
                 min_tokens_for_schema = 2048  # Validation schemas are simpler
@@ -1001,21 +1054,25 @@ class OpenRouterProvider(BaseLLMProvider):
 
             # Use the larger of: configured max, estimated needed, or minimum floor
             desired_max_tokens = max(
-                self.max_tokens,
-                estimated_needed,
-                min_tokens_for_schema
+                self.max_tokens, estimated_needed, min_tokens_for_schema
             )
 
             # But ensure we don't exceed the model's context window
             # Reserve space for input tokens and safety margin
-            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            max_allowed_by_context = (
+                context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            )
 
             # Also respect model-specific output token limits
             # Most models have output limits much lower than context window
-            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
+                model, DEFAULT_MAX_OUTPUT_TOKENS
+            )
 
             # Use the minimum of: desired, context limit, and model output limit
-            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context, model_max_output)
+            effective_max_tokens = min(
+                desired_max_tokens, max_allowed_by_context, model_max_output
+            )
 
             # Log if we had to reduce max_tokens due to limits
             # Only warn if it's a context window issue, not just a model output limit
@@ -1039,7 +1096,11 @@ class OpenRouterProvider(BaseLLMProvider):
                         context_window=context_window,
                         max_allowed_by_context=max_allowed_by_context,
                         model_max_output=model_max_output,
-                        reduction_reason=", ".join(reduction_reason) if reduction_reason else "unknown",
+                        reduction_reason=(
+                            ", ".join(reduction_reason)
+                            if reduction_reason
+                            else "unknown"
+                        ),
                         suggestion="Consider reducing input size or using a model with larger context window",
                     )
                 else:
@@ -1079,9 +1140,15 @@ class OpenRouterProvider(BaseLLMProvider):
                 )
         else:
             # For non-structured outputs, still respect context window and model limits
-            max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
-            effective_max_tokens = min(self.max_tokens, max_allowed_by_context, model_max_output)
+            max_allowed_by_context = (
+                context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
+            )
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
+                model, DEFAULT_MAX_OUTPUT_TOKENS
+            )
+            effective_max_tokens = min(
+                self.max_tokens, max_allowed_by_context, model_max_output
+            )
 
         # Build payload
         payload: dict[str, Any] = {
@@ -1198,9 +1265,11 @@ class OpenRouterProvider(BaseLLMProvider):
         for attempt in range(max_retries):
             try:
                 # Client already has timeout configured, don't override it
+                # Explicitly pass headers to ensure they're included (fixes connection pooling issue)
                 response = self.client.post(
                     f"{self.base_url}/chat/completions",
                     json=payload,
+                    headers=self._headers,
                 )
                 response.raise_for_status()
                 last_exception = None
@@ -1208,7 +1277,7 @@ class OpenRouterProvider(BaseLLMProvider):
             except httpx.RequestError as e:
                 last_exception = e
                 if attempt < max_retries - 1:
-                    wait_time = float(2 ** attempt)
+                    wait_time = float(2**attempt)
                     log_llm_retry(
                         model=model,
                         operation="openrouter_generate",
@@ -1442,12 +1511,18 @@ class OpenRouterProvider(BaseLLMProvider):
             is_truncated = finish_reason == "length" or json_truncated
             # Determine max retry tokens based on model's output limit
             # Respect model-specific output limits, not just context window
-            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
+                model, DEFAULT_MAX_OUTPUT_TOKENS
+            )
             max_retry_tokens = model_max_output  # Use model's output limit
             if is_truncated and json_schema and effective_max_tokens < max_retry_tokens:
                 # Increase max_tokens significantly and retry once
                 retry_max_tokens = min(effective_max_tokens * 2, max_retry_tokens)
-                truncation_reason = "finish_reason_length" if finish_reason == "length" else "json_truncated"
+                truncation_reason = (
+                    "finish_reason_length"
+                    if finish_reason == "length"
+                    else "json_truncated"
+                )
                 log_llm_retry(
                     model=model,
                     operation="openrouter_generate",
@@ -1462,9 +1537,11 @@ class OpenRouterProvider(BaseLLMProvider):
                 # Update payload and retry
                 payload["max_tokens"] = retry_max_tokens
                 # Client already has timeout configured, don't override it
+                # Explicitly pass headers to ensure they're included (fixes connection pooling issue)
                 retry_response = self.client.post(
                     f"{self.base_url}/chat/completions",
                     json=payload,
+                    headers=self._headers,
                 )
                 retry_response.raise_for_status()
                 retry_result = retry_response.json()
@@ -1478,9 +1555,13 @@ class OpenRouterProvider(BaseLLMProvider):
 
                 # Clean up retry completion
                 if retry_completion and json_schema:
-                    retry_completion = self._clean_json_response(retry_completion, model)
+                    retry_completion = self._clean_json_response(
+                        retry_completion, model
+                    )
 
-                retry_finish_reason = retry_result["choices"][0].get("finish_reason", "unknown")
+                retry_finish_reason = retry_result["choices"][0].get(
+                    "finish_reason", "unknown"
+                )
                 retry_usage = retry_result.get("usage", {})
                 retry_completion_tokens = retry_usage.get("completion_tokens", 0)
 
@@ -1516,7 +1597,9 @@ class OpenRouterProvider(BaseLLMProvider):
                     truncation_details.append("finish_reason=length")
                 if json_truncated:
                     truncation_details.append("json_validation_failed")
-                truncation_info = ", ".join(truncation_details) if truncation_details else "unknown"
+                truncation_info = (
+                    ", ".join(truncation_details) if truncation_details else "unknown"
+                )
                 raise ValueError(
                     f"Response truncated at {completion_tokens} tokens (max: {effective_max_tokens}, {truncation_info}). "
                     f"Cannot increase max_tokens further (already at context window limit). "
@@ -1527,7 +1610,9 @@ class OpenRouterProvider(BaseLLMProvider):
             final_completion = retry_completion if retry_completion else completion
             final_result = retry_result if retry_result else result
             final_usage = retry_usage if retry_usage else usage
-            final_finish_reason = retry_finish_reason if retry_finish_reason else finish_reason
+            final_finish_reason = (
+                retry_finish_reason if retry_finish_reason else finish_reason
+            )
 
             standardized_result = {
                 "response": final_completion if final_completion else "",
@@ -1557,7 +1642,10 @@ class OpenRouterProvider(BaseLLMProvider):
                         error_message = error_msg.get("message", "")
 
                         # If it's a schema validation error, provide helpful context
-                        if "schema" in error_type.lower() or "validation" in error_type.lower():
+                        if (
+                            "schema" in error_type.lower()
+                            or "validation" in error_type.lower()
+                        ):
                             logger.error(
                                 "openrouter_schema_validation_error",
                                 status_code=e.response.status_code,
@@ -1565,7 +1653,11 @@ class OpenRouterProvider(BaseLLMProvider):
                                 error_type=error_type,
                                 error_message=error_message,
                                 had_json_schema=bool(json_schema),
-                                schema_name=json_schema.get("name", "unknown") if json_schema else None,
+                                schema_name=(
+                                    json_schema.get("name", "unknown")
+                                    if json_schema
+                                    else None
+                                ),
                                 raw_response=raw_response_text,
                             )
                         elif "rate_limit" in error_type.lower():
@@ -1584,7 +1676,11 @@ class OpenRouterProvider(BaseLLMProvider):
                                 error_type=error_type,
                                 error_message=error_message,
                                 had_json_schema=bool(json_schema),
-                                schema_name=json_schema.get("name", "unknown") if json_schema else None,
+                                schema_name=(
+                                    json_schema.get("name", "unknown")
+                                    if json_schema
+                                    else None
+                                ),
                                 raw_response=raw_response_text,
                                 error_json=error_json,
                             )
@@ -1599,7 +1695,10 @@ class OpenRouterProvider(BaseLLMProvider):
                         had_json_schema=bool(json_schema),
                     )
             except Exception as parse_error:
-                error_details = {"raw_response": raw_response_text, "parse_error": str(parse_error)}
+                error_details = {
+                    "raw_response": raw_response_text,
+                    "parse_error": str(parse_error),
+                }
                 logger.error(
                     "openrouter_400_error_parse_failed",
                     status_code=e.response.status_code,
@@ -1729,7 +1828,9 @@ class OpenRouterProvider(BaseLLMProvider):
 
         # Clean up response text before parsing (already cleaned in generate() if using json_schema)
         # But also clean here for cases where format="json" is used without schema
-        cleaned_text = self._clean_json_response(response_text, model) if response_text else "{}"
+        cleaned_text = (
+            self._clean_json_response(response_text, model) if response_text else "{}"
+        )
 
         try:
             return cast(dict[str, Any], json.loads(cleaned_text))
@@ -1749,7 +1850,11 @@ class OpenRouterProvider(BaseLLMProvider):
                     "attempting_json_repair",
                     model=model,
                     original_error=str(e),
-                    error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
+                    error_position=(
+                        f"line {e.lineno}, col {e.colno}"
+                        if hasattr(e, "lineno")
+                        else "unknown"
+                    ),
                     cleaned_text_preview=cleaned_text[:200],
                 )
                 try:
@@ -1768,7 +1873,9 @@ class OpenRouterProvider(BaseLLMProvider):
                         model=model,
                         repair_error=str(repair_error),
                         original_error=str(e),
-                        repaired_text_preview=repaired_text[:200] if 'repaired_text' in locals() else None,
+                        repaired_text_preview=(
+                            repaired_text[:200] if "repaired_text" in locals() else None
+                        ),
                     )
                     # If repair failed, try one more time with a more aggressive approach
                     # Remove incomplete trailing structures and return partial result
@@ -1783,7 +1890,11 @@ class OpenRouterProvider(BaseLLMProvider):
                             logger.warning(
                                 "partial_json_recovery",
                                 model=model,
-                                recovered_keys=list(partial_json.keys()) if isinstance(partial_json, dict) else "array",
+                                recovered_keys=(
+                                    list(partial_json.keys())
+                                    if isinstance(partial_json, dict)
+                                    else "array"
+                                ),
                             )
                             return cast(dict[str, Any], partial_json)
                     except Exception:
@@ -1793,9 +1904,17 @@ class OpenRouterProvider(BaseLLMProvider):
                 "openrouter_json_parse_error",
                 model=model,
                 error=str(e),
-                error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
-                response_text=response_text[:500] if len(response_text) > 500 else response_text,
-                cleaned_text=cleaned_text[:500] if len(cleaned_text) > 500 else cleaned_text,
+                error_position=(
+                    f"line {e.lineno}, col {e.colno}"
+                    if hasattr(e, "lineno")
+                    else "unknown"
+                ),
+                response_text=(
+                    response_text[:500] if len(response_text) > 500 else response_text
+                ),
+                cleaned_text=(
+                    cleaned_text[:500] if len(cleaned_text) > 500 else cleaned_text
+                ),
                 response_length=len(response_text),
                 cleaned_length=len(cleaned_text),
                 had_schema=bool(json_schema),

@@ -10,7 +10,8 @@
       "Bash(python -m py_compile:*)",
       "Bash(python3 -m py_compile:*)",
       "Bash(python3:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(obsidian-anki-sync test-run:*)"
     ],
     "deny": [],
     "ask": []
