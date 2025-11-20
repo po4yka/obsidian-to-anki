@@ -147,7 +147,7 @@ class ProgressDisplay:
 
             # Top section: Progress bar
             layout.split_column(
-                Layout(name="progress", size=3),
+                Layout(progress, name="progress", size=3),
                 Layout(name="status"),
             )
 
@@ -177,7 +177,7 @@ class ProgressDisplay:
 
             return layout
 
-        return Live(generate_layout(), refresh_per_second=2, console=console)
+        return Live(generate_layout(), refresh_per_second=4, console=console)
 
     def _create_stats_table(self, stats: dict[str, Any]) -> Table:
         """Create a statistics table.

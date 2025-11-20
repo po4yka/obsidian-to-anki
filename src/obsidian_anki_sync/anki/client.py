@@ -444,13 +444,25 @@ class AnkiClient:
         logger.info("anki_sync_triggered")
 
     def close(self) -> None:
-        """Close the HTTP session."""
-        self.session.close()
+        """Close HTTP session and cleanup resources."""
+        if hasattr(self, 'session') and self.session:
+            try:
+                self.session.close()
+            except Exception:
+                pass
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Context manager exit with cleanup."""
         self.close()
+        return False
+
+    def __del__(self) -> None:
+        """Cleanup on deletion."""
+        try:
+            self.close()
+        except Exception:
+            pass

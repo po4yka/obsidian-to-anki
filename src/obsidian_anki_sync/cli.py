@@ -165,10 +165,16 @@ def test_run(
     from .anki.client import AnkiClient
     from .sync.engine import SyncEngine
     from .sync.state_db import StateDB
+    from .utils.progress_display import ProgressDisplay
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
+            # Create progress display for visual feedback
+            progress_display = ProgressDisplay(show_reflections=True)
+
             engine = SyncEngine(config, db, anki)
+            engine.set_progress_display(progress_display)
+
             stats = engine.sync(dry_run=dry_run, sample_size=count)
 
             mode_text = "dry-run" if dry_run else "applied"

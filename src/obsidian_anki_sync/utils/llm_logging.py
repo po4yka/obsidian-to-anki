@@ -5,11 +5,28 @@ including token usage, timing, cost estimation, and performance metrics.
 """
 
 import time
+from collections import defaultdict
 from typing import Any
 
 from .logging import get_logger
 
 logger = get_logger(__name__)
+
+# Global session tracking for cumulative metrics
+_session_metrics: dict[str, dict[str, Any]] = defaultdict(lambda: {
+    "total_cost": 0.0,
+    "total_tokens": 0,
+    "total_requests": 0,
+    "total_duration": 0.0,
+    "slow_requests": 0,
+    "errors": 0,
+    "by_model": defaultdict(lambda: {
+        "cost": 0.0,
+        "tokens": 0,
+        "requests": 0,
+        "duration": 0.0,
+    }),
+})
 
 # OpenRouter pricing (per 1M tokens) - update as needed
 # Source: https://openrouter.ai/models (approximate pricing)
@@ -22,6 +39,12 @@ OPENROUTER_PRICING: dict[str, dict[str, float]] = {
     "deepseek/deepseek-chat": {"prompt": 0.14, "completion": 0.28},
     "minimax/minimax-m2": {"prompt": 0.30, "completion": 0.30},
     "qwen/qwen3-max": {"prompt": 0.50, "completion": 0.50},
+    # Qwen3 series models
+    "qwen/qwen3-235b-a22b-2507": {"prompt": 0.08, "completion": 0.55},
+    "qwen/qwen3-235b-a22b-thinking-2507": {"prompt": 0.11, "completion": 0.60},
+    "qwen/qwen3-next-80b-a3b-instruct": {"prompt": 0.10, "completion": 0.80},
+    "qwen/qwen3-32b": {"prompt": 0.05, "completion": 0.20},
+    "qwen/qwen3-30b-a3b": {"prompt": 0.06, "completion": 0.22},
 }
 
 DEFAULT_PRICING = {"prompt": 0.50, "completion": 0.50}  # Conservative default
@@ -145,6 +168,12 @@ def log_llm_request(
     return start_time
 
 
+def _get_session_id() -> str:
+    """Get current session ID for metrics tracking."""
+    # Use a simple session identifier - could be enhanced with thread-local storage
+    return "default"
+
+
 def log_llm_success(
     model: str,
     operation: str,
@@ -156,6 +185,7 @@ def log_llm_success(
     finish_reason: str = "stop",
     context_window: int | None = None,
     estimate_cost_flag: bool = True,
+    session_id: str | None = None,
     **extra_context: Any,
 ) -> None:
     """Log successful LLM response with comprehensive metrics.
@@ -176,6 +206,19 @@ def log_llm_success(
     duration = time.time() - start_time
     tokens_per_second = calculate_tokens_per_second(completion_tokens, duration)
 
+    # Track slow requests (>60 seconds)
+    is_slow = duration > 60.0
+    if is_slow:
+        logger.warning(
+            "llm_slow_request",
+            model=model,
+            operation=operation,
+            duration_seconds=round(duration, 2),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            suggestion="Consider using a faster model or reducing input size",
+        )
+
     log_data: dict[str, Any] = {
         "model": model,
         "operation": operation,
@@ -186,13 +229,32 @@ def log_llm_success(
         "response_length": response_length,
         "finish_reason": finish_reason,
         "tokens_per_second": tokens_per_second,
+        "is_slow": is_slow,
         **extra_context,
     }
 
     # Add cost estimation if enabled
+    cost_info = {}
     if estimate_cost_flag:
         cost_info = estimate_cost(model, prompt_tokens, completion_tokens)
         log_data.update(cost_info)
+
+        # Update session metrics
+        sess_id = session_id or _get_session_id()
+        metrics = _session_metrics[sess_id]
+        metrics["total_cost"] += cost_info["total_cost_usd"]
+        metrics["total_tokens"] += total_tokens
+        metrics["total_requests"] += 1
+        metrics["total_duration"] += duration
+        if is_slow:
+            metrics["slow_requests"] += 1
+
+        # Per-model metrics
+        model_metrics = metrics["by_model"][model]
+        model_metrics["cost"] += cost_info["total_cost_usd"]
+        model_metrics["tokens"] += total_tokens
+        model_metrics["requests"] += 1
+        model_metrics["duration"] += duration
 
     # Add context window usage if available
     if context_window:
@@ -298,4 +360,61 @@ def log_llm_error(
         log_data["status_code"] = status_code
 
     logger.error("llm_request_error", **log_data)
+
+    # Update error count in session metrics
+    sess_id = _get_session_id()
+    _session_metrics[sess_id]["errors"] += 1
+
+
+def log_session_summary(session_id: str | None = None) -> None:
+    """Log summary statistics for the current session.
+
+    Args:
+        session_id: Optional session ID (uses default if not provided)
+    """
+    sess_id = session_id or _get_session_id()
+    metrics = _session_metrics[sess_id]
+
+    if metrics["total_requests"] == 0:
+        return  # No requests to summarize
+
+    avg_duration = metrics["total_duration"] / metrics["total_requests"] if metrics["total_requests"] > 0 else 0
+    avg_cost_per_request = metrics["total_cost"] / metrics["total_requests"] if metrics["total_requests"] > 0 else 0
+
+    logger.info(
+        "llm_session_summary",
+        session_id=sess_id,
+        total_requests=metrics["total_requests"],
+        total_tokens=metrics["total_tokens"],
+        total_cost_usd=round(metrics["total_cost"], 6),
+        total_duration_seconds=round(metrics["total_duration"], 2),
+        avg_duration_seconds=round(avg_duration, 2),
+        avg_cost_per_request_usd=round(avg_cost_per_request, 6),
+        slow_requests=metrics["slow_requests"],
+        errors=metrics["errors"],
+        models_used=list(metrics["by_model"].keys()),
+    )
+
+    # Log per-model breakdown
+    for model, model_metrics in metrics["by_model"].items():
+        model_avg_duration = model_metrics["duration"] / model_metrics["requests"] if model_metrics["requests"] > 0 else 0
+        logger.info(
+            "llm_model_summary",
+            model=model,
+            requests=model_metrics["requests"],
+            tokens=model_metrics["tokens"],
+            cost_usd=round(model_metrics["cost"], 6),
+            avg_duration_seconds=round(model_avg_duration, 2),
+        )
+
+
+def reset_session_metrics(session_id: str | None = None) -> None:
+    """Reset metrics for a session.
+
+    Args:
+        session_id: Optional session ID (uses default if not provided)
+    """
+    sess_id = session_id or _get_session_id()
+    if sess_id in _session_metrics:
+        del _session_metrics[sess_id]
 

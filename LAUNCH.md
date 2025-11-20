@@ -593,7 +593,7 @@ See [TESTING.md](TESTING.md) for detailed testing information.
 
 - **Documentation**: See other `.md` files in repository
 - **Issues**: [GitHub Issues](https://github.com/po4yka/obsidian-to-anki/issues)
-- **Provider Guides**: Check `docs/LLM_PROVIDERS.md` (if exists)
+- **Provider Guides**: Check `.docs/LLM_PROVIDERS.md` (if exists)
 
 ---
 

@@ -29,6 +29,11 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "qwen/qwen-2.5-72b-instruct",
     "qwen/qwen-2.5-32b-instruct",
     "qwen/qwen3-max",
+    "qwen/qwen3-235b-a22b-2507",
+    "qwen/qwen3-235b-a22b-thinking-2507",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "qwen/qwen3-32b",  # Smaller model, may have structured output quirks
+    "qwen/qwen3-30b-a3b",  # Smaller model, may have structured output quirks
 }
 
 # Model context window sizes (in tokens)
@@ -41,9 +46,39 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "deepseek/deepseek-chat-v3.1": 131072,
     "deepseek/deepseek-chat": 131072,
     "minimax/minimax-m2": 131072,
+    # Qwen3 models support larger context windows
+    "qwen/qwen3-235b-a22b-2507": 262144,  # 262K context
+    "qwen/qwen3-235b-a22b-thinking-2507": 262144,  # 262K context
+    "qwen/qwen3-next-80b-a3b-instruct": 262144,  # 262K context
+    "qwen/qwen3-32b": 131072,  # 128K context (standard)
+    "qwen/qwen3-30b-a3b": 131072,  # 128K context (standard)
+    # xAI Grok Series
+    "x-ai/grok-4.1-fast": 2000000,  # 2M context window
 }
 DEFAULT_CONTEXT_WINDOW = 131072  # 128k tokens
 CONTEXT_SAFETY_MARGIN = 1000  # Reserve tokens for safety
+
+# Model-specific max output token limits
+# Most models have output limits much lower than their context window
+# These are conservative limits to avoid 400 Bad Request errors
+MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
+    "qwen/qwen-2.5-72b-instruct": 8192,  # Conservative limit
+    "qwen/qwen-2.5-32b-instruct": 8192,  # Conservative limit
+    "deepseek/deepseek-chat": 8192,
+    "deepseek/deepseek-chat-v3.1": 8192,
+    "minimax/minimax-m2": 8192,
+    "moonshotai/kimi-k2": 8192,
+    "moonshotai/kimi-k2-thinking": 8192,
+    # Qwen3 models may support larger outputs
+    "qwen/qwen3-235b-a22b-2507": 16384,
+    "qwen/qwen3-235b-a22b-thinking-2507": 16384,
+    "qwen/qwen3-next-80b-a3b-instruct": 16384,
+    "qwen/qwen3-32b": 8192,
+    "qwen/qwen3-30b-a3b": 8192,
+    # xAI Grok Series - supports larger outputs due to 2M context window
+    "x-ai/grok-4.1-fast": 32768,  # Conservative limit for 2M context model
+}
+DEFAULT_MAX_OUTPUT_TOKENS = 8192  # Safe default for most models
 
 # Models that support structured outputs well
 MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
@@ -234,18 +269,22 @@ class OpenRouterProvider(BaseLLMProvider):
         # Get model's context window (default to 128k)
         context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
 
+        # Get model-specific output token limit
+        model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+
         if json_schema:
             # Use same improved logic as sync version
             multiplier = 4.5 if prompt_tokens_estimate > 3000 else 4.0
             estimated_needed = int(prompt_tokens_estimate * multiplier) + schema_overhead
 
             schema_name = json_schema.get("name", "")
+            # Set reasonable minimums that respect model output limits
             if "qa_extraction" in schema_name.lower() or "extraction" in schema_name.lower():
-                min_tokens_for_schema = 16000
+                min_tokens_for_schema = 4096  # QA extraction needs reasonable tokens
             elif "validation" in schema_name.lower():
-                min_tokens_for_schema = 8000
+                min_tokens_for_schema = 2048  # Validation schemas are simpler
             else:
-                min_tokens_for_schema = 12000
+                min_tokens_for_schema = 3072  # Default for other structured outputs
 
             desired_max_tokens = max(
                 self.max_tokens,
@@ -254,17 +293,39 @@ class OpenRouterProvider(BaseLLMProvider):
             )
 
             max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context)
+            # Respect both context window and model output limits
+            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context, model_max_output)
 
             if effective_max_tokens < desired_max_tokens:
-                logger.warning(
-                    "reduced_max_tokens_for_context_window_async",
-                    model=model,
-                    desired_max_tokens=desired_max_tokens,
-                    effective_max_tokens=effective_max_tokens,
-                    prompt_tokens_estimate=prompt_tokens_estimate,
-                    context_window=context_window,
-                )
+                reduction_reason = []
+                if effective_max_tokens == max_allowed_by_context:
+                    reduction_reason.append("context_window_limit")
+                if effective_max_tokens == model_max_output:
+                    reduction_reason.append("model_output_limit")
+
+                # Only warn if context window is the limiting factor
+                # Model output limits are expected and don't need warnings
+                if "context_window_limit" in reduction_reason:
+                    logger.warning(
+                        "reduced_max_tokens_for_context_window_async",
+                        model=model,
+                        desired_max_tokens=desired_max_tokens,
+                        effective_max_tokens=effective_max_tokens,
+                        prompt_tokens_estimate=prompt_tokens_estimate,
+                        context_window=context_window,
+                        model_max_output=model_max_output,
+                        reduction_reason=", ".join(reduction_reason) if reduction_reason else "unknown",
+                    )
+                else:
+                    # Log at debug level when only model output limit applies (expected behavior)
+                    logger.debug(
+                        "max_tokens_limited_by_model_output_async",
+                        model=model,
+                        desired_max_tokens=desired_max_tokens,
+                        effective_max_tokens=effective_max_tokens,
+                        model_max_output=model_max_output,
+                        note="This is expected - model has output token limit",
+                    )
 
             if effective_max_tokens < min_tokens_for_schema:
                 logger.warning(
@@ -276,7 +337,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 )
         else:
             max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            effective_max_tokens = min(self.max_tokens, max_allowed_by_context)
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+            effective_max_tokens = min(self.max_tokens, max_allowed_by_context, model_max_output)
 
         # Build payload (same as sync version)
         payload: dict[str, Any] = {
@@ -294,15 +356,24 @@ class OpenRouterProvider(BaseLLMProvider):
         if json_schema:
             schema_dict = json_schema.get("schema", {})
             schema_name = json_schema.get("name", "response")
-            if schema_dict and isinstance(schema_dict, dict):
+            # For models with structured output issues, skip response_format entirely
+            if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES:
+                logger.info(
+                    "skipping_response_format_for_model_async",
+                    model=model,
+                    reason="Model has known structured output issues, skipping response_format",
+                    schema_name=schema_name,
+                    note="Relying on prompt instructions for JSON output",
+                )
+                # Don't set response_format - let the model return natural JSON based on prompt
+            elif schema_dict and isinstance(schema_dict, dict):
                 default_strict = json_schema.get("strict", True)
-                use_strict = False if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES else default_strict
                 optimized_schema = self._optimize_schema_for_request(schema_dict)
                 payload["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {
                         "name": schema_name,
-                        "strict": use_strict,
+                        "strict": default_strict,
                         "schema": optimized_schema,
                     },
                 }
@@ -388,13 +459,60 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             raise
 
-    def __del__(self) -> None:
-        """Clean up client resources."""
-        if hasattr(self, "client"):
-            self.client.close()
+    def __enter__(self):
+        """Enter context manager for synchronous usage."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager and cleanup resources."""
+        self.close()
+        return False
+
+    async def __aenter__(self):
+        """Enter async context manager for asynchronous usage."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context manager and cleanup resources."""
+        await self.close_async()
+        return False
+
+    def close(self) -> None:
+        """Close synchronous HTTP client.
+
+        This method is safe to call multiple times and will silently
+        ignore errors during cleanup.
+        """
+        if hasattr(self, "client") and self.client:
+            try:
+                self.client.close()
+            except Exception:
+                pass
+
+    async def close_async(self) -> None:
+        """Close asynchronous HTTP client.
+
+        This method is safe to call multiple times and will close both
+        async and sync clients. It will silently ignore errors during cleanup.
+        """
         if hasattr(self, "_async_client") and self._async_client:
-            # Note: Can't await in __del__, so we'll close sync
-            # Async client should be closed explicitly via async context manager
+            try:
+                await self._async_client.aclose()
+            except Exception:
+                pass
+        # Also close sync client
+        self.close()
+
+    def __del__(self) -> None:
+        """Cleanup on deletion.
+
+        Note: Async client cannot be properly closed in __del__ since
+        it requires await. Use async context manager or call close_async()
+        explicitly for proper async cleanup.
+        """
+        try:
+            self.close()
+        except Exception:
             pass
 
     def _optimize_schema_for_request(self, schema: dict[str, Any]) -> dict[str, Any]:
@@ -872,12 +990,14 @@ class OpenRouterProvider(BaseLLMProvider):
             # For structured outputs, ensure minimum floor to prevent truncation
             # Complex schemas (like QA extraction) need more tokens
             schema_name = json_schema.get("name", "")
+            # Set reasonable minimums that respect model output limits
+            # These will be capped by model_max_output anyway
             if "qa_extraction" in schema_name.lower() or "extraction" in schema_name.lower():
-                min_tokens_for_schema = 16000  # QA extraction needs more tokens
+                min_tokens_for_schema = 4096  # QA extraction needs reasonable tokens
             elif "validation" in schema_name.lower():
-                min_tokens_for_schema = 8000  # Validation schemas are simpler
+                min_tokens_for_schema = 2048  # Validation schemas are simpler
             else:
-                min_tokens_for_schema = 12000  # Default for other structured outputs
+                min_tokens_for_schema = 3072  # Default for other structured outputs
 
             # Use the larger of: configured max, estimated needed, or minimum floor
             desired_max_tokens = max(
@@ -889,20 +1009,49 @@ class OpenRouterProvider(BaseLLMProvider):
             # But ensure we don't exceed the model's context window
             # Reserve space for input tokens and safety margin
             max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context)
 
-            # Log if we had to reduce max_tokens due to context window limits
+            # Also respect model-specific output token limits
+            # Most models have output limits much lower than context window
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+
+            # Use the minimum of: desired, context limit, and model output limit
+            effective_max_tokens = min(desired_max_tokens, max_allowed_by_context, model_max_output)
+
+            # Log if we had to reduce max_tokens due to limits
+            # Only warn if it's a context window issue, not just a model output limit
+            # (Model output limits are expected and normal behavior)
             if effective_max_tokens < desired_max_tokens:
-                logger.warning(
-                    "reduced_max_tokens_for_context_window",
-                    model=model,
-                    desired_max_tokens=desired_max_tokens,
-                    effective_max_tokens=effective_max_tokens,
-                    prompt_tokens_estimate=prompt_tokens_estimate,
-                    context_window=context_window,
-                    max_allowed_by_context=max_allowed_by_context,
-                    suggestion="Consider reducing input size or using a model with larger context window",
-                )
+                reduction_reason = []
+                if effective_max_tokens == max_allowed_by_context:
+                    reduction_reason.append("context_window_limit")
+                if effective_max_tokens == model_max_output:
+                    reduction_reason.append("model_output_limit")
+
+                # Only warn if context window is the limiting factor
+                # Model output limits are expected and don't need warnings
+                if "context_window_limit" in reduction_reason:
+                    logger.warning(
+                        "reduced_max_tokens_for_context_window",
+                        model=model,
+                        desired_max_tokens=desired_max_tokens,
+                        effective_max_tokens=effective_max_tokens,
+                        prompt_tokens_estimate=prompt_tokens_estimate,
+                        context_window=context_window,
+                        max_allowed_by_context=max_allowed_by_context,
+                        model_max_output=model_max_output,
+                        reduction_reason=", ".join(reduction_reason) if reduction_reason else "unknown",
+                        suggestion="Consider reducing input size or using a model with larger context window",
+                    )
+                else:
+                    # Log at debug level when only model output limit applies (expected behavior)
+                    logger.debug(
+                        "max_tokens_limited_by_model_output",
+                        model=model,
+                        desired_max_tokens=desired_max_tokens,
+                        effective_max_tokens=effective_max_tokens,
+                        model_max_output=model_max_output,
+                        note="This is expected - model has output token limit",
+                    )
 
             # Ensure we don't go below a reasonable minimum (but respect context limits)
             if effective_max_tokens < min_tokens_for_schema:
@@ -929,9 +1078,10 @@ class OpenRouterProvider(BaseLLMProvider):
                     schema_name=schema_name,
                 )
         else:
-            # For non-structured outputs, still respect context window
+            # For non-structured outputs, still respect context window and model limits
             max_allowed_by_context = context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
-            effective_max_tokens = min(self.max_tokens, max_allowed_by_context)
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+            effective_max_tokens = min(self.max_tokens, max_allowed_by_context, model_max_output)
 
         # Build payload
         payload: dict[str, Any] = {
@@ -952,7 +1102,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 schema_overhead=schema_overhead,
             )
 
-        # Enable reasoning mode for DeepSeek models if requested
+        # Enable reasoning mode for models that support it (e.g., DeepSeek, Grok 4.1 Fast)
         # Note: Reasoning mode is incompatible with strict JSON schema mode
         # If JSON schema is provided, we disable reasoning mode
         if reasoning_enabled and not json_schema:
@@ -987,20 +1137,22 @@ class OpenRouterProvider(BaseLLMProvider):
                 )
                 # Fallback to basic JSON mode if schema is invalid
                 payload["response_format"] = {"type": "json_object"}
+            # Check if model completely doesn't support structured outputs
+            # For Qwen models, don't use response_format at all - let the model return natural JSON
+            elif model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES:
+                # Qwen models don't support structured outputs or response_format well
+                # Don't set response_format - rely on prompt instructions for JSON output
+                logger.info(
+                    "skipping_response_format_for_model",
+                    model=model,
+                    reason="Model has known structured output issues, skipping response_format",
+                    schema_name=schema_name,
+                    note="Relying on prompt instructions for JSON output",
+                )
+                # Don't set response_format - let the model return natural JSON based on prompt
             else:
                 # Determine strict mode based on model compatibility
                 default_strict = json_schema.get("strict", True)
-
-                # Some models have issues with strict mode, use non-strict as fallback
-                if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES:
-                    use_strict = False
-                    logger.debug(
-                        "using_non_strict_mode_for_model",
-                        model=model,
-                        reason="Model known to have structured output issues",
-                    )
-                else:
-                    use_strict = default_strict
 
                 # Optimize schema: remove unnecessary metadata for token efficiency
                 optimized_schema = self._optimize_schema_for_request(schema_dict)
@@ -1009,7 +1161,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     "type": "json_schema",
                     "json_schema": {
                         "name": schema_name,
-                        "strict": use_strict,
+                        "strict": default_strict,
                         "schema": optimized_schema,
                     },
                 }
@@ -1018,7 +1170,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     "structured_output_configured",
                     model=model,
                     schema_name=schema_name,
-                    strict=use_strict,
+                    strict=default_strict,
                     schema_size=len(json.dumps(optimized_schema)),
                 )
         # Fallback to basic JSON mode if format="json" and no schema
@@ -1072,6 +1224,38 @@ class OpenRouterProvider(BaseLLMProvider):
             except httpx.HTTPStatusError as e:
                 last_exception = e
                 status_code = e.response.status_code
+
+                # Log detailed error information for 400 errors (bad requests)
+                if status_code == 400:
+                    raw_response_text = e.response.text[:1000]
+                    error_details = {}
+                    error_type = None
+                    error_message = str(e)
+
+                    try:
+                        error_json = e.response.json()
+                        error_details = error_json
+                        if "error" in error_json:
+                            error_msg = error_json.get("error", {})
+                            if isinstance(error_msg, dict):
+                                error_type = error_msg.get("type", "")
+                                error_message = error_msg.get("message", "")
+                    except Exception:
+                        error_details = {"raw_response": raw_response_text}
+
+                    logger.error(
+                        "openrouter_400_error_in_retry_loop",
+                        model=model,
+                        attempt=attempt + 1,
+                        error_type=error_type,
+                        error_message=error_message,
+                        raw_response=raw_response_text,
+                        error_json=error_details,
+                        had_json_schema=bool(json_schema),
+                        schema_name=json_schema.get("name") if json_schema else None,
+                        payload_preview=str(payload)[:500],  # Log payload for debugging
+                    )
+
                 if status_code in HTTP_STATUS_RETRYABLE and attempt < max_retries - 1:
                     wait_time = self._calculate_retry_wait_seconds(
                         status_code=status_code,
@@ -1114,11 +1298,11 @@ class OpenRouterProvider(BaseLLMProvider):
             message = result["choices"][0]["message"]
             completion = message.get("content")
 
-            # Handle reasoning models (like DeepSeek) that may return content in different fields
+            # Handle reasoning models (like DeepSeek, Grok) that may return content in different fields
             # When using reasoning mode with structured output, the content might be null
             # but the actual response might be in refusal, reasoning, or other fields
             if completion is None or completion == "":
-                # Check for reasoning field (DeepSeek V3.1 puts structured output here)
+                # Check for reasoning field (some models put structured output here)
                 if "reasoning" in message and message["reasoning"]:
                     completion = message["reasoning"]
                     logger.debug(
@@ -1256,9 +1440,13 @@ class OpenRouterProvider(BaseLLMProvider):
             # Check if response was truncated (either by finish_reason or JSON validation)
             # For structured outputs, truncation is critical - retry with increased max_tokens
             is_truncated = finish_reason == "length" or json_truncated
-            if is_truncated and json_schema and effective_max_tokens < 128000:
+            # Determine max retry tokens based on model's output limit
+            # Respect model-specific output limits, not just context window
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(model, DEFAULT_MAX_OUTPUT_TOKENS)
+            max_retry_tokens = model_max_output  # Use model's output limit
+            if is_truncated and json_schema and effective_max_tokens < max_retry_tokens:
                 # Increase max_tokens significantly and retry once
-                retry_max_tokens = min(effective_max_tokens * 2, 128000)
+                retry_max_tokens = min(effective_max_tokens * 2, max_retry_tokens)
                 truncation_reason = "finish_reason_length" if finish_reason == "length" else "json_truncated"
                 log_llm_retry(
                     model=model,
@@ -1355,6 +1543,7 @@ class OpenRouterProvider(BaseLLMProvider):
             error_details = {}
             error_type = None
             error_message = str(e)
+            raw_response_text = e.response.text[:1000]  # Capture more of the response
 
             try:
                 error_json = e.response.json()
@@ -1377,6 +1566,7 @@ class OpenRouterProvider(BaseLLMProvider):
                                 error_message=error_message,
                                 had_json_schema=bool(json_schema),
                                 schema_name=json_schema.get("name", "unknown") if json_schema else None,
+                                raw_response=raw_response_text,
                             )
                         elif "rate_limit" in error_type.lower():
                             logger.error(
@@ -1385,8 +1575,39 @@ class OpenRouterProvider(BaseLLMProvider):
                                 model=model,
                                 error_message=error_message,
                             )
-            except Exception:
-                error_details = {"raw_response": e.response.text[:500]}
+                        else:
+                            # Log all 400 errors with full details
+                            logger.error(
+                                "openrouter_400_error_details",
+                                status_code=e.response.status_code,
+                                model=model,
+                                error_type=error_type,
+                                error_message=error_message,
+                                had_json_schema=bool(json_schema),
+                                schema_name=json_schema.get("name", "unknown") if json_schema else None,
+                                raw_response=raw_response_text,
+                                error_json=error_json,
+                            )
+                else:
+                    # No structured error, log the full response
+                    logger.error(
+                        "openrouter_400_error_no_structure",
+                        status_code=e.response.status_code,
+                        model=model,
+                        raw_response=raw_response_text,
+                        error_json=error_json,
+                        had_json_schema=bool(json_schema),
+                    )
+            except Exception as parse_error:
+                error_details = {"raw_response": raw_response_text, "parse_error": str(parse_error)}
+                logger.error(
+                    "openrouter_400_error_parse_failed",
+                    status_code=e.response.status_code,
+                    model=model,
+                    raw_response=raw_response_text,
+                    parse_error=str(parse_error),
+                    had_json_schema=bool(json_schema),
+                )
 
             # Use enhanced error logging
             log_llm_error(
@@ -1403,13 +1624,44 @@ class OpenRouterProvider(BaseLLMProvider):
                 had_json_schema=bool(json_schema),
             )
 
-            # If structured output failed, suggest fallback
+            # If structured output failed with 400, try fallback for problematic models
             if json_schema and e.response.status_code == 400:
-                logger.warning(
-                    "structured_output_failed_suggestion",
-                    model=model,
-                    suggestion="Consider using non-strict mode or basic JSON format",
-                )
+                # Check if this is a model known to have structured output issues
+                if model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES:
+                    logger.warning(
+                        "structured_output_failed_fallback_to_json",
+                        model=model,
+                        error_message=error_message,
+                        note="Model has known structured output issues, falling back to basic JSON mode",
+                    )
+                    # Retry with basic JSON format instead of structured output
+                    try:
+                        return self.generate(
+                            model=model,
+                            prompt=prompt,
+                            system=system,
+                            temperature=temperature,
+                            format="json",  # Use basic JSON mode
+                            json_schema=None,  # Disable structured output
+                            stream=stream,
+                            reasoning_enabled=reasoning_enabled,
+                        )
+                    except Exception as fallback_error:
+                        logger.error(
+                            "structured_output_fallback_failed",
+                            model=model,
+                            fallback_error=str(fallback_error),
+                            original_error=error_message,
+                        )
+                        # Re-raise the original error
+                        raise e
+                else:
+                    logger.warning(
+                        "structured_output_failed_suggestion",
+                        model=model,
+                        error_message=error_message,
+                        suggestion="Consider using non-strict mode or basic JSON format",
+                    )
 
             raise
         except httpx.RequestError as e:

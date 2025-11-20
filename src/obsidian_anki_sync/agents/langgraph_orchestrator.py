@@ -8,6 +8,7 @@ This module implements a state machine workflow using LangGraph to coordinate:
 The workflow supports conditional routing, automatic retries, and state persistence.
 """
 
+import asyncio
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -198,8 +199,6 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             fixed_content=None,
             validation_time=time.time() - start_time,
         )
-    except BaseException:
-        raise
     except Exception as e:
         logger.exception("langgraph_pre_validation_unexpected_error", error=str(e))
         pre_result = PreValidationResult(
@@ -210,6 +209,8 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             fixed_content=None,
             validation_time=time.time() - start_time,
         )
+    except BaseException:
+        raise
 
     logger.info(
         "langgraph_pre_validation_complete",
@@ -281,8 +282,6 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             qa_pairs=qa_pairs,
         )
         splitting_result.decision_time = time.time() - start_time
-    except BaseException:
-        raise
     except Exception as e:
         logger.exception("langgraph_card_splitting_error", error=str(e))
         # Fallback: assume no splitting needed
@@ -296,6 +295,8 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             split_plan=[],
             decision_time=time.time() - start_time,
         )
+    except BaseException:
+        raise
 
     logger.info(
         "langgraph_card_splitting_complete",
@@ -370,8 +371,6 @@ async def generation_node(state: PipelineState) -> PipelineState:
             slug_base=state["slug_base"],
         )
         gen_result.generation_time = time.time() - start_time
-    except BaseException:
-        raise
     except Exception as e:
         logger.exception("langgraph_generation_error", error=str(e))
         gen_result = GenerationResult(
@@ -380,6 +379,8 @@ async def generation_node(state: PipelineState) -> PipelineState:
             generation_time=time.time() - start_time,
             model_used=str(model),
         )
+    except BaseException:
+        raise
 
     logger.info(
         "langgraph_generation_complete",
@@ -464,8 +465,6 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             strict_mode=state["strict_mode"],
         )
         post_result.validation_time = time.time() - start_time
-    except BaseException:
-        raise
     except Exception as e:
         logger.exception("langgraph_post_validation_error", error=str(e))
         post_result = PostValidationResult(
@@ -475,6 +474,8 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             corrected_cards=None,
             validation_time=time.time() - start_time,
         )
+    except BaseException:
+        raise
 
     logger.info(
         "langgraph_post_validation_complete",
@@ -576,30 +577,30 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
             GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
         ]
 
-        # Enrich each card
+        # Enrich each card in parallel
+        tasks = [enrichment_agent.enrich(card, metadata) for card in cards]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         enriched_cards = []
         total_enriched = 0
 
-        for card in cards:
-            try:
-                result = await enrichment_agent.enrich(card, metadata)
-
-                if result.should_enrich and result.enriched_card:
-                    enriched_cards.append(result.enriched_card)
-                    total_enriched += 1
-                    logger.info(
-                        "card_enriched",
-                        slug=card.slug,
-                        additions=result.additions_summary,
-                    )
-                else:
-                    enriched_cards.append(card)  # Keep original
-
-            except BaseException:
-                raise
-            except Exception as e:
-                logger.exception("card_enrichment_failed", slug=card.slug, error=str(e))
+        for i, result in enumerate(results):
+            card = cards[i]
+            if isinstance(result, Exception):
+                logger.exception(
+                    "card_enrichment_failed", slug=card.slug, error=str(result)
+                )
                 enriched_cards.append(card)  # Keep original on error
+            elif result.should_enrich and result.enriched_card:
+                enriched_cards.append(result.enriched_card)
+                total_enriched += 1
+                logger.info(
+                    "card_enriched",
+                    slug=card.slug,
+                    additions=result.additions_summary,
+                )
+            else:
+                enriched_cards.append(card)  # Keep original
 
         # Update generation with enriched cards
         state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
@@ -803,13 +804,30 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
             GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
         ]
 
-        # Check each new card against existing cards
+        # Check each new card against existing cards in parallel
+        tasks = [
+            detection_agent.find_duplicates(new_card, existing_cards)
+            for new_card in new_cards
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         duplicate_results = []
         total_duplicates_found = 0
 
-        for new_card in new_cards:
-            try:
-                result = await detection_agent.find_duplicates(new_card, existing_cards)
+        for i, result in enumerate(results):
+            new_card = new_cards[i]
+            if isinstance(result, Exception):
+                logger.exception(
+                    "card_duplicate_check_failed", slug=new_card.slug, error=str(result)
+                )
+                # Add empty result for this card
+                duplicate_results.append(
+                    {
+                        "card_slug": new_card.slug,
+                        "result": [],
+                    }
+                )
+            else:
                 duplicate_results.append(
                     {
                         "card_slug": new_card.slug,
@@ -832,20 +850,6 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
                         ),
                         recommendation=result.recommendation,
                     )
-
-            except BaseException:
-                raise
-            except Exception as e:
-                logger.exception(
-                    "card_duplicate_check_failed", slug=new_card.slug, error=str(e)
-                )
-                # Add empty result for this card
-                duplicate_results.append(
-                    {
-                        "card_slug": new_card.slug,
-                        "result": [],
-                    }
-                )
 
         # Store all results
         detection_time = time.time() - start_time

@@ -528,7 +528,7 @@ obsidian-anki-sync sync
 
 ### Getting Help
 
-- Check documentation in `docs/` folder
+- Check documentation in `.docs/` folder
 - Run with `--log-level DEBUG` for detailed logs
 - Query database directly for investigation
 - Report issues with session logs
@@ -553,4 +553,4 @@ obsidian-anki-sync sync --incremental
 obsidian-anki-sync index
 ```
 
-Happy syncing! 
+Happy syncing!
