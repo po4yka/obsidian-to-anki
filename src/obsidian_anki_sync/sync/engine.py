@@ -1,5 +1,6 @@
 """Synchronization engine for Obsidian to Anki sync."""
 
+import contextlib
 import json
 import random
 import time
