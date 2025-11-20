@@ -330,10 +330,18 @@ You are an expert Q&A extraction system specializing in educational note analysi
             # Don't cap too low - let the provider handle it, but ensure we have enough
             estimated_max_tokens = int(prompt_tokens_estimate * 3.5)
 
-            # Ensure we have at least 16k tokens for complex extractions
-            # But don't exceed 128k (provider limit for most models)
-            estimated_max_tokens = max(estimated_max_tokens, 16000)
-            estimated_max_tokens = min(estimated_max_tokens, 128000)
+            # Ensure we have reasonable tokens for complex extractions
+            # But respect model-specific output limits (not context window limits)
+            # Most models have output limits around 4K-8K tokens
+            from ..providers.openrouter import MODEL_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS
+
+            model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(self.model, DEFAULT_MAX_OUTPUT_TOKENS)
+
+            # Set minimum to 4096 for QA extraction (reasonable for most models)
+            # But don't exceed model's output limit
+            min_tokens_for_extraction = min(4096, model_max_output)
+            estimated_max_tokens = max(estimated_max_tokens, min_tokens_for_extraction)
+            estimated_max_tokens = min(estimated_max_tokens, model_max_output)
 
             # Temporarily adjust max_tokens for this extraction to ensure complete responses
             # Store original max_tokens to restore later

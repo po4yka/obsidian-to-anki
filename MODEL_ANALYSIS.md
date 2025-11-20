@@ -257,8 +257,8 @@ After updating models:
 
 ## References
 
-- [Agent Summary](docs/AGENT_SUMMARY.md) - Model recommendations per agent
-- [Model Configuration Guide](docs/MODEL_CONFIGURATION.md) - Detailed model guide
+- [Agent Summary](.docs/AGENT_SUMMARY.md) - Model recommendations per agent
+- [Model Configuration Guide](.docs/MODEL_CONFIGURATION.md) - Detailed model guide
 - [Structured Outputs](STRUCTURED_OUTPUTS_IMPLEMENTATION.md) - JSON schema requirements
 
 ---

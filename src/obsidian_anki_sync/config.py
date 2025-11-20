@@ -106,7 +106,7 @@ class Config(BaseSettings):
     llm_temperature: float = 0.2
     llm_top_p: float = 0.3
     llm_timeout: float = 900.0  # 15 minutes default for large models
-    llm_max_tokens: int = 128000  # Increased to 128k to prevent truncation for large bilingual content
+    llm_max_tokens: int = 8192  # Reasonable default - models have output token limits separate from context window
     llm_reasoning_enabled: bool = False  # Enable reasoning mode for models that support it (e.g., DeepSeek)
 
     # Ollama provider settings (local or cloud)
@@ -175,27 +175,54 @@ class Config(BaseSettings):
     use_pydantic_ai: bool = False  # Enable PydanticAI for structured outputs
 
     # ============================================================================
-    # Unified Model Configuration (OpenRouter)
+    # Unified Model Configuration System
     # ============================================================================
+    # Model preset: "cost_effective", "balanced", "high_quality", or "fast"
+    # This sets optimized models for all tasks automatically
+    model_preset: str = "balanced"
+
     # Default model used by ALL agents unless specifically overridden
-    # Optimized 2025 models: MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5
+    # Only used if model_preset is not set or for backward compatibility
     default_llm_model: str = "qwen/qwen-2.5-72b-instruct"
 
-    # Individual agent model overrides (optimized for each task)
+    # Individual agent model overrides (optional - overrides preset)
+    # Set to empty string ("") to use preset default
     # Pre-validator: Fast, efficient validation
-    pydantic_ai_pre_validator_model: str = "qwen/qwen-2.5-32b-instruct"
+    pydantic_ai_pre_validator_model: str = ""
     # Generator: Powerful content creation
-    pydantic_ai_generator_model: str = "qwen/qwen-2.5-72b-instruct"
+    pydantic_ai_generator_model: str = ""
     # Post-validator: Strong reasoning and quality checks
-    pydantic_ai_post_validator_model: str = "deepseek/deepseek-chat"
+    pydantic_ai_post_validator_model: str = ""
     # Context Enrichment: Excellent for code generation and creative examples
-    context_enrichment_model: str = "minimax/minimax-m2"
+    context_enrichment_model: str = ""
     # Memorization Quality: Strong analytical capabilities
-    memorization_quality_model: str = "moonshotai/kimi-k2"
+    memorization_quality_model: str = ""
     # Card Splitting: Advanced reasoning for decision making
-    card_splitting_model: str = "moonshotai/kimi-k2-thinking"
+    card_splitting_model: str = ""
     # Duplicate Detection: Efficient comparison
-    duplicate_detection_model: str = "qwen/qwen-2.5-32b-instruct"
+    duplicate_detection_model: str = ""
+
+    # Per-task model settings (optional - overrides preset defaults)
+    # QA Extraction
+    qa_extractor_model: str = ""
+    qa_extractor_temperature: float | None = None
+    qa_extractor_max_tokens: int | None = None
+    # Parser Repair
+    parser_repair_model: str = ""
+    parser_repair_temperature: float | None = None
+    parser_repair_max_tokens: int | None = None
+    # Pre-Validation
+    pre_validator_model: str = ""
+    pre_validator_temperature: float | None = None
+    pre_validator_max_tokens: int | None = None
+    # Generation
+    generator_model: str = ""
+    generator_temperature: float | None = None
+    generator_max_tokens: int | None = None
+    # Post-Validation
+    post_validator_model: str = ""
+    post_validator_temperature: float | None = None
+    post_validator_max_tokens: int | None = None
 
     # LangGraph Workflow Configuration
     langgraph_max_retries: int = 3
@@ -219,25 +246,144 @@ class Config(BaseSettings):
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
 
+        Uses new model configuration system with presets if available,
+        falls back to legacy configuration.
+
         Args:
             agent_type: Agent type (e.g., "pre_validator", "generator", "context_enrichment")
 
         Returns:
-            Model name (uses default_llm_model if agent-specific model is not set)
+            Model name
         """
+        from .models.config import (
+            ModelPreset,
+            ModelTask,
+            get_model_config,
+            get_model_for_task,
+        )
+
+        # Map agent types to ModelTask
+        agent_to_task = {
+            "pre_validator": ModelTask.PRE_VALIDATION,
+            "generator": ModelTask.GENERATION,
+            "post_validator": ModelTask.POST_VALIDATION,
+            "context_enrichment": ModelTask.CONTEXT_ENRICHMENT,
+            "memorization_quality": ModelTask.MEMORIZATION_QUALITY,
+            "card_splitting": ModelTask.CARD_SPLITTING,
+            "duplicate_detection": ModelTask.DUPLICATE_DETECTION,
+            "qa_extractor": ModelTask.QA_EXTRACTION,
+            "parser_repair": ModelTask.PARSER_REPAIR,
+        }
+
+        task = agent_to_task.get(agent_type)
+
+        # Check for explicit override first
         agent_model_map = {
-            "pre_validator": self.pydantic_ai_pre_validator_model,
-            "generator": self.pydantic_ai_generator_model,
-            "post_validator": self.pydantic_ai_post_validator_model,
+            "pre_validator": self.pydantic_ai_pre_validator_model or self.pre_validator_model,
+            "generator": self.pydantic_ai_generator_model or self.generator_model,
+            "post_validator": self.pydantic_ai_post_validator_model or self.post_validator_model,
             "context_enrichment": self.context_enrichment_model,
             "memorization_quality": self.memorization_quality_model,
             "card_splitting": self.card_splitting_model,
             "duplicate_detection": self.duplicate_detection_model,
+            "qa_extractor": self.qa_extractor_model,
+            "parser_repair": self.parser_repair_model,
         }
 
-        # Get agent-specific model, fall back to default if empty
-        agent_model = agent_model_map.get(agent_type, "")
-        return agent_model if agent_model else self.default_llm_model
+        explicit_model = agent_model_map.get(agent_type, "")
+        if explicit_model:
+            return explicit_model
+
+        # Use preset system if task is known
+        if task:
+            try:
+                preset = ModelPreset(self.model_preset.lower())
+                return get_model_for_task(task, preset)
+            except (ValueError, AttributeError):
+                # Invalid preset, fall back to default_llm_model
+                pass
+
+        # Fallback to default_llm_model
+        return self.default_llm_model
+
+    def get_model_config_for_task(self, task: str) -> dict[str, Any]:
+        """Get full model configuration for a task including temperature, max_tokens, etc.
+
+        Args:
+            task: Task name (e.g., "qa_extraction", "generation")
+
+        Returns:
+            Dictionary with model configuration
+        """
+        from .models.config import (
+            ModelConfig,
+            ModelPreset,
+            ModelTask,
+            get_model_config,
+        )
+
+        try:
+            model_task = ModelTask(task.lower())
+        except ValueError:
+            # Unknown task, return minimal config
+            return {
+                "model_name": self.default_llm_model,
+                "temperature": self.llm_temperature,
+                "max_tokens": self.llm_max_tokens,
+            }
+
+        # Get preset
+        try:
+            preset = ModelPreset(self.model_preset.lower())
+        except (ValueError, AttributeError):
+            preset = ModelPreset.BALANCED
+
+        # Build overrides from config
+        overrides: dict[str, Any] = {}
+
+        # Task-specific overrides
+        if task == "qa_extraction":
+            if self.qa_extractor_temperature is not None:
+                overrides["temperature"] = self.qa_extractor_temperature
+            if self.qa_extractor_max_tokens is not None:
+                overrides["max_tokens"] = self.qa_extractor_max_tokens
+        elif task == "generation":
+            if self.generator_temperature is not None:
+                overrides["temperature"] = self.generator_temperature
+            if self.generator_max_tokens is not None:
+                overrides["max_tokens"] = self.generator_max_tokens
+        elif task == "pre_validation":
+            if self.pre_validator_temperature is not None:
+                overrides["temperature"] = self.pre_validator_temperature
+            if self.pre_validator_max_tokens is not None:
+                overrides["max_tokens"] = self.pre_validator_max_tokens
+        elif task == "post_validation":
+            if self.post_validator_temperature is not None:
+                overrides["temperature"] = self.post_validator_temperature
+            if self.post_validator_max_tokens is not None:
+                overrides["max_tokens"] = self.post_validator_max_tokens
+        elif task == "parser_repair":
+            if self.parser_repair_temperature is not None:
+                overrides["temperature"] = self.parser_repair_temperature
+            if self.parser_repair_max_tokens is not None:
+                overrides["max_tokens"] = self.parser_repair_max_tokens
+
+        # Get model config from preset
+        config = get_model_config(model_task, preset, overrides if overrides else None)
+
+        # Override model name if explicitly set
+        explicit_model = self.get_model_for_agent(task)
+        if explicit_model and explicit_model != config.model_name:
+            config.model_name = explicit_model
+            config.capabilities = None  # Will be recalculated
+
+        return {
+            "model_name": config.model_name,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens or self.llm_max_tokens,
+            "top_p": config.top_p or self.llm_top_p,
+            "reasoning_enabled": config.reasoning_enabled or self.llm_reasoning_enabled,
+        }
 
     def validate(self) -> None:
         """Validate configuration values."""
@@ -261,6 +407,38 @@ class Config(BaseSettings):
 
         # Validate database path
         validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+
+        # Verify parent directory is writable
+        parent_dir = validated_db.parent
+        if not parent_dir.exists():
+            try:
+                parent_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                raise ConfigurationError(
+                    f"Cannot create database directory: {parent_dir}",
+                    suggestion=f"Ensure you have write permissions to {parent_dir.parent}. Error: {e}"
+                )
+
+        # Check parent directory is writable
+        if not os.access(parent_dir, os.W_OK):
+            raise ConfigurationError(
+                f"Database directory is not writable: {parent_dir}",
+                suggestion=f"Check directory permissions: chmod 755 {parent_dir}"
+            )
+
+        # Check if database exists and is readable/writable
+        if validated_db.exists():
+            if not os.access(validated_db, os.R_OK):
+                raise ConfigurationError(
+                    f"Database file exists but is not readable: {validated_db}",
+                    suggestion=f"Check file permissions: chmod 644 {validated_db}"
+                )
+            if not os.access(validated_db, os.W_OK):
+                raise ConfigurationError(
+                    f"Database file exists but is not writable: {validated_db}",
+                    suggestion=f"Check file permissions: chmod 644 {validated_db}"
+                )
+
         self.db_path = validated_db  # Update with validated path
 
         # Validate LLM provider

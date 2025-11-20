@@ -21,7 +21,7 @@
 
 ### Type Hints
 - Required for all function signatures
-- Use modern Python 3.14+ syntax (e.g., `list[str]` instead of `List[str]`)
+- Use modern Python 3.13+ syntax (e.g., `list[str]` instead of `List[str]`)
 - Use `Optional[T]` for nullable types
 - Use `tuple[T1, T2]` for tuples with specific types
 
@@ -222,15 +222,15 @@ Before submitting PR:
 
 ### Black
 - Line length: 88
-- Target version: Python 3.14
+- Target version: Python 3.13
 
 ### Ruff
 - Line length: 88
-- Target version: Python 3.14
+- Target version: Python 3.13
 - Enable all recommended rules
 
 ### Mypy
-- Python version: 3.14
+- Python version: 3.13
 - Strict mode enabled
 - Warn on unused configs
 - Disallow untyped definitions

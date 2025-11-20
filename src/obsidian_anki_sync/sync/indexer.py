@@ -5,10 +5,13 @@ from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
+
 if TYPE_CHECKING:
     from ..anki.client import AnkiClient
 
 from ..config import Config
+from ..models import ManifestData
 from ..obsidian.parser import ParserError, discover_notes, parse_note
 from ..sync.state_db import StateDB
 from ..utils.logging import get_logger
@@ -213,6 +216,43 @@ class AnkiIndexer:
         self.db = db
         self.anki = anki_client
 
+    def _parse_manifest_field(self, manifest_field: str) -> ManifestData | None:
+        """Parse and validate manifest field from Anki card.
+
+        Args:
+            manifest_field: JSON string from Manifest field
+
+        Returns:
+            Validated ManifestData or None if invalid
+        """
+        try:
+            manifest_dict = json.loads(manifest_field)
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "invalid_manifest_json",
+                manifest_field=manifest_field[:100],
+                error=str(e),
+            )
+            return None
+
+        if not isinstance(manifest_dict, dict):
+            logger.warning(
+                "manifest_not_dict",
+                manifest_type=type(manifest_dict).__name__,
+            )
+            return None
+
+        try:
+            manifest = ManifestData(**manifest_dict)
+            return manifest
+        except ValidationError as e:
+            logger.warning(
+                "manifest_validation_failed",
+                manifest_dict=manifest_dict,
+                errors=e.errors(),
+            )
+            return None
+
     def index_anki_cards(self, deck_name: str) -> dict:
         """
         Index all cards in Anki deck.
@@ -246,28 +286,38 @@ class AnkiIndexer:
             notes_info = self.anki.notes_info(note_ids)
 
             for note_info in notes_info:
+                # Extract manifest from note
+                fields = note_info.get("fields", {})
+                manifest_field = fields.get("Manifest", {}).get("value", "{}")
+
+                # Parse and validate manifest, keep dict for optional fields
                 try:
-                    # Extract manifest from note
-                    fields = note_info.get("fields", {})
-                    manifest_field = fields.get("Manifest", {}).get("value", "{}")
+                    manifest_dict = json.loads(manifest_field)
+                except json.JSONDecodeError:
+                    manifest_dict = {}
 
-                    manifest = json.loads(manifest_field)
-                    slug = manifest.get("slug")
-                    source_path = manifest.get("source_path")
-                    card_index = manifest.get("card_index")
-                    lang = manifest.get("lang")
+                manifest = self._parse_manifest_field(manifest_field)
+                if manifest is None:
+                    logger.warning(
+                        "skipping_card_invalid_manifest",
+                        note_id=note_info.get("noteId"),
+                    )
+                    stats["unmatched"] += 1
+                    continue
 
-                    if not all([slug, source_path, card_index, lang]):
-                        logger.warning(
-                            "incomplete_manifest",
-                            note_id=note_info.get("noteId"),
-                            slug=slug,
-                        )
-                        stats["unmatched"] += 1
-                        continue
+                # Extract validated fields
+                slug = manifest.slug
+                source_path = manifest.source_path
+                card_index = manifest.card_index
+                lang = manifest.lang
 
+                try:
                     # Update card index with Anki information
                     existing_card = self.db.get_card_index_by_slug(slug)
+
+                    # Get optional fields from raw manifest dict for backward compatibility
+                    note_id = manifest_dict.get("note_id")
+                    note_title = manifest_dict.get("note_title")
 
                     if existing_card:
                         # Update existing index entry
@@ -277,8 +327,8 @@ class AnkiIndexer:
                             lang=lang,
                             slug=slug,
                             anki_guid=note_info["noteId"],
-                            note_id=manifest.get("note_id"),
-                            note_title=manifest.get("note_title"),
+                            note_id=note_id,
+                            note_title=note_title,
                             in_obsidian=existing_card.get("in_obsidian", False),
                             in_anki=True,
                             in_database=True,
@@ -292,8 +342,8 @@ class AnkiIndexer:
                             lang=lang,
                             slug=slug,
                             anki_guid=note_info["noteId"],
-                            note_id=manifest.get("note_id"),
-                            note_title=manifest.get("note_title"),
+                            note_id=note_id,
+                            note_title=note_title,
                             status="orphaned",
                             in_obsidian=False,
                             in_anki=True,

@@ -185,7 +185,7 @@ uv sync --all-extras
 
 - [Agent Integration Plan](.docs/AGENT_INTEGRATION_PLAN.md)
 - [Security Best Practices](#security-features)
-- [Provider Guide](docs/LLM_PROVIDERS.md)
+- [Provider Guide](.docs/LLM_PROVIDERS.md)
 - [APF Format](.docs/APF_FORMAT.md)
 - [Refactoring Guide](REFACTORING_GUIDE.md)
 
