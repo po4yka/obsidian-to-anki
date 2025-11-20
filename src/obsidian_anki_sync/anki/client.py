@@ -2,7 +2,7 @@
 
 from typing import Any, cast
 
-import httpx  # type: ignore
+import httpx
 
 from ..exceptions import AnkiConnectError
 from ..utils.logging import get_logger
