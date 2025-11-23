@@ -12,9 +12,11 @@ from obsidian_anki_sync.config import Config
 
 @pytest.fixture
 def test_config(tmp_path):
+    source_dir = Path("InterviewQuestions")
+    (tmp_path / source_dir).mkdir(parents=True, exist_ok=True)
     return Config(
         vault_path=tmp_path,
-        source_dir=Path("InterviewQuestions"),
+        source_dir=source_dir,
         anki_connect_url="http://localhost:8765",
         anki_deck_name="Deck",
         anki_note_type="APF::Simple",
@@ -123,3 +125,32 @@ def test_format_command_runs_subprocess(runner, test_config, monkeypatch) -> Non
     assert result.exit_code == 0
     assert len(calls) == 2
     assert calls[0][1] is True
+
+
+def test_lint_note_passes(
+    runner, test_config, sample_note_content, tmp_path, monkeypatch
+) -> None:
+    _patch_setup(monkeypatch, test_config)
+    note_path = tmp_path / "note.md"
+    note_path.write_text(sample_note_content)
+
+    result = runner.invoke(app, ["lint-note", str(note_path)])
+
+    assert result.exit_code == 0
+    assert "No lint issues detected" in result.output
+
+
+def test_lint_note_detects_missing_answer(
+    runner, test_config, sample_note_content, tmp_path, monkeypatch
+) -> None:
+    _patch_setup(monkeypatch, test_config)
+    note_path = tmp_path / "broken.md"
+    broken_content = sample_note_content.replace(
+        "## Answer (EN)", "## Answer Missing (EN)", 1
+    )
+    note_path.write_text(broken_content)
+
+    result = runner.invoke(app, ["lint-note", str(note_path)])
+
+    assert result.exit_code == 1
+    assert "Missing '## Answer (EN)'" in result.output

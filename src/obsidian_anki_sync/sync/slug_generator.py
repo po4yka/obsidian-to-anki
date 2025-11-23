@@ -24,6 +24,48 @@ def _normalize_segment(segment: str) -> str:
     return ascii_segment
 
 
+def _retain_tail_segments(parts: list[str], max_length: int) -> str:
+    """
+    Build a slug prefix that prioritizes the right-most (note-level) segments.
+
+    Args:
+        parts: Normalized path segments.
+        max_length: Maximum allowed characters for the joined prefix.
+
+    Returns:
+        String containing as many trailing segments as possible without exceeding max_length.
+    """
+
+    if not parts:
+        return "note"[: max_length or 1]
+
+    if max_length <= 0:
+        return parts[-1][:max_length].rstrip("-") or parts[-1]
+
+    selected: list[str] = []
+    remaining = max_length
+
+    for part in reversed(parts):
+        clean_part = part.strip("-")
+        if not clean_part:
+            continue
+        separator = 1 if selected else 0
+        needed = len(clean_part) + separator
+
+        if needed > remaining:
+            if not selected:
+                return clean_part[:max_length].rstrip("-") or clean_part
+            break
+
+        selected.append(clean_part)
+        remaining -= needed
+
+    if not selected:
+        return parts[-1][:max_length].rstrip("-") or parts[-1]
+
+    return "-".join(reversed(selected))
+
+
 def generate_slug(
     source_path: str, card_index: int, lang: str, existing_slugs: set[str]
 ) -> tuple[str, str, str | None]:
@@ -46,8 +88,16 @@ def generate_slug(
     sanitized = "-".join(slug_parts) or "note"
 
     # 2. Form base without language suffix
-    base_without_suffix = f"{sanitized}-p{card_index:02d}"
-    slug_base = base_without_suffix[:MAX_SLUG_LENGTH]
+    index_suffix = f"-p{card_index:02d}"
+    base_without_suffix = f"{sanitized}{index_suffix}"
+
+    if len(base_without_suffix) <= MAX_SLUG_LENGTH:
+        slug_base = base_without_suffix
+    else:
+        available = MAX_SLUG_LENGTH - len(index_suffix) - 1  # room for trailing hyphen
+        retained = _retain_tail_segments(slug_parts, available)
+        slug_base = f"{retained}{index_suffix}"
+
     slug = f"{slug_base}-{lang}"
     hash6 = None
 

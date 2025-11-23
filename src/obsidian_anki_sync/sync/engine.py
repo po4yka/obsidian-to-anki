@@ -133,6 +133,9 @@ class SyncEngine:
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,
+                enforce_language_validation=getattr(
+                    config, "enforce_bilingual_validation", True
+                ),
             )
         else:
             self.apf_gen = APFGenerator(config)

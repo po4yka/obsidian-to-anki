@@ -30,24 +30,28 @@ ruamel_yaml.width = 4096  # Prevent line wrapping
 # Backward compatibility - global state (deprecated)
 _USE_LLM_EXTRACTION = False
 _QA_EXTRACTOR_AGENT = None
+_ENFORCE_LANGUAGE_VALIDATION = False
 
 
 @contextmanager
 def temporarily_disable_llm_extraction() -> Any:
     """Temporarily disable global LLM extraction state."""
-    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
+    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT, _ENFORCE_LANGUAGE_VALIDATION
 
     previous_flag = _USE_LLM_EXTRACTION
     previous_agent = _QA_EXTRACTOR_AGENT
+    previous_lang_validation = _ENFORCE_LANGUAGE_VALIDATION
 
     _USE_LLM_EXTRACTION = False
     _QA_EXTRACTOR_AGENT = None
+    _ENFORCE_LANGUAGE_VALIDATION = False
     try:
         logger.debug("llm_extraction_temporarily_disabled")
         yield
     finally:
         _USE_LLM_EXTRACTION = previous_flag
         _QA_EXTRACTOR_AGENT = previous_agent
+        _ENFORCE_LANGUAGE_VALIDATION = previous_lang_validation
         logger.debug("llm_extraction_restored", enabled=_USE_LLM_EXTRACTION)
 
 
@@ -56,6 +60,7 @@ def configure_llm_extraction(
     model: str = "qwen3:8b",
     temperature: float = 0.0,
     reasoning_enabled: bool = False,
+    enforce_language_validation: bool = False,
 ) -> None:
     """Configure LLM-based Q&A extraction using global state (deprecated).
 
@@ -68,11 +73,12 @@ def configure_llm_extraction(
         temperature: Sampling temperature
         reasoning_enabled: Enable reasoning mode for models that support it
     """
-    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
+    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT, _ENFORCE_LANGUAGE_VALIDATION
 
     if llm_provider is None:
         _USE_LLM_EXTRACTION = False
         _QA_EXTRACTOR_AGENT = None
+        _ENFORCE_LANGUAGE_VALIDATION = False
         logger.info("llm_extraction_disabled")
         return
 
@@ -85,10 +91,12 @@ def configure_llm_extraction(
         reasoning_enabled=reasoning_enabled,
     )
     _USE_LLM_EXTRACTION = True
+    _ENFORCE_LANGUAGE_VALIDATION = enforce_language_validation
     logger.info(
         "llm_extraction_enabled",
         model=model,
         temperature=temperature,
+        enforce_language_validation=enforce_language_validation,
     )
 
 
@@ -158,6 +166,11 @@ def parse_note(
 
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
+
+    if _ENFORCE_LANGUAGE_VALIDATION:
+        validation_errors = validate_note_structure(metadata, content)
+        if validation_errors:
+            raise ParserError("; ".join(validation_errors))
 
     # Parse Q/A pairs
     qa_pairs = parse_qa_pairs(content, metadata, file_path, qa_extractor=qa_extractor)
