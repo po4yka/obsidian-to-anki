@@ -2,6 +2,7 @@
 
 import json
 from collections import defaultdict
+from contextlib import nullcontext
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -12,7 +13,12 @@ if TYPE_CHECKING:
 
 from ..config import Config
 from ..models import ManifestData
-from ..obsidian.parser import ParserError, discover_notes, parse_note
+from ..obsidian.parser import (
+    ParserError,
+    discover_notes,
+    parse_note,
+    temporarily_disable_llm_extraction,
+)
 from ..sync.state_db import StateDB
 from ..utils.logging import get_logger
 
@@ -73,104 +79,111 @@ class VaultIndexer:
             list
         )  # Store sample errors per type
 
-        for file_path, relative_path in note_files:
-            try:
-                # Check if we should skip (incremental mode)
-                if incremental:
-                    existing_index = self.db.get_note_index(relative_path)
-                    if existing_index:
-                        # Check file modification time
-                        file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
-                        indexed_mtime = (
-                            datetime.fromisoformat(existing_index["file_modified_at"])
-                            if existing_index["file_modified_at"]
-                            else None
-                        )
+        llm_context = (
+            temporarily_disable_llm_extraction()
+            if not self.config.index_use_llm_extraction
+            else nullcontext()
+        )
 
-                        if indexed_mtime and file_mtime <= indexed_mtime:
-                            # File hasn't changed, skip
-                            stats["skipped"] += 1
-                            logger.debug("skipping_unchanged_note", path=relative_path)
-                            continue
+        with llm_context:
+            for file_path, relative_path in note_files:
+                try:
+                    # Check if we should skip (incremental mode)
+                    if incremental:
+                        existing_index = self.db.get_note_index(relative_path)
+                        if existing_index:
+                            # Check file modification time
+                            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                            indexed_mtime = (
+                                datetime.fromisoformat(existing_index["file_modified_at"])
+                                if existing_index["file_modified_at"]
+                                else None
+                            )
 
-                # Parse the note
-                metadata, qa_pairs = parse_note(file_path)
+                            if indexed_mtime and file_mtime <= indexed_mtime:
+                                # File hasn't changed, skip
+                                stats["skipped"] += 1
+                                logger.debug("skipping_unchanged_note", path=relative_path)
+                                continue
 
-                # Check for topic mismatch and collect for summary
-                expected_topic = file_path.parent.name
-                if metadata.topic != expected_topic:
-                    key = f"{expected_topic} -> {metadata.topic}"
-                    topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
+                    # Parse the note
+                    metadata, qa_pairs = parse_note(file_path)
 
-                # Get file modification time
-                file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    # Check for topic mismatch and collect for summary
+                    expected_topic = file_path.parent.name
+                    if metadata.topic != expected_topic:
+                        key = f"{expected_topic} -> {metadata.topic}"
+                        topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
-                # Serialize metadata for storage
-                metadata_json = json.dumps(
-                    {
-                        "id": metadata.id,
-                        "title": metadata.title,
-                        "topic": metadata.topic,
-                        "language_tags": metadata.language_tags,
-                        "created": metadata.created.isoformat(),
-                        "updated": metadata.updated.isoformat(),
-                        "aliases": metadata.aliases,
-                        "subtopics": metadata.subtopics,
-                        "question_kind": metadata.question_kind,
-                        "difficulty": metadata.difficulty,
-                        "status": metadata.status,
-                    }
-                )
+                    # Get file modification time
+                    file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
 
-                # Insert/update note index
-                self.db.upsert_note_index(
-                    source_path=relative_path,
-                    note_id=metadata.id,
-                    note_title=metadata.title,
-                    topic=metadata.topic,
-                    language_tags=metadata.language_tags,
-                    qa_pair_count=len(qa_pairs),
-                    file_modified_at=file_mtime,
-                    metadata_json=metadata_json,
-                )
-
-                # Index expected cards for this note
-                for qa_pair in qa_pairs:
-                    for lang in metadata.language_tags:
-                        self.db.upsert_card_index(
-                            source_path=relative_path,
-                            card_index=qa_pair.card_index,
-                            lang=lang,
-                            note_id=metadata.id,
-                            note_title=metadata.title,
-                            status="expected",
-                            in_obsidian=True,
-                            in_anki=False,
-                            in_database=False,
-                        )
-
-                stats["indexed"] += 1
-                logger.debug(
-                    "note_indexed",
-                    path=relative_path,
-                    qa_pairs=len(qa_pairs),
-                    languages=len(metadata.language_tags),
-                )
-
-            except (ParserError, OSError, Exception) as e:
-                error_type_name = type(e).__name__
-                error_message = str(e)
-
-                # Aggregate errors with defaultdict
-                error_by_type[error_type_name] += 1
-
-                # Store sample errors (up to 3 per type)
-                if len(error_samples[error_type_name]) < 3:
-                    error_samples[error_type_name].append(
-                        f"{relative_path}: {error_message}"
+                    # Serialize metadata for storage
+                    metadata_json = json.dumps(
+                        {
+                            "id": metadata.id,
+                            "title": metadata.title,
+                            "topic": metadata.topic,
+                            "language_tags": metadata.language_tags,
+                            "created": metadata.created.isoformat(),
+                            "updated": metadata.updated.isoformat(),
+                            "aliases": metadata.aliases,
+                            "subtopics": metadata.subtopics,
+                            "question_kind": metadata.question_kind,
+                            "difficulty": metadata.difficulty,
+                            "status": metadata.status,
+                        }
                     )
 
-                stats["errors"] += 1
+                    # Insert/update note index
+                    self.db.upsert_note_index(
+                        source_path=relative_path,
+                        note_id=metadata.id,
+                        note_title=metadata.title,
+                        topic=metadata.topic,
+                        language_tags=metadata.language_tags,
+                        qa_pair_count=len(qa_pairs),
+                        file_modified_at=file_mtime,
+                        metadata_json=metadata_json,
+                    )
+
+                    # Index expected cards for this note
+                    for qa_pair in qa_pairs:
+                        for lang in metadata.language_tags:
+                            self.db.upsert_card_index(
+                                source_path=relative_path,
+                                card_index=qa_pair.card_index,
+                                lang=lang,
+                                note_id=metadata.id,
+                                note_title=metadata.title,
+                                status="expected",
+                                in_obsidian=True,
+                                in_anki=False,
+                                in_database=False,
+                            )
+
+                    stats["indexed"] += 1
+                    logger.debug(
+                        "note_indexed",
+                        path=relative_path,
+                        qa_pairs=len(qa_pairs),
+                        languages=len(metadata.language_tags),
+                    )
+
+                except (ParserError, OSError, Exception) as e:
+                    error_type_name = type(e).__name__
+                    error_message = str(e)
+
+                    # Aggregate errors with defaultdict
+                    error_by_type[error_type_name] += 1
+
+                    # Store sample errors (up to 3 per type)
+                    if len(error_samples[error_type_name]) < 3:
+                        error_samples[error_type_name].append(
+                            f"{relative_path}: {error_message}"
+                        )
+
+                    stats["errors"] += 1
 
         # Log aggregated error summary
         if error_by_type:

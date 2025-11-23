@@ -120,6 +120,13 @@ def test_run(
         str,
         typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
+    index: Annotated[
+        bool,
+        typer.Option(
+            "--index/--no-index",
+            help="Build the full vault index before sampling (default: --no-index)",
+        ),
+    ] = False,
 ) -> None:
     """Run a sample by processing N random notes."""
     config, logger = get_config_and_logger(config_path, log_level)
@@ -175,7 +182,11 @@ def test_run(
             engine = SyncEngine(config, db, anki)
             engine.set_progress_display(progress_display)
 
-            stats = engine.sync(dry_run=dry_run, sample_size=count)
+            stats = engine.sync(
+                dry_run=dry_run,
+                sample_size=count,
+                build_index=index,
+            )
 
             mode_text = "dry-run" if dry_run else "applied"
             console.print(
