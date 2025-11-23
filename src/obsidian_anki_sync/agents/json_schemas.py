@@ -299,6 +299,31 @@ def get_parser_repair_schema() -> dict[str, Any]:
                     "type": ["string", "null"],
                     "description": "Repaired content if successful",
                 },
+                "content_generation_applied": {
+                    "type": "boolean",
+                    "description": "Whether content generation was applied (missing sections generated)",
+                },
+                "generated_sections": {
+                    "type": "array",
+                    "description": "List of sections that were generated (not just repaired)",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "section_type": {
+                                "type": "string",
+                                "enum": ["question_en", "question_ru", "answer_en", "answer_ru"],
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": ["translation", "inference", "completion"],
+                                "description": "How the content was generated",
+                            },
+                            "description": {"type": "string"},
+                        },
+                        "required": ["section_type", "method", "description"],
+                        "additionalProperties": False,
+                    },
+                },
                 "repair_time": {
                     "type": "number",
                     "description": "Time taken for repair in seconds",
@@ -309,6 +334,8 @@ def get_parser_repair_schema() -> dict[str, Any]:
                 "diagnosis",
                 "repairs",
                 "repaired_content",
+                "content_generation_applied",
+                "generated_sections",
                 "repair_time",
             ],
             "additionalProperties": False,

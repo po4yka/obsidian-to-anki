@@ -26,6 +26,7 @@ from ..obsidian.parser import (
     configure_llm_extraction,
     discover_notes,
     parse_note,
+    parse_note_with_repair,
 )
 from ..sync.indexer import build_full_index
 from ..sync.slug_generator import create_manifest, generate_slug
@@ -108,17 +109,20 @@ class SyncEngine:
             self.agent_orchestrator: AgentOrchestrator | None = AgentOrchestrator(
                 config
             )  # type: ignore
-            self.apf_gen = APFGenerator(config)  # Still keep for backward compat
+            # Still keep for backward compat
+            self.apf_gen = APFGenerator(config)
             self.use_agents = True
 
             # Configure LLM-based Q&A extraction when using agents
             # Use the same provider as the orchestrator
             # Resolve model from config (handles empty strings and presets)
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
+            qa_extractor_temp = getattr(
+                config, "qa_extractor_temperature", None)
             if qa_extractor_temp is None:
                 # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task("qa_extraction")
+                model_config = config.get_model_config_for_task(
+                    "qa_extraction")
                 qa_extractor_temp = model_config.get("temperature", 0.0)
             reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
@@ -212,7 +216,8 @@ class SyncEngine:
             and self.agent_orchestrator
         ):
             if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(self.progress_display)
+                self.agent_orchestrator.set_progress_display(
+                    self.progress_display)
 
     def _close_caches(self) -> None:
         """Close disk caches to ensure data is flushed to disk."""
@@ -285,7 +290,8 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(
+            f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -582,8 +588,35 @@ class SyncEngine:
                     break
 
                 try:
-                    # Parse note
-                    metadata, qa_pairs = parse_note(file_path)
+                    # Parse note with repair support
+                    # Get LLM provider for repair if available
+                    llm_provider_for_repair = None
+                    if self.use_agents and self.agent_orchestrator:
+                        llm_provider_for_repair = self.agent_orchestrator.provider
+
+                    # Get repair configuration
+                    repair_enabled = getattr(
+                        self.config, "parser_repair_enabled", True)
+                    repair_model = self.config.get_model_for_agent(
+                        "parser_repair")
+                    tolerant_parsing = getattr(
+                        self.config, "tolerant_parsing", True)
+                    enable_content_generation = getattr(
+                        self.config, "enable_content_generation", True
+                    )
+                    repair_missing_sections = getattr(
+                        self.config, "repair_missing_sections", True
+                    )
+
+                    metadata, qa_pairs = parse_note_with_repair(
+                        file_path=file_path,
+                        ollama_client=llm_provider_for_repair,
+                        repair_model=repair_model,
+                        enable_repair=repair_enabled,
+                        tolerant_parsing=tolerant_parsing,
+                        enable_content_generation=enable_content_generation,
+                        repair_missing_sections=repair_missing_sections,
+                    )
 
                     # Check for topic mismatch and collect for summary
                     expected_topic = file_path.parent.name
@@ -595,7 +628,8 @@ class SyncEngine:
                     note_content = ""
                     if self.use_agents:
                         try:
-                            note_content = file_path.read_text(encoding="utf-8")
+                            note_content = file_path.read_text(
+                                encoding="utf-8")
                         except Exception as e:
                             logger.warning(
                                 "failed_to_read_note_content",
@@ -747,7 +781,8 @@ class SyncEngine:
                                                 1,
                                             )
                                     except Exception as card_error:
-                                        error_type_name = type(card_error).__name__
+                                        error_type_name = type(
+                                            card_error).__name__
                                         error_message = str(card_error)
                                         error_by_type[error_type_name] += 1
                                         if len(error_samples[error_type_name]) < 3:
@@ -1082,7 +1117,8 @@ class SyncEngine:
         Returns:
             Dict of slug -> Card
         """
-        max_workers = min(self.config.max_concurrent_generations, len(note_files))
+        max_workers = min(
+            self.config.max_concurrent_generations, len(note_files))
         logger.info(
             "parallel_scan_started",
             total_notes=len(note_files),
@@ -1106,7 +1142,8 @@ class SyncEngine:
 
         # Use context manager for progress bar (parallel processing)
         with self._get_progress_bar(
-            len(note_files), f"Processing notes (parallel, {max_workers} workers)"
+            len(
+                note_files), f"Processing notes (parallel, {max_workers} workers)"
         ) as progress_context:
             if progress_context:
                 progress_bar, progress_task_id = progress_context
@@ -1187,7 +1224,8 @@ class SyncEngine:
                             percent=f"{(notes_processed / len(note_files) * 100):.1f}%",
                             elapsed_seconds=round(elapsed_time, 1),
                             avg_seconds_per_note=round(avg_time_per_note, 2),
-                            estimated_remaining_seconds=round(estimated_remaining, 1),
+                            estimated_remaining_seconds=round(
+                                estimated_remaining, 1),
                             cards_generated=len(obsidian_cards),
                             active_workers=max_workers,
                         )
@@ -1202,7 +1240,8 @@ class SyncEngine:
                         # Update status panel
                         if self.progress_display:
                             note_name = (
-                                Path(relative_path).stem if relative_path else "unknown"
+                                Path(
+                                    relative_path).stem if relative_path else "unknown"
                             )
                             self.progress_display.update_operation(
                                 f"Processing note {notes_processed}/{len(note_files)} (parallel)",
@@ -1316,7 +1355,8 @@ class SyncEngine:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(file_path) if file_path.exists() else None,
+                        file_path=Path(
+                            file_path) if file_path.exists() else None,
                     )
                 )
             else:
@@ -1328,7 +1368,8 @@ class SyncEngine:
                     file_path=Path(file_path) if file_path.exists() else None,
                 )
         else:
-            raise RuntimeError("Orchestrator does not have process_note method")
+            raise RuntimeError(
+                "Orchestrator does not have process_note method")
 
         if not result.success or not result.generation:
             error_msg = (
@@ -1466,8 +1507,10 @@ class SyncEngine:
             slug_parts = []
             for part in path_parts:
                 normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
+                ascii_segment = normalized.encode(
+                    "ascii", "ignore").decode("ascii")
+                ascii_segment = re.sub(
+                    r"[^a-z0-9-]", "-", ascii_segment.lower())
                 ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
                 if ascii_segment:
                     slug_parts.append(ascii_segment)
@@ -1476,7 +1519,8 @@ class SyncEngine:
             slug_base = base_without_suffix[:70]  # MAX_SLUG_LENGTH
 
             # Use thread-safe counter for collision resolution
-            slug = self._generate_thread_safe_slug(slug_base, qa_pair.card_index, lang)
+            slug = self._generate_thread_safe_slug(
+                slug_base, qa_pair.card_index, lang)
             hash6 = None
         else:
             # Sequential mode - use standard generate_slug
@@ -1502,7 +1546,8 @@ class SyncEngine:
         )
 
         # Generate APF card via LLM
-        card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
+        card = cast(Card, self.apf_gen.generate_card(
+            qa_pair, metadata, manifest, lang))
 
         # Ensure content hash is set
         if not card.content_hash:
@@ -1511,7 +1556,8 @@ class SyncEngine:
         # Validate APF format
         validation = validate_apf(card.apf_html, slug)
         if validation.errors:
-            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
+            logger.error("apf_validation_errors", slug=slug,
+                         errors=validation.errors)
             raise ValueError(
                 f"APF validation failed for {slug}: {validation.errors[0]}"
             )
@@ -1523,7 +1569,8 @@ class SyncEngine:
         html_errors = validate_card_html(card.apf_html)
         if html_errors:
             logger.error("apf_html_invalid", slug=slug, errors=html_errors)
-            raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
+            raise ValueError(
+                f"Invalid HTML formatting for {slug}: {html_errors[0]}")
 
         # Cache the generated card
         try:
@@ -1545,7 +1592,8 @@ class SyncEngine:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
+        logger.info("card_generated", slug=slug,
+                    elapsed_seconds=round(elapsed, 2))
 
         return card
 
@@ -1561,7 +1609,8 @@ class SyncEngine:
 
         # Find all notes in target deck
         try:
-            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
+            note_ids = self.anki.find_notes(
+                f"deck:{self.config.anki_deck_name}")
         except Exception as e:
             elapsed = time.time() - start_time
             logger.error(
@@ -1673,7 +1722,8 @@ class SyncEngine:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get("anki_guid") if db_card else None,
+                        anki_guid=db_card.get(
+                            "anki_guid") if db_card else None,
                         reason="No changes detected",
                     )
                 )
@@ -2022,7 +2072,8 @@ class SyncEngine:
                     ):
                         if note_id is not None:
                             # Register rollback
-                            txn.rollback_actions.append(("delete_anki_note", note_id))
+                            txn.rollback_actions.append(
+                                ("delete_anki_note", note_id))
                             successful_cards.append(
                                 (card, note_id, fields, tags, apf_html)
                             )
@@ -2116,7 +2167,8 @@ class SyncEngine:
                 card = action.card
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
-                field_updates.append({"id": action.anki_guid, "fields": fields})
+                field_updates.append(
+                    {"id": action.anki_guid, "fields": fields})
                 tag_updates.append((action.anki_guid, card.tags))
                 card_data.append((card, fields, card.tags))
 
@@ -2140,7 +2192,8 @@ class SyncEngine:
                         )
 
                     # Batch update fields
-                    field_results = self.anki.update_notes_fields(field_updates)
+                    field_results = self.anki.update_notes_fields(
+                        field_updates)
 
                     # Batch update tags
                     tag_results = self.anki.update_notes_tags(tag_updates)
@@ -2232,7 +2285,8 @@ class SyncEngine:
         if anki_guids_to_delete:
             try:
                 self.anki.delete_notes(anki_guids_to_delete)
-                logger.info("batch_delete_anki", count=len(anki_guids_to_delete))
+                logger.info("batch_delete_anki",
+                            count=len(anki_guids_to_delete))
             except Exception as e:
                 logger.error("batch_delete_anki_failed", error=str(e))
                 # Fall back to individual deletes

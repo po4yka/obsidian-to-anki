@@ -36,6 +36,8 @@ class PreValidatorAgent:
         ollama_client: BaseLLMProvider,
         model: str = "qwen3:8b",
         temperature: float = 0.0,
+        enable_content_generation: bool = True,
+        repair_missing_sections: bool = True,
     ):
         """Initialize pre-validator agent.
 
@@ -43,11 +45,20 @@ class PreValidatorAgent:
             ollama_client: LLM provider instance (BaseLLMProvider)
             model: Model to use for validation
             temperature: Sampling temperature (0.0 for deterministic)
+            enable_content_generation: Allow LLM to generate missing content
+            repair_missing_sections: Generate missing language sections
         """
         self.ollama_client = ollama_client
         self.model = model
         self.temperature = temperature
-        logger.info("pre_validator_agent_initialized", model=model)
+        self.enable_content_generation = enable_content_generation
+        self.repair_missing_sections = repair_missing_sections
+        logger.info(
+            "pre_validator_agent_initialized",
+            model=model,
+            enable_content_generation=enable_content_generation,
+            repair_missing_sections=repair_missing_sections,
+        )
 
     def _build_validation_prompt(
         self, note_content: str, metadata: NoteMetadata, qa_pairs: list[QAPair]
@@ -91,6 +102,7 @@ Step 2: Validate language tags
 Step 3: Check content presence
 - Confirm at least one Q/A pair exists
 - Verify Q/A pairs have content in all specified languages
+{"- If missing language sections are detected, GENERATE them by translating from existing content" if self.enable_content_generation and self.repair_missing_sections else ""}
 
 Step 4: Validate markdown structure
 - Check section headers are properly formatted
@@ -113,6 +125,7 @@ REQUIRED frontmatter fields:
 REQUIRED content:
 - At least one complete Q/A pair
 - Questions and answers in ALL specified languages
+{"- If missing, GENERATE missing language sections by translating from existing content" if self.enable_content_generation and self.repair_missing_sections else ""}
 
 ALLOWED language tags:
 - en (English)
@@ -146,6 +159,8 @@ error_type values:
 If you can auto-fix the issue:
 - Set auto_fix_applied to true
 - Provide the complete corrected note content in fixed_content
+{"- When generating missing language sections: translate from existing content, preserve technical terms and formatting" if self.enable_content_generation and self.repair_missing_sections else ""}
+{"- When fixing structural issues: add missing headers, fix unbalanced code fences, complete truncated content" if self.enable_content_generation else ""}
 </output_format>
 
 <examples>
@@ -241,7 +256,8 @@ Output:
 
         # Advanced AI validation using LLM
         try:
-            prompt = self._build_validation_prompt(note_content, metadata, qa_pairs)
+            prompt = self._build_validation_prompt(
+                note_content, metadata, qa_pairs)
 
             system_prompt = """<role>
 You are a structural validation agent for Obsidian educational notes. Your expertise is in identifying formatting errors, missing required fields, and content completeness issues before expensive card generation.

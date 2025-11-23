@@ -30,8 +30,10 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
-    source_dir: Path = Field(default=Path("."), description="Source directory within vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
+    source_dir: Path = Field(default=Path(
+        "."), description="Source directory within vault")
 
     @field_validator("vault_path", mode="before")
     @classmethod
@@ -108,8 +110,10 @@ class Config(BaseSettings):
     llm_temperature: float = 0.2
     llm_top_p: float = 0.3
     llm_timeout: float = 900.0  # 15 minutes default for large models
-    llm_max_tokens: int = 8192  # Reasonable default - models have output token limits separate from context window
-    llm_reasoning_enabled: bool = False  # Enable reasoning mode for models that support it (e.g., DeepSeek)
+    # Reasonable default - models have output token limits separate from context window
+    llm_max_tokens: int = 8192
+    # Enable reasoning mode for models that support it (e.g., DeepSeek)
+    llm_reasoning_enabled: bool = False
 
     # Ollama provider settings (local or cloud)
     ollama_base_url: str = "http://localhost:11434"
@@ -146,7 +150,15 @@ class Config(BaseSettings):
 
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
-    enforce_bilingual_validation: bool = True
+    # Default to False - validation done by LLM repair instead
+    enforce_bilingual_validation: bool = False
+
+    # Imperfect note processing settings
+    enable_content_generation: bool = True  # Allow LLM to generate missing content
+    repair_missing_sections: bool = True  # Generate missing language sections
+    tolerant_parsing: bool = True  # Allow notes with minor issues to proceed
+    # Enable content generation in repair agent
+    parser_repair_generate_content: bool = True
 
     # Parser-Repair Agent
     parser_repair_enabled: bool = True
@@ -373,7 +385,8 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
+        config = get_model_config(
+            model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -407,7 +420,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -524,7 +538,8 @@ def load_config(config_path: Path | None = None) -> Config:
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
 
     resolved_config_path: Path | None = None
@@ -543,7 +558,8 @@ def load_config(config_path: Path | None = None) -> Config:
             from ..utils.logging import get_logger
 
             logger = get_logger(__name__)
-            logger.warning("yaml_config_load_failed", path=str(resolved_config_path), error=str(e))
+            logger.warning("yaml_config_load_failed", path=str(
+                resolved_config_path), error=str(e))
 
     # Convert YAML data to environment variable format for pydantic-settings
     # pydantic-settings will automatically load from .env file via model_config
@@ -605,7 +621,8 @@ def load_config(config_path: Path | None = None) -> Config:
         if export_output_path is not None:
             config_kwargs["export_output_path"] = export_output_path
         if "vault_path" in yaml_data:
-            config_kwargs["vault_path"] = Path(str(yaml_data["vault_path"])).expanduser().resolve()
+            config_kwargs["vault_path"] = Path(
+                str(yaml_data["vault_path"])).expanduser().resolve()
         if "source_dir" in yaml_data:
             config_kwargs["source_dir"] = Path(str(yaml_data["source_dir"]))
         if "db_path" in yaml_data:

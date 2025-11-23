@@ -3,7 +3,7 @@
 
 # Obsidian Configuration
 vault_path: "~/Documents/InterviewQuestions"
-source_dir: "."  # Since your Q&A files are directly in subdirectories like 40-Android, 30-System-Design, etc.
+source_dir: "." # Since your Q&A files are directly in subdirectories like 40-Android, 30-System-Design, etc.
 
 # Anki Configuration
 anki_connect_url: "http://127.0.0.1:8765"
@@ -11,14 +11,14 @@ anki_deck_name: "Interview Questions"
 anki_note_type: "APF: Simple (3.0.0)"
 
 # Runtime Settings
-run_mode: "apply"  # Options: apply, dry-run
-delete_mode: "delete"  # Options: delete, archive
+run_mode: "apply" # Options: apply, dry-run
+delete_mode: "delete" # Options: delete, archive
 
 # Database
 db_path: ".sync_state.db"
 
 # Logging
-log_level: "INFO"  # Options: DEBUG, INFO, WARN, ERROR
+log_level: "INFO" # Options: DEBUG, INFO, WARN, ERROR
 
 # =============================================================================
 # AGENT SYSTEM CONFIGURATION
@@ -37,7 +37,14 @@ agent_execution_mode: "parallel"
 index_use_llm_extraction: false
 
 # Enforce bilingual validation (require Q/A pairs for all languages)
-enforce_bilingual_validation: true
+# Default to False - validation done by LLM repair instead
+enforce_bilingual_validation: false
+
+# Imperfect note processing settings
+enable_content_generation: true # Allow LLM to generate missing content
+repair_missing_sections: true # Generate missing language sections
+tolerant_parsing: true # Allow notes with minor issues to proceed
+parser_repair_generate_content: true # Enable content generation in repair agent
 
 # Ollama Configuration
 ollama_base_url: "http://localhost:11434"
@@ -74,7 +81,7 @@ llm_provider: "ollama"
 # Common LLM settings (applies to all providers)
 llm_temperature: 0.2
 llm_top_p: 0.3
-llm_timeout: 600.0  # Increased for large models (qwen3:32b, qwen3:14b)
+llm_timeout: 600.0 # Increased for large models (qwen3:32b, qwen3:14b)
 llm_max_tokens: 2048
 
 # =============================================================================
@@ -139,23 +146,23 @@ export_output_path: "interview_questions.apkg"
 # - QA Agent (semantic quality checks)
 # - Style/Hint Agent (optional refinement)
 # - Card Diff Agent (safe updates of existing cards)
-use_langchain_agents: false  # Set to true to enable
+use_langchain_agents: false # Set to true to enable
 
 # Supervisor Configuration
 langchain_agents:
   # Retry and quality thresholds
-  max_mapping_retries: 2           # Retries if schema validation fails
-  min_qa_score: 0.8                # Minimum QA score (0-1) to pass
-  allow_auto_fix: true             # Allow automatic fixing based on feedback
-  max_llm_calls_per_card: 8        # Maximum total LLM calls per card
+  max_mapping_retries: 2 # Retries if schema validation fails
+  min_qa_score: 0.8 # Minimum QA score (0-1) to pass
+  allow_auto_fix: true # Allow automatic fixing based on feedback
+  max_llm_calls_per_card: 8 # Maximum total LLM calls per card
 
   # Update policies
-  allow_content_updates: true      # Allow updates that change card content
-  allow_structural_updates: false  # Allow model/deck changes (risky)
+  allow_content_updates: true # Allow updates that change card content
+  allow_structural_updates: false # Allow model/deck changes (risky)
 
   # Optional features
-  enable_style_polish: false       # Enable style polishing step (slower but better quality)
-  strict_schema_validation: false  # Treat schema warnings as errors
+  enable_style_polish: false # Enable style polishing step (slower but better quality)
+  strict_schema_validation: false # Treat schema warnings as errors
 
   # Model assignment (uses existing LLM config)
   # mapping_model: Uses generator_model (qwen3:32b)
@@ -163,14 +170,14 @@ langchain_agents:
   # style_model: Uses pre_validator_model (qwen3:8b)
 
   # Schema validation settings
-  max_front_length: 500            # Maximum characters for Front field
-  max_back_length: 2000            # Maximum characters for Back field
-  max_field_length: 4000           # Maximum characters for any field
-  max_tags: 20                     # Maximum number of tags
+  max_front_length: 500 # Maximum characters for Front field
+  max_back_length: 2000 # Maximum characters for Back field
+  max_field_length: 4000 # Maximum characters for any field
+  max_tags: 20 # Maximum number of tags
 
   # Deck settings
   default_deck_prefix: "Interview" # Default prefix for deck names
 
   # Bilingual settings
-  bilingual_mode: "front_back"     # Options: "none", "front_back", "separate_cards"
+  bilingual_mode: "front_back" # Options: "none", "front_back", "separate_cards"
 
