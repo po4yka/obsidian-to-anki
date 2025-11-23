@@ -33,6 +33,9 @@ use_agent_system: true
 # - sequential: Slower but lower memory usage
 agent_execution_mode: "parallel"
 
+# Indexing LLM usage (disable to improve indexing speed and cost)
+index_use_llm_extraction: false
+
 # Ollama Configuration
 ollama_base_url: "http://localhost:11434"
 

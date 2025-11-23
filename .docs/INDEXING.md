@@ -72,14 +72,14 @@ obsidian-anki-sync sync --no-index
 ‚    - Create note_index entries          ‚
 ‚    - Create expected card_index entries ‚
 ˜
-              
+
 
 ‚ 2. Database Indexing                    ‚
 ‚    - Query all cards from sync DB       ‚
 ‚    - Update card_index with DB info     ‚
 ‚    - Mark cards as in_database          ‚
 ˜
-              
+
 
 ‚ 3. Anki Indexing                        ‚
 ‚    - Query Anki deck cards              ‚
@@ -87,7 +87,7 @@ obsidian-anki-sync sync --no-index
 ‚    - Mark cards as in_anki              ‚
 ‚    - Identify orphaned cards            ‚
 ˜
-              
+
 
 ‚ 4. Statistics Generation                ‚
 ‚    - Calculate totals and breakdowns    ‚
@@ -277,6 +277,8 @@ Incremental indexing:
 obsidian-anki-sync sync --no-index
 ```
 
+> **Note:** `obsidian-anki-sync test-run` now skips indexing by default for faster sampling. Pass `--index` if you want that command to rebuild the vault index before processing the sample.
+
 **Use when:**
 - Quick sync needed
 - Index already up-to-date
@@ -375,6 +377,10 @@ Cards: 750
 
 # 50 new cards created
 ```
+
+## LLM Extraction Controls
+
+Large language model extraction can dramatically slow indexing because every note triggers an expensive LLM call. Set `index_use_llm_extraction: false` (default) in `config.yaml` to rely on the fast rule-based parser while indexing. This keeps metadata and QA counts accurate without incurring LLM latency or cost, while still allowing agent-driven extraction later in the sync pipeline.
 
 ## Maintenance
 

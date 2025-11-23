@@ -1,6 +1,7 @@
 """Obsidian note parser for YAML frontmatter and Q/A pairs."""
 
 import re
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -29,6 +30,25 @@ ruamel_yaml.width = 4096  # Prevent line wrapping
 # Backward compatibility - global state (deprecated)
 _USE_LLM_EXTRACTION = False
 _QA_EXTRACTOR_AGENT = None
+
+
+@contextmanager
+def temporarily_disable_llm_extraction() -> Any:
+    """Temporarily disable global LLM extraction state."""
+    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT
+
+    previous_flag = _USE_LLM_EXTRACTION
+    previous_agent = _QA_EXTRACTOR_AGENT
+
+    _USE_LLM_EXTRACTION = False
+    _QA_EXTRACTOR_AGENT = None
+    try:
+        logger.debug("llm_extraction_temporarily_disabled")
+        yield
+    finally:
+        _USE_LLM_EXTRACTION = previous_flag
+        _QA_EXTRACTOR_AGENT = previous_agent
+        logger.debug("llm_extraction_restored", enabled=_USE_LLM_EXTRACTION)
 
 
 def configure_llm_extraction(
