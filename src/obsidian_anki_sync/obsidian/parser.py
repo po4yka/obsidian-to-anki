@@ -11,6 +11,7 @@ from ruamel.yaml import YAML
 
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
+from ..obsidian.note_validator import validate_note_structure
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 
@@ -105,6 +106,8 @@ def create_qa_extractor(
     model: str = "qwen3:8b",
     temperature: float = 0.0,
     reasoning_enabled: bool = False,
+    enable_content_generation: bool = True,
+    repair_missing_sections: bool = True,
 ) -> "QAExtractorAgent":
     """Create a QA extractor agent for LLM-based extraction.
 
@@ -115,6 +118,8 @@ def create_qa_extractor(
         model: Model to use for extraction
         temperature: Sampling temperature
         reasoning_enabled: Enable reasoning mode for models that support it
+        enable_content_generation: Allow LLM to generate missing content
+        repair_missing_sections: Generate missing language sections
 
     Returns:
         Configured QAExtractorAgent instance
@@ -126,11 +131,15 @@ def create_qa_extractor(
         model=model,
         temperature=temperature,
         reasoning_enabled=reasoning_enabled,
+        enable_content_generation=enable_content_generation,
+        repair_missing_sections=repair_missing_sections,
     )
 
 
 def parse_note(
-    file_path: Path, qa_extractor: Optional["QAExtractorAgent"] = None
+    file_path: Path,
+    qa_extractor: Optional["QAExtractorAgent"] = None,
+    tolerant_parsing: bool = False,
 ) -> tuple[NoteMetadata, list[QAPair]]:
     """
     Parse an Obsidian note and extract metadata and Q/A pairs.
@@ -139,12 +148,15 @@ def parse_note(
         file_path: Path to the markdown file
         qa_extractor: Optional QA extractor agent for LLM-based extraction.
                      If None, uses global state for backward compatibility.
+        tolerant_parsing: If True, validation errors are logged as warnings instead
+                        of raising ParserError. Allows parsing to proceed with
+                        imperfect notes that can be repaired later.
 
     Returns:
         Tuple of (metadata, qa_pairs)
 
     Raises:
-        ParserError: If parsing fails
+        ParserError: If parsing fails (unless tolerant_parsing=True for validation errors)
     """
     # Resolve to absolute path and validate
     try:
@@ -167,19 +179,33 @@ def parse_note(
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
 
-    if _ENFORCE_LANGUAGE_VALIDATION:
+    # Validate note structure
+    if _ENFORCE_LANGUAGE_VALIDATION or not tolerant_parsing:
         validation_errors = validate_note_structure(metadata, content)
         if validation_errors:
-            raise ParserError("; ".join(validation_errors))
+            if tolerant_parsing:
+                # Log as warnings but continue parsing
+                for error in validation_errors:
+                    logger.warning(
+                        "note_validation_warning",
+                        file=str(file_path),
+                        error=error,
+                    )
+            else:
+                # Raise error (strict mode)
+                raise ParserError("; ".join(validation_errors))
 
     # Parse Q/A pairs
-    qa_pairs = parse_qa_pairs(content, metadata, file_path, qa_extractor=qa_extractor)
+    qa_pairs = parse_qa_pairs(
+        content, metadata, file_path, qa_extractor=qa_extractor, tolerant_parsing=tolerant_parsing
+    )
 
     logger.debug(
         "parsed_note",
         file=str(file_path),
         pairs_count=len(qa_pairs),
         languages=metadata.language_tags,
+        tolerant_parsing=tolerant_parsing,
     )
 
     return metadata, qa_pairs
@@ -190,18 +216,24 @@ def parse_note_with_repair(
     ollama_client: Optional[BaseLLMProvider] = None,
     repair_model: str = "qwen3:8b",
     enable_repair: bool = True,
+    tolerant_parsing: bool = True,
+    enable_content_generation: bool = True,
+    repair_missing_sections: bool = True,
 ) -> tuple[NoteMetadata, list[QAPair]]:
     """
     Parse an Obsidian note with automatic repair fallback.
 
-    First attempts rule-based parsing. If that fails and repair is enabled,
-    attempts intelligent repair using LLM agent.
+    First attempts rule-based parsing with tolerant mode. If that fails and repair is enabled,
+    attempts intelligent repair using LLM agent with content generation.
 
     Args:
         file_path: Path to the markdown file
         ollama_client: LLM provider for repair (required if enable_repair=True)
         repair_model: Model to use for repair
         enable_repair: Whether to attempt repair on parse failures
+        tolerant_parsing: If True, validation errors are warnings, not errors
+        enable_content_generation: Allow LLM to generate missing content during repair
+        repair_missing_sections: Generate missing language sections during repair
 
     Returns:
         Tuple of (metadata, qa_pairs)
@@ -209,9 +241,9 @@ def parse_note_with_repair(
     Raises:
         ParserError: If both parsing and repair fail
     """
-    # First try rule-based parsing
+    # First try rule-based parsing with tolerant mode
     try:
-        return parse_note(file_path)
+        return parse_note(file_path, tolerant_parsing=tolerant_parsing)
     except ParserError as e:
         # If repair is disabled or no client provided, re-raise
         if not enable_repair or ollama_client is None:
@@ -222,6 +254,7 @@ def parse_note_with_repair(
             "parser_attempting_repair",
             file=str(file_path),
             original_error=str(e),
+            enable_content_generation=enable_content_generation,
         )
 
         from ..agents.parser_repair import attempt_repair
@@ -231,6 +264,8 @@ def parse_note_with_repair(
             original_error=e,
             ollama_client=ollama_client,
             model=repair_model,
+            enable_content_generation=enable_content_generation,
+            repair_missing_sections=repair_missing_sections,
         )
 
         if result is None:
@@ -240,7 +275,8 @@ def parse_note_with_repair(
                 file=str(file_path),
                 original_error=str(e),
             )
-            raise ParserError(f"Parse failed and repair unsuccessful: {e}") from e
+            raise ParserError(
+                f"Parse failed and repair unsuccessful: {e}") from e
 
         # Repair succeeded
         metadata, qa_pairs = result
@@ -281,7 +317,8 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         raise ParserError(f"No frontmatter found in {file_path}")
 
     # Validate required fields
-    required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
+    required_fields = ["id", "title", "topic",
+                       "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ParserError(f"Missing required fields in {file_path}: {missing}")
@@ -346,6 +383,7 @@ def parse_qa_pairs(
     metadata: NoteMetadata,
     file_path: Path | None = None,
     qa_extractor: Optional["QAExtractorAgent"] = None,
+    tolerant_parsing: bool = False,
 ) -> list[QAPair]:
     """
     Parse Q/A pairs from note content.
@@ -358,12 +396,14 @@ def parse_qa_pairs(
         file_path: Optional file path for logging
         qa_extractor: Optional QA extractor agent for LLM-based extraction.
                      If None, checks global state for backward compatibility.
+        tolerant_parsing: If True, allows parsing to proceed even with incomplete Q&A pairs.
+                        Missing sections will be handled by repair agent.
 
     Returns:
         List of Q/A pairs
 
     Raises:
-        ParserError: If structure is invalid
+        ParserError: If structure is invalid (unless tolerant_parsing=True)
     """
     # Determine which extractor to use (parameter takes precedence over global)
     extractor_to_use = qa_extractor
@@ -420,7 +460,8 @@ def parse_qa_pairs(
     )
 
     # Strip frontmatter
-    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
+    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "",
+                     content, count=1, flags=re.DOTALL)
 
     # Normalize line endings and strip BOM
     content = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -474,13 +515,15 @@ def parse_qa_pairs(
 
         # Try to parse this block as a Q/A pair
         try:
-            qa_pair = _parse_single_qa_block(block, card_index, metadata, file_path)
+            qa_pair = _parse_single_qa_block(
+                block, card_index, metadata, file_path)
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
             else:
                 # Block was skipped (incomplete or invalid)
-                failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
+                failed_blocks.append(
+                    (card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
             logger.error(
                 "qa_parse_error",
@@ -901,7 +944,8 @@ def _normalize_sources(value: Any) -> list[dict[str, str]]:
         if item is None:
             continue
         if isinstance(item, dict):
-            normalized.append({k: str(v) for k, v in item.items() if v is not None})
+            normalized.append({k: str(v)
+                              for k, v in item.items() if v is not None})
         else:
             text = str(item).strip()
             if text:

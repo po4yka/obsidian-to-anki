@@ -28,7 +28,13 @@ anki_note_type: "APF (Prompt)"
 run_mode: "apply"  # "apply" or "dry-run"
 delete_mode: "archive"  # "delete" or "archive"
 index_use_llm_extraction: false  # Disable LLM parsing while indexing for speed
-enforce_bilingual_validation: true  # Require Q/A pairs for all languages
+enforce_bilingual_validation: false  # Default to False - validation done by LLM repair instead
+
+# Imperfect note processing settings
+enable_content_generation: true  # Allow LLM to generate missing content
+repair_missing_sections: true  # Generate missing language sections
+tolerant_parsing: true  # Allow notes with minor issues to proceed
+parser_repair_generate_content: true  # Enable content generation in repair agent
 
 # =============================================================================
 # Database

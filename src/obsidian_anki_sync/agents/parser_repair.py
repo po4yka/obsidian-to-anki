@@ -31,6 +31,8 @@ class ParserRepairAgent:
         ollama_client: BaseLLMProvider,
         model: str = "qwen3:8b",
         temperature: float = 0.0,
+        enable_content_generation: bool = True,
+        repair_missing_sections: bool = True,
     ):
         """Initialize parser-repair agent.
 
@@ -38,24 +40,77 @@ class ParserRepairAgent:
             ollama_client: LLM provider instance
             model: Model to use for repair
             temperature: Sampling temperature (0.0 for deterministic)
+            enable_content_generation: Allow LLM to generate missing content
+            repair_missing_sections: Generate missing language sections
         """
         self.ollama_client = ollama_client
         self.model = model
         self.temperature = temperature
-        logger.info("parser_repair_agent_initialized", model=model)
+        self.enable_content_generation = enable_content_generation
+        self.repair_missing_sections = repair_missing_sections
+        logger.info(
+            "parser_repair_agent_initialized",
+            model=model,
+            enable_content_generation=enable_content_generation,
+            repair_missing_sections=repair_missing_sections,
+        )
 
-    def _build_repair_prompt(self, content: str, error: str) -> str:
+    def _build_repair_prompt(
+        self, content: str, error: str, enable_content_gen: bool = True
+    ) -> str:
         """Build repair prompt for the LLM.
 
         Args:
             content: Original note content
             error: Parser error message
+            enable_content_gen: Whether to enable content generation instructions
 
         Returns:
             Formatted prompt string
         """
+        content_gen_section = ""
+        if enable_content_gen and self.enable_content_generation:
+            content_gen_section = """
+<content_generation_instructions>
+When missing language sections are detected, you MUST generate the missing content:
+
+1. **Translation**: If content exists in one language but not another:
+   - Translate questions/answers from existing language to missing language
+   - Preserve technical terms, code snippets, and formatting
+   - Maintain the same level of detail and structure
+
+2. **Inference**: If only partial content exists:
+   - Infer missing questions from existing answers (or vice versa)
+   - Use context from the note to generate appropriate content
+   - Ensure generated content matches the style and depth of existing content
+
+3. **Completion**: If sections are truncated or incomplete:
+   - Complete truncated sections based on context
+   - Fix unbalanced code fences (```) by adding missing closers
+   - Complete incomplete markdown structures
+
+4. **Quality Requirements**:
+   - Generated content must be technically accurate
+   - Preserve all existing content exactly as-is
+   - Maintain markdown formatting and structure
+   - Ensure bilingual consistency (same concepts in both languages)
+
+5. **What to Generate**:
+   - Missing "# Question (EN)" or "# Вопрос (RU)" sections
+   - Missing "## Answer (EN)" or "## Ответ (RU)" sections
+   - Incomplete answers that are truncated
+   - Missing code fence closers (```)
+
+6. **What NOT to Generate**:
+   - Do NOT invent new Q&A pairs that don't exist
+   - Do NOT change existing content
+   - Do NOT generate content if the note is completely empty
+</content_generation_instructions>
+"""
+
         return f"""<task>
 Diagnose and repair an Obsidian note that failed parsing. Think step by step to identify the root cause and provide targeted fixes.
+{content_gen_section if content_gen_section else ""}
 </task>
 
 <input>
@@ -104,8 +159,10 @@ Frontmatter issues:
 Content structure issues:
 5. Missing section headers → add: # Question (EN), # Вопрос (RU), ## Answer (EN), ## Ответ (RU)
 6. Incorrect header levels → Questions use #, Answers use ##
-7. Empty question or answer sections → flag as unrepairable if truly empty
-8. Language mismatch → ensure content exists for all languages in language_tags
+7. Empty question or answer sections → {"GENERATE missing content by translating or inferring from existing content" if self.enable_content_generation else "flag as unrepairable if truly empty"}
+8. Language mismatch → {"GENERATE missing language sections by translating from existing content" if self.repair_missing_sections else "ensure content exists for all languages in language_tags"}
+9. Unbalanced code fences → add missing ``` closers
+10. Truncated content → complete based on context
 
 Ordering issues:
 9. Section ordering → both RU-first and EN-first are valid, just needs to be consistent
@@ -143,21 +200,38 @@ Respond with valid JSON matching this structure:
     "diagnosis": "Brief description of the root cause",
     "repairs": [
         {{
-            "issue": "Specific issue found",
-            "fix": "How to fix it"
+            "type": "repair_type (e.g., 'yaml_fix', 'header_fix', 'content_generation')",
+            "description": "Specific issue found and how it was fixed"
         }}
     ],
     "repaired_content": "FULL repaired content including frontmatter, or null if unrepairable",
-    "is_repairable": true/false
+    "content_generation_applied": true/false,
+    "generated_sections": [
+        {{
+            "section_type": "question_en|question_ru|answer_en|answer_ru",
+            "method": "translation|inference|completion",
+            "description": "What was generated and how"
+        }}
+    ],
+    "is_repairable": true/false,
+    "repair_time": 0.0
 }}
 
 is_repairable:
-- true: Issues can be fixed programmatically
+- true: Issues can be fixed programmatically (including content generation)
 - false: Note is fundamentally broken (missing all content, corrupted beyond repair, etc.)
 
 repaired_content:
-- If is_repairable is true: provide the COMPLETE repaired note content
+- If is_repairable is true: provide the COMPLETE repaired note content with all missing sections generated
 - If is_repairable is false: set to null
+
+content_generation_applied:
+- true: If you generated any missing content (translated, inferred, or completed sections)
+- false: If you only fixed structure/formatting without generating new content
+
+generated_sections:
+- List all sections you generated (not just repaired)
+- Include method used: "translation" (translated from existing language), "inference" (inferred from context), "completion" (completed truncated content)
 </output_format>
 
 <examples>
@@ -218,12 +292,16 @@ DO repair:
 - YAML syntax errors
 - Malformed headers
 - Minor formatting issues
+{"- Missing language sections (GENERATE by translating from existing content)" if self.enable_content_generation and self.repair_missing_sections else ""}
+{"- Incomplete Q&A pairs (GENERATE missing questions/answers from context)" if self.enable_content_generation else ""}
+{"- Unbalanced code fences (add missing ``` closers)" if self.enable_content_generation else ""}
+{"- Truncated content (complete based on context)" if self.enable_content_generation else ""}
 
 DO NOT repair (mark as unrepairable):
 - Completely empty notes
 - Notes with no Q&A content at all
 - Corrupted files with no recognizable structure
-- Notes missing both questions AND answers
+- Notes missing both questions AND answers (unless content generation can infer them from context)
 </constraints>"""
 
     def repair_and_parse(
@@ -251,11 +329,14 @@ DO NOT repair (mark as unrepairable):
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error("parser_repair_read_failed", file=str(file_path), error=str(e))
+            logger.error("parser_repair_read_failed",
+                         file=str(file_path), error=str(e))
             raise ParserError(f"Cannot read file for repair: {e}")
 
         # Build repair prompt
-        prompt = self._build_repair_prompt(content, str(original_error))
+        prompt = self._build_repair_prompt(
+            content, str(original_error), enable_content_gen=self.enable_content_generation
+        )
 
         # System prompt for note repair agent
         system_prompt = """<role>
@@ -321,7 +402,8 @@ ALWAYS:
             )
             return None
         except Exception as e:
-            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
+            logger.error("parser_repair_llm_failed",
+                         file=str(file_path), error=str(e))
             return None
 
         # Check if repairable
@@ -344,18 +426,33 @@ ALWAYS:
 
         # Log repairs applied
         repairs = repair_result.get("repairs", [])
+        content_generation_applied = repair_result.get(
+            "content_generation_applied", False)
+        generated_sections = repair_result.get("generated_sections", [])
+
         logger.info(
             "parser_repair_applied",
             file=str(file_path),
             diagnosis=repair_result.get("diagnosis", "N/A"),
             repairs_count=len(repairs),
+            content_generation_applied=content_generation_applied,
+            generated_sections_count=len(generated_sections),
         )
 
         for repair in repairs:
             logger.debug(
                 "parser_repair_detail",
-                issue=repair.get("issue"),
-                fix=repair.get("fix"),
+                repair_type=repair.get("type", "unknown"),
+                description=repair.get("description", ""),
+            )
+
+        for gen_section in generated_sections:
+            logger.info(
+                "parser_repair_content_generated",
+                file=str(file_path),
+                section_type=gen_section.get("section_type", "unknown"),
+                method=gen_section.get("method", "unknown"),
+                description=gen_section.get("description", ""),
             )
 
         # Try parsing repaired content
@@ -370,7 +467,8 @@ ALWAYS:
             metadata = parse_frontmatter(temp_content_for_parse, file_path)
 
             # Parse Q/A pairs from repaired content
-            qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata, file_path)
+            qa_pairs = parse_qa_pairs(
+                temp_content_for_parse, metadata, file_path)
 
             if not qa_pairs:
                 logger.warning(
@@ -401,6 +499,8 @@ def attempt_repair(
     original_error: Exception,
     ollama_client: BaseLLMProvider,
     model: str = "qwen3:8b",
+    enable_content_generation: bool = True,
+    repair_missing_sections: bool = True,
 ) -> tuple[NoteMetadata, list[QAPair]] | None:
     """Helper function to attempt repair of a failed parse.
 
@@ -409,9 +509,16 @@ def attempt_repair(
         original_error: Original parsing error
         ollama_client: LLM provider instance
         model: Model to use for repair
+        enable_content_generation: Allow LLM to generate missing content
+        repair_missing_sections: Generate missing language sections
 
     Returns:
         Tuple of (metadata, qa_pairs) if successful, None if unrepairable
     """
-    agent = ParserRepairAgent(ollama_client, model)
+    agent = ParserRepairAgent(
+        ollama_client,
+        model,
+        enable_content_generation=enable_content_generation,
+        repair_missing_sections=repair_missing_sections,
+    )
     return agent.repair_and_parse(file_path, original_error)
