@@ -28,6 +28,7 @@ anki_note_type: "APF (Prompt)"
 run_mode: "apply"  # "apply" or "dry-run"
 delete_mode: "archive"  # "delete" or "archive"
 index_use_llm_extraction: false  # Disable LLM parsing while indexing for speed
+enforce_bilingual_validation: true  # Require Q/A pairs for all languages
 
 # =============================================================================
 # Database

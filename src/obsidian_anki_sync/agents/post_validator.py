@@ -847,7 +847,8 @@ Requirements:
 
                 # Use slightly higher temperature for auto-fix to allow creativity
                 # but keep it low for consistency
-                auto_fix_temperature = max(0.1, self.temperature)
+                base_temperature = self.temperature if self.temperature is not None else 0.0
+                auto_fix_temperature = max(0.1, base_temperature)
 
                 logger.info(
                     "attempting_manual_auto_fix",

@@ -36,6 +36,9 @@ agent_execution_mode: "parallel"
 # Indexing LLM usage (disable to improve indexing speed and cost)
 index_use_llm_extraction: false
 
+# Enforce bilingual validation (require Q/A pairs for all languages)
+enforce_bilingual_validation: true
+
 # Ollama Configuration
 ollama_base_url: "http://localhost:11434"
 

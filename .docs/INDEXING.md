@@ -382,6 +382,8 @@ Cards: 750
 
 Large language model extraction can dramatically slow indexing because every note triggers an expensive LLM call. Set `index_use_llm_extraction: false` (default) in `config.yaml` to rely on the fast rule-based parser while indexing. This keeps metadata and QA counts accurate without incurring LLM latency or cost, while still allowing agent-driven extraction later in the sync pipeline.
 
+Use `obsidian-anki-sync lint-note <path>` to check a note for bilingual completeness and malformed code fences before running a full sync.
+
 ## Maintenance
 
 ### Rebuild Index

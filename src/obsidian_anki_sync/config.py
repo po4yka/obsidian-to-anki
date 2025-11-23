@@ -146,6 +146,7 @@ class Config(BaseSettings):
 
     # Agent system settings (optional, defaults provided)
     use_agent_system: bool = False
+    enforce_bilingual_validation: bool = True
 
     # Parser-Repair Agent
     parser_repair_enabled: bool = True

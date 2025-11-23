@@ -110,6 +110,18 @@ class TestSlugGeneration:
         assert base1 == base2
         assert hash1 == hash2
 
+    def test_slug_prefers_note_tail(self) -> None:
+        """Long slugs should preserve the note-specific tail segment."""
+        slug, slug_base, _ = generate_slug(
+            source_path="30-System-Design/q-microservices-vs-monolith-architecture.md",
+            card_index=1,
+            lang="en",
+            existing_slugs=set(),
+        )
+
+        assert "architecture" in slug_base
+        assert slug.endswith("-en")
+
 
 class TestManifestCreation:
     """Test manifest generation."""

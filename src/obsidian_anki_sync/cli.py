@@ -10,6 +10,8 @@ from rich.table import Table
 
 from .cli_commands.shared import get_config_and_logger
 from .cli_commands.sync_handler import run_sync
+from .obsidian.note_validator import validate_note_structure
+from .obsidian.parser import parse_frontmatter
 from .utils.preflight import run_preflight_checks
 
 app = typer.Typer(
@@ -211,6 +213,63 @@ def test_run(
         logger.error("test_run_failed", error=str(e))
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
+
+
+@app.command(name="lint-note")
+def lint_note(
+    note_path: Annotated[
+        Path, typer.Argument(help="Path to note file (markdown)", exists=True)
+    ],
+    enforce_bilingual: Annotated[
+        bool,
+        typer.Option(
+            "--enforce-bilingual/--allow-partial",
+            help="Require complete Q/A pairs for every language tag.",
+        ),
+    ] = True,
+    check_code_fences: Annotated[
+        bool,
+        typer.Option(
+            "--check-code-fences/--skip-code-fences",
+            help="Validate that ``` fences are balanced.",
+        ),
+    ] = True,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+    ] = "INFO",
+    config_path: Annotated[
+        Path | None,
+        typer.Option("--config", help="Path to config.yaml", exists=True),
+    ] = None,
+) -> None:
+    """Lint a note for bilingual completeness and formatting issues."""
+    _, logger = get_config_and_logger(config_path, log_level)
+    logger.info("lint_note_started", path=str(note_path))
+
+    try:
+        content = note_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        console.print(f"[bold red]Failed to read note:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    metadata = parse_frontmatter(content, note_path)
+    errors = validate_note_structure(
+        metadata,
+        content,
+        enforce_languages=enforce_bilingual,
+        check_code_fences=check_code_fences,
+    )
+
+    if errors:
+        console.print(f"[bold red]Found {len(errors)} issue(s):[/bold red]")
+        for issue in errors:
+            console.print(f"  [red]- {issue}[/red]")
+        logger.warning("lint_note_failed", path=str(note_path), errors=errors)
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]No lint issues detected.[/bold green]")
+    logger.info("lint_note_passed", path=str(note_path))
 
 
 @app.command()
