@@ -250,14 +250,33 @@ class AgentOrchestrator:
 
         # Stage 3: Post-validation with retry
         post_val_start = time.time()
-        max_retries = getattr(self.config, "post_validation_max_retries", 3)
+        base_max_retries = getattr(self.config, "post_validation_max_retries", 3)
         auto_fix = getattr(self.config, "post_validation_auto_fix", True)
         strict_mode = getattr(self.config, "post_validation_strict_mode", True)
 
+        # Configurable retry counts per error type
+        retry_config = getattr(self.config, "post_validation_retry_config", {})
+        # Default: syntax errors get more retries (deterministic), semantic errors get fewer
+        default_retries = {
+            "syntax": base_max_retries + 2,  # 5 retries for syntax (more fixable)
+            "template": base_max_retries + 1,  # 4 retries for template
+            "html": base_max_retries + 1,  # 4 retries for HTML
+            "manifest": base_max_retries,  # 3 retries for manifest
+            "factual": base_max_retries - 1,  # 2 retries for factual (harder to fix)
+            "semantic": base_max_retries - 1,  # 2 retries for semantic (harder to fix)
+        }
+        # Merge with config overrides
+        retry_counts = {**default_retries, **retry_config}
+
         current_cards = gen_result.cards
         retry_count = 0
+        error_type = "none"
 
-        for attempt in range(max_retries):
+        # Determine max retries based on first error type
+        max_retries = base_max_retries  # Will be updated after first validation
+
+        attempt = 0
+        while attempt < max_retries:
             post_result = self.post_validator.validate(
                 cards=current_cards, metadata=metadata, strict_mode=strict_mode
             )
@@ -297,14 +316,35 @@ class AgentOrchestrator:
                 )
 
             # Validation failed
+            error_type = post_result.error_type
+            # Update max retries based on error type (after first failure)
+            if attempt == 0:
+                max_retries = retry_counts.get(error_type, base_max_retries)
+                logger.info(
+                    "post_validation_retry_config",
+                    error_type=error_type,
+                    max_retries=max_retries,
+                )
+
             logger.warning(
                 "post_validation_failed",
                 correlation_id=correlation_id,
                 note_id=metadata.id,
                 attempt=attempt + 1,
-                error_type=post_result.error_type,
+                max_attempts=max_retries,
+                error_type=error_type,
                 error_details=post_result.error_details,
             )
+
+            # Exponential backoff before retry (except on first attempt)
+            if attempt > 0:
+                backoff_seconds = min(2 ** (attempt - 1), 10)  # Cap at 10 seconds
+                logger.debug(
+                    "post_validation_backoff",
+                    seconds=backoff_seconds,
+                    attempt=attempt + 1,
+                )
+                time.sleep(backoff_seconds)
 
             # Try auto-fix if enabled
             if auto_fix and post_result.corrected_cards:
@@ -330,12 +370,17 @@ class AgentOrchestrator:
                 if fixed_cards:
                     current_cards = fixed_cards
                     retry_count = attempt + 1
+                    attempt += 1
+                    continue  # Retry validation with fixed cards
                 else:
                     # Cannot fix, abort
                     break
             else:
                 # Auto-fix disabled, abort
                 break
+
+            # Increment attempt counter for next iteration
+            attempt += 1
 
         # Failed after all retries
         stage_times["post_validation"] = time.time() - post_val_start

@@ -151,6 +151,12 @@ class SyncEngine:
 
         self.changes: list[SyncAction] = []
         self.stats = {
+            # Error metrics
+            "parser_warnings": 0,
+            "llm_truncations": 0,
+            "validation_errors": 0,
+            "auto_fix_attempts": 0,
+            "auto_fix_successes": 0,
             "processed": 0,
             "created": 0,
             "updated": 0,
@@ -426,6 +432,35 @@ class SyncEngine:
                 self.progress.complete(success=True)
 
             logger.info("sync_completed", stats=self.stats)
+
+            # Log error metrics summary
+            if any(
+                self.stats.get(metric, 0) > 0
+                for metric in [
+                    "parser_warnings",
+                    "llm_truncations",
+                    "validation_errors",
+                    "auto_fix_attempts",
+                ]
+            ):
+                logger.info(
+                    "error_metrics_summary",
+                    parser_warnings=self.stats.get("parser_warnings", 0),
+                    llm_truncations=self.stats.get("llm_truncations", 0),
+                    validation_errors=self.stats.get("validation_errors", 0),
+                    auto_fix_attempts=self.stats.get("auto_fix_attempts", 0),
+                    auto_fix_successes=self.stats.get("auto_fix_successes", 0),
+                    auto_fix_success_rate=(
+                        round(
+                            self.stats.get("auto_fix_successes", 0)
+                            / self.stats.get("auto_fix_attempts", 1)
+                            * 100,
+                            1,
+                        )
+                        if self.stats.get("auto_fix_attempts", 0) > 0
+                        else 0.0
+                    ),
+                )
 
             # Log LLM session summary
             from ..utils.llm_logging import log_session_summary
@@ -1371,6 +1406,15 @@ class SyncEngine:
             raise RuntimeError(
                 "Orchestrator does not have process_note method")
 
+        # Track metrics from agent pipeline
+        if result.post_validation:
+            if not result.post_validation.is_valid:
+                self.stats["validation_errors"] += 1
+        if result.retry_count > 0:
+            self.stats["auto_fix_attempts"] += result.retry_count
+            if result.success:
+                self.stats["auto_fix_successes"] += 1
+
         if not result.success or not result.generation:
             error_msg = (
                 result.post_validation.error_details
@@ -1556,6 +1600,7 @@ class SyncEngine:
         # Validate APF format
         validation = validate_apf(card.apf_html, slug)
         if validation.errors:
+            self.stats["validation_errors"] += len(validation.errors)
             logger.error("apf_validation_errors", slug=slug,
                          errors=validation.errors)
             raise ValueError(

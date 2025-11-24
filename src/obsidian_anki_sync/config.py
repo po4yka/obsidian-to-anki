@@ -184,6 +184,18 @@ class Config(BaseSettings):
     post_validation_max_retries: int = 3
     post_validation_auto_fix: bool = True
     post_validation_strict_mode: bool = True
+    # Configurable retry counts per error type (dict mapping error_type to max_retries)
+    # Example: {"syntax": 5, "html": 4, "semantic": 2}
+    post_validation_retry_config: dict[str, int] = Field(
+        default_factory=dict,
+        description="Custom retry counts per error type"
+    )
+
+    # LLM Performance Monitoring
+    llm_slow_request_threshold: float = Field(
+        default=60.0,
+        description="Threshold in seconds for logging slow LLM requests"
+    )
 
     # LangGraph + PydanticAI Agent System (new!)
     use_langgraph: bool = False  # Enable LangGraph-based orchestration
