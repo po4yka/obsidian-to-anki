@@ -288,11 +288,52 @@ def parse_note_with_repair(
         return metadata, qa_pairs
 
 
+def _preprocess_yaml_frontmatter(content: str) -> str:
+    """
+    Preprocess YAML frontmatter to fix common syntax errors.
+
+    Fixes issues like:
+    - Backticks in YAML arrays/strings (replaces with quotes or removes)
+    - Other common YAML syntax problems
+
+    Args:
+        content: Full note content with YAML frontmatter
+
+    Returns:
+        Preprocessed content with fixed YAML syntax
+    """
+    # Extract frontmatter section
+    frontmatter_match = re.match(
+        r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
+    if not frontmatter_match:
+        return content
+
+    frontmatter_start = frontmatter_match.group(1)
+    frontmatter_body = frontmatter_match.group(2)
+    frontmatter_end = frontmatter_match.group(3)
+    rest_content = content[frontmatter_match.end():]
+
+    # Fix backticks in YAML arrays/strings
+    # Pattern: matches backticks around words in arrays or after colons
+    # Example: aliases: [Completion, `Flow`, onCompletion] -> aliases: [Completion, Flow, onCompletion]
+    # Or: aliases: [`Flow`] -> aliases: [Flow]
+    def fix_backticks(text: str) -> str:
+        # Replace backticks in array values: `word` -> word
+        # This handles cases like: [item1, `item2`, item3]
+        text = re.sub(r"`([^`]+)`", r"\1", text)
+        return text
+
+    fixed_frontmatter = fix_backticks(frontmatter_body)
+
+    return frontmatter_start + fixed_frontmatter + frontmatter_end + rest_content
+
+
 def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     """
     Extract and parse YAML frontmatter from note content.
 
     Uses python-frontmatter with ruamel.yaml to preserve comments and order.
+    Applies preprocessing to fix common YAML syntax errors before parsing.
 
     Args:
         content: Full note content
@@ -304,11 +345,30 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     Raises:
         ParserError: If frontmatter is missing or invalid
     """
+    # Preprocess content to fix common YAML syntax errors
+    try:
+        preprocessed_content = _preprocess_yaml_frontmatter(content)
+    except Exception as e:
+        logger.warning(
+            "yaml_preprocessing_failed",
+            file=str(file_path),
+            error=str(e),
+        )
+        # Continue with original content if preprocessing fails
+        preprocessed_content = content
+
     # Parse frontmatter using python-frontmatter
     try:
-        post = frontmatter.loads(content)
+        post = frontmatter.loads(preprocessed_content)
     except Exception as e:
-        raise ParserError(f"Invalid YAML in {file_path}: {e}")
+        # Provide more helpful error message
+        error_msg = str(e)
+        if "backtick" in error_msg.lower() or "`" in error_msg:
+            raise ParserError(
+                f"Invalid YAML in {file_path}: {e}. "
+                "Note: Backticks (`) are not valid YAML syntax. Use quotes or remove them."
+            ) from e
+        raise ParserError(f"Invalid YAML in {file_path}: {e}") from e
 
     # Extract metadata dictionary
     data = post.metadata

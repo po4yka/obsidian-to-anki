@@ -7,6 +7,7 @@ import pytest
 
 from obsidian_anki_sync.obsidian.parser import (
     ParserError,
+    _preprocess_yaml_frontmatter,
     discover_notes,
     parse_frontmatter,
     parse_note,
@@ -69,6 +70,75 @@ Content.
 """
         with pytest.raises(ParserError, match="Invalid YAML"):
             parse_frontmatter(content, temp_dir / "test.md")
+
+    def test_backticks_in_aliases_array(self, temp_dir) -> None:
+        """Test that backticks in YAML arrays are automatically fixed."""
+        content = """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+aliases: [Completion, `Flow`, onCompletion]
+---
+
+Content here.
+"""
+        # Should parse successfully after preprocessing removes backticks
+        metadata = parse_frontmatter(content, temp_dir / "test.md")
+        assert "Flow" in metadata.aliases
+        assert "`Flow`" not in metadata.aliases
+
+    def test_backticks_in_string_values(self, temp_dir) -> None:
+        """Test that backticks in YAML string values are fixed."""
+        content = """---
+id: test-001
+title: `Test` Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+---
+
+Content here.
+"""
+        # Should parse successfully after preprocessing removes backticks
+        metadata = parse_frontmatter(content, temp_dir / "test.md")
+        assert metadata.title == "Test Question"
+        assert "`" not in metadata.title
+
+    def test_preprocess_yaml_frontmatter_backticks(self) -> None:
+        """Test YAML preprocessing removes backticks correctly."""
+        content = """---
+aliases: [Completion, `Flow`, onCompletion]
+tags: [`tag1`, tag2]
+---
+
+Content.
+"""
+        preprocessed = _preprocess_yaml_frontmatter(content)
+        assert "`Flow`" not in preprocessed
+        assert "Flow" in preprocessed
+        assert "`tag1`" not in preprocessed
+        assert "tag1" in preprocessed
+
+    def test_preprocess_yaml_frontmatter_preserves_valid_yaml(self) -> None:
+        """Test that preprocessing doesn't break valid YAML."""
+        content = """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+---
+
+Content here.
+"""
+        preprocessed = _preprocess_yaml_frontmatter(content)
+        # Should be identical to original since no backticks
+        assert preprocessed == content
 
 
 class TestQAParsing:
