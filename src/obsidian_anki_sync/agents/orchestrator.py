@@ -356,6 +356,8 @@ class AgentOrchestrator:
                 )
                 current_cards = post_result.corrected_cards
                 retry_count = attempt + 1
+                attempt += 1
+                continue  # Retry validation with fixed cards
             elif auto_fix:
                 # Attempt auto-fix manually
                 logger.info(
