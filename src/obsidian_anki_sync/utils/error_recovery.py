@@ -14,6 +14,7 @@ from ..obsidian.parser import parse_note
 from ..exceptions import ParserError
 from ..utils.logging import get_logger
 from ..utils.types import RecoveryResult
+from ..agents.specialized_agents import diagnose_and_solve_problems
 from .content_preprocessor import ContentPreprocessor, PreprocessingConfig
 
 logger = get_logger(__name__)
@@ -78,7 +79,23 @@ class ErrorRecoveryManager:
         except Exception as e:
             logger.warning("preprocessing_recovery_failed", error=str(e))
 
-        # Strategy 3: Auto-repair specific issues
+        # Strategy 3: Specialized agent repair
+        try:
+            result = self._try_specialized_agents(file_path, original_error)
+            if result:
+                metadata, qa_pairs = result
+                return RecoveryResult(
+                    success=True,
+                    metadata=metadata,
+                    qa_pairs=qa_pairs,
+                    method_used="specialized_agent_recovery",
+                    warnings=["Content was repaired by specialized agent"],
+                    original_error=original_error
+                )
+        except Exception as e:
+            logger.warning("specialized_agent_recovery_failed", error=str(e))
+
+        # Strategy 4: Auto-repair specific issues
         try:
             repaired_content = self._auto_repair_file(file_path)
             if repaired_content:
@@ -312,6 +329,56 @@ class ErrorRecoveryManager:
                     break
 
         return languages or ['en']  # Default to English
+
+    def _try_specialized_agents(self, file_path: Path, original_error: str) -> Optional[Tuple[NoteMetadata, List[QAPair]]]:
+        """Try specialized agents to repair the content."""
+        try:
+            # Read the original content
+            content = file_path.read_text(encoding='utf-8')
+
+            # Prepare error context
+            error_context = {
+                'error_message': original_error,
+                'processing_stage': 'parsing',
+                'file_path': str(file_path)
+            }
+
+            # Use specialized agents
+            agent_results = diagnose_and_solve_problems(content, error_context)
+
+            # Find the first successful result
+            for result in agent_results:
+                if result.success and result.content:
+                    logger.info(
+                        "specialized_agent_repair_attempt",
+                        confidence=result.confidence,
+                        reasoning=result.reasoning[:100] + "..." if len(
+                            result.reasoning) > 100 else result.reasoning
+                    )
+
+                    # Try to parse the repaired content
+                    try:
+                        temp_path = self._create_temp_file(
+                            result.content, file_path)
+                        metadata, qa_pairs = parse_note(temp_path)
+                        temp_path.unlink(missing_ok=True)
+
+                        return metadata, qa_pairs
+
+                    except Exception as parse_error:
+                        logger.warning(
+                            "specialized_agent_repair_parse_failed",
+                            parse_error=str(parse_error)
+                        )
+                        continue
+
+            logger.info("no_specialized_agent_succeeded",
+                        attempts=len(agent_results))
+            return None
+
+        except Exception as e:
+            logger.error("specialized_agents_failed", error=str(e))
+            return None
 
     def _find_frontmatter_end(self, lines: List[str]) -> int:
         """Find the end of frontmatter."""
