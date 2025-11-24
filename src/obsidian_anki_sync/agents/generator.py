@@ -18,6 +18,7 @@ from ..utils.code_detection import (
 )
 from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
+from ..apf.html_generator import HTMLTemplateGenerator
 from .debug_artifacts import save_failed_llm_call
 from .llm_errors import (
     categorize_llm_error,
@@ -368,7 +369,8 @@ class GeneratorAgent:
                 response_text = None
                 if hasattr(e, "__context__") and hasattr(e.__context__, "response"):
                     try:
-                        response_text = getattr(e.__context__, "response", None)
+                        response_text = getattr(
+                            e.__context__, "response", None)
                     except (AttributeError, TypeError) as attr_err:
                         # Defensive: Ignore if response extraction fails
                         logger.debug(
@@ -432,7 +434,8 @@ class GeneratorAgent:
                     user_message=format_llm_error_for_user(llm_error),
                     duration=round(card_duration, 2),
                     attempts_made=attempt,
-                    debug_artifact=str(artifact_path) if artifact_path else None,
+                    debug_artifact=str(
+                        artifact_path) if artifact_path else None,
                 )
 
                 # Record failure metrics
@@ -448,7 +451,8 @@ class GeneratorAgent:
                 raise llm_error from e
 
         # Should never reach here, but just in case
-        raise RuntimeError(f"Failed to generate card after {max_retries} attempts")
+        raise RuntimeError(
+            f"Failed to generate card after {max_retries} attempts")
 
     def _build_user_prompt(
         self,
@@ -719,7 +723,8 @@ Now generate the card following this structure:
             apf_html = apf_html[: end_of_cards_pos + len("END_OF_CARDS")]
         else:
             # Fallback: Strip after manifest comment
-            manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
+            manifest_match = re.search(
+                r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
             if manifest_match:
                 end_pos = manifest_match.end()
                 apf_html = apf_html[:end_pos]
@@ -729,7 +734,8 @@ Now generate the card following this structure:
         if tags_match:
             # Use tags from model output
             tags = tags_match.group(1).strip().split()
-            logger.debug("extracted_tags_from_output", slug=manifest.slug, tags=tags)
+            logger.debug("extracted_tags_from_output",
+                         slug=manifest.slug, tags=tags)
         else:
             # Generate tags deterministically
             tags = self._generate_tags(metadata, manifest.lang)
@@ -771,7 +777,8 @@ Now generate the card following this structure:
             and has_end_of_cards
         ):
             # Missing wrapper sentinels, add them
-            logger.debug("adding_missing_wrapper_sentinels", slug=manifest.slug)
+            logger.debug("adding_missing_wrapper_sentinels",
+                         slug=manifest.slug)
 
             # Wrap the card content
             lines = []
@@ -792,12 +799,16 @@ Now generate the card following this structure:
             apf_html = "\n".join(lines)
 
         # 9. Normalize card header to match validator expectations
-        apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
+        apf_html = self._normalize_card_header(
+            apf_html, manifest, card_type, tags)
 
         # 10. Fix HTML validation issues: wrap standalone <code> in <pre><code>
         apf_html = self._fix_code_tags(apf_html)
 
-        # 11. Ensure proper formatting
+        # 11. Final HTML validation and auto-fix using structured templates
+        apf_html = self._validate_and_fix_html(apf_html, manifest)
+
+        # 12. Ensure proper formatting
         apf_html = apf_html.strip()
 
         return apf_html
@@ -830,8 +841,10 @@ Now generate the card following this structure:
                 slug_match = re.search(r"slug:\s*([^\s|]+)", header)
                 slug = slug_match.group(1) if slug_match else manifest.slug
 
-                card_type_match = re.search(r"CardType:\s*(\w+)", header, re.IGNORECASE)
-                card_type = card_type_match.group(1).capitalize() if card_type_match else "Simple"
+                card_type_match = re.search(
+                    r"CardType:\s*(\w+)", header, re.IGNORECASE)
+                card_type = card_type_match.group(
+                    1).capitalize() if card_type_match else "Simple"
                 if card_type not in ["Simple", "Missing", "Draw"]:
                     card_type = "Simple"
 
@@ -854,7 +867,8 @@ Now generate the card following this structure:
                 # Build correct header
                 fixed_header = f"<!-- Card {card_num} | slug: {slug} | CardType: {card_type} | Tags: {tags_str} -->"
                 html = html[:match.start()] + fixed_header + html[match.end():]
-                logger.debug("pre_validation_fix_card_header", card_num=card_num, slug=slug)
+                logger.debug("pre_validation_fix_card_header",
+                             card_num=card_num, slug=slug)
 
         return html
 
@@ -887,10 +901,12 @@ Now generate the card following this structure:
             manifest_comment = f"<!-- manifest: {manifest_json} -->"
 
             if "<!-- END_CARDS -->" in html:
-                html = html.replace("<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
+                html = html.replace("<!-- END_CARDS -->",
+                                    f"{manifest_comment}\n<!-- END_CARDS -->")
             else:
                 html += f"\n{manifest_comment}"
-            logger.debug("pre_validation_fix_added_manifest", slug=manifest.slug)
+            logger.debug("pre_validation_fix_added_manifest",
+                         slug=manifest.slug)
         else:
             # Validate manifest JSON
             try:
@@ -903,10 +919,13 @@ Now generate the card following this structure:
                     manifest_data["lang"] = manifest.lang
                     manifest_data["type"] = manifest.type
                     manifest_data["tags"] = manifest.tags
-                    new_manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                    new_manifest_json = json.dumps(
+                        manifest_data, separators=(',', ':'))
                     new_manifest = f"<!-- manifest: {new_manifest_json} -->"
-                    html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
-                    logger.debug("pre_validation_fix_manifest_slug", slug=manifest.slug)
+                    html = re.sub(manifest_pattern, new_manifest,
+                                  html, flags=re.DOTALL)
+                    logger.debug("pre_validation_fix_manifest_slug",
+                                 slug=manifest.slug)
             except json.JSONDecodeError:
                 # Invalid JSON, replace it
                 manifest_data = {
@@ -915,10 +934,13 @@ Now generate the card following this structure:
                     "type": manifest.type,
                     "tags": manifest.tags
                 }
-                new_manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                new_manifest_json = json.dumps(
+                    manifest_data, separators=(',', ':'))
                 new_manifest = f"<!-- manifest: {new_manifest_json} -->"
-                html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
-                logger.debug("pre_validation_fix_manifest_json", slug=manifest.slug)
+                html = re.sub(manifest_pattern, new_manifest,
+                              html, flags=re.DOTALL)
+                logger.debug("pre_validation_fix_manifest_json",
+                             slug=manifest.slug)
 
         return html
 
@@ -936,7 +958,8 @@ Now generate the card following this structure:
         # Match <code>...</code> tags (non-greedy to match individual tags)
         fixed_html = html
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-        matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+        matches = list(re.finditer(
+            code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
 
         # Process matches in reverse order to avoid offset issues
         for match in reversed(matches):
@@ -948,7 +971,8 @@ Now generate the card following this structure:
             # Look backwards for <pre> tag
             context_before = fixed_html[max(0, start_pos - 500):start_pos]
             # Find the last <pre> tag before this code
-            pre_matches = list(re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
+            pre_matches = list(re.finditer(
+                r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
             if pre_matches:
                 last_pre = pre_matches[-1]
                 pre_start = last_pre.start() + (start_pos - 500)
@@ -960,7 +984,169 @@ Now generate the card following this structure:
 
             # This is a standalone <code> tag, wrap it
             wrapped = f"<pre>{code_tag}</pre>"
-            fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+            fixed_html = fixed_html[:start_pos] + \
+                wrapped + fixed_html[end_pos:]
+
+        return fixed_html
+
+    def _validate_and_fix_html(self, apf_html: str, manifest: Manifest) -> str:
+        """Validate and auto-fix HTML using structured generation approach.
+
+        Args:
+            apf_html: APF HTML content to validate and fix
+            manifest: Card manifest for context
+
+        Returns:
+            Validated and fixed HTML
+        """
+        from ..apf.html_validator import validate_card_html
+
+        # Validate the HTML
+        validation_errors = validate_card_html(apf_html)
+
+        if not validation_errors:
+            # HTML is already valid
+            return apf_html
+
+        logger.debug(
+            "html_validation_errors_found",
+            slug=manifest.slug,
+            errors=validation_errors
+        )
+
+        # Attempt auto-fix using the HTML generator
+        html_generator = HTMLTemplateGenerator()
+
+        # Try to extract card data and regenerate
+        try:
+            # Extract basic card data from the HTML
+            card_data = self._extract_card_data_from_html(apf_html, manifest)
+
+            if card_data:
+                # Regenerate HTML using structured templates
+                result = html_generator.generate_card_html(card_data)
+
+                if result.is_valid:
+                    logger.info(
+                        "html_auto_fixed_with_templates",
+                        slug=manifest.slug,
+                        original_errors=len(validation_errors),
+                        remaining_warnings=len(result.warnings)
+                    )
+
+                    if result.warnings:
+                        for warning in result.warnings:
+                            logger.warning("html_fix_warning",
+                                           warning=warning, slug=manifest.slug)
+
+                    return result.html
+                else:
+                    logger.warning(
+                        "html_template_regeneration_failed",
+                        slug=manifest.slug,
+                        errors=result.validation_errors
+                    )
+
+        except Exception as e:
+            logger.warning(
+                "html_auto_fix_extraction_failed",
+                slug=manifest.slug,
+                error=str(e)
+            )
+
+        # Fallback: apply basic fixes
+        fixed_html = self._apply_basic_html_fixes(apf_html, validation_errors)
+
+        logger.debug(
+            "applied_basic_html_fixes",
+            slug=manifest.slug,
+            original_errors=len(validation_errors)
+        )
+
+        return fixed_html
+
+    def _extract_card_data_from_html(self, apf_html: str, manifest: Manifest) -> dict:
+        """Extract card data from existing HTML for regeneration."""
+        import re
+
+        card_data = {
+            'card_index': 1,
+            'slug': manifest.slug,
+            'tags': manifest.tags,
+            'title': 'Generated Card',
+            'question': '',
+            'answer': '',
+            'code_sample': None,
+            'key_points': [],
+            'other_notes': '',
+            'references': ''
+        }
+
+        try:
+            # Extract title
+            title_match = re.search(
+                r'<!-- Title -->\s*\n(.*?)(?=\n<!--|\n*$)', apf_html, re.DOTALL)
+            if title_match:
+                card_data['title'] = title_match.group(1).strip()
+
+            # Extract question
+            question_match = re.search(
+                r'<!-- Question -->\s*\n(.*?)(?=\n<!--|\n*$)', apf_html, re.DOTALL)
+            if question_match:
+                card_data['question'] = question_match.group(1).strip()
+
+            # Extract answer
+            answer_match = re.search(
+                r'<!-- Answer -->\s*\n(.*?)(?=\n<!--|\n*$)', apf_html, re.DOTALL)
+            if answer_match:
+                card_data['answer'] = answer_match.group(1).strip()
+
+            # Extract key points
+            key_points_match = re.search(
+                r'<!-- Key point -->\s*\n(.*?)(?=\n<!--|\n*$)', apf_html, re.DOTALL)
+            if key_points_match:
+                key_points_html = key_points_match.group(1).strip()
+                # Extract list items
+                li_matches = re.findall(
+                    r'<li>(.*?)</li>', key_points_html, re.IGNORECASE)
+                if li_matches:
+                    card_data['key_points'] = [li.strip() for li in li_matches]
+
+            # Extract code samples
+            code_match = re.search(
+                r'<!-- Sample \(code block\) -->\s*\n(.*?)(?=\n<!--|\n*$)', apf_html, re.DOTALL)
+            if code_match:
+                code_html = code_match.group(1).strip()
+                # Extract code content
+                code_content_match = re.search(
+                    r'<pre><code[^>]*>(.*?)</code></pre>', code_html, re.DOTALL | re.IGNORECASE)
+                if code_content_match:
+                    card_data['code_sample'] = code_content_match.group(
+                        1).strip()
+
+        except Exception as e:
+            logger.debug("card_data_extraction_failed",
+                         slug=manifest.slug, error=str(e))
+            return None
+
+        return card_data
+
+    def _apply_basic_html_fixes(self, html: str, errors: list[str]) -> str:
+        """Apply basic HTML fixes for common validation errors."""
+        fixed_html = html
+
+        for error in errors:
+            if 'language- class' in error:
+                # Add default language class to code elements without one
+                fixed_html = re.sub(
+                    r'<code(?![^>]*class=)',
+                    r'<code class="language-text"',
+                    fixed_html,
+                    flags=re.IGNORECASE
+                )
+            elif 'wrap in <pre><code>' in error:
+                # This is complex to fix automatically, log for manual review
+                logger.debug("complex_html_fix_needed", error=error)
 
         return fixed_html
 
@@ -991,7 +1177,8 @@ Now generate the card following this structure:
         match = re.search(card_header_pattern, apf_html)
         if match:
             apf_html = (
-                apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+                apf_html[: match.start()] + correct_header +
+                apf_html[match.end():]
             )
             logger.debug(
                 "normalized_card_header",

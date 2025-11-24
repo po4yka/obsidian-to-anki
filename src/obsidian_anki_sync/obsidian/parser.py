@@ -13,6 +13,7 @@ from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..obsidian.note_validator import validate_note_structure
 from ..providers.base import BaseLLMProvider
+from ..utils.error_recovery import parse_note_with_recovery, RecoveryResult
 from ..utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -543,7 +544,8 @@ def parse_qa_pairs(
                             qa_pairs.extend(extracted_pairs)
                             logger.info(
                                 "llm_extraction_recovered_incomplete_block",
-                                file=str(file_path) if file_path else "unknown",
+                                file=str(
+                                    file_path) if file_path else "unknown",
                                 card_index=card_index,
                                 recovered_pairs=len(extracted_pairs),
                             )
@@ -988,3 +990,54 @@ def _normalize_sources(value: Any) -> list[dict[str, str]]:
             if text:
                 normalized.append({"url": text})
     return normalized
+
+
+def parse_note_with_error_recovery(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
+    """
+    Parse an Obsidian note with comprehensive error recovery.
+
+    Uses multiple fallback strategies:
+    1. Normal tolerant parsing
+    2. Content preprocessing and retry
+    3. Auto-repair of common issues
+    4. Minimal valid structure creation
+
+    Args:
+        file_path: Path to the markdown file
+
+    Returns:
+        Tuple of (metadata, qa_pairs)
+
+    Raises:
+        ParserError: If all recovery strategies fail
+    """
+    result = parse_note_with_recovery(file_path)
+
+    if result.success:
+        logger.info(
+            "parse_with_recovery_successful",
+            file=str(file_path),
+            method=result.method_used,
+            qa_pairs_count=len(result.qa_pairs) if result.qa_pairs else 0,
+            warnings=result.warnings
+        )
+
+        if result.warnings:
+            for warning in result.warnings:
+                logger.warning("recovery_warning",
+                               warning=warning, file=str(file_path))
+
+        return result.metadata, result.qa_pairs
+    else:
+        error_msg = f"Failed to parse {file_path} with all recovery strategies"
+        if result.original_error:
+            error_msg += f": {result.original_error}"
+
+        logger.error(
+            "parse_recovery_failed",
+            file=str(file_path),
+            original_error=result.original_error,
+            warnings=result.warnings
+        )
+
+        raise ParserError(error_msg)
