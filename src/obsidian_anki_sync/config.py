@@ -263,6 +263,51 @@ class Config(BaseSettings):
         description="Enable failure pattern learning and routing optimization"
     )
 
+    # ============================================================================
+    # Agent Memory Configuration
+    # ============================================================================
+    # Enable agentic memory system
+    enable_agent_memory: bool = Field(
+        default=True,
+        description="Enable persistent agentic memory for learning"
+    )
+
+    # Memory storage path
+    memory_storage_path: Path = Field(
+        default=Path(".agent_memory"),
+        description="Path to store agent memory data"
+    )
+
+    # Memory backend
+    memory_backend: str = Field(
+        default="chromadb",
+        description="Memory backend: 'chromadb' or 'sqlite'"
+    )
+
+    # Enable semantic search
+    enable_semantic_search: bool = Field(
+        default=True,
+        description="Enable semantic search using embeddings"
+    )
+
+    # Embedding model
+    embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="Embedding model for semantic search"
+    )
+
+    # Memory retention
+    memory_retention_days: int = Field(
+        default=90,
+        description="Number of days to retain memories"
+    )
+
+    # Maximum memories per type
+    max_memories_per_type: int = Field(
+        default=10000,
+        description="Maximum number of memories per type"
+    )
+
     # LLM Performance Monitoring
     llm_slow_request_threshold: float = Field(
         default=60.0,

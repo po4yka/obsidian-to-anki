@@ -18,6 +18,12 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Import memory store if available
+try:
+    from .agent_memory import AgentMemoryStore
+except ImportError:
+    AgentMemoryStore = None
+
 
 class HealthStatus(str, Enum):
     """Agent health status."""
@@ -386,13 +392,17 @@ class MetricsCollector:
 class PerformanceTracker:
     """Track performance metrics for agents."""
 
-    def __init__(self, metrics_collector: MetricsCollector):
+    def __init__(
+        self, metrics_collector: MetricsCollector, memory_store: Optional[Any] = None
+    ):
         """Initialize performance tracker.
 
         Args:
             metrics_collector: Metrics collector instance
+            memory_store: Optional persistent memory store
         """
         self.metrics_collector = metrics_collector
+        self.memory_store = memory_store
         self.agent_metrics: Dict[str, AgentMetrics] = defaultdict(AgentMetrics)
 
     def record_call(
@@ -430,6 +440,20 @@ class PerformanceTracker:
 
             self.metrics_collector.record_success(
                 agent_name, confidence, response_time)
+
+            # Store in persistent memory if available
+            if self.memory_store:
+                try:
+                    self.memory_store.store_performance_metric(
+                        agent_name=agent_name,
+                        metric_name="success",
+                        value=1.0,
+                        metadata={"confidence": confidence,
+                                  "response_time": response_time},
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
         else:
             metrics.failure_count += 1
             metrics.last_failure_time = time.time()
@@ -441,6 +465,20 @@ class PerformanceTracker:
             self.metrics_collector.record_failure(
                 agent_name, error_type or "unknown", response_time)
 
+            # Store in persistent memory if available
+            if self.memory_store:
+                try:
+                    self.memory_store.store_performance_metric(
+                        agent_name=agent_name,
+                        metric_name="failure",
+                        value=1.0,
+                        metadata={"error_type": error_type or "unknown",
+                                  "response_time": response_time},
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
+
         # Update running average response time
         if metrics.total_calls == 1:
             metrics.avg_response_time = response_time
@@ -449,6 +487,17 @@ class PerformanceTracker:
                 metrics.avg_response_time *
                 (metrics.total_calls - 1) + response_time
             ) / metrics.total_calls
+
+        # Store response time metric
+        if self.memory_store:
+            try:
+                self.memory_store.store_performance_metric(
+                    agent_name=agent_name,
+                    metric_name="response_time",
+                    value=response_time,
+                )
+            except Exception as e:
+                logger.warning("performance_metric_store_failed", error=str(e))
 
     def get_agent_metrics(self, agent_name: str) -> AgentMetrics:
         """Get metrics for a specific agent."""
