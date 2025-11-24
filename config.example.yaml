@@ -40,6 +40,9 @@ index_use_llm_extraction: false
 # Default to False - validation done by LLM repair instead
 enforce_bilingual_validation: false
 
+# Card creation verification (verify cards exist in Anki after creation)
+verify_card_creation: true
+
 # Imperfect note processing settings
 enable_content_generation: true # Allow LLM to generate missing content
 repair_missing_sections: true # Generate missing language sections

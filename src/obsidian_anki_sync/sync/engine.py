@@ -1957,6 +1957,10 @@ class SyncEngine:
                     "card_created_successfully", slug=card.slug, anki_guid=note_id
                 )
 
+                # Verify card creation if enabled
+                if getattr(self.config, "verify_card_creation", True):
+                    self._verify_card_creation(card, note_id, fields, card.tags)
+
         except AnkiConnectError as e:
             logger.error("anki_create_failed", slug=card.slug, error=str(e))
             self.db.update_card_status(card.slug, "failed", str(e))
@@ -1966,6 +1970,136 @@ class SyncEngine:
             logger.error("card_create_failed", slug=card.slug, error=str(e))
             self.db.update_card_status(card.slug, "failed", str(e))
             raise CardOperationError(f"Failed to create card {card.slug}: {e}")
+
+    def _verify_card_creation(
+        self, card: Card, note_id: int, expected_fields: dict[str, str], expected_tags: list[str]
+    ) -> None:
+        """Verify that a card was successfully created in Anki.
+
+        Args:
+            card: Card object that was created
+            note_id: Anki note ID returned from creation
+            expected_fields: Expected field values
+            expected_tags: Expected tags
+
+        Raises:
+            CardOperationError: If verification fails critically
+        """
+        try:
+            # Get note info from Anki
+            notes_info = self.anki.notes_info([note_id])
+            if not notes_info:
+                logger.error(
+                    "card_verification_failed_not_found",
+                    slug=card.slug,
+                    note_id=note_id,
+                )
+                raise CardOperationError(
+                    f"Card {card.slug} (note_id={note_id}) not found in Anki after creation"
+                )
+
+            note_info = notes_info[0]
+
+            # Verify note exists
+            if note_info.get("noteId") != note_id:
+                logger.error(
+                    "card_verification_failed_id_mismatch",
+                    slug=card.slug,
+                    expected_note_id=note_id,
+                    actual_note_id=note_info.get("noteId"),
+                )
+                raise CardOperationError(
+                    f"Card {card.slug} verification failed: note ID mismatch"
+                )
+
+            # Verify deck
+            actual_deck = note_info.get("deckName", "")
+            expected_deck = self.config.anki_deck_name
+            if actual_deck != expected_deck:
+                logger.warning(
+                    "card_verification_deck_mismatch",
+                    slug=card.slug,
+                    expected_deck=expected_deck,
+                    actual_deck=actual_deck,
+                )
+
+            # Verify note type
+            actual_note_type = note_info.get("modelName", "")
+            if actual_note_type != card.note_type:
+                logger.warning(
+                    "card_verification_note_type_mismatch",
+                    slug=card.slug,
+                    expected_note_type=card.note_type,
+                    actual_note_type=actual_note_type,
+                )
+
+            # Verify fields (check key fields only to avoid false positives from formatting)
+            actual_fields = note_info.get("fields", {})
+            field_mismatches = []
+            for field_name, expected_value in expected_fields.items():
+                actual_value = actual_fields.get(field_name, {}).get("value", "")
+                # Normalize whitespace for comparison
+                expected_normalized = " ".join(expected_value.split())
+                actual_normalized = " ".join(actual_value.split())
+                if expected_normalized != actual_normalized:
+                    field_mismatches.append(field_name)
+                    logger.debug(
+                        "card_verification_field_mismatch",
+                        slug=card.slug,
+                        field=field_name,
+                        expected_length=len(expected_value),
+                        actual_length=len(actual_value),
+                    )
+
+            if field_mismatches:
+                logger.warning(
+                    "card_verification_field_mismatches",
+                    slug=card.slug,
+                    mismatched_fields=field_mismatches,
+                )
+
+            # Verify tags
+            actual_tags = set(note_info.get("tags", []))
+            expected_tags_set = set(expected_tags)
+            if actual_tags != expected_tags_set:
+                missing_tags = expected_tags_set - actual_tags
+                extra_tags = actual_tags - expected_tags_set
+                if missing_tags or extra_tags:
+                    logger.warning(
+                        "card_verification_tag_mismatch",
+                        slug=card.slug,
+                        missing_tags=list(missing_tags),
+                        extra_tags=list(extra_tags),
+                    )
+
+            logger.debug(
+                "card_verification_succeeded",
+                slug=card.slug,
+                note_id=note_id,
+            )
+
+        except AnkiConnectError as e:
+            logger.error(
+                "card_verification_failed_anki_error",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            # Don't raise - verification failure shouldn't break the sync
+            # The card was created, verification is just a safety check
+
+        except CardOperationError:
+            # Re-raise critical verification failures
+            raise
+
+        except Exception as e:
+            logger.error(
+                "card_verification_failed_unexpected",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            # Don't raise - verification failure shouldn't break the sync
 
     def _update_card(self, card: Card, anki_guid: int) -> None:
         """Update card in Anki with atomic transaction."""
@@ -2113,6 +2247,11 @@ class SyncEngine:
                         successful=created_count,
                         failed=len(batch_actions) - created_count,
                     )
+
+                    # Verify card creation if enabled
+                    if getattr(self.config, "verify_card_creation", True):
+                        for card, note_id, fields, tags, _ in successful_cards:
+                            self._verify_card_creation(card, note_id, fields, tags)
 
             except Exception as e:
                 logger.error(
