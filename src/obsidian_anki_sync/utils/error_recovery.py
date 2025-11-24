@@ -5,16 +5,27 @@ to ensure processing continues even with problematic content.
 """
 
 import re
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from ..models import NoteMetadata, QAPair
 from ..obsidian.parser import parse_note
 from ..exceptions import ParserError
 from ..utils.logging import get_logger
 from ..utils.types import RecoveryResult
-from ..agents.specialized_agents import diagnose_and_solve_problems
+from ..agents.specialized_agents import (
+    ProblemRouter,
+    ProblemDomain,
+    diagnose_and_solve_problems,
+)
+from ..agents.agent_learning import AdaptiveRouter
+from ..agents.agent_monitoring import (
+    AgentHealthMonitor,
+    MetricsCollector,
+    PerformanceTracker,
+    InMemoryMetricsStorage,
+    DatabaseMetricsStorage,
+)
 from .content_preprocessor import ContentPreprocessor, PreprocessingConfig
 
 logger = get_logger(__name__)
@@ -23,13 +34,105 @@ logger = get_logger(__name__)
 class ErrorRecoveryManager:
     """Manages error recovery and graceful degradation for note processing."""
 
-    def __init__(self):
-        self.preprocessor = ContentPreprocessor(PreprocessingConfig(
-            sanitize_code_fences=True,
-            add_missing_languages=True,
-            normalize_whitespace=True,
-            fix_malformed_frontmatter=True
-        ))
+    def __init__(
+        self,
+        config: Any = None,
+        enable_adaptive_routing: bool = True,
+        enable_learning: bool = True,
+        enable_monitoring: bool = True,
+    ):
+        """Initialize error recovery manager.
+
+        Args:
+            config: Optional configuration object
+            enable_adaptive_routing: Enable adaptive routing
+            enable_learning: Enable learning system
+            enable_monitoring: Enable health monitoring and metrics
+        """
+        self.preprocessor = ContentPreprocessor(
+            PreprocessingConfig(
+                sanitize_code_fences=True,
+                add_missing_languages=True,
+                normalize_whitespace=True,
+                fix_malformed_frontmatter=True,
+            )
+        )
+
+        self.config = config
+        self.enable_adaptive_routing = enable_adaptive_routing
+        self.enable_learning = enable_learning
+        self.enable_monitoring = enable_monitoring
+
+        # Initialize monitoring if enabled
+        if enable_monitoring:
+            self._initialize_monitoring(config)
+
+        # Initialize router (adaptive or static)
+        self._initialize_router(config)
+
+    def _initialize_monitoring(self, config: Any) -> None:
+        """Initialize monitoring and metrics collection."""
+        # Determine metrics storage
+        metrics_storage_type = "memory"
+        if config:
+            metrics_storage_type = getattr(config, "metrics_storage", "memory")
+
+        if metrics_storage_type == "database":
+            # Use database storage if db_path available
+            db_path = None
+            if config:
+                db_path = getattr(config, "db_path", None)
+            if db_path:
+                metrics_storage = DatabaseMetricsStorage(
+                    Path(db_path) / "agent_metrics.db")
+            else:
+                metrics_storage = InMemoryMetricsStorage()
+        else:
+            metrics_storage = InMemoryMetricsStorage()
+
+        self.metrics_collector = MetricsCollector(metrics_storage)
+        self.performance_tracker = PerformanceTracker(self.metrics_collector)
+        self.health_monitor = AgentHealthMonitor()
+
+    def _initialize_router(self, config: Any) -> None:
+        """Initialize problem router (adaptive or static)."""
+        # Extract configuration
+        circuit_breaker_config = {}
+        rate_limit_config = {}
+        bulkhead_config = {}
+        confidence_threshold = 0.7
+
+        if config:
+            circuit_breaker_config = getattr(
+                config, "circuit_breaker_config", {})
+            rate_limit_config = getattr(config, "rate_limit_config", {})
+            bulkhead_config = getattr(config, "bulkhead_config", {})
+            confidence_threshold = getattr(config, "confidence_threshold", 0.7)
+            self.enable_adaptive_routing = getattr(
+                config, "enable_adaptive_routing", self.enable_adaptive_routing
+            )
+            self.enable_learning = getattr(
+                config, "enable_learning", self.enable_learning
+            )
+
+        # Create router
+        if self.enable_adaptive_routing and self.enable_monitoring:
+            # Use adaptive router with performance tracking
+            self.router = AdaptiveRouter(
+                performance_tracker=self.performance_tracker,
+                circuit_breaker_config=circuit_breaker_config,
+                rate_limit_config=rate_limit_config,
+                bulkhead_config=bulkhead_config,
+                confidence_threshold=confidence_threshold,
+            )
+        else:
+            # Use static router
+            self.router = ProblemRouter(
+                circuit_breaker_config=circuit_breaker_config,
+                rate_limit_config=rate_limit_config,
+                bulkhead_config=bulkhead_config,
+                confidence_threshold=confidence_threshold,
+            )
 
     def parse_with_recovery(self, file_path: Path) -> RecoveryResult:
         """
@@ -289,10 +392,11 @@ class ErrorRecoveryManager:
 
         # Create minimal QA pair
         qa_pair = QAPair(
-            question_en="Question content could not be parsed",
-            answer_en="Answer content could not be parsed",
             card_index=1,
-            confidence=0.0
+            question_en="Question content could not be parsed",
+            question_ru="Содержимое вопроса не удалось распарсить",
+            answer_en="Answer content could not be parsed",
+            answer_ru="Содержимое ответа не удалось распарсить",
         )
 
         return metadata, [qa_pair]
@@ -332,6 +436,8 @@ class ErrorRecoveryManager:
 
     def _try_specialized_agents(self, file_path: Path, original_error: str) -> Optional[Tuple[NoteMetadata, List[QAPair]]]:
         """Try specialized agents to repair the content."""
+        import time
+
         try:
             # Read the original content
             content = file_path.read_text(encoding='utf-8')
@@ -340,40 +446,117 @@ class ErrorRecoveryManager:
             error_context = {
                 'error_message': original_error,
                 'processing_stage': 'parsing',
-                'file_path': str(file_path)
+                'file_path': str(file_path),
+                'error_type': 'ParserError',
             }
 
-            # Use specialized agents
-            agent_results = diagnose_and_solve_problems(content, error_context)
+            # Use router to diagnose and solve
+            diagnoses = self.router.diagnose_and_route(content, error_context)
 
-            # Find the first successful result
-            for result in agent_results:
-                if result.success and result.content:
-                    logger.info(
-                        "specialized_agent_repair_attempt",
-                        confidence=result.confidence,
-                        reasoning=result.reasoning[:100] + "..." if len(
-                            result.reasoning) > 100 else result.reasoning
+            # Try each recommended agent in priority order
+            for domain, confidence in diagnoses:
+                start_time = time.time()
+
+                try:
+                    # Check health if monitoring enabled
+                    if self.enable_monitoring and hasattr(self, 'health_monitor'):
+                        agent_name = domain.value
+                        if self.health_monitor.should_check(agent_name):
+                            health_result = self.health_monitor.check_health(
+                                agent_name, test_func=lambda: None
+                            )
+                            if health_result.status == "unhealthy":
+                                logger.warning(
+                                    "agent_unhealthy_skipped",
+                                    agent=agent_name,
+                                    error=health_result.error,
+                                )
+                                continue
+
+                    # Solve problem using router (includes all resilience patterns)
+                    result = self.router.solve_problem(
+                        domain, content, error_context)
+                    duration = time.time() - start_time
+
+                    # Record metrics if monitoring enabled
+                    if self.enable_monitoring and hasattr(self, 'performance_tracker'):
+                        self.performance_tracker.record_call(
+                            agent_name=domain.value,
+                            success=result.success,
+                            confidence=result.confidence,
+                            response_time=duration,
+                        )
+
+                    if result.success and result.content:
+                        logger.info(
+                            "specialized_agent_repair_attempt",
+                            domain=domain.value,
+                            confidence=result.confidence,
+                            reasoning=result.reasoning[:100] + "..." if len(
+                                result.reasoning) > 100 else result.reasoning
+                        )
+
+                        # Try to parse the repaired content
+                        try:
+                            temp_path = self._create_temp_file(
+                                result.content, file_path)
+                            metadata, qa_pairs = parse_note(temp_path)
+                            temp_path.unlink(missing_ok=True)
+
+                            # Record success for learning
+                            if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                                self.router.failure_analyzer.analyze_success(
+                                    error_context, domain
+                                )
+
+                            return metadata, qa_pairs
+
+                        except Exception as parse_error:
+                            logger.warning(
+                                "specialized_agent_repair_parse_failed",
+                                domain=domain.value,
+                                parse_error=str(parse_error)
+                            )
+                            # Record failure for learning
+                            if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                                self.router.failure_analyzer.analyze_failure(
+                                    error_context, [domain]
+                                )
+                            continue
+                    else:
+                        # Record failure for learning
+                        if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                            self.router.failure_analyzer.analyze_failure(
+                                error_context, [domain]
+                            )
+
+                except Exception as agent_error:
+                    duration = time.time() - start_time
+                    logger.error(
+                        "specialized_agent_execution_failed",
+                        domain=domain.value,
+                        error=str(agent_error),
                     )
 
-                    # Try to parse the repaired content
-                    try:
-                        temp_path = self._create_temp_file(
-                            result.content, file_path)
-                        metadata, qa_pairs = parse_note(temp_path)
-                        temp_path.unlink(missing_ok=True)
-
-                        return metadata, qa_pairs
-
-                    except Exception as parse_error:
-                        logger.warning(
-                            "specialized_agent_repair_parse_failed",
-                            parse_error=str(parse_error)
+                    # Record failure
+                    if self.enable_monitoring and hasattr(self, 'performance_tracker'):
+                        self.performance_tracker.record_call(
+                            agent_name=domain.value,
+                            success=False,
+                            response_time=duration,
+                            error_type=type(agent_error).__name__,
                         )
-                        continue
+
+                    # Record failure for learning
+                    if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                        self.router.failure_analyzer.analyze_failure(
+                            error_context, [domain]
+                        )
+
+                    continue
 
             logger.info("no_specialized_agent_succeeded",
-                        attempts=len(agent_results))
+                        attempts=len(diagnoses))
             return None
 
         except Exception as e:

@@ -7,11 +7,23 @@ routing problems to the appropriate expert agent.
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Any, Tuple
 
 from ..utils.logging import get_logger
+from ..utils.resilience import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    ConfidenceValidator,
+    RateLimiter,
+    Bulkhead,
+    RateLimitExceededError,
+    ResourceExhaustedError,
+    LowConfidenceError,
+)
 from .json_schemas import get_qa_extraction_schema
 from .llm_errors import categorize_llm_error, log_llm_error
 from .models import GeneratedCard
@@ -82,9 +94,34 @@ class AgentResult:
 class ProblemRouter:
     """Routes problems to appropriate specialized agents."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        circuit_breaker_config: Optional[Dict[str, Dict[str, Any]]] = None,
+        rate_limit_config: Optional[Dict[str, int]] = None,
+        bulkhead_config: Optional[Dict[str, int]] = None,
+        confidence_threshold: float = 0.7,
+    ):
+        """Initialize problem router with resilience patterns.
+
+        Args:
+            circuit_breaker_config: Per-domain circuit breaker configuration
+            rate_limit_config: Per-domain rate limit configuration (calls per minute)
+            bulkhead_config: Per-domain bulkhead configuration (max concurrent)
+            confidence_threshold: Minimum confidence threshold for validation
+        """
         self.agents = {}
+        self.circuit_breakers: Dict[ProblemDomain, CircuitBreaker] = {}
+        self.rate_limiters: Dict[ProblemDomain, RateLimiter] = {}
+        self.bulkheads: Dict[ProblemDomain, Bulkhead] = {}
+        self.confidence_validator = ConfidenceValidator(
+            min_confidence=confidence_threshold)
+
         self._initialize_agents()
+        self._initialize_resilience_patterns(
+            circuit_breaker_config or {},
+            rate_limit_config or {},
+            bulkhead_config or {},
+        )
 
     def _initialize_agents(self):
         """Initialize all specialized agents."""
@@ -108,6 +145,51 @@ class ProblemRouter:
                 "QA extraction requires LLM provider")
 
         self.agents = agents
+
+    def _initialize_resilience_patterns(
+        self,
+        circuit_breaker_config: Dict[str, Dict[str, Any]],
+        rate_limit_config: Dict[str, int],
+        bulkhead_config: Dict[str, int],
+    ) -> None:
+        """Initialize resilience patterns for each agent domain.
+
+        Args:
+            circuit_breaker_config: Per-domain circuit breaker config
+            rate_limit_config: Per-domain rate limit config
+            bulkhead_config: Per-domain bulkhead config
+        """
+        default_cb_config = CircuitBreakerConfig()
+        default_rate_limit = 20  # calls per minute
+        default_bulkhead = 3  # max concurrent
+
+        for domain in ProblemDomain:
+            # Circuit breaker
+            cb_config_dict = circuit_breaker_config.get(
+                domain.value, circuit_breaker_config.get("default", {})
+            )
+            if cb_config_dict:
+                cb_config = CircuitBreakerConfig(**cb_config_dict)
+            else:
+                cb_config = default_cb_config
+
+            self.circuit_breakers[domain] = CircuitBreaker(
+                name=f"{domain.value}_agent", config=cb_config
+            )
+
+            # Rate limiter
+            rate_limit = rate_limit_config.get(
+                domain.value, rate_limit_config.get(
+                    "default", default_rate_limit)
+            )
+            self.rate_limiters[domain] = RateLimiter(
+                max_calls_per_minute=rate_limit)
+
+            # Bulkhead
+            bulkhead_max = bulkhead_config.get(
+                domain.value, bulkhead_config.get("default", default_bulkhead)
+            )
+            self.bulkheads[domain] = Bulkhead(max_concurrent=bulkhead_max)
 
     def diagnose_and_route(self, content: str, error_context: Dict[str, Any]) -> List[Tuple[ProblemDomain, float]]:
         """
@@ -174,7 +256,7 @@ class ProblemRouter:
 
     def solve_problem(self, domain: ProblemDomain, content: str, context: Dict[str, Any]) -> AgentResult:
         """
-        Route problem to the appropriate specialized agent.
+        Route problem to the appropriate specialized agent with resilience patterns.
 
         Args:
             domain: The problem domain to address
@@ -193,7 +275,9 @@ class ProblemRouter:
 
         agent = self.agents[domain]
 
-        try:
+        # Wrap execution with resilience patterns
+        def _execute_agent() -> AgentResult:
+            """Execute agent with resilience protection."""
             logger.info(
                 "routing_to_specialized_agent",
                 domain=domain.value,
@@ -202,6 +286,18 @@ class ProblemRouter:
             )
 
             result = agent.solve(content, context)
+
+            # Validate confidence before returning
+            validation = self.confidence_validator.validate(result)
+            if not validation.is_valid:
+                logger.warning(
+                    "confidence_validation_failed",
+                    domain=domain.value,
+                    confidence=result.confidence,
+                    reason=validation.reason,
+                    patterns=validation.suspicious_patterns
+                )
+                raise LowConfidenceError(validation.reason)
 
             logger.info(
                 "specialized_agent_result",
@@ -212,6 +308,75 @@ class ProblemRouter:
             )
 
             return result
+
+        try:
+            # Execute with bulkhead isolation
+            def _execute_with_bulkhead() -> AgentResult:
+                """Execute with bulkhead protection."""
+                # Check rate limit
+                if not self.rate_limiters[domain].acquire():
+                    logger.warning(
+                        "rate_limit_exceeded",
+                        domain=domain.value
+                    )
+                    raise RateLimitExceededError(
+                        f"Rate limit exceeded for {domain.value}")
+
+                # Execute with circuit breaker
+                return self.circuit_breakers[domain].call(_execute_agent)
+
+            # Execute with bulkhead
+            result = self.bulkheads[domain].execute(_execute_with_bulkhead)
+
+            return result
+
+        except CircuitBreakerError as e:
+            logger.warning(
+                "circuit_breaker_open",
+                domain=domain.value,
+                error=str(e)
+            )
+            return AgentResult(
+                success=False,
+                reasoning=f"Circuit breaker is open: {e}",
+                warnings=["Circuit breaker prevented execution"]
+            )
+
+        except RateLimitExceededError as e:
+            logger.warning(
+                "rate_limit_exceeded",
+                domain=domain.value,
+                error=str(e)
+            )
+            return AgentResult(
+                success=False,
+                reasoning=f"Rate limit exceeded: {e}",
+                warnings=["Rate limit prevented execution"]
+            )
+
+        except ResourceExhaustedError as e:
+            logger.warning(
+                "bulkhead_exhausted",
+                domain=domain.value,
+                error=str(e)
+            )
+            return AgentResult(
+                success=False,
+                reasoning=f"Resources exhausted: {e}",
+                warnings=["Bulkhead prevented execution"]
+            )
+
+        except LowConfidenceError as e:
+            logger.warning(
+                "low_confidence_rejected",
+                domain=domain.value,
+                error=str(e)
+            )
+            return AgentResult(
+                success=False,
+                reasoning=f"Low confidence rejected: {e}",
+                warnings=["Confidence validation failed"]
+            )
 
         except Exception as e:
             logger.error(
@@ -230,13 +395,65 @@ class ProblemRouter:
 class BaseSpecializedAgent:
     """Base class for specialized agents."""
 
-    def __init__(self, model: str = "qwen3:8b"):
+    def __init__(
+        self,
+        model: str = "qwen3:8b",
+        enable_retry: bool = True,
+        max_retries: int = 3,
+    ):
+        """Initialize base specialized agent.
+
+        Args:
+            model: Model name for LLM-based agents
+            enable_retry: Whether to enable retry with jitter
+            max_retries: Maximum retry attempts
+        """
         self.model = model
         self.agent = None  # Will be initialized by subclasses
+        self.enable_retry = enable_retry
+        self.max_retries = max_retries
+        self.retry_with_jitter = None
+
+        if enable_retry:
+            from ..utils.resilience import RetryWithJitter
+
+            self.retry_with_jitter = RetryWithJitter(
+                max_retries=max_retries,
+                initial_delay=1.0,
+                max_delay=60.0,
+                exponential_base=2.0,
+                jitter=True,
+            )
 
     def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
-        """Solve the problem - implemented by subclasses."""
+        """Solve the problem - implemented by subclasses.
+
+        This method can be wrapped with retry logic by subclasses if needed.
+        """
         raise NotImplementedError
+
+    def _solve_with_retry(
+        self, content: str, context: Dict[str, Any], solve_func: Callable
+    ) -> AgentResult:
+        """Execute solve function with retry and jitter.
+
+        Args:
+            content: Content to process
+            context: Error context
+            solve_func: Function to execute (should return AgentResult)
+
+        Returns:
+            AgentResult from solve function
+        """
+        if self.retry_with_jitter:
+            return self.retry_with_jitter.execute(
+                solve_func,
+                exceptions=(Exception,),
+                content=content,
+                context=context,
+            )
+        else:
+            return solve_func(content, context)
 
     def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
         """Create the prompt for the agent - implemented by subclasses."""
