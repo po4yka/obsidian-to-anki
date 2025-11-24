@@ -22,6 +22,7 @@ from ..obsidian.parser import (
 )
 from ..sync.state_db import StateDB
 from ..utils.logging import get_logger
+from ..utils.problematic_notes import ProblematicNotesArchiver
 
 logger = get_logger(__name__)
 
@@ -29,16 +30,21 @@ logger = get_logger(__name__)
 class VaultIndexer:
     """Index Obsidian vault notes."""
 
-    def __init__(self, config: Config, db: StateDB):
+    def __init__(self, config: Config, db: StateDB, archiver: ProblematicNotesArchiver | None = None):
         """
         Initialize vault indexer.
 
         Args:
             config: Service configuration
             db: State database
+            archiver: Optional problematic notes archiver
         """
         self.config = config
         self.db = db
+        self.archiver = archiver or ProblematicNotesArchiver(
+            archive_dir=config.problematic_notes_dir,
+            enabled=config.enable_problematic_notes_archival,
+        )
 
     def index_vault(self, incremental: bool = False) -> dict:
         """
@@ -94,9 +100,11 @@ class VaultIndexer:
                         existing_index = self.db.get_note_index(relative_path)
                         if existing_index:
                             # Check file modification time
-                            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                            file_mtime = datetime.fromtimestamp(
+                                file_path.stat().st_mtime)
                             indexed_mtime = (
-                                datetime.fromisoformat(existing_index["file_modified_at"])
+                                datetime.fromisoformat(
+                                    existing_index["file_modified_at"])
                                 if existing_index["file_modified_at"]
                                 else None
                             )
@@ -104,11 +112,13 @@ class VaultIndexer:
                             if indexed_mtime and file_mtime <= indexed_mtime:
                                 # File hasn't changed, skip
                                 stats["skipped"] += 1
-                                logger.debug("skipping_unchanged_note", path=relative_path)
+                                logger.debug(
+                                    "skipping_unchanged_note", path=relative_path)
                                 continue
 
                     # Parse the note with repair if enabled
-                    repair_enabled = getattr(self.config, "parser_repair_enabled", True)
+                    repair_enabled = getattr(
+                        self.config, "parser_repair_enabled", True)
                     if repair_enabled:
                         # Try to get LLM provider for repair
                         llm_provider_for_repair = None
@@ -125,8 +135,10 @@ class VaultIndexer:
                             )
                             # Continue without repair provider
 
-                        repair_model = self.config.get_model_for_agent("parser_repair")
-                        tolerant_parsing = getattr(self.config, "tolerant_parsing", True)
+                        repair_model = self.config.get_model_for_agent(
+                            "parser_repair")
+                        tolerant_parsing = getattr(
+                            self.config, "tolerant_parsing", True)
                         enable_content_generation = getattr(
                             self.config, "enable_content_generation", True
                         )
@@ -155,10 +167,12 @@ class VaultIndexer:
                     expected_topic = file_path.parent.name
                     if metadata.topic != expected_topic:
                         key = f"{expected_topic} -> {metadata.topic}"
-                        topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
+                        topic_mismatches[key] = topic_mismatches.get(
+                            key, 0) + 1
 
                     # Get file modification time
-                    file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    file_mtime = datetime.fromtimestamp(
+                        file_path.stat().st_mtime)
 
                     # Serialize metadata for storage
                     metadata_json = json.dumps(
@@ -215,6 +229,32 @@ class VaultIndexer:
                 except (ParserError, OSError, Exception) as e:
                     error_type_name = type(e).__name__
                     error_message = str(e)
+
+                    # Archive problematic note
+                    try:
+                        note_content = ""
+                        try:
+                            note_content = file_path.read_text(
+                                encoding="utf-8")
+                        except Exception:
+                            pass
+
+                        self.archiver.archive_note(
+                            note_path=file_path,
+                            error=e,
+                            error_type=error_type_name,
+                            processing_stage="indexing",
+                            note_content=note_content if note_content else None,
+                            context={
+                                "relative_path": relative_path,
+                            },
+                        )
+                    except Exception as archive_error:
+                        logger.warning(
+                            "failed_to_archive_problematic_note",
+                            note_path=str(file_path),
+                            archive_error=str(archive_error),
+                        )
 
                     # Aggregate errors with defaultdict
                     error_by_type[error_type_name] += 1
@@ -384,7 +424,8 @@ class AnkiIndexer:
                             anki_guid=note_info["noteId"],
                             note_id=note_id,
                             note_title=note_title,
-                            in_obsidian=existing_card.get("in_obsidian", False),
+                            in_obsidian=existing_card.get(
+                                "in_obsidian", False),
                             in_anki=True,
                             in_database=True,
                         )
@@ -474,7 +515,8 @@ class SyncIndexer:
                             note_id=db_card.get("note_id"),
                             note_title=db_card.get("note_title"),
                             content_hash=db_card["content_hash"],
-                            in_obsidian=existing_card.get("in_obsidian", False),
+                            in_obsidian=existing_card.get(
+                                "in_obsidian", False),
                             in_anki=existing_card.get("in_anki", False),
                             in_database=True,
                         )
@@ -538,8 +580,16 @@ def build_full_index(
     }
 
     # Index vault notes
-    vault_indexer = VaultIndexer(config, db)
-    combined_stats["vault"] = vault_indexer.index_vault(incremental=incremental)
+    # Create archiver for problematic notes
+    from ..utils.problematic_notes import ProblematicNotesArchiver
+
+    archiver = ProblematicNotesArchiver(
+        archive_dir=config.problematic_notes_dir,
+        enabled=config.enable_problematic_notes_archival,
+    )
+    vault_indexer = VaultIndexer(config, db, archiver=archiver)
+    combined_stats["vault"] = vault_indexer.index_vault(
+        incremental=incremental)
 
     # Index database cards
     sync_indexer = SyncIndexer(db)
@@ -547,7 +597,8 @@ def build_full_index(
 
     # Index Anki cards
     anki_indexer = AnkiIndexer(db, anki_client)
-    combined_stats["anki"] = anki_indexer.index_anki_cards(config.anki_deck_name)
+    combined_stats["anki"] = anki_indexer.index_anki_cards(
+        config.anki_deck_name)
 
     # Get overall statistics
     combined_stats["overall"] = db.get_index_statistics()

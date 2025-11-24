@@ -94,6 +94,19 @@ class Config(BaseSettings):
 
     # Logging
     log_level: str = Field(default="INFO", description="Log level")
+    project_log_dir: Path = Field(
+        default=Path("./logs"), description="Directory for project-level logs"
+    )
+    problematic_notes_dir: Path = Field(
+        default=Path("./problematic_notes"),
+        description="Directory for archiving problematic notes",
+    )
+    enable_problematic_notes_archival: bool = Field(
+        default=True, description="Enable automatic archival of problematic notes"
+    )
+    error_log_retention_days: int = Field(
+        default=90, description="Days to retain error logs"
+    )
 
     # Optional fields (with defaults)
     # Obsidian source directories (optional - overrides source_dir if provided)

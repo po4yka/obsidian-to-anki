@@ -35,6 +35,7 @@ from ..sync.transactions import CardOperationError, CardTransaction
 from ..utils.content_hash import compute_content_hash
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
+from ..utils.problematic_notes import ProblematicNotesArchiver
 
 if TYPE_CHECKING:
     from ..sync.progress import ProgressTracker
@@ -85,6 +86,12 @@ class SyncEngine:
         self.anki = anki_client
         self.progress = progress_tracker
         self.progress_display = None  # Will be set via set_progress_display()
+
+        # Initialize problematic notes archiver
+        self.archiver = ProblematicNotesArchiver(
+            archive_dir=config.problematic_notes_dir,
+            enabled=config.enable_problematic_notes_archival,
+        )
 
         # Log configuration at startup
         logger.info(
@@ -881,6 +888,34 @@ class SyncEngine:
                                     error_type_name = type(e).__name__
                                     error_message = str(e)
 
+                                    # Archive problematic note
+                                    try:
+                                        note_content = ""
+                                        try:
+                                            note_content = file_path.read_text(
+                                                encoding="utf-8")
+                                        except Exception:
+                                            pass
+
+                                        self.archiver.archive_note(
+                                            note_path=file_path,
+                                            error=e,
+                                            error_type=error_type_name,
+                                            processing_stage="card_generation",
+                                            card_index=qa_pair.card_index,
+                                            language=lang,
+                                            note_content=note_content if note_content else None,
+                                            context={
+                                                "relative_path": relative_path,
+                                            },
+                                        )
+                                    except Exception as archive_error:
+                                        logger.warning(
+                                            "failed_to_archive_problematic_note",
+                                            note_path=str(file_path),
+                                            archive_error=str(archive_error),
+                                        )
+
                                     # Aggregate errors with defaultdict
                                     error_by_type[error_type_name] += 1
 
@@ -911,6 +946,33 @@ class SyncEngine:
                         error_type=type(e).__name__,
                         error_msg=str(e),
                     )
+
+                    # Archive problematic note
+                    try:
+                        note_content = ""
+                        try:
+                            note_content = file_path.read_text(
+                                encoding="utf-8")
+                        except Exception:
+                            pass
+
+                        self.archiver.archive_note(
+                            note_path=file_path,
+                            error=e,
+                            error_type=type(e).__name__,
+                            processing_stage="card_generation",
+                            note_content=note_content if note_content else None,
+                            context={
+                                "relative_path": relative_path,
+                            },
+                        )
+                    except Exception as archive_error:
+                        logger.warning(
+                            "failed_to_archive_problematic_note",
+                            note_path=str(file_path),
+                            archive_error=str(archive_error),
+                        )
+
                     self.stats["errors"] += 1
                     consecutive_errors += 1
 
@@ -1104,6 +1166,29 @@ class SyncEngine:
                         error_type_name = type(e).__name__
                         error_message = str(e)
 
+                        # Archive problematic note
+                        try:
+                            self.archiver.archive_note(
+                                note_path=file_path,
+                                error=e,
+                                error_type=error_type_name,
+                                processing_stage="card_generation",
+                                card_index=qa_pair.card_index,
+                                language=lang,
+                                note_content=note_content if note_content else None,
+                                context={
+                                    "relative_path": relative_path,
+                                    "metadata_id": metadata.id if "metadata" in locals() else None,
+                                    "qa_pairs_count": len(qa_pairs) if "qa_pairs" in locals() else None,
+                                },
+                            )
+                        except Exception as archive_error:
+                            logger.warning(
+                                "failed_to_archive_problematic_note",
+                                note_path=str(file_path),
+                                archive_error=str(archive_error),
+                            )
+
                         if self.progress:
                             self.progress.fail_note(
                                 relative_path, qa_pair.card_index, lang, error_message
@@ -1122,9 +1207,59 @@ class SyncEngine:
             OSError,
             UnicodeDecodeError,
         ) as e:
+            # Archive problematic note
+            try:
+                note_content = ""
+                try:
+                    note_content = file_path.read_text(encoding="utf-8")
+                except Exception:
+                    pass
+
+                self.archiver.archive_note(
+                    note_path=file_path,
+                    error=e,
+                    error_type=type(e).__name__,
+                    processing_stage="parsing",
+                    note_content=note_content,
+                    context={
+                        "relative_path": relative_path,
+                    },
+                )
+            except Exception as archive_error:
+                logger.warning(
+                    "failed_to_archive_problematic_note",
+                    note_path=str(file_path),
+                    archive_error=str(archive_error),
+                )
+
             result_info["error"] = str(e)
             result_info["error_type"] = type(e).__name__
         except Exception as e:
+            # Archive problematic note
+            try:
+                note_content = ""
+                try:
+                    note_content = file_path.read_text(encoding="utf-8")
+                except Exception:
+                    pass
+
+                self.archiver.archive_note(
+                    note_path=file_path,
+                    error=e,
+                    error_type=type(e).__name__,
+                    processing_stage="processing",
+                    note_content=note_content,
+                    context={
+                        "relative_path": relative_path,
+                    },
+                )
+            except Exception as archive_error:
+                logger.warning(
+                    "failed_to_archive_problematic_note",
+                    note_path=str(file_path),
+                    archive_error=str(archive_error),
+                )
+
             result_info["error"] = str(e)
             result_info["error_type"] = type(e).__name__
 
@@ -2004,7 +2139,8 @@ class SyncEngine:
 
                 # Verify card creation if enabled
                 if getattr(self.config, "verify_card_creation", True):
-                    self._verify_card_creation(card, note_id, fields, card.tags)
+                    self._verify_card_creation(
+                        card, note_id, fields, card.tags)
 
         except AnkiConnectError as e:
             logger.error("anki_create_failed", slug=card.slug, error=str(e))
@@ -2082,7 +2218,8 @@ class SyncEngine:
             actual_fields = note_info.get("fields", {})
             field_mismatches = []
             for field_name, expected_value in expected_fields.items():
-                actual_value = actual_fields.get(field_name, {}).get("value", "")
+                actual_value = actual_fields.get(
+                    field_name, {}).get("value", "")
                 # Normalize whitespace for comparison
                 expected_normalized = " ".join(expected_value.split())
                 actual_normalized = " ".join(actual_value.split())
@@ -2296,7 +2433,8 @@ class SyncEngine:
                     # Verify card creation if enabled
                     if getattr(self.config, "verify_card_creation", True):
                         for card, note_id, fields, tags, _ in successful_cards:
-                            self._verify_card_creation(card, note_id, fields, tags)
+                            self._verify_card_creation(
+                                card, note_id, fields, tags)
 
             except Exception as e:
                 logger.error(

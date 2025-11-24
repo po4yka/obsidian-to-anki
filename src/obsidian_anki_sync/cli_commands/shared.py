@@ -58,6 +58,8 @@ def get_config_and_logger(
             log_dir=log_dir,
             log_file=log_file,
             very_verbose=very_verbose,
+            project_log_dir=_config.project_log_dir,
+            error_log_retention_days=_config.error_log_retention_days,
         )
         _logger = get_logger("cli")
 
