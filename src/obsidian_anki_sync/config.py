@@ -204,6 +204,65 @@ class Config(BaseSettings):
         description="Custom retry counts per error type"
     )
 
+    # ============================================================================
+    # Resilience Configuration for Specialized Agents
+    # ============================================================================
+    # Circuit breaker configuration per agent domain
+    # Example: {"yaml_frontmatter": {"failure_threshold": 5, "timeout": 60}, "default": {"failure_threshold": 5, "timeout": 60}}
+    circuit_breaker_config: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Circuit breaker configuration per agent domain"
+    )
+
+    # Retry configuration for specialized agents
+    retry_config: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "max_retries": 3,
+            "initial_delay": 1.0,
+            "backoff_factor": 2.0,
+            "jitter": True,
+        },
+        description="Retry configuration for specialized agents"
+    )
+
+    # Confidence threshold for agent results
+    confidence_threshold: float = Field(
+        default=0.7,
+        description="Minimum confidence threshold for accepting agent repairs"
+    )
+
+    # Rate limiting configuration per agent domain (calls per minute)
+    # Example: {"yaml_frontmatter": 10, "content_corruption": 5, "default": 20}
+    rate_limit_config: dict[str, int] = Field(
+        default_factory=dict,
+        description="Rate limiting configuration per agent domain"
+    )
+
+    # Bulkhead configuration per agent domain (max concurrent calls)
+    # Example: {"yaml_frontmatter": 2, "content_corruption": 1, "default": 3}
+    bulkhead_config: dict[str, int] = Field(
+        default_factory=dict,
+        description="Bulkhead configuration per agent domain"
+    )
+
+    # Metrics storage configuration
+    metrics_storage: str = Field(
+        default="memory",
+        description="Metrics storage backend: 'memory' or 'database'"
+    )
+
+    # Enable adaptive routing
+    enable_adaptive_routing: bool = Field(
+        default=True,
+        description="Enable adaptive routing based on historical performance"
+    )
+
+    # Enable learning system
+    enable_learning: bool = Field(
+        default=True,
+        description="Enable failure pattern learning and routing optimization"
+    )
+
     # LLM Performance Monitoring
     llm_slow_request_threshold: float = Field(
         default=60.0,
