@@ -16,6 +16,12 @@ from .specialized_agents import ProblemDomain, ProblemRouter
 
 logger = get_logger(__name__)
 
+# Import memory store if available
+try:
+    from .agent_memory import AgentMemoryStore
+except ImportError:
+    AgentMemoryStore = None
+
 
 @dataclass
 class PatternSignature:
@@ -36,8 +42,14 @@ class LearningResult:
 class FailureAnalyzer:
     """Analyze failures to extract patterns for learning."""
 
-    def __init__(self):
-        """Initialize failure analyzer."""
+    def __init__(self, memory_store: Optional[Any] = None):
+        """Initialize failure analyzer.
+
+        Args:
+            memory_store: Optional persistent memory store (AgentMemoryStore)
+        """
+        self.memory_store = memory_store
+        # Keep in-memory fallback for backward compatibility
         self.failure_patterns: Dict[str, int] = defaultdict(int)
         self.success_patterns: Dict[str, int] = defaultdict(int)
         self.pattern_to_agent: Dict[str, ProblemDomain] = {}
@@ -53,6 +65,15 @@ class FailureAnalyzer:
             error_context: Context about the error
             attempted_agents: List of agents that were tried
         """
+        # Store in persistent memory if available
+        if self.memory_store:
+            try:
+                self.memory_store.store_failure_pattern(
+                    error_context, attempted_agents)
+            except Exception as e:
+                logger.warning("memory_store_failure", error=str(e))
+
+        # Also store in-memory for backward compatibility
         pattern = self._create_pattern_signature(
             error_context, attempted_agents)
         self.failure_patterns[pattern] += 1
@@ -74,6 +95,15 @@ class FailureAnalyzer:
             error_context: Context about the error
             successful_agent: Agent that successfully repaired
         """
+        # Store in persistent memory if available
+        if self.memory_store:
+            try:
+                self.memory_store.store_success_pattern(
+                    error_context, successful_agent)
+            except Exception as e:
+                logger.warning("memory_store_success", error=str(e))
+
+        # Also store in-memory for backward compatibility
         pattern = self._create_pattern_signature(
             error_context, [successful_agent])
         self.success_patterns[pattern] += 1
@@ -97,7 +127,21 @@ class FailureAnalyzer:
         Returns:
             Recommended agent or None if no match found
         """
-        # Find similar successful patterns
+        # Try persistent memory first (semantic search)
+        if self.memory_store:
+            try:
+                recommendation = self.memory_store.get_agent_recommendation(
+                    error_context)
+                if recommendation:
+                    logger.info(
+                        "learning_recommendation_from_memory",
+                        agent=recommendation.value,
+                    )
+                    return recommendation
+            except Exception as e:
+                logger.warning("memory_recommendation_failed", error=str(e))
+
+        # Fallback to in-memory patterns
         for pattern, count in sorted(
             self.success_patterns.items(), key=lambda x: x[1], reverse=True
         ):
@@ -234,6 +278,7 @@ class AdaptiveRouter(ProblemRouter):
     def __init__(
         self,
         performance_tracker: Optional[PerformanceTracker] = None,
+        memory_store: Optional[Any] = None,
         circuit_breaker_config: Optional[Dict[str, Dict[str, Any]]] = None,
         rate_limit_config: Optional[Dict[str, int]] = None,
         bulkhead_config: Optional[Dict[str, int]] = None,
@@ -243,6 +288,7 @@ class AdaptiveRouter(ProblemRouter):
 
         Args:
             performance_tracker: Optional performance tracker for learning
+            memory_store: Optional persistent memory store
             circuit_breaker_config: Per-domain circuit breaker configuration
             rate_limit_config: Per-domain rate limit configuration
             bulkhead_config: Per-domain bulkhead configuration
@@ -255,7 +301,8 @@ class AdaptiveRouter(ProblemRouter):
             confidence_threshold=confidence_threshold,
         )
         self.performance_tracker = performance_tracker
-        self.failure_analyzer = FailureAnalyzer()
+        self.memory_store = memory_store
+        self.failure_analyzer = FailureAnalyzer(memory_store=memory_store)
         self.learning_enabled = True
 
     def diagnose_and_route(
@@ -350,6 +397,19 @@ class AdaptiveRouter(ProblemRouter):
                     response_time=duration,
                 )
 
+            # Store routing decision in memory
+            if self.memory_store:
+                try:
+                    self.memory_store.store_routing_decision(
+                        error_context=context,
+                        selected_agent=domain,
+                        success=result.success,
+                        confidence=result.confidence,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "routing_decision_store_failed", error=str(e))
+
             if result.success:
                 # Record successful pattern
                 self.failure_analyzer.analyze_success(context, domain)
@@ -370,6 +430,19 @@ class AdaptiveRouter(ProblemRouter):
                     response_time=duration,
                     error_type=type(e).__name__,
                 )
+
+            # Store routing decision in memory
+            if self.memory_store:
+                try:
+                    self.memory_store.store_routing_decision(
+                        error_context=context,
+                        selected_agent=domain,
+                        success=False,
+                        confidence=0.0,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "routing_decision_store_failed", error=str(e))
 
             # Record failure pattern
             self.failure_analyzer.analyze_failure(context, [domain])

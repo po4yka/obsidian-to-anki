@@ -26,6 +26,13 @@ from ..agents.agent_monitoring import (
     InMemoryMetricsStorage,
     DatabaseMetricsStorage,
 )
+
+# Import memory store if available
+try:
+    from ..agents.agent_memory import AgentMemoryStore
+except ImportError:
+    AgentMemoryStore = None
+
 from .content_preprocessor import ContentPreprocessor, PreprocessingConfig
 
 logger = get_logger(__name__)
@@ -90,9 +97,34 @@ class ErrorRecoveryManager:
         else:
             metrics_storage = InMemoryMetricsStorage()
 
+        # Initialize memory store if enabled
+        memory_store = None
+        if config and getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
+            try:
+                memory_storage_path = getattr(
+                    config, "memory_storage_path", Path(".agent_memory"))
+                enable_semantic_search = getattr(
+                    config, "enable_semantic_search", True)
+                embedding_model = getattr(
+                    config, "embedding_model", "text-embedding-3-small")
+
+                memory_store = AgentMemoryStore(
+                    storage_path=memory_storage_path,
+                    embedding_model=embedding_model,
+                    enable_semantic_search=enable_semantic_search,
+                )
+                logger.info("agent_memory_store_initialized",
+                            path=str(memory_storage_path))
+            except Exception as e:
+                logger.warning(
+                    "memory_store_initialization_failed", error=str(e))
+
         self.metrics_collector = MetricsCollector(metrics_storage)
-        self.performance_tracker = PerformanceTracker(self.metrics_collector)
+        self.performance_tracker = PerformanceTracker(
+            self.metrics_collector, memory_store=memory_store
+        )
         self.health_monitor = AgentHealthMonitor()
+        self.memory_store = memory_store
 
     def _initialize_router(self, config: Any) -> None:
         """Initialize problem router (adaptive or static)."""
@@ -120,6 +152,7 @@ class ErrorRecoveryManager:
             # Use adaptive router with performance tracking
             self.router = AdaptiveRouter(
                 performance_tracker=self.performance_tracker,
+                memory_store=getattr(self, "memory_store", None),
                 circuit_breaker_config=circuit_breaker_config,
                 rate_limit_config=rate_limit_config,
                 bulkhead_config=bulkhead_config,
@@ -449,6 +482,22 @@ class ErrorRecoveryManager:
                 'file_path': str(file_path),
                 'error_type': 'ParserError',
             }
+
+            # Query memory for similar past failures if memory store available
+            if hasattr(self, "memory_store") and self.memory_store:
+                try:
+                    similar_failures = self.memory_store.find_similar_failures(
+                        error_context, limit=3
+                    )
+                    if similar_failures:
+                        logger.info(
+                            "similar_failures_found_in_memory",
+                            count=len(similar_failures),
+                            similarities=[f.get("similarity")
+                                          for f in similar_failures],
+                        )
+                except Exception as e:
+                    logger.warning("memory_query_failed", error=str(e))
 
             # Use router to diagnose and solve
             diagnoses = self.router.diagnose_and_route(content, error_context)
