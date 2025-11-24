@@ -85,76 +85,51 @@ def _validate_code_fences(content: str, title: str | None) -> list[str]:
 
     Tracks fence positions to identify which specific fence is unmatched
     and provides line numbers for better error messages.
+
+    Logic:
+    - Use a simple stack-based approach to track opened/closed fences
+    - Any ``` that doesn't have a corresponding match is an error
+    - This is more lenient and should handle most valid markdown patterns
     """
 
     errors: list[str] = []
     lines = content.splitlines()
-    fence_lines: list[tuple[int, str, bool]] = []  # (line_num, content, is_opener)
+
+    # Simple stack-based validation
+    fence_stack: list[tuple[int, str]] = []  # (line_num, content)
 
     for idx, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("```"):
-            # Check if this is an opener (has language identifier) or closer
-            # Openers typically have: ```language or ```language:something
-            # Closers are just: ```
-            is_opener = len(stripped) > 3 and not stripped[3:].strip() == ""
-            fence_lines.append((idx + 1, stripped, is_opener))
+            line_num = idx + 1
 
-    if not fence_lines:
-        return errors
-
-    # Track open/close pairs using a stack
-    unmatched_openers: list[tuple[int, str]] = []
-    unmatched_closers: list[tuple[int, str]] = []
-
-    for line_num, fence_content, is_opener in fence_lines:
-        if is_opener:
-            unmatched_openers.append((line_num, fence_content))
-        else:
-            if unmatched_openers:
-                # Matched pair - remove the opener
-                unmatched_openers.pop()
+            if fence_stack:
+                # If we have an opener on stack, this closes it
+                opener_line, opener_content = fence_stack.pop()
+                # Could log successful matches here if needed
             else:
-                # Closer without matching opener
-                unmatched_closers.append((line_num, fence_content))
+                # No opener on stack, so this is an opener (or standalone)
+                fence_stack.append((line_num, stripped))
 
-    # Report errors
-    if unmatched_openers:
-        # Find the first unmatched opener for detailed error
-        first_unmatched_line, first_unmatched_content = unmatched_openers[0]
-        language_hint = ""
-        if len(first_unmatched_content) > 3:
-            lang = first_unmatched_content[3:].strip().split()[0] if first_unmatched_content[3:].strip() else ""
-            if lang:
-                language_hint = f" (language: {lang})"
-
-        if len(unmatched_openers) == 1:
+    # Any remaining fences on stack are unmatched openers
+    if fence_stack:
+        first_unmatched_line, first_unmatched_content = fence_stack[0]
+        if len(fence_stack) == 1:
             errors.append(
                 (
-                    f"{title or 'Note'}: Unbalanced code fence detected "
-                    f"(line {first_unmatched_line}{language_hint}). "
+                    f"{title or 'Note'}: Unbalanced code fence detected. "
+                    f"Fence at line {first_unmatched_line} ({first_unmatched_content!r}) "
+                    f"does not have a matching closer. "
                     f"Ensure every ``` opener has a matching closer."
                 )
             )
         else:
             errors.append(
                 (
-                    f"{title or 'Note'}: {len(unmatched_openers)} unbalanced code fences detected. "
-                    f"First unmatched fence at line {first_unmatched_line}{language_hint}. "
+                    f"{title or 'Note'}: {len(fence_stack)} unbalanced code fences detected. "
+                    f"First unmatched fence at line {first_unmatched_line} ({first_unmatched_content!r}). "
                     f"Ensure every ``` opener has a matching closer."
                 )
             )
-
-    if unmatched_closers:
-        # This is less common but indicates malformed markdown
-        first_unmatched_closer_line = unmatched_closers[0][0]
-        errors.append(
-            (
-                f"{title or 'Note'}: Code fence closer without matching opener "
-                f"detected at line {first_unmatched_closer_line}. "
-                f"This may indicate malformed markdown."
-            )
-        )
 
     return errors
-

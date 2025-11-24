@@ -33,8 +33,10 @@ class ErrorCategory(str, Enum):
     HTML = "html"  # HTML structure validation errors (fixable)
     APF_FORMAT = "template"  # APF v2.1 template compliance (fixable)
     MANIFEST = "manifest"  # Manifest slug/format mismatches (fixable)
-    SEMANTIC = "semantic"  # Question-answer mismatch or coherence issues (harder to fix)
-    FACTUAL = "factual"  # Information inaccuracies or hallucinations (hardest to fix)
+    # Question-answer mismatch or coherence issues (harder to fix)
+    SEMANTIC = "semantic"
+    # Information inaccuracies or hallucinations (hardest to fix)
+    FACTUAL = "factual"
     NONE = "none"  # No errors
 
     @classmethod
@@ -124,8 +126,10 @@ class PostValidatorAgent:
             for error in syntax_errors:
                 # Extract error type from error message
                 if "APF format:" in error:
-                    error_type = error.split("APF format:")[1].strip().split()[0:3]
-                    error_key = " ".join(error_type) if error_type else "unknown"
+                    error_type = error.split("APF format:")[
+                        1].strip().split()[0:3]
+                    error_key = " ".join(
+                        error_type) if error_type else "unknown"
                 elif "HTML:" in error:
                     error_key = "HTML validation"
                 else:
@@ -133,7 +137,8 @@ class PostValidatorAgent:
                 error_by_type[error_key] = error_by_type.get(error_key, 0) + 1
                 # Categorize error
                 category = ErrorCategory.from_error_string(error)
-                error_by_category[category.value] = error_by_category.get(category.value, 0) + 1
+                error_by_category[category.value] = error_by_category.get(
+                    category.value, 0) + 1
 
             # Log error summary
             logger.warning(
@@ -145,7 +150,8 @@ class PostValidatorAgent:
 
             # Log each error individually (up to 20 to avoid spam)
             for i, error in enumerate(syntax_errors[:20]):
-                logger.warning("validation_error_detail", error_num=i + 1, error=error)
+                logger.warning("validation_error_detail",
+                               error_num=i + 1, error=error)
 
             if len(syntax_errors) > 20:
                 logger.warning(
@@ -165,7 +171,8 @@ class PostValidatorAgent:
 
         # Step 2: Semantic validation (AI-powered)
         try:
-            semantic_result = self._semantic_validation(cards, metadata, strict_mode)
+            semantic_result = self._semantic_validation(
+                cards, metadata, strict_mode)
 
             validation_time = time.time() - start_time
 
@@ -233,7 +240,8 @@ class PostValidatorAgent:
             logger.debug(
                 "validating_card_syntax",
                 slug=card.slug,
-                apf_preview=card.apf_html[:500] if card.apf_html else "(empty)",
+                apf_preview=card.apf_html[:
+                                          500] if card.apf_html else "(empty)",
                 apf_length=len(card.apf_html),
             )
 
@@ -395,11 +403,16 @@ DO suggest auto-fixes for:
                         title = lines[i + 1].strip()[:100]  # First 100 chars
                         break
 
+            # Include truncated HTML content for validation (first 2000 chars should be enough for key content)
+            html_preview = card.apf_html[:2000]
+            if len(card.apf_html) > 2000:
+                html_preview += "...[truncated]"
+
             card_summaries.append(
                 f"Card {card.card_index} (slug: {card.slug}, lang: {card.lang}):\n"
                 f"  Title: {title}\n"
                 f"  Confidence: {card.confidence}\n"
-                f"  HTML length: {len(card.apf_html)} chars"
+                f"  HTML Content:\n{html_preview}\n"
             )
 
         cards_summary = "\n".join(card_summaries)
@@ -711,7 +724,8 @@ Output:
         """
         try:
             # Strategy 1: Try deterministic fixes first (fastest, most reliable)
-            logger.debug("auto_fix_strategy_1_deterministic", error_preview=error_details[:100])
+            logger.debug("auto_fix_strategy_1_deterministic",
+                         error_preview=error_details[:100])
             fixed_cards = self._apply_deterministic_fixes(cards, error_details)
             if fixed_cards:
                 logger.info(
@@ -1094,10 +1108,13 @@ Requirements:
                 )
 
                 # Strategy 3: Fallback to aggressive deterministic fixes
-                logger.info("auto_fix_llm_failed_trying_aggressive_deterministic", error=str(llm_error))
-                fixed_cards = self._apply_aggressive_deterministic_fixes(cards_to_fix, error_details)
+                logger.info(
+                    "auto_fix_llm_failed_trying_aggressive_deterministic", error=str(llm_error))
+                fixed_cards = self._apply_aggressive_deterministic_fixes(
+                    cards_to_fix, error_details)
                 if fixed_cards:
-                    logger.info("auto_fix_aggressive_deterministic_success", cards_fixed=len(fixed_cards))
+                    logger.info(
+                        "auto_fix_aggressive_deterministic_success", cards_fixed=len(fixed_cards))
                     return fixed_cards
 
                 logger.error(
@@ -1105,7 +1122,8 @@ Requirements:
                     error_type=categorized_error.error_type.value,
                     error=str(categorized_error),
                     user_message=format_llm_error_for_user(categorized_error),
-                    strategies_attempted=["deterministic", "rule_based", "llm", "aggressive_deterministic"],
+                    strategies_attempted=[
+                        "deterministic", "rule_based", "llm", "aggressive_deterministic"],
                 )
                 return None
 
@@ -1150,7 +1168,8 @@ Requirements:
                     fixed_html = "<!-- PROMPT_VERSION: apf-v2.1 -->\n" + fixed_html
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_added_prompt_version", slug=card.slug)
+                    logger.debug(
+                        "deterministic_fix_added_prompt_version", slug=card.slug)
 
                 # Add BEGIN_CARDS if missing
                 if "<!-- BEGIN_CARDS -->" not in fixed_html:
@@ -1164,31 +1183,36 @@ Requirements:
                         fixed_html = "<!-- BEGIN_CARDS -->\n" + fixed_html
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_added_begin_cards", slug=card.slug)
+                    logger.debug(
+                        "deterministic_fix_added_begin_cards", slug=card.slug)
 
                 # Add END_CARDS if missing
                 if "<!-- END_CARDS -->" not in fixed_html:
                     # Add before END_OF_CARDS if present
                     if "END_OF_CARDS" in fixed_html:
-                        fixed_html = fixed_html.replace("END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
+                        fixed_html = fixed_html.replace(
+                            "END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
                     else:
                         # Add both if neither present
                         fixed_html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_added_end_cards", slug=card.slug)
+                    logger.debug(
+                        "deterministic_fix_added_end_cards", slug=card.slug)
 
                 # Add END_OF_CARDS if missing (must be last line)
                 if not fixed_html.rstrip().endswith("END_OF_CARDS"):
                     fixed_html = fixed_html.rstrip() + "\nEND_OF_CARDS"
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_added_end_of_cards", slug=card.slug)
+                    logger.debug(
+                        "deterministic_fix_added_end_of_cards", slug=card.slug)
 
             # Fix 2: Invalid card header format
             if "Invalid card header" in error_details or "card header format" in error_details.lower():
                 # Try to extract and fix card header
-                header_match = re.search(r"<!--\s*Card\s+(\d+).*?-->", fixed_html)
+                header_match = re.search(
+                    r"<!--\s*Card\s+(\d+).*?-->", fixed_html)
                 if header_match:
                     card_num = header_match.group(1)
                     # Extract slug from card if available
@@ -1196,8 +1220,10 @@ Requirements:
                     slug = slug_match.group(1) if slug_match else card.slug
 
                     # Extract card type
-                    card_type_match = re.search(r"CardType:\s*(Simple|Missing|Draw)", fixed_html, re.IGNORECASE)
-                    card_type = card_type_match.group(1).capitalize() if card_type_match else "Simple"
+                    card_type_match = re.search(
+                        r"CardType:\s*(Simple|Missing|Draw)", fixed_html, re.IGNORECASE)
+                    card_type = card_type_match.group(
+                        1).capitalize() if card_type_match else "Simple"
 
                     # Extract tags
                     tags_match = re.search(r"Tags:\s*([^>]+)", fixed_html)
@@ -1212,15 +1238,18 @@ Requirements:
 
                     # Replace the header
                     old_header = header_match.group(0)
-                    fixed_html = fixed_html.replace(old_header, correct_header, 1)
+                    fixed_html = fixed_html.replace(
+                        old_header, correct_header, 1)
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_card_header", slug=card.slug, old=old_header[:50])
+                    logger.debug("deterministic_fix_card_header",
+                                 slug=card.slug, old=old_header[:50])
 
             # Fix 3: Missing manifest
             if "Missing manifest" in error_details or ("manifest" in error_details.lower() and "missing" in error_details.lower()):
                 # Extract card info from header
-                header_match = re.search(r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
+                header_match = re.search(
+                    r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
                 if header_match:
                     card_num, slug, card_type, tags_str = header_match.groups()
                     tags = tags_str.strip().split()
@@ -1232,23 +1261,27 @@ Requirements:
                         "type": card_type,
                         "tags": tags
                     }
-                    manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                    manifest_json = json.dumps(
+                        manifest_data, separators=(',', ':'))
                     manifest_comment = f"<!-- manifest: {manifest_json} -->"
 
                     # Insert manifest before END_CARDS or at end
                     if "<!-- END_CARDS -->" in fixed_html:
-                        fixed_html = fixed_html.replace("<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
+                        fixed_html = fixed_html.replace(
+                            "<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
                     else:
                         fixed_html += f"\n{manifest_comment}"
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_added_manifest", slug=card.slug)
+                    logger.debug(
+                        "deterministic_fix_added_manifest", slug=card.slug)
 
             # Fix 4: Inline <code> without <pre> wrapper
             if "HTML" in error_details and ("code" in error_details.lower() or "inline" in error_details.lower()):
                 # Find standalone <code> tags not inside <pre>
                 code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-                matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+                matches = list(re.finditer(
+                    code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
 
                 # Process in reverse to avoid offset issues
                 for match in reversed(matches):
@@ -1257,8 +1290,10 @@ Requirements:
                     end_pos = match.end()
 
                     # Check if already inside <pre>
-                    context_before = fixed_html[max(0, start_pos - 500):start_pos]
-                    pre_matches = list(re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
+                    context_before = fixed_html[max(
+                        0, start_pos - 500):start_pos]
+                    pre_matches = list(re.finditer(
+                        r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
                     if pre_matches:
                         last_pre = pre_matches[-1]
                         pre_start = last_pre.start() + (start_pos - 500)
@@ -1268,10 +1303,12 @@ Requirements:
 
                     # Wrap standalone code tag
                     wrapped = f"<pre>{code_tag}</pre>"
-                    fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+                    fixed_html = fixed_html[:start_pos] + \
+                        wrapped + fixed_html[end_pos:]
                     any_fixes = True
                     card_fixed = True
-                    logger.debug("deterministic_fix_wrapped_code", slug=card.slug)
+                    logger.debug("deterministic_fix_wrapped_code",
+                                 slug=card.slug)
 
             # Fix 5: Tag format issues (snake_case, count)
             if "tag" in error_details.lower() and ("format" in error_details.lower() or "snake_case" in error_details.lower() or "Must have" in error_details):
@@ -1311,16 +1348,19 @@ Requirements:
                         )
                         any_fixes = True
                         card_fixed = True
-                        logger.debug("deterministic_fix_tags", slug=card.slug, old=tags, new=fixed_tags)
+                        logger.debug("deterministic_fix_tags",
+                                     slug=card.slug, old=tags, new=fixed_tags)
 
             # Fix 6: Manifest slug mismatch
             if "manifest" in error_details.lower() and "slug" in error_details.lower() and "mismatch" in error_details.lower():
                 # Extract slug from card header
-                header_match = re.search(r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", fixed_html)
+                header_match = re.search(
+                    r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", fixed_html)
                 if header_match:
                     header_slug = header_match.group(1)
                     # Check manifest slug
-                    manifest_match = re.search(r'<!--\s*manifest:.*?"slug"\s*:\s*"([^"]+)"', fixed_html, re.DOTALL)
+                    manifest_match = re.search(
+                        r'<!--\s*manifest:.*?"slug"\s*:\s*"([^"]+)"', fixed_html, re.DOTALL)
                     if manifest_match:
                         manifest_slug = manifest_match.group(1)
                         if header_slug != manifest_slug:
@@ -1333,7 +1373,8 @@ Requirements:
                             )
                             any_fixes = True
                             card_fixed = True
-                            logger.debug("deterministic_fix_manifest_slug", slug=card.slug, fixed_slug=header_slug)
+                            logger.debug("deterministic_fix_manifest_slug",
+                                         slug=card.slug, fixed_slug=header_slug)
 
             # Fix 7: Missing field headers (add minimal required headers)
             if "Missing required field header" in error_details or "field header" in error_details.lower():
@@ -1359,22 +1400,26 @@ Requirements:
                             )
                         else:
                             # Add at end before END_OF_CARDS
-                            fixed_html = fixed_html.rstrip() + f"\n\n{header_with_content}"
+                            fixed_html = fixed_html.rstrip(
+                            ) + f"\n\n{header_with_content}"
                         any_fixes = True
                         card_fixed = True
-                        logger.debug("deterministic_fix_added_field_header", slug=card.slug, header=header_check)
+                        logger.debug("deterministic_fix_added_field_header",
+                                     slug=card.slug, header=header_check)
 
             # Fix 8: Invalid manifest JSON
             if "Invalid manifest JSON" in error_details or "manifest JSON" in error_details.lower():
                 # Try to fix malformed JSON in manifest
-                manifest_match = re.search(r'<!--\s*manifest:\s*({.*?})\s*-->', fixed_html, re.DOTALL)
+                manifest_match = re.search(
+                    r'<!--\s*manifest:\s*({.*?})\s*-->', fixed_html, re.DOTALL)
                 if manifest_match:
                     try:
                         # Try to parse existing JSON
                         json.loads(manifest_match.group(1))
                     except json.JSONDecodeError:
                         # JSON is invalid, try to extract and rebuild
-                        header_match = re.search(r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
+                        header_match = re.search(
+                            r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
                         if header_match:
                             slug = header_match.group(1)
                             card_type = header_match.group(2)
@@ -1387,7 +1432,8 @@ Requirements:
                                 "type": card_type,
                                 "tags": tags
                             }
-                            manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                            manifest_json = json.dumps(
+                                manifest_data, separators=(',', ':'))
                             new_manifest = f"<!-- manifest: {manifest_json} -->"
 
                             # Replace old manifest
@@ -1399,7 +1445,8 @@ Requirements:
                             )
                             any_fixes = True
                             card_fixed = True
-                            logger.debug("deterministic_fix_manifest_json", slug=card.slug)
+                            logger.debug(
+                                "deterministic_fix_manifest_json", slug=card.slug)
 
             if card_fixed:
                 fixed_card = GeneratedCard(
@@ -1458,7 +1505,8 @@ Requirements:
 
             if "<!-- END_CARDS -->" not in fixed_html:
                 if "END_OF_CARDS" in fixed_html:
-                    fixed_html = fixed_html.replace("END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
+                    fixed_html = fixed_html.replace(
+                        "END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
                 else:
                     fixed_html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
                 card_fixed = True
@@ -1469,13 +1517,15 @@ Requirements:
 
             # Aggressively fix all standalone <code> tags
             code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-            matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+            matches = list(re.finditer(
+                code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
             for match in reversed(matches):
                 code_tag = match.group(0)
                 start_pos = match.start()
                 end_pos = match.end()
                 context_before = fixed_html[max(0, start_pos - 500):start_pos]
-                pre_matches = list(re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
+                pre_matches = list(re.finditer(
+                    r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
                 if pre_matches:
                     last_pre = pre_matches[-1]
                     pre_start = last_pre.start() + (start_pos - 500)
@@ -1483,12 +1533,14 @@ Requirements:
                     if "</pre>" not in between and "</PRE>" not in between:
                         continue
                 wrapped = f"<pre>{code_tag}</pre>"
-                fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+                fixed_html = fixed_html[:start_pos] + \
+                    wrapped + fixed_html[end_pos:]
                 card_fixed = True
 
             # Ensure manifest exists and is valid
             if "<!-- manifest:" not in fixed_html:
-                header_match = re.search(r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
+                header_match = re.search(
+                    r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*CardType:\s*(\w+)\s*\|\s*Tags:\s*([^>]+)\s*-->", fixed_html)
                 if header_match:
                     card_num, slug, card_type, tags_str = header_match.groups()
                     tags = tags_str.strip().split()[:6]  # Limit to 6 tags
@@ -1498,10 +1550,12 @@ Requirements:
                         "type": card_type.capitalize(),
                         "tags": tags
                     }
-                    manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                    manifest_json = json.dumps(
+                        manifest_data, separators=(',', ':'))
                     manifest_comment = f"<!-- manifest: {manifest_json} -->"
                     if "<!-- END_CARDS -->" in fixed_html:
-                        fixed_html = fixed_html.replace("<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
+                        fixed_html = fixed_html.replace(
+                            "<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
                     else:
                         fixed_html += f"\n{manifest_comment}"
                     card_fixed = True
