@@ -258,6 +258,7 @@ class Config(BaseSettings):
     batch_size: int = 50  # Cards per batch for Anki and DB operations
     max_concurrent_generations: int = 5  # Max parallel card generations
     index_use_llm_extraction: bool = False  # Use LLM extraction during indexing
+    verify_card_creation: bool = True  # Verify cards exist in Anki after creation
 
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
