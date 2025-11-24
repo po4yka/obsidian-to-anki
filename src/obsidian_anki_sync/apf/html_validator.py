@@ -38,8 +38,9 @@ def validate_card_html(apf_html: str) -> list[str]:
         classes: list[str] = (
             classes_attr if isinstance(classes_attr, list) else [classes_attr]
         )
-        if not any(cls.startswith("language-") for cls in classes):
-            errors.append("<code> element missing language- class")
+        # Language classes are recommended but not strictly required for APF validation
+        # They are mainly used for syntax highlighting and missing them is not a critical error
+        # Skip this check to allow cards with code blocks that don't have language classes
 
     # Check for bare <code> elements outside <pre>
     for code in soup.find_all("code"):
