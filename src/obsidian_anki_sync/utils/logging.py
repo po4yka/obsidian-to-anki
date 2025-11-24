@@ -50,12 +50,19 @@ def _add_formatted_extra(record: dict) -> bool:
     return True
 
 
-def configure_logging(log_level: str = "INFO", log_dir: Path | None = None) -> None:
+def configure_logging(
+    log_level: str = "INFO",
+    log_dir: Path | None = None,
+    log_file: Path | None = None,
+    very_verbose: bool = False,
+) -> None:
     """Configure loguru logging with dual output.
 
     Args:
         log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         log_dir: Directory for log files (default: ./logs)
+        log_file: Specific log file path (overrides log_dir)
+        very_verbose: If True, log full LLM requests/responses
     """
     # Remove default handler
     logger.remove()
@@ -75,16 +82,22 @@ def configure_logging(log_level: str = "INFO", log_dir: Path | None = None) -> N
     )
 
     # Add file handler - detailed format with rotation
-    if log_dir is None:
-        log_dir = Path("./logs")
-
-    log_dir.mkdir(exist_ok=True, parents=True)
+    if log_file:
+        # Use specific log file
+        log_path = log_file
+    else:
+        # Use log directory
+        if log_dir is None:
+            log_dir = Path("./logs")
+        log_dir.mkdir(exist_ok=True, parents=True)
+        log_path = log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
 
     logger.add(
-        log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log",
+        log_path,
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
         level="DEBUG",  # File gets all logs
-        rotation="00:00",  # Rotate at midnight
+        # Rotate at midnight only for auto-named files
+        rotation="00:00" if not log_file else None,
         retention="30 days",  # Keep logs for 30 days
         compression="zip",  # Compress old logs
         backtrace=True,  # Include traceback
@@ -93,11 +106,29 @@ def configure_logging(log_level: str = "INFO", log_dir: Path | None = None) -> N
         filter=_add_formatted_extra,
     )
 
+    if very_verbose:
+        # Add a separate handler for very verbose LLM logging
+        verbose_log_path = log_path.parent / \
+            f"{log_path.stem}_verbose{log_path.suffix}" if log_file else log_dir / \
+            "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
+        logger.add(
+            verbose_log_path,
+            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}\n{exception}",
+            level="DEBUG",
+            filter=lambda record: "llm" in record["name"].lower(
+            ) or "prompt" in record["message"].lower() or "response" in record["message"].lower(),
+            rotation="00:00" if not log_file else None,
+            retention="7 days",  # Keep verbose logs for shorter time
+            compression="zip",
+        )
+
     logger.info(
         "logging_configured",
         console_level=level,
         file_level="DEBUG",
-        log_dir=str(log_dir),
+        log_dir=str(log_dir) if not log_file else str(log_file.parent),
+        log_file=str(log_file) if log_file else None,
+        very_verbose=very_verbose,
     )
 
 

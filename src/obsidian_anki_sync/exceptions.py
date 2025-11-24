@@ -228,6 +228,19 @@ class DeckExportError(AnkiError):
     pass
 
 
+class DeckImportError(AnkiError):
+    """Deck import errors.
+
+    Raised when:
+    - Failed to import deck from file
+    - Invalid file format
+    - File system errors during import
+    - Invalid card data in file
+    """
+
+    pass
+
+
 # Agent System Errors
 
 
@@ -310,6 +323,7 @@ def get_exception_hierarchy() -> dict[str, list[str]]:
             "AnkiConnectError",
             "FieldMappingError",
             "DeckExportError",
+            "DeckImportError",
         ],
         "AgentError": [
             "PreValidationError",

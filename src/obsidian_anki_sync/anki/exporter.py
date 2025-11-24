@@ -1,9 +1,13 @@
 """Export cards to Anki deck files (.apkg) using genanki."""
 
+import csv
 import hashlib
+import json
 from pathlib import Path
+from typing import Any
 
 import genanki
+import yaml
 
 from ..exceptions import DeckExportError
 from ..models import Card
@@ -332,7 +336,8 @@ def _card_to_note(card: Card) -> genanki.Note:
         return note
 
     except Exception as e:
-        raise DeckExportError(f"Failed to convert card {card.slug}: {e}") from e
+        raise DeckExportError(
+            f"Failed to convert card {card.slug}: {e}") from e
 
 
 def export_deck(
@@ -404,3 +409,286 @@ def export_cards_to_apkg(
         deck_name=deck_name,
         card_count=len(cards),
     )
+
+
+def export_cards_to_yaml(
+    cards: list[Card],
+    output_path: str | Path,
+    include_note_id: bool = True,
+) -> None:
+    """
+    Export cards to YAML format.
+
+    Args:
+        cards: List of Card objects
+        output_path: Path to output YAML file
+        include_note_id: Whether to include noteId field for updates
+
+    Raises:
+        DeckExportError: If export fails
+    """
+    try:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Convert cards to YAML-serializable format
+        yaml_data = []
+        for card in cards:
+            # Map APF HTML to Anki fields
+            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+            card_data: dict[str, Any] = {
+                "slug": card.slug,
+                "noteType": card.note_type,
+                "tags": card.tags,
+            }
+
+            # Add noteId if available and requested
+            if include_note_id and card.manifest.guid:
+                card_data["noteId"] = card.manifest.guid
+
+            # Add all fields
+            card_data.update(fields)
+
+            # Add manifest data
+            card_data["manifest"] = {
+                "slug": card.manifest.slug,
+                "slug_base": card.manifest.slug_base,
+                "lang": card.manifest.lang,
+                "source_path": card.manifest.source_path,
+                "source_anchor": card.manifest.source_anchor,
+                "note_id": card.manifest.note_id,
+                "note_title": card.manifest.note_title,
+                "card_index": card.manifest.card_index,
+                "guid": card.manifest.guid,
+            }
+
+            if card.manifest.hash6:
+                card_data["manifest"]["hash6"] = card.manifest.hash6
+
+            yaml_data.append(card_data)
+
+        # Write YAML file
+        with output_path.open("w", encoding="utf-8") as f:
+            yaml.dump(yaml_data, f, default_flow_style=False,
+                      allow_unicode=True, sort_keys=False)
+
+        logger.info(
+            "cards_exported_to_yaml",
+            output_path=str(output_path),
+            card_count=len(cards),
+        )
+
+    except Exception as e:
+        raise DeckExportError(f"Failed to export cards to YAML: {e}") from e
+
+
+def export_cards_to_csv(
+    cards: list[Card],
+    output_path: str | Path,
+    include_note_id: bool = True,
+) -> None:
+    """
+    Export cards to CSV format.
+
+    Args:
+        cards: List of Card objects
+        output_path: Path to output CSV file
+        include_note_id: Whether to include noteId field for updates
+
+    Raises:
+        DeckExportError: If export fails
+    """
+    try:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not cards:
+            # Create empty CSV with headers
+            with output_path.open("w", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    ["noteId", "slug", "noteType", "tags", "fields"])
+            logger.info("empty_csv_created", output_path=str(output_path))
+            return
+
+        # Collect all unique field names across all cards
+        all_field_names = set()
+        card_data_list = []
+
+        for card in cards:
+            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+            all_field_names.update(fields.keys())
+
+            card_data = {
+                "slug": card.slug,
+                "noteType": card.note_type,
+                "tags": " ".join(card.tags) if card.tags else "",
+                **fields,
+            }
+
+            if include_note_id and card.manifest.guid:
+                card_data["noteId"] = card.manifest.guid
+
+            card_data_list.append(card_data)
+
+        # Sort field names for consistent column order
+        # Put common fields first
+        common_fields = ["noteId", "slug", "noteType", "tags"]
+        field_names = [f for f in common_fields if f in all_field_names or any(
+            f in d for d in card_data_list)]
+        field_names.extend(sorted(all_field_names - set(common_fields)))
+
+        # Write CSV file
+        with output_path.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=field_names, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(card_data_list)
+
+        logger.info(
+            "cards_exported_to_csv",
+            output_path=str(output_path),
+            card_count=len(cards),
+        )
+
+    except Exception as e:
+        raise DeckExportError(f"Failed to export cards to CSV: {e}") from e
+
+
+def export_deck_from_anki(
+    client: Any,
+    deck_name: str,
+    output_path: str | Path,
+    format: str = "yaml",
+    include_note_id: bool = True,
+) -> None:
+    """
+    Export a deck from Anki to YAML or CSV file.
+
+    Args:
+        client: AnkiClient instance
+        deck_name: Name of the deck to export
+        output_path: Path to output file
+        format: Output format ('yaml' or 'csv')
+        include_note_id: Whether to include noteId field
+
+    Raises:
+        DeckExportError: If export fails
+    """
+    try:
+        # Find all notes in the deck
+        note_ids = client.find_notes(f'deck:"{deck_name}"')
+
+        if not note_ids:
+            logger.warning("no_notes_found", deck_name=deck_name)
+            # Create empty file
+            if format.lower() == "csv":
+                export_cards_to_csv([], output_path, include_note_id)
+            else:
+                export_cards_to_yaml([], output_path, include_note_id)
+            return
+
+        # Get note information
+        notes_info = client.notes_info(note_ids)
+
+        # Convert to Card objects (simplified - we'll need to reconstruct from Anki fields)
+        cards = []
+        for note_info in notes_info:
+            # Extract fields
+            fields = {name: value for name,
+                      value in note_info.get("fields", {}).items()}
+
+            # Try to extract manifest from Manifest field
+            manifest_data = {}
+            if "Manifest" in fields:
+                try:
+                    # Manifest might be in HTML comment or JSON
+                    manifest_text = fields["Manifest"]
+                    # Try to parse as JSON first
+                    manifest_data = json.loads(manifest_text)
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+            # Reconstruct card (simplified - we lose some data)
+            from ..models import Manifest
+
+            manifest = Manifest(
+                slug=manifest_data.get("slug", f"note-{note_info['noteId']}"),
+                slug_base=manifest_data.get("slug_base", ""),
+                lang=manifest_data.get("lang", "en"),
+                source_path=manifest_data.get("source_path", ""),
+                source_anchor=manifest_data.get("source_anchor", ""),
+                note_id=manifest_data.get("note_id", ""),
+                note_title=manifest_data.get("note_title", ""),
+                card_index=manifest_data.get("card_index", 0),
+                guid=str(note_info.get("noteId", "")),
+                hash6=manifest_data.get("hash6"),
+            )
+
+            # Reconstruct APF HTML from fields
+            # This is a simplified reconstruction
+            apf_html = _reconstruct_apf_from_fields(
+                fields, note_info.get("modelName", "APF::Simple"))
+
+            card = Card(
+                slug=manifest.slug,
+                lang=manifest.lang,
+                apf_html=apf_html,
+                manifest=manifest,
+                content_hash="",  # We don't have this from Anki
+                note_type=note_info.get("modelName", "APF::Simple"),
+                tags=note_info.get("tags", []),
+                guid=str(note_info.get("noteId", "")),
+            )
+
+            cards.append(card)
+
+        # Export based on format
+        if format.lower() == "csv":
+            export_cards_to_csv(cards, output_path, include_note_id)
+        else:
+            export_cards_to_yaml(cards, output_path, include_note_id)
+
+        logger.info(
+            "deck_exported_from_anki",
+            deck_name=deck_name,
+            output_path=str(output_path),
+            format=format,
+            card_count=len(cards),
+        )
+
+    except Exception as e:
+        raise DeckExportError(f"Failed to export deck from Anki: {e}") from e
+
+
+def _reconstruct_apf_from_fields(fields: dict[str, str], note_type: str) -> str:
+    """
+    Reconstruct APF HTML from Anki fields.
+
+    This is a simplified reconstruction. Full APF format reconstruction
+    would require more complex logic.
+
+    Args:
+        fields: Dictionary of field names to values
+        note_type: The note type name
+
+    Returns:
+        Reconstructed APF HTML string
+    """
+    if note_type.startswith("APF::Missing"):
+        # Cloze deletion card
+        text = fields.get("Text", "")
+        extra = fields.get("Extra", "")
+        return f"<!-- APF::Missing -->\n{text}\n{extra}"
+    elif note_type == "APF::Draw":
+        prompt = fields.get("Prompt", "")
+        drawing = fields.get("Drawing", "")
+        notes = fields.get("Notes", "")
+        return f"<!-- APF::Draw -->\n{prompt}\n{drawing}\n{notes}"
+    else:
+        # Simple card
+        front = fields.get("Front", "")
+        back = fields.get("Back", "")
+        additional = fields.get("Additional", "")
+        return f"<!-- APF::Simple -->\n<!-- BEGIN_CARDS -->\n<div class='card'><div class='front'>{front}</div><div class='back'>{back}</div></div>\n<!-- END_CARDS -->\n{additional}"

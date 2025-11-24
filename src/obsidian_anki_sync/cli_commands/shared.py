@@ -20,14 +20,10 @@ _logger: Any | None = None
 
 
 def get_config_and_logger(
-    config_path: Annotated[
-        Path | None,
-        typer.Option("--config", help="Path to config.yaml", exists=True),
-    ] = None,
-    log_level: Annotated[
-        str,
-        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
-    ] = "INFO",
+    config_path: Path | None = None,
+    log_level: str = "INFO",
+    log_file: Path | None = None,
+    very_verbose: bool = False,
 ) -> tuple[Config, Any]:
     """Load configuration and logger (dependency injection helper).
 
@@ -38,6 +34,8 @@ def get_config_and_logger(
     Args:
         config_path: Optional path to config file
         log_level: Logging level
+        log_file: Optional specific log file path
+        very_verbose: Enable very verbose logging (full LLM requests/responses)
 
     Returns:
         Tuple of (Config, Logger)
@@ -53,8 +51,14 @@ def get_config_and_logger(
         set_config(_config)
 
         # Configure logging with vault-specific log directory
-        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
-        configure_logging(log_level or _config.log_level, log_dir=log_dir)
+        log_dir = Path(_config.vault_path) / \
+            ".logs" if _config.vault_path else None
+        configure_logging(
+            log_level or _config.log_level,
+            log_dir=log_dir,
+            log_file=log_file,
+            very_verbose=very_verbose,
+        )
         _logger = get_logger("cli")
 
     return _config, _logger
