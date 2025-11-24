@@ -55,6 +55,8 @@ def configure_logging(
     log_dir: Path | None = None,
     log_file: Path | None = None,
     very_verbose: bool = False,
+    project_log_dir: Path | None = None,
+    error_log_retention_days: int = 90,
 ) -> None:
     """Configure loguru logging with dual output.
 
@@ -63,6 +65,8 @@ def configure_logging(
         log_dir: Directory for log files (default: ./logs)
         log_file: Specific log file path (overrides log_dir)
         very_verbose: If True, log full LLM requests/responses
+        project_log_dir: Directory for project-level logs (default: ./logs)
+        error_log_retention_days: Days to retain error logs (default: 90)
     """
     # Remove default handler
     logger.remove()
@@ -81,7 +85,7 @@ def configure_logging(
         filter=_add_formatted_extra,
     )
 
-    # Add file handler - detailed format with rotation
+    # Add file handler - detailed format with rotation (vault-level or custom)
     if log_file:
         # Use specific log file
         log_path = log_file
@@ -106,6 +110,47 @@ def configure_logging(
         filter=_add_formatted_extra,
     )
 
+    # Add project-level log file handler (in project root)
+    if project_log_dir is None:
+        project_log_dir = Path("./logs")
+    project_log_dir.mkdir(exist_ok=True, parents=True)
+    project_log_path = project_log_dir / \
+        "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
+
+    logger.add(
+        project_log_path,
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
+        level="DEBUG",  # Project logs get all levels
+        rotation="00:00",
+        retention="30 days",
+        compression="zip",
+        backtrace=True,
+        diagnose=True,
+        enqueue=True,
+        filter=_add_formatted_extra,
+    )
+
+    # Add error-specific log file handler (ERROR and above only)
+    error_log_path = project_log_dir / "errors_{time:YYYY-MM-DD}.log"
+
+    def error_filter(record: dict) -> bool:
+        """Filter to only include ERROR and CRITICAL level logs."""
+        return record["level"].no >= logger.level("ERROR").no
+
+    logger.add(
+        error_log_path,
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}\n{exception}",
+        level="ERROR",  # Only ERROR and above
+        rotation="00:00",
+        retention=f"{error_log_retention_days} days",
+        compression="zip",
+        backtrace=True,
+        diagnose=True,
+        enqueue=True,
+        filter=lambda record: error_filter(
+            record) and _add_formatted_extra(record),
+    )
+
     if very_verbose:
         # Add a separate handler for very verbose LLM logging
         verbose_log_path = log_path.parent / \
@@ -128,6 +173,8 @@ def configure_logging(
         file_level="DEBUG",
         log_dir=str(log_dir) if not log_file else str(log_file.parent),
         log_file=str(log_file) if log_file else None,
+        project_log_dir=str(project_log_dir),
+        error_log_dir=str(project_log_dir),
         very_verbose=very_verbose,
     )
 
