@@ -521,6 +521,43 @@ def parse_qa_pairs(
                 qa_pairs.append(qa_pair)
                 card_index += 1
             else:
+                # Block was incomplete - attempt LLM extraction if enabled and tolerant_parsing is True
+                if tolerant_parsing and extractor_to_use is not None:
+                    logger.debug(
+                        "attempting_llm_extraction_for_incomplete_block",
+                        file=str(file_path) if file_path else "unknown",
+                        card_index=card_index,
+                        block_preview=block[:200],
+                    )
+                    try:
+                        # Try extracting from just this block
+                        # Create a minimal note content with just this block
+                        block_content = f"---\nid: {metadata.id}\ntitle: {metadata.title}\ntopic: {metadata.topic}\nlanguage_tags: {metadata.language_tags}\ncreated: {metadata.created}\nupdated: {metadata.updated}\n---\n\n{block}"
+                        extracted_pairs = extractor_to_use.extract_qa_pairs(
+                            note_content=block_content,
+                            metadata=metadata,
+                            file_path=file_path,
+                        )
+                        if extracted_pairs:
+                            # Use the first extracted pair and update card_index
+                            qa_pairs.extend(extracted_pairs)
+                            logger.info(
+                                "llm_extraction_recovered_incomplete_block",
+                                file=str(file_path) if file_path else "unknown",
+                                card_index=card_index,
+                                recovered_pairs=len(extracted_pairs),
+                            )
+                            card_index += len(extracted_pairs)
+                            continue  # Successfully recovered, skip adding to failed_blocks
+                    except Exception as e:
+                        logger.debug(
+                            "llm_extraction_failed_for_incomplete_block",
+                            file=str(file_path) if file_path else "unknown",
+                            card_index=card_index,
+                            error=str(e),
+                        )
+                        # Fall through to add to failed_blocks
+
                 # Block was skipped (incomplete or invalid)
                 failed_blocks.append(
                     (card_index, "Incomplete or invalid Q/A block"))

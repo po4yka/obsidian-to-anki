@@ -723,7 +723,21 @@ class OpenRouterProvider(BaseLLMProvider):
                 repaired += "}"
                 brace_count -= 1
 
+        # Handle incomplete array/object values
+        # If we're in the middle of a value after a colon, we need to complete it
+        if last_key_pos >= 0:
+            after_colon = repaired[last_key_pos + 1:].lstrip()
+            # If after colon is empty or incomplete, add a placeholder
+            if not after_colon or (after_colon.startswith('"') and after_colon.count('"') == 1):
+                # Incomplete string value - close it if needed
+                if after_colon.startswith('"') and not repaired.endswith('"'):
+                    repaired += '"'
+                elif not after_colon:
+                    # No value at all - add empty string
+                    repaired += ' ""'
+
         # Close any open braces (objects) first - objects must be closed before arrays
+        # This handles nested structures correctly
         while brace_count > 0:
             repaired += "}"
             brace_count -= 1
@@ -733,7 +747,45 @@ class OpenRouterProvider(BaseLLMProvider):
             repaired += "]"
             bracket_count -= 1
 
-        return repaired
+        # Validate the repaired JSON
+        try:
+            import json
+            json.loads(repaired)
+            logger.debug("json_repair_successful", original_length=len(text), repaired_length=len(repaired))
+            return repaired
+        except json.JSONDecodeError as e:
+            # Repair failed - try a more aggressive approach
+            logger.warning(
+                "json_repair_failed_attempting_aggressive",
+                error=str(e),
+                repaired_preview=repaired[:200],
+            )
+            # Try to extract just the root object if possible
+            if repaired.startswith("{"):
+                # Find the first complete top-level object
+                first_brace = repaired.find("{")
+                brace_depth = 0
+                end_pos = -1
+                for i in range(first_brace, len(repaired)):
+                    if repaired[i] == "{":
+                        brace_depth += 1
+                    elif repaired[i] == "}":
+                        brace_depth -= 1
+                        if brace_depth == 0:
+                            end_pos = i + 1
+                            break
+                if end_pos > 0:
+                    partial_json = repaired[:end_pos]
+                    try:
+                        json.loads(partial_json)
+                        logger.debug("json_repair_partial_success", extracted_length=len(partial_json))
+                        return partial_json
+                    except json.JSONDecodeError:
+                        pass
+
+            # Last resort: return minimal valid JSON
+            logger.warning("json_repair_failed_using_fallback", original_preview=text[:100])
+            return "{}"
 
     def _clean_json_response(self, text: str, model: str) -> str:
         """Clean JSON response from DeepSeek and similar models.

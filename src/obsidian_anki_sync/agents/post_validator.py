@@ -8,6 +8,7 @@ This agent validates generated APF cards for:
 """
 
 import time
+from enum import Enum
 
 from ..apf.html_validator import validate_card_html
 from ..apf.linter import validate_apf
@@ -23,6 +24,44 @@ from .llm_errors import (
 from .models import GeneratedCard, PostValidationResult
 
 logger = get_logger(__name__)
+
+
+class ErrorCategory(str, Enum):
+    """Error categories for validation errors."""
+
+    SYNTAX = "syntax"  # APF format or HTML syntax errors (most fixable)
+    HTML = "html"  # HTML structure validation errors (fixable)
+    APF_FORMAT = "template"  # APF v2.1 template compliance (fixable)
+    MANIFEST = "manifest"  # Manifest slug/format mismatches (fixable)
+    SEMANTIC = "semantic"  # Question-answer mismatch or coherence issues (harder to fix)
+    FACTUAL = "factual"  # Information inaccuracies or hallucinations (hardest to fix)
+    NONE = "none"  # No errors
+
+    @classmethod
+    def from_error_string(cls, error_str: str) -> "ErrorCategory":
+        """Categorize error from error string.
+
+        Args:
+            error_str: Error description string
+
+        Returns:
+            ErrorCategory enum value
+        """
+        error_lower = error_str.lower()
+        if "html" in error_lower or "inline" in error_lower or "<code>" in error_lower:
+            return cls.HTML
+        elif "apf format" in error_lower or "template" in error_lower or "format" in error_lower:
+            return cls.APF_FORMAT
+        elif "manifest" in error_lower or "slug" in error_lower:
+            return cls.MANIFEST
+        elif "factual" in error_lower or "hallucination" in error_lower or "inaccurate" in error_lower:
+            return cls.FACTUAL
+        elif "semantic" in error_lower or "mismatch" in error_lower or "coherence" in error_lower:
+            return cls.SEMANTIC
+        elif "syntax" in error_lower or "parse" in error_lower or "invalid" in error_lower:
+            return cls.SYNTAX
+        else:
+            return cls.NONE
 
 
 class PostValidatorAgent:
@@ -81,6 +120,7 @@ class PostValidatorAgent:
 
             # Categorize errors by type for better diagnostics
             error_by_type: dict[str, int] = {}
+            error_by_category: dict[str, int] = {}
             for error in syntax_errors:
                 # Extract error type from error message
                 if "APF format:" in error:
@@ -91,12 +131,16 @@ class PostValidatorAgent:
                 else:
                     error_key = "other"
                 error_by_type[error_key] = error_by_type.get(error_key, 0) + 1
+                # Categorize error
+                category = ErrorCategory.from_error_string(error)
+                error_by_category[category.value] = error_by_category.get(category.value, 0) + 1
 
             # Log error summary
             logger.warning(
                 "post_validation_syntax_failed",
                 errors_count=len(syntax_errors),
                 error_breakdown=error_by_type,
+                error_by_category=error_by_category,
             )
 
             # Log each error individually (up to 20 to avoid spam)
@@ -742,6 +786,21 @@ Tag Format Issues:
 CardType Issues:
 - Ensure exact capitalization: Simple, Missing, or Draw
 - No variations like "simple", "SIMPLE", or "SimplE"
+
+HTML Validation Issues:
+- Inline <code> elements MUST be wrapped in <pre><code>...</code></pre>
+- Standalone <code> tags are invalid - always wrap in <pre>
+- Example fix: <code>text</code> -> <pre><code>text</code></pre>
+
+Missing END_CARDS:
+- ALWAYS include <!-- END_CARDS --> before END_OF_CARDS
+- If missing, add it right before END_OF_CARDS line
+- Format: <!-- END_CARDS -->\nEND_OF_CARDS
+
+Manifest Slug Mismatches:
+- Ensure slug in card header matches manifest slug exactly
+- Check both <!-- Card ... | slug: ... --> and <!-- manifest: ... -->
+- They must match or card will fail validation
 </common_fixes>
 
 <examples>
@@ -912,6 +971,13 @@ Requirements:
                     error_details_length=len(error_details),
                 )
 
+                # Fallback: Try deterministic fixes for common issues
+                logger.info("auto_fix_llm_failed_trying_deterministic", error=str(llm_error))
+                fixed_cards = self._apply_deterministic_fixes(cards_to_fix, error_details)
+                if fixed_cards:
+                    logger.info("auto_fix_deterministic_success", cards_fixed=len(fixed_cards))
+                    return fixed_cards
+
                 logger.error(
                     "auto_fix_llm_failed",
                     error_type=categorized_error.error_type.value,
@@ -923,3 +989,99 @@ Requirements:
         except Exception as e:
             logger.error("auto_fix_failed", error=str(e))
             return None
+
+    def _apply_deterministic_fixes(
+        self, cards: list[GeneratedCard], error_details: str
+    ) -> list[GeneratedCard] | None:
+        """Apply deterministic fixes without LLM for common issues.
+
+        Args:
+            cards: Cards to fix
+            error_details: Error description
+
+        Returns:
+            Fixed cards if any fixes applied, None otherwise
+        """
+        import re
+
+        fixed_cards = []
+        any_fixes = False
+
+        for card in cards:
+            fixed_html = card.apf_html
+
+            # Fix 1: Missing END_CARDS
+            if "Missing" in error_details and "END_CARDS" in error_details:
+                if "<!-- END_CARDS -->" not in fixed_html:
+                    # Add END_CARDS before END_OF_CARDS if present
+                    if "END_OF_CARDS" in fixed_html:
+                        fixed_html = fixed_html.replace("END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
+                    else:
+                        # Add both if neither present
+                        fixed_html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
+                    any_fixes = True
+                    logger.debug("deterministic_fix_added_end_cards", slug=card.slug)
+
+            # Fix 2: Inline <code> without <pre> wrapper
+            if "HTML" in error_details and ("code" in error_details.lower() or "inline" in error_details.lower()):
+                # Find standalone <code> tags not inside <pre>
+                code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
+                matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+
+                # Process in reverse to avoid offset issues
+                for match in reversed(matches):
+                    code_tag = match.group(0)
+                    start_pos = match.start()
+                    end_pos = match.end()
+
+                    # Check if already inside <pre>
+                    context_before = fixed_html[max(0, start_pos - 500):start_pos]
+                    pre_matches = list(re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
+                    if pre_matches:
+                        last_pre = pre_matches[-1]
+                        pre_start = last_pre.start() + (start_pos - 500)
+                        between = fixed_html[pre_start:start_pos]
+                        if "</pre>" not in between and "</PRE>" not in between:
+                            continue  # Already wrapped
+
+                    # Wrap standalone code tag
+                    wrapped = f"<pre>{code_tag}</pre>"
+                    fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+                    any_fixes = True
+                    logger.debug("deterministic_fix_wrapped_code", slug=card.slug)
+
+            # Fix 3: Manifest slug mismatch (if error mentions it)
+            if "manifest" in error_details.lower() and "slug" in error_details.lower():
+                # Extract slug from card header
+                header_match = re.search(r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", fixed_html)
+                if header_match:
+                    header_slug = header_match.group(1)
+                    # Check manifest slug
+                    manifest_match = re.search(r'<!--\s*manifest:.*?"slug"\s*:\s*"([^"]+)"', fixed_html, re.DOTALL)
+                    if manifest_match:
+                        manifest_slug = manifest_match.group(1)
+                        if header_slug != manifest_slug:
+                            # Fix manifest to match header
+                            fixed_html = re.sub(
+                                r'(<!--\s*manifest:.*?"slug"\s*:\s*")[^"]+(")',
+                                rf'\1{header_slug}\2',
+                                fixed_html,
+                                flags=re.DOTALL
+                            )
+                            any_fixes = True
+                            logger.debug("deterministic_fix_manifest_slug", slug=card.slug, fixed_slug=header_slug)
+
+            if any_fixes:
+                fixed_card = GeneratedCard(
+                    card_index=card.card_index,
+                    slug=card.slug,
+                    lang=card.lang,
+                    apf_html=fixed_html,
+                    confidence=card.confidence,
+                    content_hash=card.content_hash,
+                )
+                fixed_cards.append(fixed_card)
+            else:
+                fixed_cards.append(card)
+
+        return fixed_cards if any_fixes else None

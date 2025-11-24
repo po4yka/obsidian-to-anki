@@ -511,9 +511,11 @@ Answer:
 Requirements:
 - Use EXACTLY these tags: {" ".join(suggested_tags)}
 - CardType: Simple (or Missing if cloze {{{{c1::...}}}}, Draw if diagram)
+- CRITICAL: ALL code blocks MUST use <pre><code> format - NEVER use standalone <code> tags
 - Preserve code blocks with <pre><code class="language-{code_lang}">...</code></pre>
 - Add "Ref: {ref_link}" in Other notes section
 - Follow exact structure below including ALL wrapper sentinels
+- ALWAYS include <!-- END_CARDS --> before END_OF_CARDS
 
 CRITICAL: Output ONLY the complete APF v2.1 format below. NO explanations before or after.
 
@@ -792,10 +794,55 @@ Now generate the card following this structure:
         # 9. Normalize card header to match validator expectations
         apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
 
-        # 10. Ensure proper formatting
+        # 10. Fix HTML validation issues: wrap standalone <code> in <pre><code>
+        apf_html = self._fix_code_tags(apf_html)
+
+        # 11. Ensure proper formatting
         apf_html = apf_html.strip()
 
         return apf_html
+
+    def _fix_code_tags(self, html: str) -> str:
+        """Fix HTML validation issues by wrapping standalone <code> in <pre><code>.
+
+        Args:
+            html: HTML content to fix
+
+        Returns:
+            Fixed HTML with all code blocks properly wrapped
+        """
+        import re
+
+        # Match <code>...</code> tags (non-greedy to match individual tags)
+        fixed_html = html
+        code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
+        matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+
+        # Process matches in reverse order to avoid offset issues
+        for match in reversed(matches):
+            code_tag = match.group(0)
+            start_pos = match.start()
+            end_pos = match.end()
+
+            # Check if this code tag is already inside a <pre> tag
+            # Look backwards for <pre> tag
+            context_before = fixed_html[max(0, start_pos - 500):start_pos]
+            # Find the last <pre> tag before this code
+            pre_matches = list(re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE))
+            if pre_matches:
+                last_pre = pre_matches[-1]
+                pre_start = last_pre.start() + (start_pos - 500)
+                # Check if there's a closing </pre> between <pre> and our <code>
+                between = fixed_html[pre_start:start_pos]
+                if "</pre>" not in between and "</PRE>" not in between:
+                    # <pre> is still open, this code is already wrapped
+                    continue
+
+            # This is a standalone <code> tag, wrap it
+            wrapped = f"<pre>{code_tag}</pre>"
+            fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+
+        return fixed_html
 
     def _normalize_card_header(
         self, apf_html: str, manifest: Manifest, card_type: str, tags: list[str]

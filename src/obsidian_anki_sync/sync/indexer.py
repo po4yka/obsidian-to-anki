@@ -17,6 +17,7 @@ from ..obsidian.parser import (
     ParserError,
     discover_notes,
     parse_note,
+    parse_note_with_repair,
     temporarily_disable_llm_extraction,
 )
 from ..sync.state_db import StateDB
@@ -106,8 +107,49 @@ class VaultIndexer:
                                 logger.debug("skipping_unchanged_note", path=relative_path)
                                 continue
 
-                    # Parse the note
-                    metadata, qa_pairs = parse_note(file_path)
+                    # Parse the note with repair if enabled
+                    repair_enabled = getattr(self.config, "parser_repair_enabled", True)
+                    if repair_enabled:
+                        # Try to get LLM provider for repair
+                        llm_provider_for_repair = None
+                        try:
+                            from ..providers.factory import ProviderFactory
+                            llm_provider_for_repair = ProviderFactory.create_from_config(
+                                self.config
+                            )
+                        except Exception as e:
+                            logger.debug(
+                                "repair_provider_unavailable",
+                                error=str(e),
+                                note=str(relative_path),
+                            )
+                            # Continue without repair provider
+
+                        repair_model = self.config.get_model_for_agent("parser_repair")
+                        tolerant_parsing = getattr(self.config, "tolerant_parsing", True)
+                        enable_content_generation = getattr(
+                            self.config, "enable_content_generation", True
+                        )
+                        repair_missing_sections = getattr(
+                            self.config, "repair_missing_sections", True
+                        )
+
+                        try:
+                            metadata, qa_pairs = parse_note_with_repair(
+                                file_path=file_path,
+                                ollama_client=llm_provider_for_repair,
+                                repair_model=repair_model,
+                                enable_repair=repair_enabled and llm_provider_for_repair is not None,
+                                tolerant_parsing=tolerant_parsing,
+                                enable_content_generation=enable_content_generation,
+                                repair_missing_sections=repair_missing_sections,
+                            )
+                        except ParserError:
+                            # If repair also fails, fall back to regular parse for error reporting
+                            raise
+                    else:
+                        # Parse without repair
+                        metadata, qa_pairs = parse_note(file_path)
 
                     # Check for topic mismatch and collect for summary
                     expected_topic = file_path.parent.name

@@ -336,27 +336,33 @@ You are an expert Q&A extraction system specializing in educational note analysi
             json_schema = get_qa_extraction_schema()
 
             # Calculate reasonable max_tokens based on input size
-            # For extraction, we typically need 3-4x the input size for bilingual content
+            # For extraction, we typically need 4-4.5x the input size for bilingual content
             # Using character count as rough estimate (1 token ≈ 4 characters)
             prompt_tokens_estimate = len(prompt) // 4
-            # For bilingual Q&A extraction, we need more tokens (3.5x input is safer)
-            # Don't cap too low - let the provider handle it, but ensure we have enough
-            estimated_max_tokens = int(prompt_tokens_estimate * 3.5)
+            system_tokens_estimate = len(system_prompt) // 4
+            total_input_tokens = prompt_tokens_estimate + system_tokens_estimate
+
+            # For bilingual Q&A extraction, use more conservative multiplier
+            # Large prompts (>3000 tokens) need 4.5x, smaller ones can use 4.0x
+            multiplier = 4.5 if total_input_tokens > 3000 else 4.0
+            estimated_max_tokens = int(total_input_tokens * multiplier)
 
             # Ensure we have reasonable tokens for complex extractions
             # But respect model-specific output limits (not context window limits)
-            # Most models have output limits around 4K-8K tokens
             from ..providers.openrouter import MODEL_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS
 
             model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
                 self.model, DEFAULT_MAX_OUTPUT_TOKENS)
 
+            # Add safety margin: use 90% of model's max output to prevent hitting hard limits
+            safe_max_output = int(model_max_output * 0.9)
+
             # Set minimum to 4096 for QA extraction (reasonable for most models)
-            # But don't exceed model's output limit
-            min_tokens_for_extraction = min(4096, model_max_output)
+            # But don't exceed model's safe output limit
+            min_tokens_for_extraction = min(4096, safe_max_output)
             estimated_max_tokens = max(
                 estimated_max_tokens, min_tokens_for_extraction)
-            estimated_max_tokens = min(estimated_max_tokens, model_max_output)
+            estimated_max_tokens = min(estimated_max_tokens, safe_max_output)
 
             # Temporarily adjust max_tokens for this extraction to ensure complete responses
             # Store original max_tokens to restore later

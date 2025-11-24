@@ -81,23 +81,78 @@ def _validate_language_sections(
 
 def _validate_code_fences(content: str, title: str | None) -> list[str]:
     """
-    Detect unbalanced triple backtick fences. Lightweight but effective for truncated code.
+    Detect unbalanced triple backtick fences with detailed error reporting.
+
+    Tracks fence positions to identify which specific fence is unmatched
+    and provides line numbers for better error messages.
     """
 
     errors: list[str] = []
-    fence_lines = [
-        (idx + 1, line.strip())
-        for idx, line in enumerate(content.splitlines())
-        if line.strip().startswith("```")
-    ]
+    lines = content.splitlines()
+    fence_lines: list[tuple[int, str, bool]] = []  # (line_num, content, is_opener)
 
-    if len(fence_lines) % 2 != 0:
-        first_unmatched_line = fence_lines[-1][0] if fence_lines else "unknown"
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            # Check if this is an opener (has language identifier) or closer
+            # Openers typically have: ```language or ```language:something
+            # Closers are just: ```
+            is_opener = len(stripped) > 3 and not stripped[3:].strip() == ""
+            fence_lines.append((idx + 1, stripped, is_opener))
+
+    if not fence_lines:
+        return errors
+
+    # Track open/close pairs using a stack
+    unmatched_openers: list[tuple[int, str]] = []
+    unmatched_closers: list[tuple[int, str]] = []
+
+    for line_num, fence_content, is_opener in fence_lines:
+        if is_opener:
+            unmatched_openers.append((line_num, fence_content))
+        else:
+            if unmatched_openers:
+                # Matched pair - remove the opener
+                unmatched_openers.pop()
+            else:
+                # Closer without matching opener
+                unmatched_closers.append((line_num, fence_content))
+
+    # Report errors
+    if unmatched_openers:
+        # Find the first unmatched opener for detailed error
+        first_unmatched_line, first_unmatched_content = unmatched_openers[0]
+        language_hint = ""
+        if len(first_unmatched_content) > 3:
+            lang = first_unmatched_content[3:].strip().split()[0] if first_unmatched_content[3:].strip() else ""
+            if lang:
+                language_hint = f" (language: {lang})"
+
+        if len(unmatched_openers) == 1:
+            errors.append(
+                (
+                    f"{title or 'Note'}: Unbalanced code fence detected "
+                    f"(line {first_unmatched_line}{language_hint}). "
+                    f"Ensure every ``` opener has a matching closer."
+                )
+            )
+        else:
+            errors.append(
+                (
+                    f"{title or 'Note'}: {len(unmatched_openers)} unbalanced code fences detected. "
+                    f"First unmatched fence at line {first_unmatched_line}{language_hint}. "
+                    f"Ensure every ``` opener has a matching closer."
+                )
+            )
+
+    if unmatched_closers:
+        # This is less common but indicates malformed markdown
+        first_unmatched_closer_line = unmatched_closers[0][0]
         errors.append(
             (
-                f"{title or 'Note'}: Unbalanced code fences detected "
-                f"(line {first_unmatched_line}). Ensure every ``` opener "
-                "has a matching closer."
+                f"{title or 'Note'}: Code fence closer without matching opener "
+                f"detected at line {first_unmatched_closer_line}. "
+                f"This may indicate malformed markdown."
             )
         )
 
