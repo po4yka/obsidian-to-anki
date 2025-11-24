@@ -802,6 +802,126 @@ Now generate the card following this structure:
 
         return apf_html
 
+    def _fix_card_headers(self, html: str, manifest: Manifest) -> str:
+        """Fix card headers to ensure correct format.
+
+        Args:
+            html: APF HTML
+            manifest: Card manifest
+
+        Returns:
+            HTML with fixed card headers
+        """
+        import re
+
+        # Find all card headers
+        header_pattern = r"(<!--\s*Card\s+(\d+)\s*\|.*?-->)"
+        matches = list(re.finditer(header_pattern, html))
+
+        for match in reversed(matches):
+            header = match.group(1)
+            card_num = match.group(2)
+
+            # Check if header is valid
+            valid_pattern = r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*[a-z0-9-]+\s*\|\s*CardType:\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*[^>]+\s*-->"
+            if not re.match(valid_pattern, header):
+                # Fix the header
+                # Extract components
+                slug_match = re.search(r"slug:\s*([^\s|]+)", header)
+                slug = slug_match.group(1) if slug_match else manifest.slug
+
+                card_type_match = re.search(r"CardType:\s*(\w+)", header, re.IGNORECASE)
+                card_type = card_type_match.group(1).capitalize() if card_type_match else "Simple"
+                if card_type not in ["Simple", "Missing", "Draw"]:
+                    card_type = "Simple"
+
+                tags_match = re.search(r"Tags:\s*([^>]+)", header)
+                if tags_match:
+                    tags_str = tags_match.group(1).strip()
+                    # Fix tag format: space-separated, lowercase
+                    tags = tags_str.split()
+                    fixed_tags = []
+                    for tag in tags:
+                        # Convert to snake_case
+                        fixed_tag = re.sub(r'[^a-z0-9_]', '_', tag.lower())
+                        fixed_tag = re.sub(r'_+', '_', fixed_tag).strip('_')
+                        if fixed_tag:
+                            fixed_tags.append(fixed_tag)
+                    tags_str = " ".join(fixed_tags[:6])  # Limit to 6 tags
+                else:
+                    tags_str = " ".join(manifest.tags[:6])
+
+                # Build correct header
+                fixed_header = f"<!-- Card {card_num} | slug: {slug} | CardType: {card_type} | Tags: {tags_str} -->"
+                html = html[:match.start()] + fixed_header + html[match.end():]
+                logger.debug("pre_validation_fix_card_header", card_num=card_num, slug=slug)
+
+        return html
+
+    def _ensure_manifest(self, html: str, manifest: Manifest) -> str:
+        """Ensure manifest is present and valid.
+
+        Args:
+            html: APF HTML
+            manifest: Card manifest
+
+        Returns:
+            HTML with valid manifest
+        """
+        import json
+        import re
+
+        # Check if manifest exists
+        manifest_pattern = r'<!--\s*manifest:\s*({.*?})\s*-->'
+        manifest_match = re.search(manifest_pattern, html, re.DOTALL)
+
+        if not manifest_match:
+            # Add manifest before END_CARDS
+            manifest_data = {
+                "slug": manifest.slug,
+                "lang": manifest.lang,
+                "type": manifest.type,
+                "tags": manifest.tags
+            }
+            manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+            manifest_comment = f"<!-- manifest: {manifest_json} -->"
+
+            if "<!-- END_CARDS -->" in html:
+                html = html.replace("<!-- END_CARDS -->", f"{manifest_comment}\n<!-- END_CARDS -->")
+            else:
+                html += f"\n{manifest_comment}"
+            logger.debug("pre_validation_fix_added_manifest", slug=manifest.slug)
+        else:
+            # Validate manifest JSON
+            try:
+                manifest_json_str = manifest_match.group(1)
+                manifest_data = json.loads(manifest_json_str)
+                # Check if slug matches
+                if manifest_data.get("slug") != manifest.slug:
+                    # Fix manifest slug
+                    manifest_data["slug"] = manifest.slug
+                    manifest_data["lang"] = manifest.lang
+                    manifest_data["type"] = manifest.type
+                    manifest_data["tags"] = manifest.tags
+                    new_manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                    new_manifest = f"<!-- manifest: {new_manifest_json} -->"
+                    html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
+                    logger.debug("pre_validation_fix_manifest_slug", slug=manifest.slug)
+            except json.JSONDecodeError:
+                # Invalid JSON, replace it
+                manifest_data = {
+                    "slug": manifest.slug,
+                    "lang": manifest.lang,
+                    "type": manifest.type,
+                    "tags": manifest.tags
+                }
+                new_manifest_json = json.dumps(manifest_data, separators=(',', ':'))
+                new_manifest = f"<!-- manifest: {new_manifest_json} -->"
+                html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
+                logger.debug("pre_validation_fix_manifest_json", slug=manifest.slug)
+
+        return html
+
     def _fix_code_tags(self, html: str) -> str:
         """Fix HTML validation issues by wrapping standalone <code> in <pre><code>.
 
