@@ -1009,6 +1009,7 @@ Requirements:
 
         for card in cards:
             fixed_html = card.apf_html
+            card_fixed = False
 
             # Fix 1: Missing END_CARDS
             if "Missing" in error_details and "END_CARDS" in error_details:
@@ -1020,6 +1021,7 @@ Requirements:
                         # Add both if neither present
                         fixed_html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
                     any_fixes = True
+                    card_fixed = True
                     logger.debug("deterministic_fix_added_end_cards", slug=card.slug)
 
             # Fix 2: Inline <code> without <pre> wrapper
@@ -1048,6 +1050,7 @@ Requirements:
                     wrapped = f"<pre>{code_tag}</pre>"
                     fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
                     any_fixes = True
+                    card_fixed = True
                     logger.debug("deterministic_fix_wrapped_code", slug=card.slug)
 
             # Fix 3: Manifest slug mismatch (if error mentions it)
@@ -1069,9 +1072,10 @@ Requirements:
                                 flags=re.DOTALL
                             )
                             any_fixes = True
+                            card_fixed = True
                             logger.debug("deterministic_fix_manifest_slug", slug=card.slug, fixed_slug=header_slug)
 
-            if any_fixes:
+            if card_fixed:
                 fixed_card = GeneratedCard(
                     card_index=card.card_index,
                     slug=card.slug,
