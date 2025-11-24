@@ -13,24 +13,10 @@ from ..models import NoteMetadata, QAPair
 from ..obsidian.parser import parse_note
 from ..exceptions import ParserError
 from ..utils.logging import get_logger
+from ..utils.types import RecoveryResult
 from .content_preprocessor import ContentPreprocessor, PreprocessingConfig
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class RecoveryResult:
-    """Result of error recovery attempt."""
-    success: bool
-    metadata: Optional[NoteMetadata] = None
-    qa_pairs: Optional[List[QAPair]] = None
-    method_used: str = ""
-    warnings: List[str] = None
-    original_error: Optional[str] = None
-
-    def __post_init__(self):
-        if self.warnings is None:
-            self.warnings = []
 
 
 class ErrorRecoveryManager:
@@ -321,7 +307,8 @@ class ErrorRecoveryManager:
                 # Extract from YAML list format
                 match = re.search(r'language_tags:\s*\[(.*?)\]', line)
                 if match:
-                    languages = [lang.strip().strip('"\''') for lang in match.group(1).split(', ')]
+                    languages = [lang.strip().strip('"\'')
+                                 for lang in match.group(1).split(', ')]
                     break
 
         return languages or ['en']  # Default to English
@@ -346,3 +333,54 @@ def parse_note_with_recovery(file_path: Path) -> RecoveryResult:
     """
     recovery_manager = ErrorRecoveryManager()
     return recovery_manager.parse_with_recovery(file_path)
+
+
+def parse_note_with_error_recovery(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
+    """
+    Parse an Obsidian note with comprehensive error recovery.
+
+    Uses multiple fallback strategies:
+    1. Normal tolerant parsing
+    2. Content preprocessing and retry
+    3. Auto-repair of common issues
+    4. Minimal valid structure creation
+
+    Args:
+        file_path: Path to the markdown file
+
+    Returns:
+        Tuple of (metadata, qa_pairs)
+
+    Raises:
+        ParserError: If all recovery strategies fail
+    """
+    result = parse_note_with_recovery(file_path)
+
+    if result.success:
+        logger.info(
+            "parse_with_recovery_successful",
+            file=str(file_path),
+            method=result.method_used,
+            qa_pairs_count=len(result.qa_pairs) if result.qa_pairs else 0,
+            warnings=result.warnings
+        )
+
+        if result.warnings:
+            for warning in result.warnings:
+                logger.warning("recovery_warning",
+                               warning=warning, file=str(file_path))
+
+        return result.metadata, result.qa_pairs
+    else:
+        error_msg = f"Failed to parse {file_path} with all recovery strategies"
+        if result.original_error:
+            error_msg += f": {result.original_error}"
+
+        logger.error(
+            "parse_recovery_failed",
+            file=str(file_path),
+            original_error=result.original_error,
+            warnings=result.warnings
+        )
+
+        raise ParserError(error_msg)

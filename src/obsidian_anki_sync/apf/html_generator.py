@@ -7,7 +7,7 @@ to ensure consistent, well-formed HTML output.
 import html
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from html import escape
 
 from ..utils.logging import get_logger
