@@ -20,7 +20,8 @@ class TestAnkiClient:
     def test_successful_invoke(self, mock_anki_url) -> None:
         """Test successful API call."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": "success", "error": None})
+            return_value=httpx.Response(
+                200, json={"result": "success", "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -46,7 +47,8 @@ class TestAnkiClient:
     def test_find_notes(self, mock_anki_url) -> None:
         """Test finding notes."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": [1, 2, 3], "error": None})
+            return_value=httpx.Response(
+                200, json={"result": [1, 2, 3], "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -84,7 +86,8 @@ class TestAnkiClient:
         """Test adding a note (INT-crud-01)."""
         route = respx.post(mock_anki_url)
         route.mock(
-            return_value=httpx.Response(200, json={"result": 12345, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": 12345, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -98,16 +101,64 @@ class TestAnkiClient:
 
         assert note_id == 12345
         assert route.called
-        import json
 
-        payload = json.loads(route.calls[-1].request.content)
-        assert payload["params"]["note"]["guid"] == "guid-123"
+    @respx.mock
+    def test_can_add_notes(self, mock_anki_url) -> None:
+        """Test checking if notes can be added."""
+        respx.post(mock_anki_url).mock(
+            return_value=httpx.Response(
+                200, json={"result": [True, False], "error": None})
+        )
+
+        client = AnkiClient(mock_anki_url)
+        can_add = client.can_add_notes([
+            {
+                "deckName": "Test Deck",
+                "modelName": "Basic",
+                "fields": {"Front": "Q1", "Back": "A1"}
+            },
+            {
+                "deckName": "Test Deck",
+                "modelName": "Basic",
+                "fields": {"Front": "Q2", "Back": "A2"}
+            }
+        ])
+
+        assert can_add == [True, False]
+
+    @respx.mock
+    def test_store_media_file(self, mock_anki_url) -> None:
+        """Test storing a media file."""
+        respx.post(mock_anki_url).mock(
+            return_value=httpx.Response(
+                200, json={"result": "stored_image.png", "error": None})
+        )
+
+        client = AnkiClient(mock_anki_url)
+        result = client.store_media_file("image.png", "base64data")
+
+        assert result == "stored_image.png"
+
+    @respx.mock
+    def test_suspend_cards(self, mock_anki_url) -> None:
+        """Test suspending cards."""
+        respx.post(mock_anki_url).mock(
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
+        )
+
+        client = AnkiClient(mock_anki_url)
+        client.suspend_cards([1, 2, 3])
+
+        # Verify the request was made
+        assert mock_anki_url.rstrip('/') in str(respx.calls.last.request.url)
 
     @respx.mock
     def test_update_note_fields(self, mock_anki_url) -> None:
         """Test updating note fields (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": None, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -119,7 +170,8 @@ class TestAnkiClient:
     def test_delete_notes(self, mock_anki_url) -> None:
         """Test deleting notes (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": None, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)

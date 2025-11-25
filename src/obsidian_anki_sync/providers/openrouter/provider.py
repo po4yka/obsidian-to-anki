@@ -128,7 +128,8 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -155,7 +156,8 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
         return self._async_client
@@ -258,7 +260,8 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success", model_count=len(models))
+            logger.info("openrouter_list_models_success",
+                        model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
@@ -301,7 +304,8 @@ class OpenRouterProvider(BaseLLMProvider):
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -561,8 +565,18 @@ class OpenRouterProvider(BaseLLMProvider):
         """Process API response and handle errors."""
         try:
             result = response.json()
-            message = result["choices"][0]["message"]
-            completion = self._extract_completion(message, model, result, json_schema)
+
+            # Validate response structure
+            choices = result.get("choices", [])
+            if not choices:
+                raise ValueError(
+                    f"OpenRouter returned empty choices array. Response: {str(result)[:500]}"
+                )
+
+            first_choice = choices[0]
+            message = first_choice.get("message", {})
+            completion = self._extract_completion(
+                message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -573,10 +587,11 @@ class OpenRouterProvider(BaseLLMProvider):
             prompt_tokens = usage.get("prompt_tokens", 0)
             completion_tokens = usage.get("completion_tokens", 0)
             total_tokens = usage.get("total_tokens", 0)
-            finish_reason = result["choices"][0].get("finish_reason", "stop")
+            finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(
+                model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -656,7 +671,8 @@ class OpenRouterProvider(BaseLLMProvider):
             elif "refusal" in message and message["refusal"]:
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get("finish_reason", "unknown")
+                finish_reason = result["choices"][0].get(
+                    "finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -727,7 +743,15 @@ class OpenRouterProvider(BaseLLMProvider):
         retry_response.raise_for_status()
 
         retry_result = retry_response.json()
-        retry_message = retry_result["choices"][0]["message"]
+
+        # Validate retry response structure
+        retry_choices = retry_result.get("choices", [])
+        if not retry_choices:
+            raise ValueError(
+                f"OpenRouter retry returned empty choices. Response: {str(retry_result)[:500]}"
+            )
+
+        retry_message = retry_choices[0].get("message", {})
         retry_completion: str = retry_message.get("content", "")
 
         if retry_completion and json_schema:
@@ -764,6 +788,39 @@ class OpenRouterProvider(BaseLLMProvider):
             error_details=error_info["error_details"],
             had_json_schema=bool(json_schema),
         )
+
+        # Enhanced fallback for Grok models: try with reasoning enabled first
+        if (
+            should_fallback_to_basic_json(
+                model, error.response.status_code, json_schema)
+            and "grok" in model.lower()
+            and json_schema
+            and not reasoning_enabled
+        ):
+            logger.info(
+                "grok_structured_output_failed_trying_with_reasoning",
+                model=model,
+                error_message=error_info["error_message"],
+            )
+            try:
+                # Try again with reasoning enabled
+                return self.generate(
+                    model=model,
+                    prompt=prompt,
+                    system=system,
+                    temperature=temperature,
+                    format=format,
+                    json_schema=json_schema,
+                    stream=stream,
+                    reasoning_enabled=True,  # Enable reasoning for fallback
+                )
+            except Exception as retry_error:
+                logger.warning(
+                    "grok_reasoning_fallback_failed",
+                    model=model,
+                    retry_error=str(retry_error),
+                )
+                # Continue to basic JSON fallback
 
         # Fallback to basic JSON for problematic models
         if should_fallback_to_basic_json(
@@ -825,6 +882,42 @@ class OpenRouterProvider(BaseLLMProvider):
                 reasoning_enabled=reasoning_enabled,
             )
         except ValueError as e:
+            # Enhanced fallback for Grok models: try with reasoning enabled first
+            if (
+                "empty completion" in str(e).lower()
+                and json_schema
+                and "grok" in model.lower()
+                and not reasoning_enabled
+            ):
+                logger.info(
+                    "generate_json_grok_fallback_with_reasoning",
+                    model=model,
+                    reason="Empty completion with json_schema, trying with reasoning enabled",
+                )
+                try:
+                    result = self.generate(
+                        model=model,
+                        prompt=prompt,
+                        system=system,
+                        temperature=temperature,
+                        format="",  # Use schema-based format
+                        json_schema=json_schema,
+                        reasoning_enabled=True,  # Enable reasoning for fallback
+                    )
+                    # Check if reasoning fallback also returned empty
+                    response_text = result.get("response", "")
+                    if not response_text or response_text.strip() == "":
+                        raise ValueError(
+                            f"Model {model} returned empty completion even with reasoning enabled."
+                        ) from e
+                except Exception as reasoning_error:
+                    logger.warning(
+                        "grok_reasoning_fallback_failed_in_generate_json",
+                        model=model,
+                        error=str(reasoning_error),
+                    )
+                    # Continue to basic JSON fallback
+
             # If structured output failed (empty completion), try fallback without schema
             if "empty completion" in str(e).lower() and json_schema:
                 logger.info(
@@ -900,12 +993,14 @@ class OpenRouterProvider(BaseLLMProvider):
             Response dictionary
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported in async mode")
+            raise NotImplementedError(
+                "Streaming is not yet supported in async mode")
 
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -959,14 +1054,23 @@ class OpenRouterProvider(BaseLLMProvider):
             response.raise_for_status()
 
             result = response.json()
-            message = result["choices"][0]["message"]
+
+            # Validate response structure
+            choices = result.get("choices", [])
+            if not choices:
+                raise ValueError(
+                    f"OpenRouter async returned empty choices. Response: {str(result)[:500]}"
+                )
+
+            first_choice = choices[0]
+            message = first_choice.get("message", {})
             completion = message.get("content", "")
 
             if json_schema or format == "json":
                 completion = clean_json_response(completion, model)
 
             usage = result.get("usage", {})
-            finish_reason = result["choices"][0].get("finish_reason", "stop")
+            finish_reason = first_choice.get("finish_reason", "stop")
 
             log_llm_success(
                 model=model,

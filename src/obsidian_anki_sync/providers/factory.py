@@ -141,22 +141,26 @@ class ProviderFactory:
             }
 
         elif provider_type in ("lm_studio", "lmstudio"):
+            # Use 'or' to handle both missing attribute AND explicit None value
+            max_tokens = getattr(config, "llm_max_tokens", None) or 2048
             kwargs = {
                 "base_url": getattr(
                     config, "lm_studio_base_url", "http://localhost:1234/v1"
                 ),
                 "timeout": getattr(config, "llm_timeout", 120.0),
-                "max_tokens": getattr(config, "llm_max_tokens", 2048),
+                "max_tokens": max_tokens,
             }
 
         elif provider_type == "openrouter":
+            # Use 'or' to handle both missing attribute AND explicit None value
+            max_tokens = getattr(config, "llm_max_tokens", None) or 2048
             kwargs = {
                 "api_key": getattr(config, "openrouter_api_key", None),
                 "base_url": getattr(
                     config, "openrouter_base_url", "https://openrouter.ai/api/v1"
                 ),
                 "timeout": getattr(config, "llm_timeout", 120.0),
-                "max_tokens": getattr(config, "llm_max_tokens", 2048),
+                "max_tokens": max_tokens,
                 "site_url": getattr(config, "openrouter_site_url", None),
                 "site_name": getattr(config, "openrouter_site_name", None),
             }
@@ -173,6 +177,8 @@ class ProviderFactory:
             }
 
         elif provider_type in ("anthropic", "claude"):
+            # Use 'or' to handle both missing attribute AND explicit None value
+            max_tokens = getattr(config, "llm_max_tokens", None) or 4096
             kwargs = {
                 "api_key": getattr(config, "anthropic_api_key", None),
                 "base_url": getattr(
@@ -180,7 +186,7 @@ class ProviderFactory:
                 ),
                 "api_version": getattr(config, "anthropic_api_version", "2023-06-01"),
                 "timeout": getattr(config, "llm_timeout", 120.0),
-                "max_tokens": getattr(config, "llm_max_tokens", 4096),
+                "max_tokens": max_tokens,
                 "max_retries": getattr(config, "anthropic_max_retries", 3),
             }
 

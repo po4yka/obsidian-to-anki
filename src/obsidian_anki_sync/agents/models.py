@@ -5,6 +5,37 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class QualityDimension(BaseModel):
+    """Quality assessment for a specific dimension."""
+
+    model_config = ConfigDict(frozen=False)
+
+    score: float = Field(ge=0.0, le=1.0, description="Dimension quality score")
+    weight: float = Field(
+        ge=0.0, le=1.0, description="Dimension weight in overall score")
+    issues: list[str] = Field(default_factory=list,
+                              description="Specific issues found")
+    strengths: list[str] = Field(
+        default_factory=list, description="Positive aspects identified")
+
+
+class QualityReport(BaseModel):
+    """Comprehensive quality assessment report for a card."""
+
+    model_config = ConfigDict(frozen=False)
+
+    overall_score: float = Field(
+        ge=0.0, le=1.0, description="Overall quality score")
+    dimensions: dict[str, QualityDimension] = Field(
+        default_factory=dict, description="Quality scores by dimension")
+    suggestions: list[str] = Field(
+        default_factory=list, description="Actionable improvement suggestions")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Confidence in assessment")
+    assessment_time: float = Field(
+        ge=0.0, description="Time taken for assessment")
+
+
 class PreValidationResult(BaseModel):
     """Result from pre-validator agent.
 

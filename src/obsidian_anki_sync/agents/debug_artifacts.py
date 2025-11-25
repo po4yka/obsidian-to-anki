@@ -21,9 +21,15 @@ class DebugArtifactSaver:
             enabled: Whether artifact saving is enabled
         """
         self.enabled = enabled
-        self.artifacts_dir = artifacts_dir or Path(".debug_artifacts")
+        if artifacts_dir is None:
+            # Use a secure default path that resolves to current working directory
+            self.artifacts_dir = Path.cwd() / ".debug_artifacts"
+        else:
+            # Resolve the provided path to prevent path traversal
+            self.artifacts_dir = artifacts_dir.resolve()
 
         if self.enabled:
+            # Create parent directories if they don't exist
             self.artifacts_dir.mkdir(parents=True, exist_ok=True)
             logger.info(
                 "debug_artifacts_enabled", artifacts_dir=str(self.artifacts_dir)

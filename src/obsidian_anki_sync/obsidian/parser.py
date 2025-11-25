@@ -312,6 +312,16 @@ def parse_note(
             raise ParserError(f"File does not exist: {resolved_path}")
         if not resolved_path.is_file():
             raise ParserError(f"Path is not a file: {resolved_path}")
+
+        # Security: Check file size to prevent DoS attacks
+        file_size = resolved_path.stat().st_size
+        max_file_size = 10 * 1024 * 1024  # 10MB limit
+        if file_size > max_file_size:
+            raise ParserError(
+                f"File too large: {resolved_path} ({file_size} bytes). "
+                f"Maximum allowed size is {max_file_size} bytes."
+            )
+
     except (OSError, RuntimeError) as e:
         raise ParserError(f"Cannot resolve path {file_path}: {e}")
 
@@ -427,7 +437,8 @@ def parse_note_with_repair(
                 file=str(file_path),
                 original_error=str(e),
             )
-            raise ParserError(f"Parse failed and repair unsuccessful: {e}") from e
+            raise ParserError(
+                f"Parse failed and repair unsuccessful: {e}") from e
 
         # Repair succeeded
         metadata, qa_pairs = result
@@ -455,14 +466,15 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
         Preprocessed content with fixed YAML syntax
     """
     # Extract frontmatter section
-    frontmatter_match = re.match(r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
+    frontmatter_match = re.match(
+        r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
     if not frontmatter_match:
         return content
 
     frontmatter_start = frontmatter_match.group(1)
     frontmatter_body = frontmatter_match.group(2)
     frontmatter_end = frontmatter_match.group(3)
-    rest_content = content[frontmatter_match.end() :]
+    rest_content = content[frontmatter_match.end():]
 
     # Fix backticks in YAML arrays/strings
     # Pattern: matches backticks around words in arrays or after colons
@@ -703,7 +715,8 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         raise ParserError(f"No frontmatter found in {file_path}")
 
     # Validate required fields
-    required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
+    required_fields = ["id", "title", "topic",
+                       "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ParserError(f"Missing required fields in {file_path}: {missing}")
@@ -844,7 +857,8 @@ def parse_qa_pairs(
     )
 
     # Strip frontmatter
-    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
+    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "",
+                     content, count=1, flags=re.DOTALL)
 
     # Normalize line endings and strip BOM
     content = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -898,7 +912,8 @@ def parse_qa_pairs(
 
         # Try to parse this block as a Q/A pair
         try:
-            qa_pair = _parse_single_qa_block(block, card_index, metadata, file_path)
+            qa_pair = _parse_single_qa_block(
+                block, card_index, metadata, file_path)
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
@@ -925,7 +940,8 @@ def parse_qa_pairs(
                             qa_pairs.extend(extracted_pairs)
                             logger.info(
                                 "llm_extraction_recovered_incomplete_block",
-                                file=str(file_path) if file_path else "unknown",
+                                file=str(
+                                    file_path) if file_path else "unknown",
                                 card_index=card_index,
                                 recovered_pairs=len(extracted_pairs),
                             )
@@ -941,7 +957,8 @@ def parse_qa_pairs(
                         # Fall through to add to failed_blocks
 
                 # Block was skipped (incomplete or invalid)
-                failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
+                failed_blocks.append(
+                    (card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
             logger.error(
                 "qa_parse_error",
@@ -1362,7 +1379,8 @@ def _normalize_sources(value: Any) -> list[dict[str, str]]:
         if item is None:
             continue
         if isinstance(item, dict):
-            normalized.append({k: str(v) for k, v in item.items() if v is not None})
+            normalized.append({k: str(v)
+                              for k, v in item.items() if v is not None})
         else:
             text = str(item).strip()
             if text:

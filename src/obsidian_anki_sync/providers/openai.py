@@ -239,8 +239,18 @@ class OpenAIProvider(BaseLLMProvider):
         try:
             data = response.json()
 
-            # Extract response
-            response_text = data["choices"][0]["message"]["content"]
+            # Validate response structure
+            choices = data.get("choices", [])
+            if not choices:
+                raise ValueError(
+                    f"OpenAI returned empty choices array. Response: {str(data)[:500]}"
+                )
+
+            # Extract response safely
+            first_choice = choices[0]
+            message = first_choice.get("message", {})
+            response_text = message.get("content", "")
+            finish_reason = first_choice.get("finish_reason", "stop")
 
             # Extract token usage
             usage = data.get("usage", {})
@@ -252,7 +262,7 @@ class OpenAIProvider(BaseLLMProvider):
             result = {
                 "response": response_text,
                 "model": data.get("model", model),
-                "finish_reason": data["choices"][0].get("finish_reason", "stop"),
+                "finish_reason": finish_reason,
                 "_token_usage": {
                     "prompt_tokens": prompt_tokens,
                     "completion_tokens": completion_tokens,

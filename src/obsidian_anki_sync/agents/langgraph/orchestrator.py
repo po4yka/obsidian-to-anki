@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -40,11 +40,16 @@ from .nodes import (
 from .retry_policies import TRANSIENT_RETRY_POLICY, VALIDATION_RETRY_POLICY
 from .state import PipelineState
 
-# Optional agent memory (requires chromadb)
+# Optional agent memory and observability (requires chromadb, motor, langsmith)
 try:
     from ..agent_memory import AgentMemoryStore
+    from ..advanced_memory import AdvancedMemoryStore  # NEW: Advanced memory system
+    # NEW: Enhanced observability
+    from ..enhanced_observability import EnhancedObservabilitySystem
 except ImportError:
     AgentMemoryStore = None
+    AdvancedMemoryStore = None
+    EnhancedObservabilitySystem = None
 
 logger = get_logger(__name__)
 
@@ -145,7 +150,7 @@ class LangGraphOrchestrator:
     and state persistence via checkpoints.
     """
 
-    def __init__(
+    async def __init__(  # CHANGED: Made async for MongoDB connection
         self,
         config: Config,
         max_retries: int | None = None,
@@ -210,31 +215,32 @@ class LangGraphOrchestrator:
         from ...providers.pydantic_ai_models import PydanticAIModelFactory
 
         try:
-            self.pre_validator_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("pre_validator")
+            # Create models with full configuration including reasoning
+            self.pre_validator_model = self._create_model_with_config(
+                config, "pre_validator"
             )
-            self.card_splitting_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("card_splitting")
+            self.card_splitting_model = self._create_model_with_config(
+                config, "card_splitting"
             )
-            self.generator_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("generator")
+            self.generator_model = self._create_model_with_config(
+                config, "generator"
             )
-            self.post_validator_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("post_validator")
+            self.post_validator_model = self._create_model_with_config(
+                config, "post_validator"
             )
-            self.context_enrichment_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("context_enrichment")
+            self.context_enrichment_model = self._create_model_with_config(
+                config, "context_enrichment"
             )
-            self.memorization_quality_model = PydanticAIModelFactory.create_from_config(
-                config,
-                model_name=config.get_model_for_agent("memorization_quality"),
+            self.memorization_quality_model = self._create_model_with_config(
+                config, "memorization_quality"
             )
-            self.duplicate_detection_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("duplicate_detection")
+            self.duplicate_detection_model = self._create_model_with_config(
+                config, "duplicate_detection"
             )
             logger.info("pydantic_ai_models_cached", models_created=7)
         except Exception as e:
-            logger.warning("failed_to_cache_models_will_create_on_demand", error=str(e))
+            logger.warning(
+                "failed_to_cache_models_will_create_on_demand", error=str(e))
             # Set to None - nodes will create models on demand as fallback
             self.pre_validator_model = None
             self.card_splitting_model = None
@@ -244,14 +250,38 @@ class LangGraphOrchestrator:
             self.memorization_quality_model = None
             self.duplicate_detection_model = None
 
-        # Initialize memory store if enabled
+        # Initialize memory stores if enabled
         self.memory_store = None
+        self.advanced_memory_store = None
+
+    def _create_model_with_config(self, config: Config, agent_type: str) -> Any:
+        """Create a PydanticAI model with full configuration including reasoning.
+
+        Args:
+            config: Configuration object
+            agent_type: Agent type (e.g., "pre_validator", "generator")
+
+        Returns:
+            Configured PydanticAI model
+        """
+        model_name = config.get_model_for_agent(agent_type)
+        model_config = config.get_model_config_for_task(agent_type)
+
+        return PydanticAIModelFactory.create_from_config(
+            config,
+            model_name=model_name,
+            reasoning_enabled=model_config.get("reasoning_enabled", False),
+            max_tokens=model_config.get("max_tokens"),
+        )
+
+        # Legacy ChromaDB memory store
         if getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
             try:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(
+                    config, "enable_semantic_search", True)
                 embedding_model = getattr(
                     config, "embedding_model", "text-embedding-3-small"
                 )
@@ -266,7 +296,67 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning("langgraph_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "langgraph_memory_store_init_failed", error=str(e))
+
+        # NEW: Advanced MongoDB memory store
+        if getattr(config, "use_advanced_memory", False) and AdvancedMemoryStore:
+            try:
+                mongodb_url = getattr(
+                    config, "mongodb_url", "mongodb://localhost:27017")
+                memory_db_name = getattr(
+                    config, "memory_db_name", "obsidian_anki_memory")
+
+                self.advanced_memory_store = AdvancedMemoryStore(
+                    config=config,
+                    mongodb_url=mongodb_url,
+                    db_name=memory_db_name,
+                    embedding_store=self.memory_store,  # Link to ChromaDB for embeddings
+                )
+
+                # Connect to MongoDB (synchronous wrapper for async connect)
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # If already in async context, schedule the coroutine
+                        # Connection will be established on first use
+                        logger.info(
+                            "advanced_memory_store_deferred_connection",
+                            mongodb_url=mongodb_url,
+                            db_name=memory_db_name,
+                        )
+                    else:
+                        connected = loop.run_until_complete(
+                            self.advanced_memory_store.connect()
+                        )
+                        if connected:
+                            logger.info(
+                                "advanced_memory_store_initialized",
+                                mongodb_url=mongodb_url,
+                                db_name=memory_db_name,
+                            )
+                        else:
+                            logger.warning(
+                                "advanced_memory_store_connection_failed")
+                            self.advanced_memory_store = None
+                except RuntimeError:
+                    # No event loop available, will connect on first use
+                    logger.info("advanced_memory_store_lazy_connection")
+
+            except Exception as e:
+                logger.warning(
+                    "advanced_memory_store_init_failed", error=str(e))
+
+        # NEW: Enhanced observability system
+        self.observability = None
+        if getattr(config, "enable_enhanced_observability", False) and EnhancedObservabilitySystem:
+            try:
+                self.observability = EnhancedObservabilitySystem(config)
+                logger.info("enhanced_observability_system_initialized")
+            except Exception as e:
+                logger.warning(
+                    "enhanced_observability_init_failed", error=str(e))
 
         # Build the workflow graph
         self.workflow = self._build_workflow()
@@ -304,7 +394,8 @@ class LangGraphOrchestrator:
 
         # Add optional note correction node (if enabled)
         # Best practice: Use RetryPolicy for nodes that call external APIs
-        enable_note_correction = getattr(self.config, "enable_note_correction", False)
+        enable_note_correction = getattr(
+            self.config, "enable_note_correction", False)
         if enable_note_correction:
             workflow.add_node(
                 "note_correction",
@@ -445,6 +536,16 @@ class LangGraphOrchestrator:
             qa_pairs_count=len(qa_pairs),
         )
 
+        # NEW: Start observability tracking
+        observability_context = None
+        if self.observability:
+            observability_context = self.observability.trace_agent_execution(
+                agent_name="langgraph_orchestrator",
+                title=metadata.title,
+                qa_pairs_count=len(qa_pairs),
+                has_existing_cards=existing_cards is not None,
+            )
+
         # Generate slug base
         slug_base = self._generate_slug_base(metadata)
 
@@ -575,6 +676,56 @@ class LangGraphOrchestrator:
             total_time=total_time,
             messages=final_state["messages"],
         )
+
+        # NEW: Record observability metrics
+        if self.observability:
+            try:
+                from ..enhanced_observability import AgentMetrics
+                metrics = AgentMetrics(
+                    agent_name="langgraph_orchestrator",
+                    execution_time=total_time,
+                    success=success,
+                    retry_count=final_state["retry_count"],
+                    step_count=final_state.get("step_count", 0),
+                    quality_score=memorization_quality.memorization_score if memorization_quality else None,
+                    api_cost=None,  # Could be calculated from API usage
+                    token_count=None,  # Could be tracked from model usage
+                    error_type=final_state.get("last_error_severity"),
+                    handoffs=0,  # Could be tracked in swarm mode
+                    timestamp=start_time,
+                )
+                self.observability.record_metrics(metrics)
+                logger.info("observability_metrics_recorded")
+            except Exception as e:
+                logger.warning(
+                    "observability_metrics_recording_failed", error=str(e))
+
+        # NEW: Learn from execution if advanced memory is enabled
+        if self.advanced_memory_store and self.advanced_memory_store.connected:
+            try:
+                await self.advanced_memory_store.learn_from_pipeline_result(
+                    agent_name="langgraph_orchestrator",
+                    task_type="note_processing",
+                    input_data={
+                        # Truncate for hashing
+                        "note_content": note_content[:500],
+                        "qa_pairs_count": len(qa_pairs),
+                        "metadata_title": metadata.title,
+                    },
+                    pipeline_result={
+                        "success": success,
+                        "total_time": total_time,
+                        "retry_count": final_state["retry_count"],
+                        "step_count": final_state.get("step_count", 0),
+                        "quality_score": memorization_quality.memorization_score if memorization_quality else None,
+                        "context_enrichment": context_enrichment is not None,
+                        "error_type": last_error.get("type") if (last_error := final_state.get("last_error")) else None,
+                    },
+                    execution_time=total_time,
+                )
+                logger.info("advanced_memory_learning_completed")
+            except Exception as e:
+                logger.warning("advanced_memory_learning_failed", error=str(e))
 
         return result
 

@@ -286,14 +286,23 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            if results["ids"] and len(results["ids"][0]) > 0:
-                for i in range(len(results["ids"][0])):
-                    memory_id = results["ids"][0][i]
-                    metadata = results["metadatas"][0][i]
-                    document = results["documents"][0][i]
-                    distance = (
-                        results["distances"][0][i] if "distances" in results else None
-                    )
+            ids = results.get("ids", [[]])
+            metadatas = results.get("metadatas", [[]])
+            documents = results.get("documents", [[]])
+            distances = results.get("distances", [[]])
+
+            # Validate all arrays have consistent structure
+            if ids and len(ids[0]) > 0:
+                num_results = len(ids[0])
+                for i in range(num_results):
+                    # Safe access with bounds checking
+                    memory_id = ids[0][i] if i < len(ids[0]) else None
+                    metadata = metadatas[0][i] if metadatas and len(metadatas[0]) > i else {}
+                    document = documents[0][i] if documents and len(documents[0]) > i else ""
+                    distance = distances[0][i] if distances and len(distances[0]) > i else None
+
+                    if memory_id is None:
+                        continue
 
                     similar_failures.append(
                         {
@@ -350,10 +359,12 @@ class AgentMemoryStore:
                     n_results=1,
                 )
 
-            # Extract recommendation
-            if results["ids"] and len(results["ids"][0]) > 0:
-                metadata = results["metadatas"][0][0]
-                successful_agent_str = metadata.get("successful_agent")
+            # Extract recommendation with safe access
+            ids = results.get("ids", [[]])
+            metadatas = results.get("metadatas", [[]])
+            if ids and len(ids[0]) > 0 and metadatas and len(metadatas[0]) > 0:
+                metadata = metadatas[0][0]
+                successful_agent_str = metadata.get("successful_agent") if metadata else None
 
                 if successful_agent_str:
                     try:

@@ -8,9 +8,9 @@ The project uses AnkiConnect API v6 to communicate with Anki. All API calls are 
 
 ## API Version
 
-- **Version**: 6 (latest stable)
-- **Default URL**: `http://127.0.0.1:8765`
-- **Protocol**: HTTP POST with JSON payloads
+-   **Version**: 6 (latest stable)
+-   **Default URL**: `http://127.0.0.1:8765`
+-   **Protocol**: HTTP POST with JSON payloads
 
 ## Request Format
 
@@ -42,6 +42,7 @@ All responses follow this structure:
 ### Note Operations
 
 #### findNotes
+
 Find notes matching a query.
 
 ```python
@@ -53,6 +54,7 @@ client.find_notes("deck:MyDeck tag:interview")
 **Parameters**: `{"query": str}`
 
 #### notesInfo
+
 Get detailed information about notes.
 
 ```python
@@ -64,6 +66,7 @@ client.notes_info([1234567890, 9876543210])
 **Parameters**: `{"notes": list[int]}`
 
 #### addNote
+
 Add a new note to Anki.
 
 ```python
@@ -83,6 +86,7 @@ client.add_note(
 
 **API Action**: `addNote`
 **Parameters**:
+
 ```python
 {
     "note": {
@@ -99,6 +103,7 @@ client.add_note(
 ```
 
 #### updateNoteFields
+
 Update fields of an existing note.
 
 ```python
@@ -110,6 +115,7 @@ client.update_note_fields(
 
 **API Action**: `updateNoteFields`
 **Parameters**:
+
 ```python
 {
     "note": {
@@ -120,6 +126,7 @@ client.update_note_fields(
 ```
 
 #### deleteNotes
+
 Delete notes by ID.
 
 ```python
@@ -132,6 +139,7 @@ client.delete_notes([1234567890, 9876543210])
 ### Tag Operations
 
 #### addTags
+
 Add tags to notes.
 
 ```python
@@ -145,6 +153,7 @@ client.add_tags(
 **Parameters**: `{"notes": list[int], "tags": str}`
 
 #### removeTags
+
 Remove tags from notes.
 
 ```python
@@ -158,6 +167,7 @@ client.remove_tags(
 **Parameters**: `{"notes": list[int], "tags": str}`
 
 #### replaceTags
+
 Replace a tag with another across notes.
 
 ```python
@@ -174,6 +184,7 @@ client.replace_tags(
 ### Deck and Model Operations
 
 #### deckNames
+
 Get all deck names.
 
 ```python
@@ -185,6 +196,7 @@ client.get_deck_names()
 **Parameters**: None
 
 #### modelNames
+
 Get all note type (model) names.
 
 ```python
@@ -196,6 +208,7 @@ client.get_model_names()
 **Parameters**: None
 
 #### modelFieldNames
+
 Get field names for a note type.
 
 ```python
@@ -209,6 +222,7 @@ client.get_model_field_names("APF::Simple")
 ### Utility Operations
 
 #### canAddNotes
+
 Check if notes can be added (duplicate check).
 
 ```python
@@ -225,7 +239,56 @@ client.can_add_notes([
 **API Action**: `canAddNotes`
 **Parameters**: `{"notes": list[dict]}`
 
+#### suspend/unsuspend
+
+Suspend or unsuspend cards.
+
+```python
+client.suspend_cards([1234567890, 9876543210])
+client.unsuspend_cards([1234567890, 9876543210])
+```
+
+**API Action**: `suspend`/`unsuspend`
+**Parameters**: `{"cards": list[int]}`
+
+#### guiBrowse
+
+Open Anki browser with a search query.
+
+```python
+client.gui_browse("deck:MyDeck tag:interview")
+# Returns: list[int] - Note IDs in browser
+```
+
+**API Action**: `guiBrowse`
+**Parameters**: `{"query": str}`
+
+#### getCollectionStatsHtml
+
+Get collection statistics.
+
+```python
+stats_html = client.get_collection_stats()
+# Returns: str - HTML statistics
+```
+
+**API Action**: `getCollectionStatsHtml`
+**Parameters**: None
+
+#### getNumCardsReviewedToday
+
+Get daily review count.
+
+```python
+count = client.get_num_cards_reviewed_today()
+# Returns: int - Cards reviewed today
+```
+
+**API Action**: `getNumCardsReviewedToday`
+**Parameters**: None
+
 #### storeMediaFile
+
 Store a media file in Anki's media folder.
 
 ```python
@@ -240,6 +303,7 @@ client.store_media_file(
 **Parameters**: `{"filename": str, "data": str}`
 
 #### guiBrowse
+
 Open Anki browser with a search query.
 
 ```python
@@ -251,6 +315,7 @@ client.gui_browse("deck:MyDeck")
 **Parameters**: `{"query": str}`
 
 #### sync
+
 Trigger Anki synchronization.
 
 ```python
@@ -274,18 +339,18 @@ except AnkiConnectError as e:
 
 ### Error Types
 
-- **Connection Errors**: AnkiConnect not running or network issues
-- **HTTP Errors**: Invalid requests or server errors
-- **API Errors**: Invalid parameters or Anki-specific errors (e.g., duplicate notes)
+-   **Connection Errors**: AnkiConnect not running or network issues
+-   **HTTP Errors**: Invalid requests or server errors
+-   **API Errors**: Invalid parameters or Anki-specific errors (e.g., duplicate notes)
 
 ## Retry Logic
 
 All API calls are automatically retried on failure:
 
-- **Max Attempts**: 3
-- **Initial Delay**: 1.0 seconds
-- **Backoff**: Exponential
-- **Retryable Errors**: `httpx.HTTPError`, `httpx.TimeoutException`, `AnkiConnectError`
+-   **Max Attempts**: 3
+-   **Initial Delay**: 1.0 seconds
+-   **Backoff**: Exponential
+-   **Retryable Errors**: `httpx.HTTPError`, `httpx.TimeoutException`, `AnkiConnectError`
 
 ## Connection Pooling
 
@@ -324,8 +389,22 @@ Or in code:
 from obsidian_anki_sync.config import Config
 
 config = Config()
-client = AnkiClient(url=config.anki_connect_url)
+client = AnkiClient(
+    url=config.anki_connect_url,
+    enable_health_checks=True  # Enable periodic health checks
+)
 ```
+
+## Health Checking
+
+The client includes automatic health checking to improve reliability:
+
+-   **Periodic Checks**: Health is checked every 60 seconds by default
+-   **Connection State Tracking**: Failed connections are marked as unhealthy
+-   **Early Failure Detection**: Unhealthy connections fail fast instead of retrying
+-   **Configurable**: Health checks can be disabled with `enable_health_checks=False`
+
+Health checks use a lightweight `version` API call to verify AnkiConnect is responding.
 
 ## Testing
 
@@ -353,9 +432,9 @@ def test_add_note():
 
 ### Supported AnkiConnect Versions
 
-- **v6**: Fully supported (current)
-- **v5**: Not tested
-- **v4 and below**: Not supported
+-   **v6**: Fully supported (current)
+-   **v5**: Not tested
+-   **v4 and below**: Not supported
 
 ### Breaking Changes from Previous Versions
 
@@ -443,19 +522,40 @@ AnkiConnectError: model was not found: APF::Simple
 
 ## References
 
-- [AnkiConnect Official Documentation](https://foosoft.net/projects/anki-connect/)
-- [AnkiConnect GitHub Repository](https://github.com/FooSoft/anki-connect)
-- [Anki Manual](https://docs.ankiweb.net/)
+-   [AnkiConnect GitHub Repository](https://github.com/amikey/anki-connect) (actively maintained fork)
+-   [Anki Manual](https://docs.ankiweb.net/)
+-   [AnkiConnect Original Repository](https://github.com/FooSoft/anki-connect) (archived)
 
 ## Changelog
 
+### v0.3.0 (2025-11-25) - Quality Enhancement System
+
+-   **CardQualityAgent**: Multi-dimensional quality assessment (content, learning science, technical, accessibility)
+-   **CardImprover**: Automated card improvement with rule-based fixes and LLM-powered enhancements
+-   **PerformanceTracker**: Integration with Anki performance metrics for continuous improvement
+-   **QualityValidator**: Comprehensive validation system orchestrating all quality components
+-   **Quality metrics**: Overall scores, dimension-specific analysis, actionable improvement suggestions
+-   **Accessibility compliance**: WCAG checks, alt text validation, semantic HTML verification
+-   **Learning science validation**: Active recall assessment, cognitive load analysis, atomic principle checking
+-   **Performance integration**: Retention tracking, lapse analysis, ease factor monitoring
+
+### v0.2.0 (2025-11-25)
+
+-   Added `canAddNotes` method for efficient duplicate checking
+-   Added `storeMediaFile` method for media file management
+-   Added `suspend`/`unsuspend` methods for card management
+-   Added `guiBrowse` method for opening Anki browser
+-   Added `getCollectionStatsHtml` method for statistics
+-   Added `getNumCardsReviewedToday` method for daily review count
+-   Added `getModelNamesAndIds` method for model ID mapping
+-   Implemented connection health checking with automatic state tracking
+-   Enhanced error handling with early failure detection for unhealthy connections
+-   Updated documentation links to point to active repository
+
 ### v0.1.0 (2025-10-12)
 
-- Initial implementation with AnkiConnect API v6
-- Fixed incorrect `update_note_tags` method (was using non-existent `notesTags` action)
-- Replaced with correct `addTags`, `removeTags`, and `replaceTags` methods
-- Added `canAddNotes` for duplicate checking
-- Added `storeMediaFile` for media support
-- Added `guiBrowse` for UI integration
-- Implemented retry logic and connection pooling
-- Added comprehensive error handling
+-   Initial implementation with AnkiConnect API v6
+-   Fixed incorrect `update_note_tags` method (was using non-existent `notesTags` action)
+-   Replaced with correct `addTags`, `removeTags`, and `replaceTags` methods
+-   Implemented retry logic and connection pooling
+-   Added comprehensive error handling

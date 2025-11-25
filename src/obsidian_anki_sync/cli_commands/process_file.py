@@ -26,6 +26,18 @@ def load_cards_from_file(input_path: Path) -> list[dict[str, Any]]:
     Raises:
         DeckImportError: If file cannot be loaded
     """
+    # Security: Check file size to prevent DoS attacks
+    try:
+        file_size = input_path.stat().st_size
+        max_file_size = 50 * 1024 * 1024  # 50MB limit for import files
+        if file_size > max_file_size:
+            raise DeckImportError(
+                f"File too large: {input_path} ({file_size} bytes). "
+                f"Maximum allowed size is {max_file_size} bytes."
+            )
+    except OSError as e:
+        raise DeckImportError(f"Cannot check file size: {e}")
+
     file_format = input_path.suffix.lower()
 
     if file_format in (".yaml", ".yml"):
@@ -72,7 +84,8 @@ def save_cards_to_file(
         field_names = sorted(all_fields)
 
         with output_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=field_names, extrasaction="ignore")
+            writer = csv.DictWriter(
+                f, fieldnames=field_names, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(cards)
     else:
@@ -200,7 +213,8 @@ def process_card_with_llm(
                 card[first_key] = result_text
 
     except (ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
-        logger.error("llm_processing_failed", error=str(e), slug=card.get("slug"))
+        logger.error("llm_processing_failed",
+                     error=str(e), slug=card.get("slug"))
         card["_error"] = str(e)
 
     return card
