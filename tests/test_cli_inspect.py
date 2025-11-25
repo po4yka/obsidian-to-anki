@@ -40,7 +40,7 @@ def runner():
 def patch_logging(monkeypatch):
     monkeypatch.setattr(
         "obsidian_anki_sync.cli_commands.shared.configure_logging",
-        lambda level, log_dir=None: None,
+        lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
         "obsidian_anki_sync.cli_commands.shared.get_logger", lambda name: MagicMock()

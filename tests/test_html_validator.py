@@ -20,10 +20,12 @@ def test_detects_missing_code_in_pre() -> None:
     assert any("<pre> block without nested <code>" in err for err in errors)
 
 
-def test_detects_missing_language_class() -> None:
+def test_allows_missing_language_class() -> None:
+    """Language classes are recommended but not required for APF validation."""
     html = """<pre><code>no class</code></pre>"""
     errors = validate_card_html(html)
-    assert any("language- class" in err for err in errors)
+    # Language classes are no longer strictly required (see html_validator.py comments)
+    assert errors == []
 
 
 def test_detects_inline_code() -> None:

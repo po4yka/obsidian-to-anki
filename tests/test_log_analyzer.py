@@ -1,10 +1,16 @@
 """Tests for log analyzer utilities."""
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from obsidian_anki_sync.utils.log_analyzer import LogAnalyzer
+
+
+def _get_recent_date_str() -> str:
+    """Get a recent date string for log entries that won't be filtered."""
+    return datetime.now().strftime("%Y-%m-%d")
 
 
 class TestLogAnalyzer:
@@ -98,14 +104,23 @@ class TestLogAnalyzer:
         log_dir = temp_dir / "logs"
         log_dir.mkdir()
 
+        # Use recent date so entries won't be filtered
+        recent_date = _get_recent_date_str()
+
         # Create log file with various entries
-        log_file = log_dir / "obsidian-anki-sync_2025-01-15.log"
-        log_content = """2025-01-15 10:30:45.123 | ERROR    | module:function:42 - error message
-2025-01-15 10:30:46.456 | INFO     | module:function:43 - llm_request_start operation=qa_extraction
-2025-01-15 10:30:47.789 | INFO     | module:function:44 - sync_started
-2025-01-15 10:30:48.012 | WARNING  | module:function:45 - warning message
+        log_file = log_dir / f"obsidian-anki-sync_{recent_date}.log"
+        log_content = f"""{recent_date} 10:30:45.123 | ERROR    | module:function:42 - error message
+{recent_date} 10:30:46.456 | INFO     | module:function:43 - llm_request_start operation=qa_extraction
+{recent_date} 10:30:47.789 | INFO     | module:function:44 - sync_started
+{recent_date} 10:30:48.012 | WARNING  | module:function:45 - warning message
 """
         log_file.write_text(log_content, encoding="utf-8")
+
+        # Also create error log file (analyze_errors only looks at errors_*.log files)
+        error_log = log_dir / f"errors_{recent_date}.log"
+        error_content = f"""{recent_date} 10:30:45.123 | ERROR    | module:function:42 - error message
+"""
+        error_log.write_text(error_content, encoding="utf-8")
 
         analyzer = LogAnalyzer(log_dir=log_dir)
         summary = analyzer.generate_summary_report(days=7)
@@ -115,3 +130,4 @@ class TestLogAnalyzer:
         assert "INFO" in summary["levels"]
         assert "WARNING" in summary["levels"]
         assert summary["errors"]["total_errors"] >= 1
+

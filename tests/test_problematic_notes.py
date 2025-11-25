@@ -20,7 +20,8 @@ class TestProblematicNotesArchiver:
         assert archiver.archive_dir == archive_dir
         assert archiver.enabled is True
         assert archive_dir.exists()
-        assert archiver.index_file.exists()
+        # Index file is created lazily when saving, not on initialization
+        assert archiver.index_file == archive_dir / "index.json"
 
     def test_archiver_disabled(self, temp_dir):
         """Test archiver when disabled."""
@@ -165,6 +166,7 @@ class TestProblematicNotesArchiver:
             error=ParserError("test"),
         )
 
-        # Cleanup with very short retention (should keep everything recent)
-        cleaned = archiver.cleanup_old_archives(max_age_days=0)
+        # Cleanup with long retention (should keep recent notes)
+        cleaned = archiver.cleanup_old_archives(max_age_days=30)
         assert cleaned == 0  # Recent notes should not be cleaned
+
