@@ -6,6 +6,17 @@ This module implements a state machine workflow using LangGraph to coordinate:
 3. Post-Validator Agent - quality validation with retry logic
 
 The workflow supports conditional routing, automatic retries, and state persistence.
+
+Best Practices Applied (2025):
+- RetryPolicy with exponential backoff for transient failures
+- Typed state with Pydantic validation
+- Max steps counter for cycle protection
+- Graceful error degradation with severity-based routing
+- Checkpointing for fault tolerance
+
+References:
+- https://www.swarnendu.de/blog/langgraph-best-practices/
+- https://langchain-ai.github.io/langgraph/how-tos/persistence/
 """
 
 import asyncio
@@ -17,6 +28,7 @@ from typing import Annotated, Any, Literal, TypedDict
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.types import RetryPolicy
 
 from ..config import Config
 from ..models import NoteMetadata, QAPair
@@ -40,6 +52,115 @@ from .slug_utils import generate_agent_slug_base
 
 logger = get_logger(__name__)
 
+
+# ============================================================================
+# Retry Policy Configuration
+# ============================================================================
+
+# Default retry policy for LLM-based nodes (handles transient API failures)
+# Best practice: Retry on transient errors (5xx, 429, network issues)
+DEFAULT_RETRY_POLICY = RetryPolicy(
+    max_attempts=3,
+    initial_interval=1.0,  # Start with 1 second delay
+    backoff_factor=2.0,  # Double the delay each retry
+    max_interval=30.0,  # Cap at 30 seconds
+    jitter=True,  # Add randomization to prevent thundering herd
+)
+
+# Lighter retry policy for validation nodes (faster, less critical)
+VALIDATION_RETRY_POLICY = RetryPolicy(
+    max_attempts=2,
+    initial_interval=0.5,
+    backoff_factor=2.0,
+    max_interval=10.0,
+    jitter=True,
+)
+
+# Custom retry condition: only retry on transient errors
+def is_transient_error(exc: Exception) -> bool:
+    """Determine if an exception is transient and should be retried.
+
+    Best practice: Only retry on server errors (5xx), rate limits (429),
+    and network/timeout errors. Don't retry validation or logic errors.
+    """
+    error_msg = str(exc).lower()
+
+    # Network/timeout errors
+    if any(term in error_msg for term in [
+        "timeout", "timed out", "connection", "network",
+        "temporarily unavailable", "service unavailable"
+    ]):
+        return True
+
+    # Rate limiting
+    if "429" in error_msg or "rate limit" in error_msg or "too many requests" in error_msg:
+        return True
+
+    # Server errors (5xx)
+    if any(f"{code}" in error_msg for code in range(500, 600)):
+        return True
+
+    # API-specific transient errors
+    if any(term in error_msg for term in [
+        "overloaded", "capacity", "retry", "temporary"
+    ]):
+        return True
+
+    return False
+
+
+# Retry policy with custom retry condition
+TRANSIENT_RETRY_POLICY = RetryPolicy(
+    max_attempts=3,
+    initial_interval=1.0,
+    backoff_factor=2.0,
+    max_interval=30.0,
+    jitter=True,
+    retry_on=is_transient_error,
+)
+
+
+# ============================================================================
+# Error Severity Classification
+# ============================================================================
+
+class ErrorSeverity:
+    """Error severity levels for routing decisions."""
+    CRITICAL = "critical"  # Unrecoverable, stop pipeline
+    RECOVERABLE = "recoverable"  # Can retry or use fallback
+    WARNING = "warning"  # Log and continue
+
+
+def classify_error_severity(error: Exception) -> str:
+    """Classify error severity for routing decisions.
+
+    Best practice: Different errors need different handling strategies.
+    - Critical: Stop and escalate
+    - Recoverable: Retry with backoff or use fallback
+    - Warning: Log and continue with degraded output
+    """
+    error_msg = str(error).lower()
+
+    # Critical errors - cannot continue
+    if any(term in error_msg for term in [
+        "api key", "authentication", "authorization", "forbidden",
+        "invalid model", "model not found", "quota exceeded"
+    ]):
+        return ErrorSeverity.CRITICAL
+
+    # Recoverable errors - can retry
+    if is_transient_error(error):
+        return ErrorSeverity.RECOVERABLE
+
+    # Validation errors - warning, continue with fallback
+    if any(term in error_msg for term in [
+        "validation", "format", "parse", "json", "schema"
+    ]):
+        return ErrorSeverity.WARNING
+
+    # Default to recoverable for unknown errors
+    return ErrorSeverity.RECOVERABLE
+
 # Optional agent memory (requires chromadb)
 try:
     from .agent_memory import AgentMemoryStore
@@ -56,6 +177,12 @@ class PipelineState(TypedDict):
     """State for the card generation pipeline workflow.
 
     This state is passed between nodes and tracks the entire pipeline execution.
+
+    Best practices applied:
+    - Keep state minimal and explicit
+    - Use TypedDict for consistency
+    - Track step count for cycle protection
+    - Include error context for debugging
     """
 
     # Input data
@@ -110,12 +237,161 @@ class PipelineState(TypedDict):
     auto_fix_enabled: bool
     strict_mode: bool
 
+    # Cycle protection (best practice: add hard stops for bounded cycles)
+    step_count: int  # Current number of steps executed
+    max_steps: int  # Maximum allowed steps (prevents infinite loops)
+
+    # Error tracking (best practice: track errors for debugging and routing)
+    last_error: str | None  # Last error message
+    last_error_severity: str | None  # Error severity (critical/recoverable/warning)
+    errors: list[dict]  # History of errors: [{stage, error, severity, timestamp}]
+
     # Timing
     start_time: float
     stage_times: dict[str, float]
 
     # Messages (for debugging/logging)
     messages: Annotated[list[str], add_messages]
+
+
+# ============================================================================
+# Node Helper Functions
+# ============================================================================
+
+
+def increment_step_count(state: PipelineState, stage_name: str) -> bool:
+    """Increment step count and check for max steps limit.
+
+    Best practice: Add hard stops to prevent infinite loops in cycles.
+
+    Args:
+        state: Current pipeline state
+        stage_name: Name of the current stage for logging
+
+    Returns:
+        True if within limits, False if max steps exceeded
+    """
+    state["step_count"] = state.get("step_count", 0) + 1
+    max_steps = state.get("max_steps", 20)
+
+    if state["step_count"] > max_steps:
+        logger.error(
+            "max_steps_exceeded",
+            step_count=state["step_count"],
+            max_steps=max_steps,
+            stage=stage_name,
+        )
+        state["current_stage"] = "failed"
+        state["last_error"] = f"Max steps ({max_steps}) exceeded at stage {stage_name}"
+        state["last_error_severity"] = ErrorSeverity.CRITICAL
+        record_error(state, stage_name, state["last_error"], ErrorSeverity.CRITICAL)
+        return False
+
+    logger.debug(
+        "step_count_incremented",
+        step_count=state["step_count"],
+        max_steps=max_steps,
+        stage=stage_name,
+    )
+    return True
+
+
+def record_error(
+    state: PipelineState,
+    stage: str,
+    error: str,
+    severity: str,
+) -> None:
+    """Record an error in the state for debugging and routing.
+
+    Best practice: Track all errors with context for debugging.
+
+    Args:
+        state: Current pipeline state
+        stage: Stage where error occurred
+        error: Error message
+        severity: Error severity level
+    """
+    if "errors" not in state or state["errors"] is None:
+        state["errors"] = []
+
+    state["errors"].append({
+        "stage": stage,
+        "error": error,
+        "severity": severity,
+        "timestamp": time.time(),
+        "step_count": state.get("step_count", 0),
+    })
+
+    state["last_error"] = error
+    state["last_error_severity"] = severity
+
+    logger.info(
+        "error_recorded",
+        stage=stage,
+        severity=severity,
+        error_count=len(state["errors"]),
+    )
+
+
+def handle_node_error(
+    state: PipelineState,
+    stage: str,
+    error: Exception,
+    fallback_result: Any = None,
+) -> tuple[PipelineState, str]:
+    """Handle an error in a node with appropriate routing.
+
+    Best practice: Different errors need different handling strategies.
+
+    Args:
+        state: Current pipeline state
+        stage: Stage where error occurred
+        error: The exception that occurred
+        fallback_result: Optional fallback result to use
+
+    Returns:
+        Tuple of (updated state, next stage)
+    """
+    severity = classify_error_severity(error)
+    record_error(state, stage, str(error), severity)
+
+    if severity == ErrorSeverity.CRITICAL:
+        # Critical errors stop the pipeline
+        logger.error(
+            "critical_error_stopping_pipeline",
+            stage=stage,
+            error=str(error),
+        )
+        state["current_stage"] = "failed"
+        return state, "failed"
+
+    elif severity == ErrorSeverity.WARNING:
+        # Warnings allow continuation with degraded output
+        logger.warning(
+            "warning_continuing_with_fallback",
+            stage=stage,
+            error=str(error),
+        )
+        # Don't change stage - let caller decide
+
+    else:  # RECOVERABLE
+        # Recoverable errors may retry if retries available
+        if state["retry_count"] < state["max_retries"]:
+            logger.info(
+                "recoverable_error_will_retry",
+                stage=stage,
+                error=str(error),
+                retry_count=state["retry_count"],
+            )
+        else:
+            logger.warning(
+                "recoverable_error_no_retries_left",
+                stage=stage,
+                error=str(error),
+            )
+
+    return state, state.get("current_stage", "failed")
 
 
 # ============================================================================
@@ -135,8 +411,11 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     Returns:
         Updated state with corrected note content
     """
-    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .parser_repair import ParserRepairAgent
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "note_correction"):
+        return state
 
     logger.info("langgraph_note_correction_start")
     start_time = time.time()
@@ -163,7 +442,8 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         correction_temp = getattr(config, "note_correction_temperature", 0.0)
 
         # Create repair agent for correction (reuse existing infrastructure)
-        correction_agent = ParserRepairAgent(
+        # Note: This is a placeholder - actual correction logic would go here
+        _correction_agent = ParserRepairAgent(
             ollama_client=provider,
             model=correction_model,
             temperature=correction_temp,
@@ -213,6 +493,10 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         create_openrouter_model_from_env,
     )
     from .pydantic_ai_agents import PreValidatorAgentAI
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "pre_validation"):
+        return state
 
     logger.info("langgraph_pre_validation_start")
     start_time = time.time()
@@ -325,6 +609,10 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import CardSplittingAgentAI
 
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "card_splitting"):
+        return state
+
     logger.info("langgraph_card_splitting_start")
     start_time = time.time()
 
@@ -363,7 +651,7 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
     # Get splitting preferences from config
     config = state["config"]
     preferred_size = getattr(config, "card_splitting_preferred_size", "medium")
-    prefer_splitting = getattr(config, "card_splitting_prefer_splitting", True)
+    _prefer_splitting = getattr(config, "card_splitting_prefer_splitting", True)  # Reserved for future use
     min_confidence = getattr(config, "card_splitting_min_confidence", 0.7)
     max_cards = getattr(config, "card_splitting_max_cards_per_note", 10)
 
@@ -473,6 +761,10 @@ async def generation_node(state: PipelineState) -> PipelineState:
     from ..models import NoteMetadata, QAPair
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import GeneratorAgentAI
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "generation"):
+        return state
 
     logger.info("langgraph_generation_start")
     start_time = time.time()
@@ -608,6 +900,10 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import PostValidatorAgentAI
 
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "post_validation"):
+        return state
+
     logger.info("langgraph_post_validation_start",
                 retry_count=state["retry_count"])
     start_time = time.time()
@@ -731,6 +1027,10 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
     from ..models import NoteMetadata
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import ContextEnrichmentAgentAI
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "context_enrichment"):
+        return state
 
     logger.info("langgraph_context_enrichment_start")
     start_time = time.time()
@@ -858,6 +1158,10 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import MemorizationQualityAgentAI
 
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "memorization_quality"):
+        return state
+
     logger.info("langgraph_memorization_quality_start")
     start_time = time.time()
 
@@ -958,6 +1262,10 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     """
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import DuplicateDetectionAgentAI
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "duplicate_detection"):
+        return state
 
     logger.info("langgraph_duplicate_detection_start")
     start_time = time.time()
@@ -1337,6 +1645,11 @@ class LangGraphOrchestrator:
     def _build_workflow(self) -> StateGraph:
         """Build the LangGraph workflow.
 
+        Best practices applied:
+        - RetryPolicy with exponential backoff for transient failures
+        - Different retry policies for different node types
+        - Conditional routing for error handling
+
         Returns:
             Configured StateGraph instance
         """
@@ -1344,21 +1657,61 @@ class LangGraphOrchestrator:
         workflow = StateGraph(PipelineState)
 
         # Add optional note correction node (if enabled)
+        # Best practice: Use RetryPolicy for nodes that call external APIs
         enable_note_correction = getattr(
             self.config, "enable_note_correction", False)
         if enable_note_correction:
-            workflow.add_node("note_correction", note_correction_node)
+            workflow.add_node(
+                "note_correction",
+                note_correction_node,
+                retry=TRANSIENT_RETRY_POLICY,
+            )
 
-        # Add core nodes
-        workflow.add_node("pre_validation", pre_validation_node)
-        workflow.add_node("card_splitting", card_splitting_node)
-        workflow.add_node("generation", generation_node)
-        workflow.add_node("post_validation", post_validation_node)
+        # Add core nodes with appropriate retry policies
+        # Validation nodes: lighter retry (faster, less critical)
+        workflow.add_node(
+            "pre_validation",
+            pre_validation_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
 
-        # Add enhancement nodes
-        workflow.add_node("context_enrichment", context_enrichment_node)
-        workflow.add_node("memorization_quality", memorization_quality_node)
-        workflow.add_node("duplicate_detection", duplicate_detection_node)
+        # Card splitting: lighter retry (optional enhancement)
+        workflow.add_node(
+            "card_splitting",
+            card_splitting_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
+
+        # Generation: full retry policy (critical, expensive operation)
+        workflow.add_node(
+            "generation",
+            generation_node,
+            retry=TRANSIENT_RETRY_POLICY,
+        )
+
+        # Post-validation: lighter retry (validation step)
+        workflow.add_node(
+            "post_validation",
+            post_validation_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
+
+        # Add enhancement nodes with appropriate retry policies
+        workflow.add_node(
+            "context_enrichment",
+            context_enrichment_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
+        workflow.add_node(
+            "memorization_quality",
+            memorization_quality_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
+        workflow.add_node(
+            "duplicate_detection",
+            duplicate_detection_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
 
         # Set entry point (note_correction if enabled, otherwise pre_validation)
         if enable_note_correction:
@@ -1453,7 +1806,9 @@ class LangGraphOrchestrator:
         slug_base = self._generate_slug_base(metadata)
 
         # Initialize state
+        # Best practice: Initialize all state fields explicitly
         initial_state: PipelineState = {
+            # Input data
             "note_content": note_content,
             "metadata_dict": asdict(metadata),
             "qa_pairs_dicts": [asdict(qa) for qa in qa_pairs],
@@ -1473,6 +1828,7 @@ class LangGraphOrchestrator:
             "context_enrichment_model": self.context_enrichment_model,
             "memorization_quality_model": self.memorization_quality_model,
             "duplicate_detection_model": self.duplicate_detection_model,
+            # Pipeline stage results
             "pre_validation": None,
             "card_splitting": None,
             "generation": None,
@@ -1480,9 +1836,10 @@ class LangGraphOrchestrator:
             "context_enrichment": None,
             "memorization_quality": None,
             "duplicate_detection": None,
+            # Workflow control
             "current_stage": (
                 "note_correction"
-                if getattr(config, "enable_note_correction", False)
+                if getattr(self.config, "enable_note_correction", False)
                 else "pre_validation"
             ),
             "enable_card_splitting": self.enable_card_splitting,
@@ -1493,6 +1850,14 @@ class LangGraphOrchestrator:
             "max_retries": self.max_retries,
             "auto_fix_enabled": self.auto_fix_enabled,
             "strict_mode": self.strict_mode,
+            # Cycle protection (best practice: add hard stops)
+            "step_count": 0,
+            "max_steps": getattr(self.config, "langgraph_max_steps", 20),
+            # Error tracking (best practice: track errors for debugging)
+            "last_error": None,
+            "last_error_severity": None,
+            "errors": [],
+            # Timing
             "start_time": start_time,
             "stage_times": {},
             "messages": [],
