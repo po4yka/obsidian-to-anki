@@ -57,7 +57,7 @@ class OpenRouterProvider(BaseLLMProvider):
         api_key: str | None = None,
         base_url: str = "https://openrouter.ai/api/v1",
         timeout: float = 180.0,
-        max_tokens: int = 2048,
+        max_tokens: int | None = 2048,
         site_url: str | None = None,
         site_name: str | None = None,
         **kwargs: Any,
@@ -68,7 +68,7 @@ class OpenRouterProvider(BaseLLMProvider):
             api_key: OpenRouter API key (if not provided, uses OPENROUTER_API_KEY env var)
             base_url: Base URL for OpenRouter API
             timeout: Request timeout in seconds
-            max_tokens: Maximum tokens in response
+            max_tokens: Maximum tokens in response (default: 2048)
             site_url: Your site URL (optional, for rankings)
             site_name: Your site name (optional, for rankings)
             **kwargs: Additional configuration options
@@ -85,6 +85,10 @@ class OpenRouterProvider(BaseLLMProvider):
                 "OpenRouter API key is required. Provide it via the api_key parameter "
                 "or set the OPENROUTER_API_KEY environment variable."
             )
+
+        # Ensure max_tokens has a default value
+        if max_tokens is None:
+            max_tokens = 2048
 
         super().__init__(
             api_key=api_key,
