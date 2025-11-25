@@ -402,8 +402,10 @@ class OpenRouterProvider(BaseLLMProvider):
             context_window - prompt_tokens_estimate - CONTEXT_SAFETY_MARGIN
         )
 
+        # Handle case where max_tokens might be None (shouldn't happen but be defensive)
+        configured_max = self.max_tokens if self.max_tokens is not None else 2048
         desired_max_tokens = max(
-            self.max_tokens,
+            configured_max,
             int(prompt_tokens_estimate * 4.0),
         )
 
