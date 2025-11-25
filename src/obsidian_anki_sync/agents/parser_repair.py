@@ -15,6 +15,7 @@ from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .json_schemas import get_parser_repair_schema
+from .models import RepairDiagnosis, RepairQualityScore
 
 logger = get_logger(__name__)
 
@@ -72,44 +73,77 @@ class ParserRepairAgent:
         if enable_content_gen and self.enable_content_generation:
             content_gen_section = """
 <content_generation_instructions>
-When missing language sections are detected, you MUST generate the missing content:
+When missing language sections are detected, you MUST generate the missing content with HIGH QUALITY:
 
 1. **Translation**: If content exists in one language but not another:
    - Translate questions/answers from existing language to missing language
-   - Preserve technical terms, code snippets, and formatting
+   - Preserve technical terms, code snippets, and formatting EXACTLY
    - Maintain the same level of detail and structure
+   - Use proper grammar and clear, concise language
+   - Ensure technical accuracy - verify technical terms are correctly translated
+   - Maintain consistency in terminology throughout the note
 
 2. **Inference**: If only partial content exists:
    - Infer missing questions from existing answers (or vice versa)
    - Use context from the note to generate appropriate content
    - Ensure generated content matches the style and depth of existing content
+   - Maintain technical accuracy - don't invent technical details
+   - Use clear, grammatically correct language
 
 3. **Completion**: If sections are truncated or incomplete:
    - Complete truncated sections based on context
    - Fix unbalanced code fences (```) by adding missing closers
    - Complete incomplete markdown structures
+   - Ensure completed content is grammatically correct and clear
+   - Maintain technical accuracy in completed portions
 
 4. **Quality Requirements**:
-   - Generated content must be technically accurate
-   - Preserve all existing content exactly as-is
+   - Generated content must be technically accurate - verify all technical claims
+   - Preserve all existing content exactly as-is (no modifications)
    - Maintain markdown formatting and structure
-   - Ensure bilingual consistency (same concepts in both languages)
+   - Ensure bilingual consistency (same concepts, same level of detail in both languages)
+   - Use proper grammar, spelling, and punctuation
+   - Write clearly and concisely - avoid ambiguity
+   - Maintain consistent terminology (use same technical terms in both languages)
+   - Ensure code examples are syntactically correct if present
 
-5. **What to Generate**:
+5. **Grammar and Clarity Improvements**:
+   - Fix grammatical errors in existing content (if safe to do so)
+   - Improve clarity without changing meaning
+   - Ensure consistent verb tenses and voice
+   - Use active voice when possible for clarity
+   - Break up long sentences for readability
+
+6. **Technical Accuracy Checks**:
+   - Verify technical terms are used correctly
+   - Ensure code examples are syntactically valid
+   - Check that explanations match the technical level of the note
+   - Verify consistency in technical terminology
+
+7. **What to Generate**:
    - Missing "# Question (EN)" or "# Вопрос (RU)" sections
    - Missing "## Answer (EN)" or "## Ответ (RU)" sections
    - Incomplete answers that are truncated
    - Missing code fence closers (```)
+   - Grammar and clarity improvements (when safe)
 
-6. **What NOT to Generate**:
+8. **What NOT to Generate**:
    - Do NOT invent new Q&A pairs that don't exist
-   - Do NOT change existing content
+   - Do NOT change existing content meaning
    - Do NOT generate content if the note is completely empty
+   - Do NOT make up technical details that aren't inferable from context
 </content_generation_instructions>
 """
 
         return f"""<task>
 Diagnose and repair an Obsidian note that failed parsing. Think step by step to identify the root cause and provide targeted fixes.
+
+IMPORTANT: You must provide structured error diagnosis and quality scoring:
+1. Categorize the error (syntax/structure/content/quality/frontmatter/unknown)
+2. Assess severity (low/medium/high/critical)
+3. Score quality BEFORE repair (completeness, structure, bilingual consistency, technical accuracy)
+4. Perform repairs with priority ranking
+5. Score quality AFTER repair to measure improvement
 {content_gen_section if content_gen_section else ""}
 </task>
 
@@ -127,26 +161,43 @@ Diagnose and repair an Obsidian note that failed parsing. Think step by step to 
 Step 1: Analyze the parsing error message
 - Identify what the parser expected vs. what it found
 - Determine which parsing stage failed (frontmatter, Q&A extraction, etc.)
+- Categorize error type: syntax/structure/content/quality/frontmatter/unknown
+- Assess severity: low (minor formatting) / medium (missing fields) / high (structural issues) / critical (unparseable)
 
-Step 2: Inspect the frontmatter
+Step 2: Score quality BEFORE repair
+- Completeness: Are all required sections present? (0.0-1.0)
+- Structure: Is markdown structure correct? (0.0-1.0)
+- Bilingual consistency: Do both languages have equivalent content? (0.0-1.0)
+- Technical accuracy: Is content technically correct? (0.0-1.0)
+- Overall score: Weighted average of above scores
+- List specific issues found
+
+Step 3: Inspect the frontmatter
 - Check for missing required fields: id, title, topic, language_tags, created, updated
 - Validate YAML syntax (proper indentation, array notation, no quotes issues)
 - Verify language_tags contains valid values: 'en', 'ru', or both
+- Assign repair priority (1=highest priority, 10=lowest)
 
-Step 3: Check Q&A structure
+Step 4: Check Q&A structure
 - Verify presence of question headers: # Question (EN), # Вопрос (RU)
 - Verify presence of answer headers: ## Answer (EN), ## Ответ (RU)
 - Confirm questions and answers have actual content (not empty)
 - Check section ordering is logical (both RU-first and EN-first are valid)
 
-Step 4: Validate markdown syntax
+Step 5: Validate markdown syntax
 - Check for malformed headers (missing #, incorrect spacing)
 - Verify proper YAML frontmatter delimiters (---)
 - Look for special characters that might break parsing
 
-Step 5: Determine repairability
+Step 6: Determine repairability and prioritize repairs
 - If fixable: prepare complete repaired content
-- If fundamentally broken: explain why it cannot be repaired
+- Rank repairs by priority (critical syntax errors first, then structure, then content)
+- Mark which errors can be auto-fixed vs require manual intervention
+
+Step 7: Score quality AFTER repair
+- Re-assess all quality metrics after applying repairs
+- Calculate improvement delta
+- Verify repairs resolved the issues
 </diagnostic_steps>
 
 <common_issues>
@@ -213,6 +264,29 @@ Respond with valid JSON matching this structure:
             "description": "What was generated and how"
         }}
     ],
+    "error_diagnosis": {{
+        "error_category": "syntax|structure|content|quality|frontmatter|unknown",
+        "severity": "low|medium|high|critical",
+        "error_description": "Detailed description of the error",
+        "repair_priority": 1-10,
+        "can_auto_fix": true/false
+    }},
+    "quality_before": {{
+        "completeness_score": 0.0-1.0,
+        "structure_score": 0.0-1.0,
+        "bilingual_consistency": 0.0-1.0,
+        "technical_accuracy": 0.0-1.0,
+        "overall_score": 0.0-1.0,
+        "issues_found": ["issue1", "issue2", ...]
+    }},
+    "quality_after": {{
+        "completeness_score": 0.0-1.0,
+        "structure_score": 0.0-1.0,
+        "bilingual_consistency": 0.0-1.0,
+        "technical_accuracy": 0.0-1.0,
+        "overall_score": 0.0-1.0,
+        "issues_found": ["remaining_issue1", ...]
+    }},
     "is_repairable": true/false,
     "repair_time": 0.0
 }}
@@ -329,7 +403,8 @@ DO NOT repair (mark as unrepairable):
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error("parser_repair_read_failed", file=str(file_path), error=str(e))
+            logger.error("parser_repair_read_failed",
+                         file=str(file_path), error=str(e))
             raise ParserError(f"Cannot read file for repair: {e}")
 
         # Build repair prompt
@@ -403,7 +478,8 @@ ALWAYS:
             )
             return None
         except Exception as e:
-            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
+            logger.error("parser_repair_llm_failed",
+                         file=str(file_path), error=str(e))
             return None
 
         # Check if repairable
@@ -431,6 +507,45 @@ ALWAYS:
         )
         generated_sections = repair_result.get("generated_sections", [])
 
+        # Parse error diagnosis if present
+        error_diagnosis = None
+        error_diag_data = repair_result.get("error_diagnosis")
+        if error_diag_data:
+            try:
+                error_diagnosis = RepairDiagnosis(**error_diag_data)
+            except Exception as e:
+                logger.warning(
+                    "parser_repair_invalid_diagnosis",
+                    file=str(file_path),
+                    error=str(e),
+                )
+
+        # Parse quality scores if present
+        quality_before = None
+        quality_after = None
+        quality_before_data = repair_result.get("quality_before")
+        quality_after_data = repair_result.get("quality_after")
+
+        if quality_before_data:
+            try:
+                quality_before = RepairQualityScore(**quality_before_data)
+            except Exception as e:
+                logger.warning(
+                    "parser_repair_invalid_quality_before",
+                    file=str(file_path),
+                    error=str(e),
+                )
+
+        if quality_after_data:
+            try:
+                quality_after = RepairQualityScore(**quality_after_data)
+            except Exception as e:
+                logger.warning(
+                    "parser_repair_invalid_quality_after",
+                    file=str(file_path),
+                    error=str(e),
+                )
+
         logger.info(
             "parser_repair_applied",
             file=str(file_path),
@@ -438,6 +553,10 @@ ALWAYS:
             repairs_count=len(repairs),
             content_generation_applied=content_generation_applied,
             generated_sections_count=len(generated_sections),
+            error_category=error_diagnosis.error_category if error_diagnosis else None,
+            severity=error_diagnosis.severity if error_diagnosis else None,
+            quality_before=quality_before.overall_score if quality_before else None,
+            quality_after=quality_after.overall_score if quality_after else None,
         )
 
         for repair in repairs:
@@ -468,7 +587,8 @@ ALWAYS:
             metadata = parse_frontmatter(temp_content_for_parse, file_path)
 
             # Parse Q/A pairs from repaired content
-            qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata, file_path)
+            qa_pairs = parse_qa_pairs(
+                temp_content_for_parse, metadata, file_path)
 
             if not qa_pairs:
                 logger.warning(
@@ -481,6 +601,11 @@ ALWAYS:
                 "parser_repair_success",
                 file=str(file_path),
                 qa_pairs_count=len(qa_pairs),
+                quality_improvement=(
+                    quality_after.overall_score - quality_before.overall_score
+                    if quality_before and quality_after
+                    else None
+                ),
             )
 
             return metadata, qa_pairs

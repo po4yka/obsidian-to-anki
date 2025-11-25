@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
@@ -30,7 +30,8 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path("."), description="Source directory within vault"
     )
@@ -75,10 +76,12 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type")
 
     # Runtime settings
-    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -150,7 +153,7 @@ class Config(BaseSettings):
     openrouter_site_name: str | None = None
 
     # Legacy OpenRouter settings (for backward compatibility)
-    openrouter_model: str = "openai/gpt-4"
+    openrouter_model: str = "x-ai/grok-4.1-fast"
 
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
@@ -169,10 +172,26 @@ class Config(BaseSettings):
     # Enable content generation in repair agent
     parser_repair_generate_content: bool = True
 
-    # Parser-Repair Agent
+    # Parser-Repair Agent (reactive - only runs when parsing fails)
     parser_repair_enabled: bool = True
     parser_repair_model: str = "qwen3:8b"
     parser_repair_temperature: float = 0.0
+
+    # Note Correction Agent (optional proactive correction before parsing)
+    enable_note_correction: bool = Field(
+        default=False,
+        description="Enable proactive note correction before parsing (optional pre-processing)",
+    )
+    note_correction_model: str = Field(
+        default="x-ai/grok-4.1-fast",
+        description="Model for proactive note correction",
+    )
+    note_correction_temperature: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Temperature for note correction agent",
+    )
 
     # Q&A Extractor Agent (flexible LLM-based Q&A extraction)
     qa_extractor_model: str = "qwen3:8b"
@@ -312,7 +331,7 @@ class Config(BaseSettings):
 
     # Default model used by ALL agents unless specifically overridden
     # Only used if model_preset is not set or for backward compatibility
-    default_llm_model: str = "qwen/qwen-2.5-72b-instruct"
+    default_llm_model: str = "x-ai/grok-4.1-fast"
 
     # Individual agent model overrides (optional - overrides preset)
     # Set to empty string ("") to use preset default
@@ -361,6 +380,27 @@ class Config(BaseSettings):
 
     # Enhancement Agents (optional quality improvements)
     enable_card_splitting: bool = True  # Analyze if note should be split
+
+    # Card splitting preferences
+    card_splitting_preferred_size: Literal["small", "medium", "large"] = Field(
+        default="medium",
+        description="Preferred card size: small (more splits), medium (balanced), large (fewer splits)",
+    )
+    card_splitting_prefer_splitting: bool = Field(
+        default=True,
+        description="Prefer splitting complex notes into multiple cards",
+    )
+    card_splitting_min_confidence: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence threshold to apply split decision",
+    )
+    card_splitting_max_cards_per_note: int = Field(
+        default=10,
+        ge=1,
+        description="Maximum number of cards to generate from a single note (safety limit)",
+    )
     enable_context_enrichment: bool = True  # Add examples and mnemonics
     enable_memorization_quality: bool = True  # Check SRS effectiveness
     enable_duplicate_detection: bool = (
@@ -404,6 +444,7 @@ class Config(BaseSettings):
             "duplicate_detection": ModelTask.DUPLICATE_DETECTION,
             "qa_extractor": ModelTask.QA_EXTRACTION,
             "parser_repair": ModelTask.PARSER_REPAIR,
+            "note_correction": ModelTask.PARSER_REPAIR,  # Reuse parser repair task
         }
 
         task = agent_to_task.get(agent_type)
@@ -421,6 +462,8 @@ class Config(BaseSettings):
             "duplicate_detection": self.duplicate_detection_model,
             "qa_extractor": self.qa_extractor_model,
             "parser_repair": self.parser_repair_model,
+            "note_correction": getattr(self, "note_correction_model", "")
+            or self.parser_repair_model,  # Fallback to parser repair model
         }
 
         explicit_model = agent_model_map.get(agent_type, "")
@@ -502,7 +545,8 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
+        config = get_model_config(
+            model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -536,7 +580,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -653,7 +698,8 @@ def load_config(config_path: Path | None = None) -> Config:
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
 
     resolved_config_path: Path | None = None

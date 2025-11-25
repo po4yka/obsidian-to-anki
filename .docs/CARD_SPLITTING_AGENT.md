@@ -7,77 +7,92 @@
 ## Overview
 
 The Card Splitting Agent analyzes Obsidian notes and makes intelligent routing decisions:
-- **Single Card**: Note contains one atomic concept → Generate 1 card
-- **Multiple Cards**: Note contains multiple concepts → Split into N cards
+
+-   **Single Card**: Note contains one atomic concept → Generate 1 card
+-   **Multiple Cards**: Note contains multiple concepts → Split into N cards
 
 This solves a critical problem in flashcard generation: **one-size-fits-all doesn't work**.
 
 ### The Problem
 
 Without intelligent splitting:
-- ❌ **Too much per card**: "List 5 SOLID principles" → Cognitive overload
-- ❌ **Loss of atomic principle**: Multiple concepts in one card → Poor retention
-- ❌ **Inefficient reviews**: Can't selectively review specific concepts
-- ❌ **All-or-nothing learning**: Must know all concepts or fail the card
+
+-   ❌ **Too much per card**: "List 5 SOLID principles" → Cognitive overload
+-   ❌ **Loss of atomic principle**: Multiple concepts in one card → Poor retention
+-   ❌ **Inefficient reviews**: Can't selectively review specific concepts
+-   ❌ **All-or-nothing learning**: Must know all concepts or fail the card
 
 With intelligent splitting:
-- ✅ **Atomic cards**: One concept per card → Better retention
-- ✅ **Granular reviews**: Review each concept separately
-- ✅ **Progressive learning**: Master concepts one at a time
-- ✅ **Better scheduling**: Each concept gets optimal spaced repetition
+
+-   ✅ **Atomic cards**: One concept per card → Better retention
+-   ✅ **Granular reviews**: Review each concept separately
+-   ✅ **Progressive learning**: Master concepts one at a time
+-   ✅ **Better scheduling**: Each concept gets optimal spaced repetition
 
 ## Decision Criteria
 
 ### When to Create SINGLE Card
 
 ✅ **Single Atomic Concept**
-- Example: "What is Big O notation?"
-- Rationale: One clear concept, one card
+
+-   Example: "What is Big O notation?"
+-   Rationale: One clear concept, one card
 
 ✅ **Simple Q&A**
-- Example: "What does `git log` do?"
-- Rationale: Straightforward question-answer pair
+
+-   Example: "What does `git log` do?"
+-   Rationale: Straightforward question-answer pair
 
 ✅ **Tightly Coupled Information**
-- Example: "Pros and cons of microservices"
-- Rationale: Comparison requires both sides together
+
+-   Example: "Pros and cons of microservices"
+-   Rationale: Comparison requires both sides together
 
 ✅ **Short Content**
-- Q+A < 200 words
-- Rationale: Fits comfortably in one card
+
+-   Q+A < 200 words
+-   Rationale: Fits comfortably in one card
 
 ### When to Split into MULTIPLE Cards
 
 ❌ **Multiple Independent Concepts**
-- Example: "Python Lists AND Dictionaries"
-- Action: Split into 2 cards (one per data structure)
+
+-   Example: "Python Lists AND Dictionaries"
+-   Action: Split into 2 cards (one per data structure)
 
 ❌ **List of Items** (N ≥ 3)
-- Example: "5 SOLID principles"
-- Action: Overview card + 5 detail cards = 6 total
+
+-   Example: "5 SOLID principles"
+-   Action: Overview card + 5 detail cards = 6 total
 
 ❌ **Multiple Examples**
-- Example: "SQL Joins" with 3 examples
-- Action: Concept card + 3 example cards = 4 total
+
+-   Example: "SQL Joins" with 3 examples
+-   Action: Concept card + 3 example cards = 4 total
 
 ❌ **Subquestions**
-- Example: "What is REST?" + "What are REST verbs?"
-- Action: 2 separate cards
+
+-   Example: "What is REST?" + "What are REST verbs?"
+-   Action: 2 separate cards
 
 ❌ **Complex Topic with Parts**
-- Example: "React Hooks" (useState, useEffect, useContext)
-- Action: Overview + 3 hook-specific cards = 4 total
+
+-   Example: "React Hooks" (useState, useEffect, useContext)
+-   Action: Overview + 3 hook-specific cards = 4 total
 
 ❌ **Hierarchical Content**
-- Example: "React Lifecycle" (mounting/updating/unmounting phases)
-- Action: Phases card + methods per phase = 4+ cards
+
+-   Example: "React Lifecycle" (mounting/updating/unmounting phases)
+-   Action: Phases card + methods per phase = 4+ cards
 
 ## Splitting Strategies
 
 ### 1. Concept Splitting
+
 **Pattern**: Multiple independent concepts in one note
 
 **Example**:
+
 ```
 Input: "Python Lists and Dictionaries"
 Output: 2 cards
@@ -86,9 +101,11 @@ Output: 2 cards
 ```
 
 ### 2. List Item Splitting
+
 **Pattern**: List of N items (principles, steps, types)
 
 **Example**:
+
 ```
 Input: "5 SOLID Principles"
 Output: 6 cards
@@ -97,9 +114,11 @@ Output: 6 cards
 ```
 
 ### 3. Example Splitting
+
 **Pattern**: Main concept + multiple examples
 
 **Example**:
+
 ```
 Input: "SQL Joins with Examples"
 Output: 4 cards
@@ -110,9 +129,11 @@ Output: 4 cards
 ```
 
 ### 4. Hierarchical Splitting
+
 **Pattern**: Main topic with subtopics
 
 **Example**:
+
 ```
 Input: "React Component Lifecycle"
 Output: 4 cards
@@ -123,14 +144,64 @@ Output: 4 cards
 ```
 
 ### 5. Step-by-Step Splitting
+
 **Pattern**: Process with multiple steps
 
 **Example**:
+
 ```
 Input: "Git Branching Workflow"
 Output: 6 cards
 - Card 1: "What are the Git branching steps?" (overview)
 - Cards 2-6: One per step (details)
+```
+
+### 6. Difficulty-Based Splitting (NEW)
+
+**Pattern**: Concepts with varying difficulty levels
+
+**Example**:
+
+```
+Input: "JavaScript Promises"
+Output: 5 cards (ordered by difficulty)
+- Card 1: "How to create a Promise?" (easy)
+- Card 2: "How to chain Promises?" (medium)
+- Card 3: "What does Promise.all() do?" (medium)
+- Card 4: "How to use async/await?" (medium)
+- Card 5: "What is Promise.allSettled()?" (hard)
+```
+
+### 7. Prerequisite-Aware Splitting (NEW)
+
+**Pattern**: Concepts with dependencies (foundational concepts first)
+
+**Example**:
+
+```
+Input: "React State Management"
+Output: 5 cards (ordered by prerequisites)
+- Card 1: "What is useState hook?" (foundational)
+- Card 2: "What is useEffect hook?" (requires useState)
+- Card 3: "What is useContext hook?" (requires hooks)
+- Card 4: "How to create custom hooks?" (requires useState/useEffect)
+- Card 5: "What is Redux?" (advanced, uses hooks)
+```
+
+### 8. Context-Aware Splitting (NEW)
+
+**Pattern**: Related concepts that can be grouped or separated
+
+**Example**:
+
+```
+Input: "HTTP Status Codes"
+Decision: Group by category
+Output: 4 cards
+- Card 1: "What are HTTP 2xx status codes?" (Success: 200, 201, 204)
+- Card 2: "What are HTTP 3xx status codes?" (Redirection: 301, 302, 304)
+- Card 3: "What are HTTP 4xx status codes?" (Client error: 400, 401, 404)
+- Card 4: "What are HTTP 5xx status codes?" (Server error: 500, 502, 503)
 ```
 
 ## Architecture
@@ -246,28 +317,30 @@ else:
 
 ```json
 {
-  "should_split": true,
-  "card_count": 6,
-  "splitting_strategy": "list",
-  "split_plan": [
-    {
-      "card_number": 1,
-      "concept": "HTTP methods overview",
-      "question": "What are the 5 main HTTP methods in REST APIs?",
-      "answer_summary": "GET, POST, PUT, PATCH, DELETE",
-      "rationale": "Overview card for context"
-    },
-    {
-      "card_number": 2,
-      "concept": "GET method",
-      "question": "What does GET do in REST API?",
-      "answer_summary": "Retrieves data from server",
-      "rationale": "Individual method card"
-    },
-    // ... 4 more cards
-  ],
-  "reasoning": "Note lists 5 HTTP methods. Creating overview + detail cards follows SRS best practices.",
-  "decision_time": 0.8
+    "should_split": true,
+    "card_count": 6,
+    "splitting_strategy": "list",
+    "split_plan": [
+        {
+            "card_number": 1,
+            "concept": "HTTP methods overview",
+            "question": "What are the 5 main HTTP methods in REST APIs?",
+            "answer_summary": "GET, POST, PUT, PATCH, DELETE",
+            "rationale": "Overview card for context"
+        },
+        {
+            "card_number": 2,
+            "concept": "GET method",
+            "question": "What does GET do in REST API?",
+            "answer_summary": "Retrieves data from server",
+            "rationale": "Individual method card"
+        }
+        // ... 4 more cards
+    ],
+    "reasoning": "Note lists 5 HTTP methods. Creating overview + detail cards follows SRS best practices.",
+    "confidence": 0.92,
+    "fallback_strategy": null,
+    "decision_time": 0.8
 }
 ```
 
@@ -275,20 +348,22 @@ else:
 
 ```json
 {
-  "should_split": false,
-  "card_count": 1,
-  "splitting_strategy": "none",
-  "split_plan": [
-    {
-      "card_number": 1,
-      "concept": "Binary search complexity",
-      "question": "What is the time complexity of binary search?",
-      "answer_summary": "O(log n)",
-      "rationale": "Single focused question"
-    }
-  ],
-  "reasoning": "Single atomic concept with clear Q&A. No splitting needed.",
-  "decision_time": 0.5
+    "should_split": false,
+    "card_count": 1,
+    "splitting_strategy": "none",
+    "split_plan": [
+        {
+            "card_number": 1,
+            "concept": "Binary search complexity",
+            "question": "What is the time complexity of binary search?",
+            "answer_summary": "O(log n)",
+            "rationale": "Single focused question"
+        }
+    ],
+    "reasoning": "Single atomic concept with clear Q&A. No splitting needed.",
+    "confidence": 0.95,
+    "fallback_strategy": null,
+    "decision_time": 0.5
 }
 ```
 
@@ -296,21 +371,47 @@ else:
 
 ### Model Selection
 
-Recommended model: **gpt-4o-mini** (fast, cheap, sufficient for analysis)
+Recommended model: **moonshotai/kimi-k2-thinking** (advanced reasoning for decision making)
 
 ```yaml
-# config.yaml (future integration)
-card_splitting_enabled: true
-card_splitting_model: "openai/gpt-4o-mini"
-card_splitting_min_confidence: 0.7
-card_splitting_max_cards: 10  # Safety limit
+# Card Splitting Configuration
+enable_card_splitting: true
+card_splitting_model: "moonshotai/kimi-k2-thinking"
+
+# Card Splitting Preferences
+card_splitting_preferred_size: "medium" # small, medium, large
+card_splitting_prefer_splitting: true # Prefer splitting complex notes
+card_splitting_min_confidence: 0.7 # Minimum confidence to apply split
+card_splitting_max_cards_per_note: 10 # Safety limit
 ```
+
+### Preference Options
+
+-   **preferred_size**:
+
+    -   `small`: Encourages more splits (more cards per note)
+    -   `medium`: Balanced approach (default)
+    -   `large`: Prefers fewer splits (larger cards)
+
+-   **prefer_splitting**:
+
+    -   `true`: Default to splitting when ambiguous (better retention)
+    -   `false`: Default to single card when ambiguous
+
+-   **min_confidence**:
+
+    -   Minimum confidence score (0.0-1.0) required to apply split decision
+    -   Low confidence decisions will use fallback strategy or default to no split
+
+-   **max_cards_per_note**:
+    -   Safety limit to prevent excessive card generation
+    -   Split plans exceeding this limit will be truncated
 
 ### Cost
 
-- **Model**: gpt-4o-mini (~$0.15/1M tokens)
-- **Per note**: ~$0.0002 (very cheap)
-- **100 notes**: ~$0.02
+-   **Model**: gpt-4o-mini (~$0.15/1M tokens)
+-   **Per note**: ~$0.0002 (very cheap)
+-   **100 notes**: ~$0.02
 
 ## Red Flags for Splitting
 
@@ -329,6 +430,7 @@ The agent automatically detects these patterns:
 ### Example 1: No Split (Simple Q&A)
 
 **Input**:
+
 ```
 Title: "Binary Search Complexity"
 Q: What is the time complexity of binary search?
@@ -343,6 +445,7 @@ A: O(log n) because it halves the search space each iteration.
 ### Example 2: Split (List Pattern)
 
 **Input**:
+
 ```
 Title: "REST API HTTP Methods"
 Q: What are the main HTTP methods?
@@ -357,14 +460,16 @@ A:
 **Decision**: ✗ Split into 6 cards
 **Strategy**: List item splitting
 **Cards**:
+
 1. Overview (what are the 5 methods?)
-2-6. One per method (GET, POST, PUT, PATCH, DELETE)
+   2-6. One per method (GET, POST, PUT, PATCH, DELETE)
 
 ---
 
 ### Example 3: Split (Multiple Concepts)
 
 **Input**:
+
 ```
 Title: "Python Lists and Dictionaries"
 Q: What are lists and dictionaries?
@@ -376,6 +481,7 @@ Dictionaries are key-value mappings.
 **Decision**: ✗ Split into 2 cards
 **Strategy**: Concept splitting
 **Cards**:
+
 1. What are Python lists?
 2. What are Python dictionaries?
 
@@ -384,6 +490,7 @@ Dictionaries are key-value mappings.
 ### Example 4: No Split (Tightly Coupled)
 
 **Input**:
+
 ```
 Title: "Microservices Tradeoffs"
 Q: What are pros and cons of microservices?
@@ -427,14 +534,46 @@ Cons: complexity, latency, harder debugging
 3. **Language Specific**: Optimized for English/Russian tech content
 4. **No User Preferences**: Some users may prefer different splitting
 
+## Enhanced Features (2025)
+
+### Confidence Scoring
+
+The agent now provides confidence scores for split decisions:
+
+-   **High Confidence (0.85-1.0)**: Clear pattern, unambiguous decision
+-   **Medium Confidence (0.6-0.84)**: Some ambiguity, but decision is reasonable
+-   **Low Confidence (0.0-0.59)**: Unclear, uses fallback strategy
+
+Low confidence decisions (< min_confidence threshold) will:
+
+-   Use fallback strategy if provided
+-   Default to no split if fallback unavailable
+-   Log warnings for review
+
+### Fallback Strategies
+
+When confidence is low, the agent can specify a fallback strategy:
+
+-   Alternative splitting approach
+-   Default to single card
+-   Manual review recommendation
+
+### User Preferences
+
+Users can configure splitting behavior:
+
+-   **Preferred card size**: small/medium/large
+-   **Prefer splitting**: Encourage or discourage splitting
+-   **Confidence threshold**: Minimum confidence to apply split
+-   **Safety limits**: Maximum cards per note
+
 ## Future Enhancements
 
-- [ ] User preferences (prefer larger/smaller cards)
-- [ ] Domain-specific splitting strategies (medical, language, etc.)
-- [ ] Learning from review performance (adjust splitting based on success rates)
-- [ ] Interactive mode (suggest split, ask for confirmation)
-- [ ] Batch analysis (analyze entire vault, suggest resplits)
-- [ ] Integration with card merging (inverse operation)
+-   [ ] Domain-specific splitting strategies (medical, language, etc.)
+-   [ ] Learning from review performance (adjust splitting based on success rates)
+-   [ ] Interactive mode (suggest split, ask for confirmation)
+-   [ ] Batch analysis (analyze entire vault, suggest resplits)
+-   [ ] Integration with card merging (inverse operation)
 
 ## Research Background
 
@@ -447,9 +586,9 @@ Card splitting decisions are based on:
 
 ## Support
 
-- **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
-- **Documentation**: This file
-- **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (CardSplittingAgentAI)
+-   **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
+-   **Documentation**: This file
+-   **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (CardSplittingAgentAI)
 
 ---
 

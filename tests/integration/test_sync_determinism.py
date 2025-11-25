@@ -7,29 +7,6 @@ import pytest
 from obsidian_anki_sync.sync.engine import SyncEngine
 
 
-class TestSyncDeterminism:
-    """Test sync determinism (REGR-det-01)."""
-
-    @pytest.mark.skip(reason="Requires full integration setup")
-    def test_deterministic_output(self, test_config, temp_dir) -> None:
-        """Test that same input produces same output."""
-        # This would require:
-        # 1. Creating identical test notes
-        # 2. Running sync twice
-        # 3. Comparing APF output
-        # 4. Verifying content hashes match
-        pass
-
-    @pytest.mark.skip(reason="Requires full integration setup")
-    def test_idempotency(self, test_config, temp_dir) -> None:
-        """Test that repeated sync with no changes produces no updates."""
-        # This would require:
-        # 1. Running initial sync
-        # 2. Running sync again without changes
-        # 3. Verifying 0 updates
-        pass
-
-
 class TestSyncFlow:
     """Test sync orchestration flow (INT-02)."""
 

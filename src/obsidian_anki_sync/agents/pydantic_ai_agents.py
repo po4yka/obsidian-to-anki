@@ -9,7 +9,7 @@ All agents use structured outputs and proper type validation.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
@@ -63,7 +63,8 @@ class PreValidationOutput(BaseModel):
     error_type: str = Field(
         description="Type of error: format, structure, frontmatter, content, or none"
     )
-    error_details: str = Field(default="", description="Detailed error description")
+    error_details: str = Field(
+        default="", description="Detailed error description")
     suggested_fixes: list[str] = Field(
         default_factory=list, description="Suggested fixes for validation errors"
     )
@@ -78,7 +79,8 @@ class CardGenerationOutput(BaseModel):
     cards: list[dict[str, Any]] = Field(
         description="Generated cards with all APF fields"
     )
-    total_generated: int = Field(ge=0, description="Total number of cards generated")
+    total_generated: int = Field(
+        ge=0, description="Total number of cards generated")
     generation_notes: str = Field(
         default="", description="Notes about the generation process"
     )
@@ -94,7 +96,8 @@ class PostValidationOutput(BaseModel):
     error_type: str = Field(
         description="Type of error: syntax, factual, semantic, template, or none"
     )
-    error_details: str = Field(default="", description="Detailed validation errors")
+    error_details: str = Field(
+        default="", description="Detailed validation errors")
     card_issues: list[dict[str, str]] = Field(
         default_factory=list,
         description="Per-card issues with card_index and issue description",
@@ -135,7 +138,8 @@ class MemorizationQualityOutput(BaseModel):
     suggested_improvements: list[str] = Field(
         default_factory=list, description="Actionable improvements"
     )
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in assessment")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Confidence in assessment")
 
 
 class CardSplitPlanOutput(BaseModel):
@@ -151,16 +155,22 @@ class CardSplitPlanOutput(BaseModel):
 class CardSplittingOutput(BaseModel):
     """Structured output from card splitting agent."""
 
-    should_split: bool = Field(description="Whether to split into multiple cards")
+    should_split: bool = Field(
+        description="Whether to split into multiple cards")
     card_count: int = Field(ge=1, description="Number of cards to generate")
     splitting_strategy: str = Field(
-        description="Strategy: none/concept/list/example/hierarchical/step"
+        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware"
     )
     split_plan: list[CardSplitPlanOutput] = Field(
         default_factory=list, description="Plan for each card"
     )
     reasoning: str = Field(description="Explanation of the decision")
-    confidence: float = Field(ge=0.0, le=1.0, description="Decision confidence")
+    confidence: float = Field(
+        ge=0.0, le=1.0, default=0.5, description="Decision confidence (0.0-1.0)"
+    )
+    fallback_strategy: Optional[str] = Field(
+        default=None, description="Fallback strategy if primary fails"
+    )
 
 
 # ============================================================================
@@ -305,7 +315,8 @@ Validate the structure, frontmatter, and content quality."""
 
         except ValueError as e:
             # Structured output parsing error
-            logger.error("pydantic_ai_pre_validation_parse_error", error=str(e))
+            logger.error(
+                "pydantic_ai_pre_validation_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse pre-validation output",
                 details={"error": str(e), "title": metadata.title},
@@ -415,14 +426,16 @@ Q&A Pairs ({len(qa_pairs)}):
                     qa_pair = qa_lookup.get(card_index)
                     content_hash = ""
                     if qa_pair is not None:
-                        content_hash = compute_content_hash(qa_pair, metadata, lang)
+                        content_hash = compute_content_hash(
+                            qa_pair, metadata, lang)
 
                     generated_card = GeneratedCard(
                         card_index=card_index,
                         slug=card_dict["slug"],
                         lang=lang,
                         apf_html=card_dict["apf_html"],
-                        confidence=card_dict.get("confidence", output.confidence),
+                        confidence=card_dict.get(
+                            "confidence", output.confidence),
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)
@@ -523,7 +536,8 @@ class PostValidatorAgentAI:
         Returns:
             PostValidationResult with validation outcome
         """
-        logger.info("pydantic_ai_post_validation_start", cards_count=len(cards))
+        logger.info("pydantic_ai_post_validation_start",
+                    cards_count=len(cards))
 
         # Create dependencies
         deps = PostValidationDeps(
@@ -583,7 +597,8 @@ Cards to validate:
             return validation_result
 
         except ValueError as e:
-            logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            logger.error(
+                "pydantic_ai_post_validation_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse post-validation output",
                 details={"error": str(e), "cards_count": len(cards)},
@@ -624,7 +639,8 @@ class MemorizationQualityAgentAI:
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
         )
 
-        logger.info("pydantic_ai_memorization_agent_initialized", model=str(model))
+        logger.info("pydantic_ai_memorization_agent_initialized",
+                    model=str(model))
 
     async def assess(
         self,
@@ -640,10 +656,12 @@ class MemorizationQualityAgentAI:
         Returns:
             MemorizationQualityResult with assessment
         """
-        logger.info("pydantic_ai_memorization_assessment_start", cards_count=len(cards))
+        logger.info("pydantic_ai_memorization_assessment_start",
+                    cards_count=len(cards))
 
         # Create dependencies (reuse PostValidationDeps)
-        deps = PostValidationDeps(cards=cards, metadata=metadata, strict_mode=True)
+        deps = PostValidationDeps(
+            cards=cards, metadata=metadata, strict_mode=True)
 
         # Build assessment prompt
         prompt = f"""Assess memorization quality of these {len(cards)} Anki cards:
@@ -660,7 +678,8 @@ Cards to assess:
             # Extract Front and Back from APF HTML (simplified)
             front_match = card.apf_html.split("<!-- Front -->")
             if len(front_match) > 1:
-                front_text = front_match[1].split("<!-- Back -->")[0].strip()[:150]
+                front_text = front_match[1].split(
+                    "<!-- Back -->")[0].strip()[:150]
                 prompt += f"Front: {front_text}...\n"
             back_match = card.apf_html.split("<!-- Back -->")
             if len(back_match) > 1:
@@ -715,7 +734,8 @@ Cards to assess:
                 memorization_score=0.7,  # Default acceptable score
                 issues=[],
                 strengths=[],
-                suggested_improvements=[f"Memorization agent failed: {str(e)}"],
+                suggested_improvements=[
+                    f"Memorization agent failed: {str(e)}"],
                 assessment_time=0.0,
             )
 
@@ -744,7 +764,8 @@ class CardSplittingAgentAI:
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
         )
 
-        logger.info("pydantic_ai_card_splitting_agent_initialized", model=str(model))
+        logger.info("pydantic_ai_card_splitting_agent_initialized",
+                    model=str(model))
 
     async def analyze(
         self,
@@ -813,14 +834,17 @@ Questions:
                 )
                 split_plans.append(split_plan)
 
-            # Create result
+            # Create result with confidence and fallback
             splitting_result = CardSplittingResult(
                 should_split=output.should_split,
                 card_count=output.card_count,
-                splitting_strategy=output.splitting_strategy,  # type: ignore[arg-type]
+                # type: ignore[arg-type]
+                splitting_strategy=output.splitting_strategy,
                 split_plan=split_plans,
                 reasoning=output.reasoning,
                 decision_time=time.time() - start_time,
+                confidence=output.confidence,
+                fallback_strategy=output.fallback_strategy,
             )
 
             logger.info(
@@ -829,12 +853,23 @@ Questions:
                 card_count=output.card_count,
                 strategy=output.splitting_strategy,
                 confidence=output.confidence,
+                fallback_strategy=output.fallback_strategy,
             )
+
+            # Log warning if confidence is low
+            if output.confidence < 0.6:
+                logger.warning(
+                    "card_splitting_low_confidence",
+                    confidence=output.confidence,
+                    strategy=output.splitting_strategy,
+                    fallback=output.fallback_strategy,
+                )
 
             return splitting_result
 
         except ValueError as e:
-            logger.error("pydantic_ai_card_splitting_parse_error", error=str(e))
+            logger.error(
+                "pydantic_ai_card_splitting_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse card splitting output",
                 details={"error": str(e), "title": metadata.title},
@@ -865,6 +900,8 @@ Questions:
                 ],
                 reasoning=f"Card splitting agent failed: {str(e)}. Defaulting to single card.",
                 decision_time=0.0,
+                confidence=0.3,  # Low confidence for fallback
+                fallback_strategy="none",
             )
 
 
@@ -878,18 +915,22 @@ class DuplicateMatchOutput(BaseModel):
 
     card_slug: str = Field(min_length=1)
     similarity_score: float = Field(ge=0.0, le=1.0)
-    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    duplicate_type: str = Field(
+        description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(default="")
 
 
 class DuplicateDetectionOutput(BaseModel):
     """Structured output from duplicate detection agent."""
 
-    is_duplicate: bool = Field(description="True if exact or semantic duplicate")
+    is_duplicate: bool = Field(
+        description="True if exact or semantic duplicate")
     similarity_score: float = Field(ge=0.0, le=1.0)
-    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    duplicate_type: str = Field(
+        description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(description="Explanation of similarity assessment")
-    recommendation: str = Field(description="delete/merge/keep_both/review_manually")
+    recommendation: str = Field(
+        description="delete/merge/keep_both/review_manually")
     better_card: str | None = Field(
         default=None, description="'new' or existing card slug if duplicate"
     )
@@ -953,7 +994,8 @@ class DuplicateDetectionAgentAI:
         try:
             # Extract question/answer from APF HTML (simplified)
             new_q, new_a = self._extract_qa_from_apf(new_card.apf_html)
-            existing_q, existing_a = self._extract_qa_from_apf(existing_card.apf_html)
+            existing_q, existing_a = self._extract_qa_from_apf(
+                existing_card.apf_html)
 
             # Create dependencies
             deps = DuplicateDetectionDeps(
@@ -1120,13 +1162,15 @@ Analyze similarity and provide your assessment."""
         answer = ""
 
         # Extract Front (question)
-        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        front_match = re.search(
+            r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
         if front_match:
             # Remove HTML tags
             question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
         # Extract Back (answer)
-        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        back_match = re.search(
+            r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
         if back_match:
             answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 
@@ -1155,9 +1199,12 @@ class ContextEnrichmentOutput(BaseModel):
     enrichment_type: list[str] = Field(
         default_factory=list, description="Types of enrichment to add"
     )
-    enriched_answer: str = Field(default="", description="Enhanced answer text")
-    enriched_extra: str = Field(default="", description="Enhanced Extra section")
-    additions_summary: str = Field(default="", description="Summary of additions")
+    enriched_answer: str = Field(
+        default="", description="Enhanced answer text")
+    enriched_extra: str = Field(
+        default="", description="Enhanced Extra section")
+    additions_summary: str = Field(
+        default="", description="Summary of additions")
     rationale: str = Field(default="", description="Why enrichment helps")
     confidence: float = Field(ge=0.0, le=1.0)
 
@@ -1308,7 +1355,8 @@ Provide your enrichment assessment."""
             return enrichment_result
 
         except Exception as e:
-            logger.error("pydantic_ai_enrichment_failed", error=str(e), slug=card.slug)
+            logger.error("pydantic_ai_enrichment_failed",
+                         error=str(e), slug=card.slug)
             # Return safe fallback (no enrichment)
             return ContextEnrichmentResult(
                 should_enrich=False,
@@ -1327,12 +1375,14 @@ Provide your enrichment assessment."""
         answer = ""
 
         # Extract Front (question)
-        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        front_match = re.search(
+            r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
         if front_match:
             question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
         # Extract Back (answer)
-        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        back_match = re.search(
+            r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
         if back_match:
             answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 
@@ -1342,7 +1392,8 @@ Provide your enrichment assessment."""
         """Extract Extra section from APF HTML."""
         import re
 
-        extra_match = re.search(r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
+        extra_match = re.search(
+            r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
         if extra_match:
             return re.sub(r"<[^>]+>", "", extra_match.group(1)).strip()
         return ""

@@ -131,3 +131,4 @@ class TestLogAnalyzer:
         assert "WARNING" in summary["levels"]
         assert summary["errors"]["total_errors"] >= 1
 
+

@@ -114,17 +114,43 @@ class TestParserRepairAgent:
         test_file = tmp_path / "test-note.md"
         test_file.write_text(malformed_note_empty_language_tags)
 
-        # Mock LLM response
+        # Mock LLM response with enhanced fields
         repair_response = {
             "is_repairable": True,
             "diagnosis": "Empty language_tags field",
             "repairs": [
                 {
-                    "issue": "language_tags is empty",
-                    "fix": "Set language_tags to [en, ru] based on content",
+                    "type": "frontmatter_fix",
+                    "description": "language_tags is empty - Set language_tags to [en, ru] based on content",
                 }
             ],
             "repaired_content": repaired_note_content,
+            "content_generation_applied": False,
+            "generated_sections": [],
+            "error_diagnosis": {
+                "error_category": "frontmatter",
+                "severity": "medium",
+                "error_description": "Empty language_tags field in frontmatter",
+                "repair_priority": 2,
+                "can_auto_fix": True,
+            },
+            "quality_before": {
+                "completeness_score": 0.8,
+                "structure_score": 0.9,
+                "bilingual_consistency": 1.0,
+                "technical_accuracy": 1.0,
+                "overall_score": 0.925,
+                "issues_found": ["Missing language_tags value"],
+            },
+            "quality_after": {
+                "completeness_score": 1.0,
+                "structure_score": 1.0,
+                "bilingual_consistency": 1.0,
+                "technical_accuracy": 1.0,
+                "overall_score": 1.0,
+                "issues_found": [],
+            },
+            "repair_time": 0.5,
         }
 
         parser_repair_agent.ollama_client.generate_json.return_value = repair_response
@@ -151,6 +177,25 @@ class TestParserRepairAgent:
             "diagnosis": "File contains no valid frontmatter or structure",
             "repairs": [],
             "repaired_content": None,
+            "content_generation_applied": False,
+            "generated_sections": [],
+            "error_diagnosis": {
+                "error_category": "structure",
+                "severity": "critical",
+                "error_description": "No valid frontmatter or content structure",
+                "repair_priority": 1,
+                "can_auto_fix": False,
+            },
+            "quality_before": {
+                "completeness_score": 0.0,
+                "structure_score": 0.0,
+                "bilingual_consistency": 0.0,
+                "technical_accuracy": 0.0,
+                "overall_score": 0.0,
+                "issues_found": ["No frontmatter", "No content structure"],
+            },
+            "quality_after": None,
+            "repair_time": 0.3,
         }
 
         parser_repair_agent.ollama_client.generate_json.return_value = repair_response

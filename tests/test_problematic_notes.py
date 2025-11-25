@@ -170,3 +170,4 @@ class TestProblematicNotesArchiver:
         cleaned = archiver.cleanup_old_archives(max_age_days=30)
         assert cleaned == 0  # Recent notes should not be cleaned
 
+

@@ -3,19 +3,18 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ManifestData(BaseModel):
     """Validated manifest data structure for parsing from Anki cards."""
 
+    model_config = ConfigDict(extra="allow")
+
     slug: str = Field(min_length=1, description="Card slug identifier")
     source_path: str = Field(min_length=1, description="Source note path")
     card_index: int = Field(ge=0, description="Card index in note")
     lang: str = Field(min_length=2, max_length=2, description="Language code")
-
-    class Config:
-        extra = "allow"  # Allow additional fields
 
 
 @dataclass

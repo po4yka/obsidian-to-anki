@@ -298,3 +298,4 @@ class LogAnalyzer:
             "errors": error_analysis,
         }
 
+

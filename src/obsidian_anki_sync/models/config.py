@@ -180,192 +180,196 @@ MODEL_CAPABILITIES: dict[str, ModelCapabilities] = {
     ),
 }
 
+# Default model for all tasks - Grok 4.1 Fast (free, high quality, 2M context)
+DEFAULT_MODEL = "x-ai/grok-4.1-fast"
+
 # Model presets - optimized configurations for different use cases
+# All presets now use x-ai/grok-4.1-fast (free, high quality, 2M context)
 MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
     ModelPreset.COST_EFFECTIVE: {
         ModelTask.QA_EXTRACTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=8192,
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.GENERATION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
             max_tokens=8192,
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
-            model_name="deepseek/deepseek-chat",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
             max_tokens=8192,
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
             max_tokens=4096,
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
     },
     ModelPreset.BALANCED: {
         ModelTask.QA_EXTRACTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=8192,
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.GENERATION: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
             max_tokens=8192,
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
-            model_name="deepseek/deepseek-chat",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=8192,
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
-            model_name="minimax/minimax-m2",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
             max_tokens=8192,
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
-            model_name="moonshotai/kimi-k2",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
-            model_name="moonshotai/kimi-k2-thinking",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
             max_tokens=4096,
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
     },
     ModelPreset.HIGH_QUALITY: {
         ModelTask.QA_EXTRACTION: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=8192,
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.GENERATION: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
             max_tokens=8192,
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
-            model_name="deepseek/deepseek-chat",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=8192,
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
-            model_name="moonshotai/kimi-k2",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
             max_tokens=8192,
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
-            model_name="moonshotai/kimi-k2",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
-            model_name="moonshotai/kimi-k2-thinking",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
             max_tokens=4096,
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
-            model_name="qwen/qwen-2.5-72b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,
         ),
     },
     ModelPreset.FAST: {
         ModelTask.QA_EXTRACTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=4096,  # Lower limit for speed
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=2048,
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=2048,
         ),
         ModelTask.GENERATION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
             max_tokens=4096,
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
-            model_name="deepseek/deepseek-chat",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=2048,
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
             max_tokens=4096,
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=2048,
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
             max_tokens=2048,
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
-            model_name="qwen/qwen-2.5-32b-instruct",
+            model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
             max_tokens=2048,
         ),
@@ -403,7 +407,8 @@ def get_model_config(
     Returns:
         Model configuration
     """
-    preset_configs = MODEL_PRESETS.get(preset, MODEL_PRESETS[ModelPreset.BALANCED])
+    preset_configs = MODEL_PRESETS.get(
+        preset, MODEL_PRESETS[ModelPreset.BALANCED])
     config = preset_configs.get(task)
 
     if config is None:
