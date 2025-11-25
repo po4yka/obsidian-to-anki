@@ -7,8 +7,8 @@ to ensure consistent, well-formed HTML output.
 import html
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any, Tuple
 from html import escape
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils.logging import get_logger
 from .html_validator import validate_card_html
@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 @dataclass
 class CardTemplate:
     """Template for generating APF card HTML."""
+
     card_type: str
     sections: Dict[str, str]
 
@@ -33,7 +34,7 @@ class CardTemplate:
                 if rendered:
                     html_parts.append(rendered)
 
-        return '\n'.join(html_parts)
+        return "\n".join(html_parts)
 
     def _render_section(self, template: str, data: Dict[str, Any]) -> str:
         """Render a single section template."""
@@ -50,6 +51,7 @@ class CardTemplate:
 @dataclass
 class GenerationResult:
     """Result of HTML generation with validation."""
+
     html: str
     is_valid: bool
     validation_errors: List[str]
@@ -65,39 +67,51 @@ class HTMLTemplateGenerator:
     def _initialize_templates(self) -> Dict[str, CardTemplate]:
         """Initialize available card templates."""
         return {
-            'simple': CardTemplate(
-                card_type='Simple',
+            "simple": CardTemplate(
+                card_type="Simple",
                 sections={
-                    'header': '<!-- Card {card_index} | slug: {slug} | CardType: Simple | Tags: {tags} -->',
-                    'title': '\n<!-- Title -->\n{title}',
-                    'question': '\n<!-- Question -->\n{question}',
-                    'answer': '\n<!-- Answer -->\n{answer}',
-                    'key_points': '\n<!-- Key point -->\n{key_points}',
-                    'notes': '\n<!-- Other notes -->\n{other_notes}' if '{other_notes}' else '',
-                    'references': '\n<!-- References -->\n{references}' if '{references}' else '',
-                }
+                    "header": "<!-- Card {card_index} | slug: {slug} | CardType: Simple | Tags: {tags} -->",
+                    "title": "\n<!-- Title -->\n{title}",
+                    "question": "\n<!-- Question -->\n{question}",
+                    "answer": "\n<!-- Answer -->\n{answer}",
+                    "key_points": "\n<!-- Key point -->\n{key_points}",
+                    "notes": (
+                        "\n<!-- Other notes -->\n{other_notes}"
+                        if "{other_notes}"
+                        else ""
+                    ),
+                    "references": (
+                        "\n<!-- References -->\n{references}" if "{references}" else ""
+                    ),
+                },
             ),
-            'code_block': CardTemplate(
-                card_type='Simple',
+            "code_block": CardTemplate(
+                card_type="Simple",
                 sections={
-                    'header': '<!-- Card {card_index} | slug: {slug} | CardType: Simple | Tags: {tags} -->',
-                    'title': '\n<!-- Title -->\n{title}',
-                    'code_sample': '\n<!-- Sample (code block) -->\n{code_sample}',
-                    'key_points': '\n<!-- Key point -->\n{key_points}',
-                    'notes': '\n<!-- Other notes -->\n{other_notes}' if '{other_notes}' else '',
-                }
+                    "header": "<!-- Card {card_index} | slug: {slug} | CardType: Simple | Tags: {tags} -->",
+                    "title": "\n<!-- Title -->\n{title}",
+                    "code_sample": "\n<!-- Sample (code block) -->\n{code_sample}",
+                    "key_points": "\n<!-- Key point -->\n{key_points}",
+                    "notes": (
+                        "\n<!-- Other notes -->\n{other_notes}"
+                        if "{other_notes}"
+                        else ""
+                    ),
+                },
             ),
-            'cloze': CardTemplate(
-                card_type='Missing',  # Cloze cards use "Missing" type
+            "cloze": CardTemplate(
+                card_type="Missing",  # Cloze cards use "Missing" type
                 sections={
-                    'header': '<!-- Card {card_index} | slug: {slug} | CardType: Missing | Tags: {tags} -->',
-                    'title': '\n<!-- Title -->\n{title}',
-                    'content': '\n<!-- Content -->\n{content}',
-                }
-            )
+                    "header": "<!-- Card {card_index} | slug: {slug} | CardType: Missing | Tags: {tags} -->",
+                    "title": "\n<!-- Title -->\n{title}",
+                    "content": "\n<!-- Content -->\n{content}",
+                },
+            ),
         }
 
-    def generate_card_html(self, card_data: Dict[str, Any], template_name: str = 'simple') -> GenerationResult:
+    def generate_card_html(
+        self, card_data: Dict[str, Any], template_name: str = "simple"
+    ) -> GenerationResult:
         """
         Generate APF HTML for a card using templates.
 
@@ -109,7 +123,7 @@ class HTMLTemplateGenerator:
             GenerationResult with HTML and validation info
         """
         # Select appropriate template
-        template = self.templates.get(template_name, self.templates['simple'])
+        template = self.templates.get(template_name, self.templates["simple"])
 
         # Pre-process data
         processed_data = self._preprocess_card_data(card_data)
@@ -123,21 +137,21 @@ class HTMLTemplateGenerator:
 
         if validation_errors:
             html_content, fix_warnings = self._auto_fix_html_issues(
-                html_content, validation_errors)
+                html_content, validation_errors
+            )
             warnings.extend(fix_warnings)
 
             # Re-validate after fixes
             final_errors = validate_card_html(html_content)
             if final_errors:
                 validation_errors.extend(final_errors)
-                warnings.append(
-                    "Some HTML validation issues could not be auto-fixed")
+                warnings.append("Some HTML validation issues could not be auto-fixed")
 
         return GenerationResult(
             html=html_content,
             is_valid=len(validation_errors) == 0,
             validation_errors=validation_errors,
-            warnings=warnings
+            warnings=warnings,
         )
 
     def _preprocess_card_data(self, card_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -145,25 +159,24 @@ class HTMLTemplateGenerator:
         processed = card_data.copy()
 
         # Ensure required fields
-        processed.setdefault('card_index', 1)
-        processed.setdefault('slug', f'card-{processed["card_index"]}')
-        processed.setdefault('tags', '')
-        processed.setdefault('title', 'Untitled Card')
+        processed.setdefault("card_index", 1)
+        processed.setdefault("slug", f'card-{processed["card_index"]}')
+        processed.setdefault("tags", "")
+        processed.setdefault("title", "Untitled Card")
 
         # Process code blocks
-        if 'code_sample' in processed:
-            processed['code_sample'] = self._generate_code_block(
-                processed['code_sample'])
+        if "code_sample" in processed:
+            processed["code_sample"] = self._generate_code_block(
+                processed["code_sample"]
+            )
 
-        if 'key_points' in processed:
-            processed['key_points'] = self._generate_key_points(
-                processed['key_points'])
+        if "key_points" in processed:
+            processed["key_points"] = self._generate_key_points(processed["key_points"])
 
         # Process text content
-        for field in ['question', 'answer', 'title', 'other_notes', 'content']:
+        for field in ["question", "answer", "title", "other_notes", "content"]:
             if field in processed and processed[field]:
-                processed[field] = self._escape_and_format_text(
-                    processed[field])
+                processed[field] = self._escape_and_format_text(processed[field])
 
         return processed
 
@@ -171,23 +184,25 @@ class HTMLTemplateGenerator:
         """Generate properly formatted code block HTML."""
         if isinstance(code_data, str):
             # Simple code string
-            return self._create_code_html(code_data, 'text')
+            return self._create_code_html(code_data, "text")
         elif isinstance(code_data, dict):
             # Structured code data
-            code = code_data.get('code', '')
-            language = code_data.get('language', 'text')
-            caption = code_data.get('caption', '')
+            code = code_data.get("code", "")
+            language = code_data.get("language", "text")
+            caption = code_data.get("caption", "")
             return self._create_code_html(code, language, caption)
         else:
-            return '<pre><code>Invalid code data</code></pre>'
+            return "<pre><code>Invalid code data</code></pre>"
 
-    def _create_code_html(self, code: str, language: str, caption: str = '') -> str:
+    def _create_code_html(self, code: str, language: str, caption: str = "") -> str:
         """Create properly formatted code HTML."""
         escaped_code = escape(code.strip())
-        code_html = f'<pre><code class="language-{language}">{escaped_code}</code></pre>'
+        code_html = (
+            f'<pre><code class="language-{language}">{escaped_code}</code></pre>'
+        )
 
         if caption:
-            return f'<figure>\n{code_html}\n<figcaption>{escape(caption)}</figcaption>\n</figure>'
+            return f"<figure>\n{code_html}\n<figcaption>{escape(caption)}</figcaption>\n</figure>"
         else:
             return code_html
 
@@ -195,53 +210,57 @@ class HTMLTemplateGenerator:
         """Generate key points HTML."""
         if isinstance(key_points, str):
             # Simple string
-            return f'<ul>\n<li>{escape(key_points)}</li>\n</ul>'
+            return f"<ul>\n<li>{escape(key_points)}</li>\n</ul>"
         elif isinstance(key_points, list):
             # List of points
-            points_html = '\n'.join(
-                f'<li>{escape(point)}</li>' for point in key_points)
-            return f'<ul>\n{points_html}\n</ul>'
+            points_html = "\n".join(f"<li>{escape(point)}</li>" for point in key_points)
+            return f"<ul>\n{points_html}\n</ul>"
         else:
-            return '<ul><li>Key points data</li></ul>'
+            return "<ul><li>Key points data</li></ul>"
 
     def _escape_and_format_text(self, text: str) -> str:
         """Escape and format text content."""
         if not text:
-            return ''
+            return ""
 
         # Basic HTML escaping
         escaped = escape(text)
 
         # Convert basic markdown to HTML
-        escaped = re.sub(r'\*\*(.*?)\*\*',
-                         r'<strong>\1</strong>', escaped)  # Bold
-        escaped = re.sub(r'\*(.*?)\*', r'<em>\1</em>', escaped)  # Italic
+        escaped = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", escaped)  # Bold
+        escaped = re.sub(r"\*(.*?)\*", r"<em>\1</em>", escaped)  # Italic
 
         # Convert line breaks
-        escaped = escaped.replace('\n', '<br>')
+        escaped = escaped.replace("\n", "<br>")
 
         return escaped
 
-    def _auto_fix_html_issues(self, html: str, errors: List[str]) -> Tuple[str, List[str]]:
+    def _auto_fix_html_issues(
+        self, html: str, errors: List[str]
+    ) -> Tuple[str, List[str]]:
         """Attempt to auto-fix common HTML validation issues."""
         fixed_html = html
         warnings = []
 
         for error in errors:
-            if 'language- class' in error:
+            if "language- class" in error:
                 # Add default language class to code elements without one
                 fixed_html, lang_warnings = self._add_missing_language_classes(
-                    fixed_html)
+                    fixed_html
+                )
                 warnings.extend(lang_warnings)
-            elif 'wrap in <pre><code>' in error:
+            elif "wrap in <pre><code>" in error:
                 # Wrap standalone code elements
-                fixed_html, wrap_warnings = self._wrap_standalone_code(
-                    fixed_html)
+                fixed_html, wrap_warnings = self._wrap_standalone_code(fixed_html)
                 warnings.extend(wrap_warnings)
-            elif 'Backtick code fences detected' in error:
+            elif "Backtick code fences detected" in error:
                 # Remove markdown code fences from HTML
                 fixed_html = re.sub(
-                    r'```[^\n]*\n(.*?)\n```', r'<pre><code>\1</code></pre>', fixed_html, flags=re.DOTALL)
+                    r"```[^\n]*\n(.*?)\n```",
+                    r"<pre><code>\1</code></pre>",
+                    fixed_html,
+                    flags=re.DOTALL,
+                )
                 warnings.append("Converted markdown code fences to HTML")
 
         return fixed_html, warnings
@@ -252,14 +271,14 @@ class HTMLTemplateGenerator:
 
         def add_class(match):
             code_tag = match.group(0)
-            if 'class=' not in code_tag:
+            if "class=" not in code_tag:
                 # Add default language class
                 warnings.append("Added default language class to code element")
-                return code_tag.replace('<code', '<code class="language-text"', 1)
+                return code_tag.replace("<code", '<code class="language-text"', 1)
             return code_tag
 
         # Find code tags without language classes
-        pattern = r'<code(?:\s[^>]*)?>'
+        pattern = r"<code(?:\s[^>]*)?>"
         fixed_html = re.sub(pattern, add_class, html)
 
         return fixed_html, warnings
@@ -271,17 +290,20 @@ class HTMLTemplateGenerator:
         def wrap_code(match):
             code_content = match.group(1)
             warnings.append("Wrapped standalone code element in pre tags")
-            return f'<pre>{match.group(0)}</pre>'
+            return f"<pre>{match.group(0)}</pre>"
 
         # Find code elements not inside pre tags
         # This is a simplified version - a full implementation would need more complex parsing
         fixed_html = html
         warnings.append(
-            "Standalone code wrapping not fully implemented - requires complex HTML parsing")
+            "Standalone code wrapping not fully implemented - requires complex HTML parsing"
+        )
 
         return fixed_html, warnings
 
-    def generate_full_apf_html(self, cards_data: List[Dict[str, Any]], manifest_data: Dict[str, Any]) -> str:
+    def generate_full_apf_html(
+        self, cards_data: List[Dict[str, Any]], manifest_data: Dict[str, Any]
+    ) -> str:
         """
         Generate complete APF HTML document with all cards.
 
@@ -306,18 +328,22 @@ class HTMLTemplateGenerator:
             parts.append("")  # Blank line between cards
 
             if result.warnings:
-                logger.warning("card_generation_warnings",
-                               card_index=card_data.get('card_index'),
-                               warnings=result.warnings)
+                logger.warning(
+                    "card_generation_warnings",
+                    card_index=card_data.get("card_index"),
+                    warnings=result.warnings,
+                )
 
         # Close document
         parts.append("<!-- END_CARDS -->")
         parts.append("END_OF_CARDS")
 
-        return '\n'.join(parts)
+        return "\n".join(parts)
 
 
-def generate_card_html_with_validation(card_data: Dict[str, Any], template_name: str = 'simple') -> GenerationResult:
+def generate_card_html_with_validation(
+    card_data: Dict[str, Any], template_name: str = "simple"
+) -> GenerationResult:
     """
     Convenience function to generate card HTML with validation.
 

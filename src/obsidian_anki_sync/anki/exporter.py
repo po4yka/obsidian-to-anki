@@ -336,8 +336,7 @@ def _card_to_note(card: Card) -> genanki.Note:
         return note
 
     except Exception as e:
-        raise DeckExportError(
-            f"Failed to convert card {card.slug}: {e}") from e
+        raise DeckExportError(f"Failed to convert card {card.slug}: {e}") from e
 
 
 def export_deck(
@@ -470,8 +469,13 @@ def export_cards_to_yaml(
 
         # Write YAML file
         with output_path.open("w", encoding="utf-8") as f:
-            yaml.dump(yaml_data, f, default_flow_style=False,
-                      allow_unicode=True, sort_keys=False)
+            yaml.dump(
+                yaml_data,
+                f,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
 
         logger.info(
             "cards_exported_to_yaml",
@@ -507,8 +511,7 @@ def export_cards_to_csv(
             # Create empty CSV with headers
             with output_path.open("w", encoding="utf-8", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(
-                    ["noteId", "slug", "noteType", "tags", "fields"])
+                writer.writerow(["noteId", "slug", "noteType", "tags", "fields"])
             logger.info("empty_csv_created", output_path=str(output_path))
             return
 
@@ -535,14 +538,16 @@ def export_cards_to_csv(
         # Sort field names for consistent column order
         # Put common fields first
         common_fields = ["noteId", "slug", "noteType", "tags"]
-        field_names = [f for f in common_fields if f in all_field_names or any(
-            f in d for d in card_data_list)]
+        field_names = [
+            f
+            for f in common_fields
+            if f in all_field_names or any(f in d for d in card_data_list)
+        ]
         field_names.extend(sorted(all_field_names - set(common_fields)))
 
         # Write CSV file
         with output_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=field_names, extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=field_names, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(card_data_list)
 
@@ -596,8 +601,9 @@ def export_deck_from_anki(
         cards = []
         for note_info in notes_info:
             # Extract fields
-            fields = {name: value for name,
-                      value in note_info.get("fields", {}).items()}
+            fields = {
+                name: value for name, value in note_info.get("fields", {}).items()
+            }
 
             # Try to extract manifest from Manifest field
             manifest_data = {}
@@ -629,7 +635,8 @@ def export_deck_from_anki(
             # Reconstruct APF HTML from fields
             # This is a simplified reconstruction
             apf_html = _reconstruct_apf_from_fields(
-                fields, note_info.get("modelName", "APF::Simple"))
+                fields, note_info.get("modelName", "APF::Simple")
+            )
 
             card = Card(
                 slug=manifest.slug,

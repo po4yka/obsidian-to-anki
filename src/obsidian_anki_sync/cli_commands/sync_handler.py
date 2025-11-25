@@ -52,7 +52,9 @@ def run_sync(
     check_anki = not dry_run
     check_llm = True
 
-    passed, results = run_preflight_checks(config, check_anki=check_anki, check_llm=check_llm)
+    passed, results = run_preflight_checks(
+        config, check_anki=check_anki, check_llm=check_llm
+    )
 
     # Display results
     for result in results:
@@ -78,13 +80,19 @@ def run_sync(
     warnings = [r for r in results if not r.passed and r.severity == "warning"]
 
     if errors:
-        console.print(f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+        console.print(
+            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]"
+        )
         console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
         raise typer.Exit(code=1)
 
     if warnings:
-        console.print(f"\n[bold yellow]Pre-flight checks passed with {len(warnings)} warning(s).[/bold yellow]")
-        console.print("[dim]You may proceed, but some features may not work as expected.[/dim]\n")
+        console.print(
+            f"\n[bold yellow]Pre-flight checks passed with {len(warnings)} warning(s).[/bold yellow]"
+        )
+        console.print(
+            "[dim]You may proceed, but some features may not work as expected.[/dim]\n"
+        )
     else:
         console.print("[bold green]All pre-flight checks passed![/bold green]\n")
 

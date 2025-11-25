@@ -103,12 +103,10 @@ class LogAnalyzer:
         timestamp_str, level, name, function, line_no, message = match.groups()
 
         try:
-            timestamp = datetime.strptime(
-                timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
         except ValueError:
             try:
-                timestamp = datetime.strptime(
-                    timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 timestamp = None
 
@@ -204,8 +202,7 @@ class LogAnalyzer:
         errors_by_stage: Counter[str] = Counter()
 
         for entry in error_entries:
-            error_type = entry.get("error_type") or entry.get(
-                "message", "Unknown")
+            error_type = entry.get("error_type") or entry.get("message", "Unknown")
             errors_by_type[error_type] += 1
 
             file_path = entry.get("file") or entry.get("source_path")
@@ -230,8 +227,7 @@ class LogAnalyzer:
         # Get recent errors (last 20)
         recent_errors = sorted(
             error_entries,
-            key=lambda e: e.get("timestamp").timestamp() if e.get(
-                "timestamp") else 0,
+            key=lambda e: e.get("timestamp").timestamp() if e.get("timestamp") else 0,
             reverse=True,
         )[:20]
 
@@ -253,9 +249,7 @@ class LogAnalyzer:
             ],
         }
 
-    def generate_summary_report(
-        self, days: int = 7
-    ) -> dict[str, Any]:
+    def generate_summary_report(self, days: int = 7) -> dict[str, Any]:
         """Generate a summary report of recent activity.
 
         Args:
@@ -303,4 +297,3 @@ class LogAnalyzer:
             "operations": dict(operations),
             "errors": error_analysis,
         }
-

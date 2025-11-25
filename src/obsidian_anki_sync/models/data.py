@@ -110,4 +110,3 @@ class SyncAction:
     card: Card
     anki_guid: int | None = None
     reason: str | None = None
-

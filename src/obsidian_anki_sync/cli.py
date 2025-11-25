@@ -29,8 +29,7 @@ console = Console()
 @app.command()
 def sync(
     dry_run: Annotated[
-        bool, typer.Option(
-            "--dry-run", help="Preview changes without applying")
+        bool, typer.Option("--dry-run", help="Preview changes without applying")
     ] = False,
     incremental: Annotated[
         bool,
@@ -71,8 +70,7 @@ def sync(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Synchronize Obsidian notes to Anki cards."""
@@ -125,8 +123,7 @@ def test_run(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
     index: Annotated[
         bool,
@@ -150,7 +147,8 @@ def test_run(
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
     passed, results = run_preflight_checks(
-        config, check_anki=not dry_run, check_llm=True)
+        config, check_anki=not dry_run, check_llm=True
+    )
 
     # Display results
     for result in results:
@@ -173,7 +171,8 @@ def test_run(
 
     if errors:
         console.print(
-            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]"
+        )
         console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
         raise typer.Exit(code=1)
 
@@ -244,8 +243,7 @@ def lint_note(
     ] = True,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
     config_path: Annotated[
         Path | None,
@@ -290,8 +288,7 @@ def validate(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Validate note structure and APF compliance."""
@@ -310,8 +307,7 @@ def validate(
         console.print(f"[bold]Parsed:[/bold] {note_path}")
         console.print(f"  [cyan]Title:[/cyan] {metadata.title}")
         console.print(f"  [cyan]Topic:[/cyan] {metadata.topic}")
-        console.print(
-            f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
+        console.print(f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
         console.print(f"  [cyan]Q/A pairs:[/cyan] {len(qa_pairs)}")
 
         # Validate
@@ -342,8 +338,7 @@ def init(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Initialize configuration and database."""
@@ -406,8 +401,7 @@ def list_decks(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """List deck names available via AnkiConnect."""
@@ -444,8 +438,7 @@ def list_models(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """List note models (types) available in Anki."""
@@ -483,8 +476,7 @@ def show_model_fields(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Show field names for a specific Anki model."""
@@ -507,8 +499,7 @@ def show_model_fields(
             for field in fields:
                 console.print(f"  [cyan]• {field}[/cyan]")
 
-        logger.info("model_fields_completed",
-                    model=model_name, count=len(fields))
+        logger.info("model_fields_completed", model=model_name, count=len(fields))
 
     except Exception as e:
         logger.error("model_fields_failed", model=model_name, error=str(e))
@@ -539,8 +530,7 @@ def export(
     ] = None,
     sample_size: Annotated[
         int | None,
-        typer.Option(
-            "--sample", help="Export only N random notes (for testing)"),
+        typer.Option("--sample", help="Export only N random notes (for testing)"),
     ] = None,
     config_path: Annotated[
         Path | None,
@@ -548,8 +538,7 @@ def export(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Export Obsidian notes to Anki deck file (.apkg)."""
@@ -579,8 +568,7 @@ def export(
     # Run pre-flight checks (skip Anki since we're exporting to file)
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    passed, results = run_preflight_checks(
-        config, check_anki=False, check_llm=True)
+    passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
 
     # Display results
     for result in results:
@@ -603,7 +591,8 @@ def export(
 
     if errors:
         console.print(
-            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]")
+            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]"
+        )
         console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
         raise typer.Exit(code=1)
 
@@ -631,8 +620,7 @@ def export(
                     note_paths, min(sample_size, len(note_paths))
                 )
 
-            console.print(
-                f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
+            console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
 
             # Generate cards using the sync engine's generation logic
             from .apf.generator import APFGenerator
@@ -641,10 +629,10 @@ def export(
             cards: list[Card] = []
 
             if config.use_agent_system:
-                console.print(
-                    "[cyan]Using multi-agent system for generation...[/cyan]")
+                console.print("[cyan]Using multi-agent system for generation...[/cyan]")
                 import asyncio
                 import inspect
+
                 from .agents.orchestrator import AgentOrchestrator
 
                 orchestrator = AgentOrchestrator(config)
@@ -689,8 +677,7 @@ def export(
                         console.print(f"  [red][/red] {note_path.name}: {e}")
 
             else:
-                console.print(
-                    "[cyan]Using OpenRouter for generation...[/cyan]")
+                console.print("[cyan]Using OpenRouter for generation...[/cyan]")
                 generator = APFGenerator(config)
 
                 for note_path_tuple in note_paths:
@@ -713,8 +700,7 @@ def export(
                         console.print(f"  [red][/red] {note_path.name}: {e}")
 
             if not cards:
-                console.print(
-                    "\n[yellow]No cards generated. Exiting.[/yellow]")
+                console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
                 return
 
             # Export to .apkg
@@ -734,8 +720,7 @@ def export(
                 f"to {output_path}[/bold green]"
             )
 
-            console.print(
-                "\n[cyan]Import this file into Anki to add the cards.[/cyan]")
+            console.print("\n[cyan]Import this file into Anki to add the cards.[/cyan]")
 
             logger.info(
                 "export_completed",
@@ -754,8 +739,9 @@ def export_deck(
     deck_name: Annotated[str, typer.Argument(help="Name of the Anki deck to export")],
     output: Annotated[
         Path | None,
-        typer.Option("--output", "-o",
-                     help="Output file path (auto-generated if omitted)"),
+        typer.Option(
+            "--output", "-o", help="Output file path (auto-generated if omitted)"
+        ),
     ] = None,
     file_format: Annotated[
         str,
@@ -778,8 +764,7 @@ def export_deck(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Export an Anki deck to YAML or CSV file."""
@@ -803,10 +788,8 @@ def export_deck(
 
     try:
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(
-            config, check_anki=True, check_llm=False)
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
 
         for result in results:
             icon = "[green]✓[/green]" if result.passed else "[red]✗[/red]"
@@ -828,7 +811,8 @@ def export_deck(
         )
 
         console.print(
-            f"\n[bold green]Successfully exported deck to {output}[/bold green]")
+            f"\n[bold green]Successfully exported deck to {output}[/bold green]"
+        )
         logger.info("export_deck_completed", output_path=str(output))
 
     except Exception as e:
@@ -849,8 +833,11 @@ def import_deck(
     ],
     note_type: Annotated[
         str | None,
-        typer.Option("--note-type", "-n",
-                     help="Note type to use (auto-detected if not specified)"),
+        typer.Option(
+            "--note-type",
+            "-n",
+            help="Note type to use (auto-detected if not specified)",
+        ),
     ] = None,
     key_field: Annotated[
         str | None,
@@ -866,8 +853,7 @@ def import_deck(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Import cards from YAML or CSV file into Anki deck."""
@@ -881,7 +867,8 @@ def import_deck(
     file_format = input.suffix.lower()
     if file_format not in (".yaml", ".yml", ".csv"):
         console.print(
-            f"\n[bold red]Error:[/bold red] Unsupported file format: {file_format}")
+            f"\n[bold red]Error:[/bold red] Unsupported file format: {file_format}"
+        )
         console.print("[yellow]Supported formats: .yaml, .yml, .csv[/yellow]")
         raise typer.Exit(code=1)
 
@@ -897,10 +884,8 @@ def import_deck(
 
     try:
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(
-            config, check_anki=True, check_llm=False)
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
 
         for result in results:
             icon = "[green]✓[/green]" if result.passed else "[red]✗[/red]"
@@ -960,13 +945,11 @@ def process_file(
     ],
     field: Annotated[
         str | None,
-        typer.Option(
-            "--field", help="Field name to update (single field mode)"),
+        typer.Option("--field", help="Field name to update (single field mode)"),
     ] = None,
     json_mode: Annotated[
         bool,
-        typer.Option(
-            "--json", help="Expect JSON response and merge all fields"),
+        typer.Option("--json", help="Expect JSON response and merge all fields"),
     ] = False,
     model: Annotated[
         str | None,
@@ -974,13 +957,11 @@ def process_file(
     ] = None,
     batch_size: Annotated[
         int,
-        typer.Option("--batch-size", "-b",
-                     help="Number of concurrent API requests"),
+        typer.Option("--batch-size", "-b", help="Number of concurrent API requests"),
     ] = 5,
     retries: Annotated[
         int,
-        typer.Option("--retries", "-r",
-                     help="Number of retries for failed requests"),
+        typer.Option("--retries", "-r", help="Number of retries for failed requests"),
     ] = 3,
     dry_run: Annotated[
         bool,
@@ -988,8 +969,7 @@ def process_file(
     ] = False,
     force: Annotated[
         bool,
-        typer.Option(
-            "--force", help="Re-process all rows, ignoring existing output"),
+        typer.Option("--force", help="Re-process all rows, ignoring existing output"),
     ] = False,
     limit: Annotated[
         int | None,
@@ -1008,32 +988,31 @@ def process_file(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Process cards from file with LLM and save results."""
     config, logger = get_config_and_logger(config_path, log_level)
 
     if not input.exists():
-        console.print(
-            f"\n[bold red]Error:[/bold red] Input file not found: {input}")
+        console.print(f"\n[bold red]Error:[/bold red] Input file not found: {input}")
         raise typer.Exit(code=1)
 
     if field and json_mode:
         console.print(
-            "\n[bold red]Error:[/bold red] --field and --json are mutually exclusive")
+            "\n[bold red]Error:[/bold red] --field and --json are mutually exclusive"
+        )
         raise typer.Exit(code=1)
 
     if not field and not json_mode:
         console.print(
-            "\n[bold red]Error:[/bold red] Must specify either --field or --json")
+            "\n[bold red]Error:[/bold red] Must specify either --field or --json"
+        )
         raise typer.Exit(code=1)
 
     # Load prompt template
     if not prompt.exists():
-        console.print(
-            f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
+        console.print(f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
         raise typer.Exit(code=1)
 
     with prompt.open("r", encoding="utf-8") as f:
@@ -1043,7 +1022,8 @@ def process_file(
     model_name = model or config.openrouter_model or "gpt-4o-mini"
     if not model_name:
         console.print(
-            "\n[bold red]Error:[/bold red] No model specified and no default configured")
+            "\n[bold red]Error:[/bold red] No model specified and no default configured"
+        )
         raise typer.Exit(code=1)
 
     logger.info(
@@ -1082,7 +1062,8 @@ def process_file(
             processed_slugs = get_processed_slugs(output, output_format)
             processed_cards = load_cards_from_file(output)
             console.print(
-                f"[cyan]Found {len(processed_cards)} already processed cards[/cyan]")
+                f"[cyan]Found {len(processed_cards)} already processed cards[/cyan]"
+            )
 
         # Filter cards to process
         cards_to_process = []
@@ -1098,15 +1079,12 @@ def process_file(
             console.print("\n[yellow]No new cards to process.[/yellow]")
             return
 
-        console.print(
-            f"\n[cyan]Processing {len(cards_to_process)} cards...[/cyan]")
+        console.print(f"\n[cyan]Processing {len(cards_to_process)} cards...[/cyan]")
 
         if dry_run:
-            console.print(
-                "[yellow]Dry run mode: No API calls will be made[/yellow]")
+            console.print("[yellow]Dry run mode: No API calls will be made[/yellow]")
             for card in cards_to_process[:5]:  # Show first 5 as examples
-                console.print(
-                    f"  Would process: {card.get('slug', 'unknown')}")
+                console.print(f"  Would process: {card.get('slug', 'unknown')}")
             return
 
         # Initialize LLM client
@@ -1130,7 +1108,8 @@ def process_file(
         for i, card in enumerate(cards_to_process, 1):
             try:
                 console.print(
-                    f"  [{i}/{len(cards_to_process)}] Processing {card.get('slug', 'unknown')}...")
+                    f"  [{i}/{len(cards_to_process)}] Processing {card.get('slug', 'unknown')}..."
+                )
                 updated_card = process_card_with_llm(
                     card=card.copy(),
                     prompt_template=prompt_template,
@@ -1152,11 +1131,13 @@ def process_file(
                     all_processed = processed_cards + updated_cards
                     save_cards_to_file(all_processed, output, output_format)
                     console.print(
-                        f"  [dim]Saved progress ({i}/{len(cards_to_process)})[/dim]")
+                        f"  [dim]Saved progress ({i}/{len(cards_to_process)})[/dim]"
+                    )
 
             except Exception as e:
-                logger.error("card_processing_error",
-                             error=str(e), slug=card.get("slug"))
+                logger.error(
+                    "card_processing_error", error=str(e), slug=card.get("slug")
+                )
                 error_count += 1
                 card["_error"] = str(e)
                 updated_cards.append(card)
@@ -1188,7 +1169,8 @@ def query_anki(
     action: Annotated[
         str,
         typer.Argument(
-            help="AnkiConnect API action name (e.g., 'deckNames', 'findNotes')"),
+            help="AnkiConnect API action name (e.g., 'deckNames', 'findNotes')"
+        ),
     ],
     params: Annotated[
         str | None,
@@ -1200,8 +1182,7 @@ def query_anki(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Query AnkiConnect API directly."""
@@ -1221,7 +1202,8 @@ def query_anki(
             console.print("  - cardsInfo: Get card information")
             console.print("  - getDeckStats: Get deck statistics")
             console.print(
-                "\nSee https://foosoft.net/projects/anki-connect/ for full documentation")
+                "\nSee https://foosoft.net/projects/anki-connect/ for full documentation"
+            )
             return
 
         # Parse params if provided
@@ -1233,14 +1215,13 @@ def query_anki(
                 params_dict = json.loads(params)
             except json.JSONDecodeError as e:
                 console.print(
-                    f"\n[bold red]Error:[/bold red] Invalid JSON parameters: {e}")
+                    f"\n[bold red]Error:[/bold red] Invalid JSON parameters: {e}"
+                )
                 raise typer.Exit(code=1)
 
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(
-            config, check_anki=True, check_llm=False)
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
 
         errors = [r for r in results if not r.passed and r.severity == "error"]
         if errors:
@@ -1257,8 +1238,7 @@ def query_anki(
         console.print("\n[bold green]Result:[/bold green]")
         console.print(json.dumps(result, indent=2, ensure_ascii=False))
 
-        logger.info("query_completed", action=action,
-                    has_result=result is not None)
+        logger.info("query_completed", action=action, has_result=result is not None)
 
     except Exception as e:
         logger.error("query_failed", error=str(e), action=action)
@@ -1278,8 +1258,7 @@ def generate_cards(
     ],
     count: Annotated[
         int,
-        typer.Option("--count", "-c",
-                     help="Number of card examples to generate"),
+        typer.Option("--count", "-c", help="Number of card examples to generate"),
     ] = 3,
     model: Annotated[
         str | None,
@@ -1295,18 +1274,19 @@ def generate_cards(
     ] = False,
     output: Annotated[
         Path | None,
-        typer.Option("--output", "-o",
-                     help="Export cards to file instead of importing"),
+        typer.Option(
+            "--output", "-o", help="Export cards to file instead of importing"
+        ),
     ] = None,
     copy_mode: Annotated[
         bool,
         typer.Option(
-            "--copy", help="Copy prompt to clipboard for manual LLM interaction"),
+            "--copy", help="Copy prompt to clipboard for manual LLM interaction"
+        ),
     ] = False,
     log: Annotated[
         Path | None,
-        typer.Option(
-            "--log", help="Generate log file with detailed debug information"),
+        typer.Option("--log", help="Generate log file with detailed debug information"),
     ] = None,
     very_verbose: Annotated[
         bool,
@@ -1321,8 +1301,7 @@ def generate_cards(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Generate multiple card examples for a term and interactively select which to keep."""
@@ -1338,8 +1317,7 @@ def generate_cards(
     )
 
     if not prompt.exists():
-        console.print(
-            f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
+        console.print(f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
         raise typer.Exit(code=1)
 
     # Parse prompt template
@@ -1348,15 +1326,15 @@ def generate_cards(
     try:
         template = parse_template_file(prompt)
     except Exception as e:
-        console.print(
-            f"\n[bold red]Error:[/bold red] Failed to parse template: {e}")
+        console.print(f"\n[bold red]Error:[/bold red] Failed to parse template: {e}")
         raise typer.Exit(code=1)
 
     # Determine model
     model_name = model or config.openrouter_model or "gpt-4o-mini"
     if not model_name:
         console.print(
-            "\n[bold red]Error:[/bold red] No model specified and no default configured")
+            "\n[bold red]Error:[/bold red] No model specified and no default configured"
+        )
         raise typer.Exit(code=1)
 
     logger.info(
@@ -1379,7 +1357,8 @@ def generate_cards(
             console.print("[green]Prompt copied![/green]")
             console.print("\n[yellow]Instructions:[/yellow]")
             console.print(
-                "1. Paste the prompt into your LLM interface (ChatGPT, Claude, etc.)")
+                "1. Paste the prompt into your LLM interface (ChatGPT, Claude, etc.)"
+            )
             console.print("2. Copy the complete JSON response")
             console.print("3. Paste it here and press Enter")
             console.print("4. Type 'END' on a new line to finish\n")
@@ -1387,7 +1366,8 @@ def generate_cards(
             # Wait for user input
             lines = []
             console.print(
-                "[cyan]Paste JSON response (type 'END' on new line to finish):[/cyan]")
+                "[cyan]Paste JSON response (type 'END' on new line to finish):[/cyan]"
+            )
             while True:
                 try:
                     line = input()
@@ -1401,10 +1381,10 @@ def generate_cards(
             response_text = "\n".join(lines)
         else:
             console.print(
-                "[yellow]Clipboard not available, displaying prompt:[/yellow]")
+                "[yellow]Clipboard not available, displaying prompt:[/yellow]"
+            )
             console.print(f"\n[dim]{prompt_text}[/dim]\n")
-            response_text = Prompt.ask(
-                "[cyan]Paste LLM response[/cyan]", default="")
+            response_text = Prompt.ask("[cyan]Paste LLM response[/cyan]", default="")
     else:
         # Normal mode: call LLM
         from .providers.factory import ProviderFactory
@@ -1416,7 +1396,8 @@ def generate_cards(
             llm_client = provider
 
         console.print(
-            f"\n[cyan]Generating {count} card candidates for '{term}'...[/cyan]")
+            f"\n[cyan]Generating {count} card candidates for '{term}'...[/cyan]"
+        )
 
         try:
             if hasattr(llm_client, "chat") and hasattr(llm_client.chat, "completions"):
@@ -1433,12 +1414,12 @@ def generate_cards(
             else:
                 # Generic interface
                 response_text = llm_client.generate(
-                    prompt_text, model=model_name, temperature=temperature)
+                    prompt_text, model=model_name, temperature=temperature
+                )
 
         except Exception as e:
             logger.error("card_generation_failed", error=str(e))
-            console.print(
-                f"\n[bold red]Error generating cards:[/bold red] {e}")
+            console.print(f"\n[bold red]Error generating cards:[/bold red] {e}")
             raise typer.Exit(code=1)
 
     # Parse JSON response
@@ -1449,10 +1430,8 @@ def generate_cards(
         if not isinstance(cards_data, list):
             cards_data = [cards_data]
     except json.JSONDecodeError as e:
-        console.print(
-            f"\n[bold red]Error:[/bold red] Invalid JSON response: {e}")
-        console.print(
-            f"[yellow]Response was:[/yellow]\n{response_text[:200]}...")
+        console.print(f"\n[bold red]Error:[/bold red] Invalid JSON response: {e}")
+        console.print(f"[yellow]Response was:[/yellow]\n{response_text[:200]}...")
         raise typer.Exit(code=1)
 
     # Convert to CardCandidate objects
@@ -1497,7 +1476,9 @@ def generate_cards(
                             if field_name in note_fields:
                                 if field_value[:50] in note_fields[field_name][:50]:
                                     candidate.is_duplicate = True
-                                    candidate.duplicate_reason = f"Similar to existing card in {template.deck}"
+                                    candidate.duplicate_reason = (
+                                        f"Similar to existing card in {template.deck}"
+                                    )
                                     break
         except Exception as e:
             logger.warning("duplicate_check_failed", error=str(e))
@@ -1519,8 +1500,8 @@ def generate_cards(
         # Quality check if configured
         if template.quality_check:
             console.print("\n[cyan]Running quality checks...[/cyan]")
-            from .utils.quality_check import run_quality_check
             from .providers.factory import ProviderFactory
+            from .utils.quality_check import run_quality_check
 
             quality_provider = ProviderFactory.create_from_config(config)
             if hasattr(quality_provider, "client"):
@@ -1544,12 +1525,13 @@ def generate_cards(
 
         # Import selected cards
         if template.deck:
-            from .anki.client import AnkiClient
-            from .anki.importer import import_cards_from_yaml
             import tempfile
 
             # Convert to YAML format for import
             import yaml
+
+            from .anki.client import AnkiClient
+            from .anki.importer import import_cards_from_yaml
 
             cards_for_import = []
             for candidate in selected_candidates:
@@ -1559,7 +1541,9 @@ def generate_cards(
                 }
                 cards_for_import.append(card_data)
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as f:
                 yaml.dump(cards_for_import, f)
                 temp_path = Path(f.name)
 
@@ -1572,7 +1556,8 @@ def generate_cards(
                     note_type=template.note_type,
                 )
                 console.print(
-                    f"\n[bold green]Successfully added {result['created']} card(s)![/bold green]")
+                    f"\n[bold green]Successfully added {result['created']} card(s)![/bold green]"
+                )
             finally:
                 temp_path.unlink()
 
@@ -1589,20 +1574,20 @@ def generate_cards(
             cards_for_export.append(card_data)
 
         with output.open("w", encoding="utf-8") as f:
-            yaml.dump(cards_for_export, f,
-                      default_flow_style=False, allow_unicode=True)
+            yaml.dump(cards_for_export, f, default_flow_style=False, allow_unicode=True)
 
         console.print(
-            f"\n[bold green]Exported {len(cards_for_export)} cards to {output}[/bold green]")
+            f"\n[bold green]Exported {len(cards_for_export)} cards to {output}[/bold green]"
+        )
     else:
         # Dry run: just display
-        console.print(
-            f"\n[cyan]Generated {len(candidates)} card candidates:[/cyan]\n")
+        console.print(f"\n[cyan]Generated {len(candidates)} card candidates:[/cyan]\n")
         for candidate in candidates:
             console.print(f"[bold]Card {candidate.index + 1}:[/bold]")
             for key, value in candidate.fields.items():
                 console.print(
-                    f"  {key}: {value[:100]}{'...' if len(value) > 100 else ''}")
+                    f"  {key}: {value[:100]}{'...' if len(value) > 100 else ''}"
+                )
             console.print()
 
     logger.info("generate_cards_completed", term=term, count=len(candidates))
@@ -1616,8 +1601,7 @@ def show_index(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Show vault and Anki card index statistics."""
@@ -1695,8 +1679,7 @@ def show_progress(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Show recent sync progress and incomplete sessions."""
@@ -1787,8 +1770,7 @@ def clean_progress(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Clean up sync progress records."""
@@ -1843,8 +1825,7 @@ def check_setup(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
     skip_anki: Annotated[
         bool,
@@ -1852,8 +1833,7 @@ def check_setup(
     ] = False,
     skip_llm: Annotated[
         bool,
-        typer.Option(
-            "--skip-llm", help="Skip LLM provider connectivity check"),
+        typer.Option("--skip-llm", help="Skip LLM provider connectivity check"),
     ] = False,
 ) -> None:
     """Run pre-flight checks to validate your setup."""
@@ -1889,8 +1869,9 @@ def check_setup(
     passed_checks = [r for r in results if r.passed]
 
     # Display summary table
-    summary_table = Table(title="Check Summary",
-                          show_header=True, header_style="bold magenta")
+    summary_table = Table(
+        title="Check Summary", show_header=True, header_style="bold magenta"
+    )
     summary_table.add_column("Status", style="cyan")
     summary_table.add_column("Count", style="green")
 
@@ -1903,20 +1884,21 @@ def check_setup(
 
     if errors:
         console.print("[bold red]❌ Setup validation failed![/bold red]")
-        console.print(
-            "[yellow]Fix the errors above before running sync.[/yellow]\n")
-        logger.error("check_setup_failed", errors=len(
-            errors), warnings=len(warnings))
+        console.print("[yellow]Fix the errors above before running sync.[/yellow]\n")
+        logger.error("check_setup_failed", errors=len(errors), warnings=len(warnings))
         raise typer.Exit(code=1)
     elif warnings:
         console.print(
-            "[bold yellow]⚠️  Setup validation passed with warnings.[/bold yellow]")
+            "[bold yellow]⚠️  Setup validation passed with warnings.[/bold yellow]"
+        )
         console.print(
-            "[dim]You may proceed, but some features may not work as expected.[/dim]\n")
+            "[dim]You may proceed, but some features may not work as expected.[/dim]\n"
+        )
         logger.info("check_setup_passed_with_warnings", warnings=len(warnings))
     else:
         console.print(
-            "[bold green]✅ All checks passed! Your setup is ready.[/bold green]\n")
+            "[bold green]✅ All checks passed! Your setup is ready.[/bold green]\n"
+        )
         logger.info("check_setup_passed")
 
 
@@ -1924,8 +1906,7 @@ def check_setup(
 def analyze_logs(
     days: Annotated[
         int,
-        typer.Option("--days", "-d",
-                     help="Number of days to analyze (default: 7)"),
+        typer.Option("--days", "-d", help="Number of days to analyze (default: 7)"),
     ] = 7,
     config_path: Annotated[
         Path | None,
@@ -1933,8 +1914,7 @@ def analyze_logs(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Analyze log files and show error summary."""
@@ -1945,8 +1925,7 @@ def analyze_logs(
     summary = analyzer.generate_summary_report(days=days)
     error_analysis = analyzer.analyze_errors(days=days)
 
-    console.print(
-        f"\n[bold cyan]Log Analysis Summary (Last {days} days)[/bold cyan]\n")
+    console.print(f"\n[bold cyan]Log Analysis Summary (Last {days} days)[/bold cyan]\n")
 
     # Overall statistics
     table = Table(title="Overall Statistics")
@@ -1968,14 +1947,14 @@ def analyze_logs(
         error_table.add_column("Category", style="cyan")
         error_table.add_column("Count", style="red")
 
-        error_table.add_row("Total Errors", str(
-            error_analysis["total_errors"]))
+        error_table.add_row("Total Errors", str(error_analysis["total_errors"]))
 
         if error_analysis["errors_by_type"]:
             error_table.add_row("", "")
             error_table.add_row("[bold]By Error Type[/bold]", "")
-            for error_type, count in list(
-                    error_analysis["errors_by_type"].items())[:10]:
+            for error_type, count in list(error_analysis["errors_by_type"].items())[
+                :10
+            ]:
                 error_table.add_row(f"  {error_type}", str(count))
 
         if error_analysis["errors_by_stage"]:
@@ -1987,8 +1966,7 @@ def analyze_logs(
         if error_analysis["errors_by_file"]:
             error_table.add_row("", "")
             error_table.add_row("[bold]Most Problematic Files[/bold]", "")
-            for file_path, count in list(
-                    error_analysis["errors_by_file"].items())[:5]:
+            for file_path, count in list(error_analysis["errors_by_file"].items())[:5]:
                 error_table.add_row(f"  {file_path}", str(count))
 
         console.print(error_table)
@@ -2014,8 +1992,7 @@ def analyze_logs(
 
             console.print(recent_table)
     else:
-        console.print(
-            "[green]No errors found in the specified period![/green]\n")
+        console.print("[green]No errors found in the specified period![/green]\n")
 
     logger.info("analyze_logs_completed")
 
@@ -2047,8 +2024,7 @@ def list_problematic_notes(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """List archived problematic notes."""
@@ -2069,11 +2045,11 @@ def list_problematic_notes(
 
     if not notes:
         console.print(
-            "[yellow]No problematic notes found matching the criteria.[/yellow]\n")
+            "[yellow]No problematic notes found matching the criteria.[/yellow]\n"
+        )
         return
 
-    console.print(
-        f"\n[bold cyan]Problematic Notes ({len(notes)} found)[/bold cyan]\n")
+    console.print(f"\n[bold cyan]Problematic Notes ({len(notes)} found)[/bold cyan]\n")
 
     table = Table()
     table.add_column("Original Path", style="cyan", max_width=50)
@@ -2105,8 +2081,7 @@ def list_problematic_notes(
 def format(
     check: Annotated[
         bool,
-        typer.Option(
-            "--check", help="Run formatters in check mode (no modifications)"),
+        typer.Option("--check", help="Run formatters in check mode (no modifications)"),
     ] = False,
     config_path: Annotated[
         Path | None,
@@ -2114,8 +2089,7 @@ def format(
     ] = None,
     log_level: Annotated[
         str,
-        typer.Option(
-            "--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
+        typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
 ) -> None:
     """Run code formatters (ruff + black)."""
@@ -2144,8 +2118,7 @@ def format(
         logger.info("format_completed", check=check)
     except subprocess.CalledProcessError as exc:
         logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
-        console.print(
-            f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
+        console.print(f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
         raise typer.Exit(code=1)
 
 

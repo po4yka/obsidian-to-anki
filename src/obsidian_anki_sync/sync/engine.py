@@ -124,12 +124,10 @@ class SyncEngine:
             # Use the same provider as the orchestrator
             # Resolve model from config (handles empty strings and presets)
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(
-                config, "qa_extractor_temperature", None)
+            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
             if qa_extractor_temp is None:
                 # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task(
-                    "qa_extraction")
+                model_config = config.get_model_config_for_task("qa_extraction")
                 qa_extractor_temp = model_config.get("temperature", 0.0)
             reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
@@ -229,8 +227,7 @@ class SyncEngine:
             and self.agent_orchestrator
         ):
             if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(
-                    self.progress_display)
+                self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def _close_caches(self) -> None:
         """Close disk caches to ensure data is flushed to disk."""
@@ -246,9 +243,14 @@ class SyncEngine:
         """Cleanup caches on destruction."""
         try:
             self._close_caches()
-        except Exception:
-            # Ignore errors during cleanup
-            pass
+        except OSError as e:
+            logger.warning("cache_close_failed_on_destruction", error=str(e))
+        except Exception as e:
+            logger.error(
+                "unexpected_cache_close_error_on_destruction",
+                error=str(e),
+                exc_info=True,
+            )
 
     def _parse_manifest_field(self, manifest_field: str) -> ManifestData | None:
         """Parse and validate manifest field from Anki card.
@@ -303,8 +305,7 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(
-            f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -637,12 +638,9 @@ class SyncEngine:
                         llm_provider_for_repair = self.agent_orchestrator.provider
 
                     # Get repair configuration
-                    repair_enabled = getattr(
-                        self.config, "parser_repair_enabled", True)
-                    repair_model = self.config.get_model_for_agent(
-                        "parser_repair")
-                    tolerant_parsing = getattr(
-                        self.config, "tolerant_parsing", True)
+                    repair_enabled = getattr(self.config, "parser_repair_enabled", True)
+                    repair_model = self.config.get_model_for_agent("parser_repair")
+                    tolerant_parsing = getattr(self.config, "tolerant_parsing", True)
                     enable_content_generation = getattr(
                         self.config, "enable_content_generation", True
                     )
@@ -670,13 +668,25 @@ class SyncEngine:
                     note_content = ""
                     if self.use_agents:
                         try:
-                            note_content = file_path.read_text(
-                                encoding="utf-8")
-                        except Exception as e:
+                            note_content = file_path.read_text(encoding="utf-8")
+                        except UnicodeDecodeError as e:
                             logger.warning(
-                                "failed_to_read_note_content",
+                                "failed_to_read_note_content_encoding_error",
                                 file=relative_path,
                                 error=str(e),
+                            )
+                        except OSError as e:
+                            logger.warning(
+                                "failed_to_read_note_content_io_error",
+                                file=relative_path,
+                                error=str(e),
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "failed_to_read_note_content_unexpected",
+                                file=relative_path,
+                                error=str(e),
+                                exc_info=True,
                             )
 
                 except (
@@ -823,8 +833,7 @@ class SyncEngine:
                                                 1,
                                             )
                                     except Exception as card_error:
-                                        error_type_name = type(
-                                            card_error).__name__
+                                        error_type_name = type(card_error).__name__
                                         error_message = str(card_error)
                                         error_by_type[error_type_name] += 1
                                         if len(error_samples[error_type_name]) < 3:
@@ -893,9 +902,17 @@ class SyncEngine:
                                         note_content = ""
                                         try:
                                             note_content = file_path.read_text(
-                                                encoding="utf-8")
-                                        except Exception:
-                                            pass
+                                                encoding="utf-8"
+                                            )
+                                        except (
+                                            UnicodeDecodeError,
+                                            OSError,
+                                        ) as read_err:
+                                            logger.debug(
+                                                "unable_to_read_note_for_archiving",
+                                                file=relative_path,
+                                                error=str(read_err),
+                                            )
 
                                         self.archiver.archive_note(
                                             note_path=file_path,
@@ -904,7 +921,9 @@ class SyncEngine:
                                             processing_stage="card_generation",
                                             card_index=qa_pair.card_index,
                                             language=lang,
-                                            note_content=note_content if note_content else None,
+                                            note_content=(
+                                                note_content if note_content else None
+                                            ),
                                             context={
                                                 "relative_path": relative_path,
                                             },
@@ -951,10 +970,13 @@ class SyncEngine:
                     try:
                         note_content = ""
                         try:
-                            note_content = file_path.read_text(
-                                encoding="utf-8")
-                        except Exception:
-                            pass
+                            note_content = file_path.read_text(encoding="utf-8")
+                        except (UnicodeDecodeError, OSError) as read_err:
+                            logger.debug(
+                                "unable_to_read_note_for_archiving",
+                                file=relative_path,
+                                error=str(read_err),
+                            )
 
                         self.archiver.archive_note(
                             note_path=file_path,
@@ -1121,11 +1143,24 @@ class SyncEngine:
             if self.use_agents:
                 try:
                     note_content = file_path.read_text(encoding="utf-8")
-                except Exception as e:
+                except UnicodeDecodeError as e:
                     logger.warning(
-                        "failed_to_read_note_content",
+                        "failed_to_read_note_content_encoding_error",
                         file=relative_path,
                         error=str(e),
+                    )
+                except OSError as e:
+                    logger.warning(
+                        "failed_to_read_note_content_io_error",
+                        file=relative_path,
+                        error=str(e),
+                    )
+                except Exception as e:
+                    logger.error(
+                        "failed_to_read_note_content_unexpected",
+                        file=relative_path,
+                        error=str(e),
+                        exc_info=True,
                     )
 
             # Generate cards for each Q/A pair and language
@@ -1178,8 +1213,14 @@ class SyncEngine:
                                 note_content=note_content if note_content else None,
                                 context={
                                     "relative_path": relative_path,
-                                    "metadata_id": metadata.id if "metadata" in locals() else None,
-                                    "qa_pairs_count": len(qa_pairs) if "qa_pairs" in locals() else None,
+                                    "metadata_id": (
+                                        metadata.id if "metadata" in locals() else None
+                                    ),
+                                    "qa_pairs_count": (
+                                        len(qa_pairs)
+                                        if "qa_pairs" in locals()
+                                        else None
+                                    ),
                                 },
                             )
                         except Exception as archive_error:
@@ -1212,8 +1253,12 @@ class SyncEngine:
                 note_content = ""
                 try:
                     note_content = file_path.read_text(encoding="utf-8")
-                except Exception:
-                    pass
+                except (UnicodeDecodeError, OSError) as read_err:
+                    logger.debug(
+                        "unable_to_read_note_for_archiving",
+                        file=relative_path,
+                        error=str(read_err),
+                    )
 
                 self.archiver.archive_note(
                     note_path=file_path,
@@ -1240,8 +1285,12 @@ class SyncEngine:
                 note_content = ""
                 try:
                     note_content = file_path.read_text(encoding="utf-8")
-                except Exception:
-                    pass
+                except (UnicodeDecodeError, OSError) as read_err:
+                    logger.debug(
+                        "unable_to_read_note_for_archiving",
+                        file=relative_path,
+                        error=str(read_err),
+                    )
 
                 self.archiver.archive_note(
                     note_path=file_path,
@@ -1287,8 +1336,7 @@ class SyncEngine:
         Returns:
             Dict of slug -> Card
         """
-        max_workers = min(
-            self.config.max_concurrent_generations, len(note_files))
+        max_workers = min(self.config.max_concurrent_generations, len(note_files))
         logger.info(
             "parallel_scan_started",
             total_notes=len(note_files),
@@ -1312,8 +1360,7 @@ class SyncEngine:
 
         # Use context manager for progress bar (parallel processing)
         with self._get_progress_bar(
-            len(
-                note_files), f"Processing notes (parallel, {max_workers} workers)"
+            len(note_files), f"Processing notes (parallel, {max_workers} workers)"
         ) as progress_context:
             if progress_context:
                 progress_bar, progress_task_id = progress_context
@@ -1394,8 +1441,7 @@ class SyncEngine:
                             percent=f"{(notes_processed / len(note_files) * 100):.1f}%",
                             elapsed_seconds=round(elapsed_time, 1),
                             avg_seconds_per_note=round(avg_time_per_note, 2),
-                            estimated_remaining_seconds=round(
-                                estimated_remaining, 1),
+                            estimated_remaining_seconds=round(estimated_remaining, 1),
                             cards_generated=len(obsidian_cards),
                             active_workers=max_workers,
                         )
@@ -1410,8 +1456,7 @@ class SyncEngine:
                         # Update status panel
                         if self.progress_display:
                             note_name = (
-                                Path(
-                                    relative_path).stem if relative_path else "unknown"
+                                Path(relative_path).stem if relative_path else "unknown"
                             )
                             self.progress_display.update_operation(
                                 f"Processing note {notes_processed}/{len(note_files)} (parallel)",
@@ -1525,8 +1570,7 @@ class SyncEngine:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(
-                            file_path) if file_path.exists() else None,
+                        file_path=Path(file_path) if file_path.exists() else None,
                     )
                 )
             else:
@@ -1538,8 +1582,7 @@ class SyncEngine:
                     file_path=Path(file_path) if file_path.exists() else None,
                 )
         else:
-            raise RuntimeError(
-                "Orchestrator does not have process_note method")
+            raise RuntimeError("Orchestrator does not have process_note method")
 
         # Track metrics from agent pipeline
         if result.post_validation:
@@ -1686,10 +1729,8 @@ class SyncEngine:
             slug_parts = []
             for part in path_parts:
                 normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode(
-                    "ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(
-                    r"[^a-z0-9-]", "-", ascii_segment.lower())
+                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
+                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
                 ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
                 if ascii_segment:
                     slug_parts.append(ascii_segment)
@@ -1698,8 +1739,7 @@ class SyncEngine:
             slug_base = base_without_suffix[:70]  # MAX_SLUG_LENGTH
 
             # Use thread-safe counter for collision resolution
-            slug = self._generate_thread_safe_slug(
-                slug_base, qa_pair.card_index, lang)
+            slug = self._generate_thread_safe_slug(slug_base, qa_pair.card_index, lang)
             hash6 = None
         else:
             # Sequential mode - use standard generate_slug
@@ -1725,8 +1765,7 @@ class SyncEngine:
         )
 
         # Generate APF card via LLM
-        card = cast(Card, self.apf_gen.generate_card(
-            qa_pair, metadata, manifest, lang))
+        card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
 
         # Ensure content hash is set
         if not card.content_hash:
@@ -1736,8 +1775,7 @@ class SyncEngine:
         validation = validate_apf(card.apf_html, slug)
         if validation.errors:
             self.stats["validation_errors"] += len(validation.errors)
-            logger.error("apf_validation_errors", slug=slug,
-                         errors=validation.errors)
+            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
             raise ValueError(
                 f"APF validation failed for {slug}: {validation.errors[0]}"
             )
@@ -1749,8 +1787,7 @@ class SyncEngine:
         html_errors = validate_card_html(card.apf_html)
         if html_errors:
             logger.error("apf_html_invalid", slug=slug, errors=html_errors)
-            raise ValueError(
-                f"Invalid HTML formatting for {slug}: {html_errors[0]}")
+            raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
 
         # Cache the generated card
         try:
@@ -1772,8 +1809,7 @@ class SyncEngine:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug,
-                    elapsed_seconds=round(elapsed, 2))
+        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
 
         return card
 
@@ -1789,15 +1825,24 @@ class SyncEngine:
 
         # Find all notes in target deck
         try:
-            note_ids = self.anki.find_notes(
-                f"deck:{self.config.anki_deck_name}")
-        except Exception as e:
+            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
+        except AnkiConnectError as e:
             elapsed = time.time() - start_time
             logger.error(
-                "anki_query_failed",
+                "anki_query_failed_connect_error",
                 deck=self.config.anki_deck_name,
                 error=str(e),
                 elapsed_seconds=round(elapsed, 2),
+            )
+            return {}
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(
+                "anki_query_failed_unexpected",
+                deck=self.config.anki_deck_name,
+                error=str(e),
+                elapsed_seconds=round(elapsed, 2),
+                exc_info=True,
             )
             return {}
 
@@ -1814,13 +1859,23 @@ class SyncEngine:
         logger.info("fetching_note_info", note_count=len(note_ids))
         try:
             notes_info = self.anki.notes_info(note_ids)
-        except Exception as e:
+        except AnkiConnectError as e:
             elapsed = time.time() - start_time
             logger.error(
-                "anki_notes_info_failed",
+                "anki_notes_info_failed_connect_error",
                 note_count=len(note_ids),
                 error=str(e),
                 elapsed_seconds=round(elapsed, 2),
+            )
+            return {}
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(
+                "anki_notes_info_failed_unexpected",
+                note_count=len(note_ids),
+                error=str(e),
+                elapsed_seconds=round(elapsed, 2),
+                exc_info=True,
             )
             return {}
 
@@ -1902,8 +1957,7 @@ class SyncEngine:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get(
-                            "anki_guid") if db_card else None,
+                        anki_guid=db_card.get("anki_guid") if db_card else None,
                         reason="No changes detected",
                     )
                 )
@@ -2053,12 +2107,33 @@ class SyncEngine:
                     if self.progress:
                         self.progress.increment_stat("skipped")
 
-            except Exception as e:
+            except CardOperationError as e:
                 logger.error(
-                    "action_failed",
+                    "action_failed_card_operation",
                     action=action.type,
                     slug=action.card.slug,
                     error=str(e),
+                )
+                self.stats["errors"] += 1
+                if self.progress:
+                    self.progress.increment_stat("errors")
+            except AnkiConnectError as e:
+                logger.error(
+                    "action_failed_anki_connect",
+                    action=action.type,
+                    slug=action.card.slug,
+                    error=str(e),
+                )
+                self.stats["errors"] += 1
+                if self.progress:
+                    self.progress.increment_stat("errors")
+            except Exception as e:
+                logger.error(
+                    "action_failed_unexpected",
+                    action=action.type,
+                    slug=action.card.slug,
+                    error=str(e),
+                    exc_info=True,
                 )
                 self.stats["errors"] += 1
                 if self.progress:
@@ -2139,8 +2214,7 @@ class SyncEngine:
 
                 # Verify card creation if enabled
                 if getattr(self.config, "verify_card_creation", True):
-                    self._verify_card_creation(
-                        card, note_id, fields, card.tags)
+                    self._verify_card_creation(card, note_id, fields, card.tags)
 
         except AnkiConnectError as e:
             logger.error("anki_create_failed", slug=card.slug, error=str(e))
@@ -2153,7 +2227,11 @@ class SyncEngine:
             raise CardOperationError(f"Failed to create card {card.slug}: {e}")
 
     def _verify_card_creation(
-        self, card: Card, note_id: int, expected_fields: dict[str, str], expected_tags: list[str]
+        self,
+        card: Card,
+        note_id: int,
+        expected_fields: dict[str, str],
+        expected_tags: list[str],
     ) -> None:
         """Verify that a card was successfully created in Anki.
 
@@ -2218,8 +2296,7 @@ class SyncEngine:
             actual_fields = note_info.get("fields", {})
             field_mismatches = []
             for field_name, expected_value in expected_fields.items():
-                actual_value = actual_fields.get(
-                    field_name, {}).get("value", "")
+                actual_value = actual_fields.get(field_name, {}).get("value", "")
                 # Normalize whitespace for comparison
                 expected_normalized = " ".join(expected_value.split())
                 actual_normalized = " ".join(actual_value.split())
@@ -2388,8 +2465,7 @@ class SyncEngine:
                     ):
                         if note_id is not None:
                             # Register rollback
-                            txn.rollback_actions.append(
-                                ("delete_anki_note", note_id))
+                            txn.rollback_actions.append(("delete_anki_note", note_id))
                             successful_cards.append(
                                 (card, note_id, fields, tags, apf_html)
                             )
@@ -2433,12 +2509,60 @@ class SyncEngine:
                     # Verify card creation if enabled
                     if getattr(self.config, "verify_card_creation", True):
                         for card, note_id, fields, tags, _ in successful_cards:
-                            self._verify_card_creation(
-                                card, note_id, fields, tags)
+                            self._verify_card_creation(card, note_id, fields, tags)
 
+            except AnkiConnectError as e:
+                logger.error(
+                    "batch_create_failed_anki_connect",
+                    error=str(e),
+                    batch_start=batch_start,
+                )
+                # Fall back to individual creates
+                for action in batch_actions:
+                    try:
+                        self._create_card(action.card)
+                        if action.type == "restore":
+                            self.stats["restored"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("restored")
+                        else:
+                            self.stats["created"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("created")
+                    except CardOperationError as card_error:
+                        logger.error(
+                            "individual_create_failed_after_batch_operation",
+                            slug=action.card.slug,
+                            error=str(card_error),
+                        )
+                        self.stats["errors"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("errors")
+                    except AnkiConnectError as card_error:
+                        logger.error(
+                            "individual_create_failed_after_batch_anki",
+                            slug=action.card.slug,
+                            error=str(card_error),
+                        )
+                        self.stats["errors"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("errors")
+                    except Exception as card_error:
+                        logger.error(
+                            "individual_create_failed_after_batch_unexpected",
+                            slug=action.card.slug,
+                            error=str(card_error),
+                            exc_info=True,
+                        )
+                        self.stats["errors"] += 1
+                        if self.progress:
+                            self.progress.increment_stat("errors")
             except Exception as e:
                 logger.error(
-                    "batch_create_failed", error=str(e), batch_start=batch_start
+                    "batch_create_failed_unexpected",
+                    error=str(e),
+                    batch_start=batch_start,
+                    exc_info=True,
                 )
                 # Fall back to individual creates
                 for action in batch_actions:
@@ -2454,7 +2578,7 @@ class SyncEngine:
                                 self.progress.increment_stat("created")
                     except Exception as card_error:
                         logger.error(
-                            "individual_create_failed_after_batch",
+                            "individual_create_failed_after_batch_fallback",
                             slug=action.card.slug,
                             error=str(card_error),
                         )
@@ -2489,8 +2613,7 @@ class SyncEngine:
                 card = action.card
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
-                field_updates.append(
-                    {"id": action.anki_guid, "fields": fields})
+                field_updates.append({"id": action.anki_guid, "fields": fields})
                 tag_updates.append((action.anki_guid, card.tags))
                 card_data.append((card, fields, card.tags))
 
@@ -2514,8 +2637,7 @@ class SyncEngine:
                         )
 
                     # Batch update fields
-                    field_results = self.anki.update_notes_fields(
-                        field_updates)
+                    field_results = self.anki.update_notes_fields(field_updates)
 
                     # Batch update tags
                     tag_results = self.anki.update_notes_tags(tag_updates)
@@ -2566,9 +2688,54 @@ class SyncEngine:
                         failed=len(batch_actions) - updated_count,
                     )
 
+            except AnkiConnectError as e:
+                logger.error(
+                    "batch_update_failed_anki_connect",
+                    error=str(e),
+                    batch_start=batch_start,
+                )
+                # Fall back to individual updates
+                for action in batch_actions:
+                    if action.anki_guid:
+                        try:
+                            self._update_card(action.card, action.anki_guid)
+                            self.stats["updated"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("updated")
+                        except CardOperationError as card_error:
+                            logger.error(
+                                "individual_update_failed_after_batch_operation",
+                                slug=action.card.slug,
+                                error=str(card_error),
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                        except AnkiConnectError as card_error:
+                            logger.error(
+                                "individual_update_failed_after_batch_anki",
+                                slug=action.card.slug,
+                                error=str(card_error),
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                        except Exception as card_error:
+                            logger.error(
+                                "individual_update_failed_after_batch_unexpected",
+                                slug=action.card.slug,
+                                error=str(card_error),
+                                exc_info=True,
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
             except Exception as e:
                 logger.error(
-                    "batch_update_failed", error=str(e), batch_start=batch_start
+                    "batch_update_failed_unexpected",
+                    error=str(e),
+                    batch_start=batch_start,
+                    exc_info=True,
                 )
                 # Fall back to individual updates
                 for action in batch_actions:
@@ -2580,7 +2747,7 @@ class SyncEngine:
                                 self.progress.increment_stat("updated")
                         except Exception as card_error:
                             logger.error(
-                                "individual_update_failed_after_batch",
+                                "individual_update_failed_after_batch_fallback",
                                 slug=action.card.slug,
                                 error=str(card_error),
                             )
@@ -2607,10 +2774,9 @@ class SyncEngine:
         if anki_guids_to_delete:
             try:
                 self.anki.delete_notes(anki_guids_to_delete)
-                logger.info("batch_delete_anki",
-                            count=len(anki_guids_to_delete))
-            except Exception as e:
-                logger.error("batch_delete_anki_failed", error=str(e))
+                logger.info("batch_delete_anki", count=len(anki_guids_to_delete))
+            except AnkiConnectError as e:
+                logger.error("batch_delete_anki_failed_connect_error", error=str(e))
                 # Fall back to individual deletes
                 for action in actions:
                     if action.anki_guid:
@@ -2619,7 +2785,44 @@ class SyncEngine:
                             self.stats["deleted"] += 1
                             if self.progress:
                                 self.progress.increment_stat("deleted")
-                        except Exception:
+                        except AnkiConnectError as del_error:
+                            logger.error(
+                                "individual_delete_failed_after_batch_anki",
+                                slug=action.card.slug,
+                                error=str(del_error),
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                        except Exception as del_error:
+                            logger.error(
+                                "individual_delete_failed_after_batch_unexpected",
+                                slug=action.card.slug,
+                                error=str(del_error),
+                                exc_info=True,
+                            )
+                            self.stats["errors"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("errors")
+                return
+            except Exception as e:
+                logger.error(
+                    "batch_delete_anki_failed_unexpected", error=str(e), exc_info=True
+                )
+                # Fall back to individual deletes
+                for action in actions:
+                    if action.anki_guid:
+                        try:
+                            self._delete_card(action.card, action.anki_guid)
+                            self.stats["deleted"] += 1
+                            if self.progress:
+                                self.progress.increment_stat("deleted")
+                        except Exception as del_error:
+                            logger.error(
+                                "individual_delete_failed_after_batch_fallback",
+                                slug=action.card.slug,
+                                error=str(del_error),
+                            )
                             self.stats["errors"] += 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
@@ -2636,10 +2839,14 @@ class SyncEngine:
                         self.progress.increment_stat("deleted")
                 logger.info("batch_delete_db", count=deleted_count)
             except Exception as e:
-                logger.error("batch_delete_db_failed", error=str(e))
+                logger.error("batch_delete_db_failed", error=str(e), exc_info=True)
                 # Fall back to individual deletes
                 for slug in slugs_to_delete:
                     try:
                         self.db.delete_card(slug)
-                    except Exception:
-                        pass
+                    except Exception as db_error:
+                        logger.warning(
+                            "individual_db_delete_failed_after_batch",
+                            slug=slug,
+                            error=str(db_error),
+                        )

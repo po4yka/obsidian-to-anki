@@ -1,6 +1,7 @@
 """AnkiConnect HTTP API client."""
 
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -198,9 +199,7 @@ class AnkiClient:
 
         logger.info("note_updated", note_id=note_id)
 
-    def update_notes_fields(
-        self, updates: list[dict[str, Any]]
-    ) -> list[bool]:
+    def update_notes_fields(self, updates: list[dict[str, Any]]) -> list[bool]:
         """
         Update multiple notes' fields in a single batch operation using multi action.
 
@@ -445,17 +444,23 @@ class AnkiClient:
 
     def close(self) -> None:
         """Close HTTP session and cleanup resources."""
-        if hasattr(self, 'session') and self.session:
+        if hasattr(self, "session") and self.session:
             try:
                 self.session.close()
-            except Exception:
-                pass
+                logger.debug("anki_client_closed", url=self.url)
+            except Exception as e:
+                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
         """Context manager exit with cleanup."""
         self.close()
         return False

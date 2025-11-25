@@ -25,8 +25,10 @@ class CardCandidate:
         """Get a short summary for display."""
         # Get first few fields for preview
         preview_fields = list(self.fields.items())[:2]
-        preview = ", ".join(f"{k}: {v[:30]}..." if len(
-            v) > 30 else f"{k}: {v}" for k, v in preview_fields)
+        preview = ", ".join(
+            f"{k}: {v[:30]}..." if len(v) > 30 else f"{k}: {v}"
+            for k, v in preview_fields
+        )
         return preview
 
 
@@ -73,8 +75,7 @@ def select_cards_interactive(
                 status_parts.append("[yellow]Low Quality[/yellow]")
             else:
                 status_parts.append("[green]Good[/green]")
-        status = " | ".join(
-            status_parts) if status_parts else "[green]Ready[/green]"
+        status = " | ".join(status_parts) if status_parts else "[green]Ready[/green]"
 
         table.add_row(select_text, card_preview, status)
 
@@ -86,15 +87,17 @@ def select_cards_interactive(
     while True:
         console.print("[cyan]Commands:[/cyan]")
         console.print(
-            "  [bold]number[/bold] - Toggle selection of card (e.g., '1', '2')")
+            "  [bold]number[/bold] - Toggle selection of card (e.g., '1', '2')"
+        )
         console.print("  [bold]all[/bold] - Select all cards")
         console.print("  [bold]none[/bold] - Deselect all cards")
         console.print("  [bold]info N[/bold] - Show details for card N")
         console.print("  [bold]done[/bold] - Confirm selection and proceed")
         console.print("  [bold]cancel[/bold] - Cancel without selecting")
 
-        choice = Prompt.ask("\n[bold]Your choice[/bold]",
-                            default="done").strip().lower()
+        choice = (
+            Prompt.ask("\n[bold]Your choice[/bold]", default="done").strip().lower()
+        )
 
         if choice == "done":
             break
@@ -102,8 +105,7 @@ def select_cards_interactive(
             return []
         elif choice == "all":
             selected_indices = set(range(len(candidates)))
-            console.print(
-                f"[green]Selected all {len(candidates)} cards[/green]")
+            console.print(f"[green]Selected all {len(candidates)} cards[/green]")
         elif choice == "none":
             selected_indices = set()
             console.print("[yellow]Deselected all cards[/yellow]")
@@ -113,11 +115,11 @@ def select_cards_interactive(
                 if 1 <= card_num <= len(candidates):
                     _show_card_details(candidates[card_num - 1])
                 else:
-                    console.print(
-                        f"[red]Invalid card number: {card_num}[/red]")
+                    console.print(f"[red]Invalid card number: {card_num}[/red]")
             except (ValueError, IndexError):
                 console.print(
-                    "[red]Invalid format. Use 'info N' where N is card number[/red]")
+                    "[red]Invalid format. Use 'info N' where N is card number[/red]"
+                )
         elif choice.isdigit():
             card_index = int(choice) - 1  # Convert to 0-based
             if 0 <= card_index < len(candidates):
@@ -134,8 +136,7 @@ def select_cards_interactive(
 
         # Redraw table with updated selections
         console.clear()
-        table = Table(title=title, show_header=True,
-                      header_style="bold magenta")
+        table = Table(title=title, show_header=True, header_style="bold magenta")
         table.add_column("Select", style="cyan", width=8)
         table.add_column("Card", style="white", width=50)
         table.add_column("Status", style="yellow", width=20)
@@ -153,8 +154,9 @@ def select_cards_interactive(
                     status_parts.append("[yellow]Low Quality[/yellow]")
                 else:
                     status_parts.append("[green]Good[/green]")
-            status = " | ".join(
-                status_parts) if status_parts else "[green]Ready[/green]"
+            status = (
+                " | ".join(status_parts) if status_parts else "[green]Ready[/green]"
+            )
 
             table.add_row(select_text, card_preview, status)
 
@@ -177,13 +179,17 @@ def _show_card_details(candidate: CardCandidate) -> None:
 
     # Show duplicate info
     if candidate.is_duplicate:
-        panel_content += f"\n[bold red]Duplicate:[/bold red] {candidate.duplicate_reason}\n"
+        panel_content += (
+            f"\n[bold red]Duplicate:[/bold red] {candidate.duplicate_reason}\n"
+        )
 
     # Show quality info
     if candidate.quality_score is not None:
         panel_content += f"\n[bold yellow]Quality Score:[/bold yellow] {candidate.quality_score:.2f}\n"
         if candidate.quality_reason:
-            panel_content += f"[bold yellow]Reason:[/bold yellow] {candidate.quality_reason}\n"
+            panel_content += (
+                f"[bold yellow]Reason:[/bold yellow] {candidate.quality_reason}\n"
+            )
 
     panel = Panel(panel_content, title="Card Details", border_style="blue")
     console.print(panel)

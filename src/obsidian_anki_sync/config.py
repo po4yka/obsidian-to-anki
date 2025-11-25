@@ -30,10 +30,10 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(
-        default="", description="Path to Obsidian vault")
-    source_dir: Path = Field(default=Path(
-        "."), description="Source directory within vault")
+    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    source_dir: Path = Field(
+        default=Path("."), description="Source directory within vault"
+    )
 
     @field_validator("vault_path", mode="before")
     @classmethod
@@ -75,14 +75,10 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(
-        default="APF::Simple", description="Anki note type"
-    )
+    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
 
     # Runtime settings
-    run_mode: str = Field(
-        default="apply", description="Run mode: 'apply' or 'dry-run'"
-    )
+    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -200,8 +196,7 @@ class Config(BaseSettings):
     # Configurable retry counts per error type (dict mapping error_type to max_retries)
     # Example: {"syntax": 5, "html": 4, "semantic": 2}
     post_validation_retry_config: dict[str, int] = Field(
-        default_factory=dict,
-        description="Custom retry counts per error type"
+        default_factory=dict, description="Custom retry counts per error type"
     )
 
     # ============================================================================
@@ -211,7 +206,7 @@ class Config(BaseSettings):
     # Example: {"yaml_frontmatter": {"failure_threshold": 5, "timeout": 60}, "default": {"failure_threshold": 5, "timeout": 60}}
     circuit_breaker_config: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
-        description="Circuit breaker configuration per agent domain"
+        description="Circuit breaker configuration per agent domain",
     )
 
     # Retry configuration for specialized agents
@@ -222,45 +217,42 @@ class Config(BaseSettings):
             "backoff_factor": 2.0,
             "jitter": True,
         },
-        description="Retry configuration for specialized agents"
+        description="Retry configuration for specialized agents",
     )
 
     # Confidence threshold for agent results
     confidence_threshold: float = Field(
         default=0.7,
-        description="Minimum confidence threshold for accepting agent repairs"
+        description="Minimum confidence threshold for accepting agent repairs",
     )
 
     # Rate limiting configuration per agent domain (calls per minute)
     # Example: {"yaml_frontmatter": 10, "content_corruption": 5, "default": 20}
     rate_limit_config: dict[str, int] = Field(
-        default_factory=dict,
-        description="Rate limiting configuration per agent domain"
+        default_factory=dict, description="Rate limiting configuration per agent domain"
     )
 
     # Bulkhead configuration per agent domain (max concurrent calls)
     # Example: {"yaml_frontmatter": 2, "content_corruption": 1, "default": 3}
     bulkhead_config: dict[str, int] = Field(
-        default_factory=dict,
-        description="Bulkhead configuration per agent domain"
+        default_factory=dict, description="Bulkhead configuration per agent domain"
     )
 
     # Metrics storage configuration
     metrics_storage: str = Field(
-        default="memory",
-        description="Metrics storage backend: 'memory' or 'database'"
+        default="memory", description="Metrics storage backend: 'memory' or 'database'"
     )
 
     # Enable adaptive routing
     enable_adaptive_routing: bool = Field(
         default=True,
-        description="Enable adaptive routing based on historical performance"
+        description="Enable adaptive routing based on historical performance",
     )
 
     # Enable learning system
     enable_learning: bool = Field(
         default=True,
-        description="Enable failure pattern learning and routing optimization"
+        description="Enable failure pattern learning and routing optimization",
     )
 
     # ============================================================================
@@ -268,50 +260,43 @@ class Config(BaseSettings):
     # ============================================================================
     # Enable agentic memory system
     enable_agent_memory: bool = Field(
-        default=True,
-        description="Enable persistent agentic memory for learning"
+        default=True, description="Enable persistent agentic memory for learning"
     )
 
     # Memory storage path
     memory_storage_path: Path = Field(
-        default=Path(".agent_memory"),
-        description="Path to store agent memory data"
+        default=Path(".agent_memory"), description="Path to store agent memory data"
     )
 
     # Memory backend
     memory_backend: str = Field(
-        default="chromadb",
-        description="Memory backend: 'chromadb' or 'sqlite'"
+        default="chromadb", description="Memory backend: 'chromadb' or 'sqlite'"
     )
 
     # Enable semantic search
     enable_semantic_search: bool = Field(
-        default=True,
-        description="Enable semantic search using embeddings"
+        default=True, description="Enable semantic search using embeddings"
     )
 
     # Embedding model
     embedding_model: str = Field(
         default="text-embedding-3-small",
-        description="Embedding model for semantic search"
+        description="Embedding model for semantic search",
     )
 
     # Memory retention
     memory_retention_days: int = Field(
-        default=90,
-        description="Number of days to retain memories"
+        default=90, description="Number of days to retain memories"
     )
 
     # Maximum memories per type
     max_memories_per_type: int = Field(
-        default=10000,
-        description="Maximum number of memories per type"
+        default=10000, description="Maximum number of memories per type"
     )
 
     # LLM Performance Monitoring
     llm_slow_request_threshold: float = Field(
-        default=60.0,
-        description="Threshold in seconds for logging slow LLM requests"
+        default=60.0, description="Threshold in seconds for logging slow LLM requests"
     )
 
     # LangGraph + PydanticAI Agent System (new!)
@@ -425,9 +410,11 @@ class Config(BaseSettings):
 
         # Check for explicit override first
         agent_model_map = {
-            "pre_validator": self.pydantic_ai_pre_validator_model or self.pre_validator_model,
+            "pre_validator": self.pydantic_ai_pre_validator_model
+            or self.pre_validator_model,
             "generator": self.pydantic_ai_generator_model or self.generator_model,
-            "post_validator": self.pydantic_ai_post_validator_model or self.post_validator_model,
+            "post_validator": self.pydantic_ai_post_validator_model
+            or self.post_validator_model,
             "context_enrichment": self.context_enrichment_model,
             "memorization_quality": self.memorization_quality_model,
             "card_splitting": self.card_splitting_model,
@@ -515,8 +502,7 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(
-            model_task, preset, overrides if overrides else None)
+        config = get_model_config(model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -550,8 +536,7 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(
-            self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -560,25 +545,25 @@ class Config(BaseSettings):
             except OSError as e:
                 raise ConfigurationError(
                     f"Cannot create database directory: {parent_dir}",
-                    suggestion=f"Ensure you have write permissions to {parent_dir.parent}. Error: {e}"
+                    suggestion=f"Ensure you have write permissions to {parent_dir.parent}. Error: {e}",
                 )
 
         if not os.access(parent_dir, os.W_OK):
             raise ConfigurationError(
                 f"Database directory is not writable: {parent_dir}",
-                suggestion=f"Check directory permissions: chmod 755 {parent_dir}"
+                suggestion=f"Check directory permissions: chmod 755 {parent_dir}",
             )
 
         if validated_db.exists():
             if not os.access(validated_db, os.R_OK):
                 raise ConfigurationError(
                     f"Database file exists but is not readable: {validated_db}",
-                    suggestion=f"Check file permissions: chmod 644 {validated_db}"
+                    suggestion=f"Check file permissions: chmod 644 {validated_db}",
                 )
             if not os.access(validated_db, os.W_OK):
                 raise ConfigurationError(
                     f"Database file exists but is not writable: {validated_db}",
-                    suggestion=f"Check file permissions: chmod 644 {validated_db}"
+                    suggestion=f"Check file permissions: chmod 644 {validated_db}",
                 )
 
         valid_providers = [
@@ -668,8 +653,7 @@ def load_config(config_path: Path | None = None) -> Config:
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(
-            __file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
 
     resolved_config_path: Path | None = None
@@ -688,8 +672,9 @@ def load_config(config_path: Path | None = None) -> Config:
             from ..utils.logging import get_logger
 
             logger = get_logger(__name__)
-            logger.warning("yaml_config_load_failed", path=str(
-                resolved_config_path), error=str(e))
+            logger.warning(
+                "yaml_config_load_failed", path=str(resolved_config_path), error=str(e)
+            )
 
     # Convert YAML data to environment variable format for pydantic-settings
     # pydantic-settings will automatically load from .env file via model_config
@@ -751,8 +736,9 @@ def load_config(config_path: Path | None = None) -> Config:
         if export_output_path is not None:
             config_kwargs["export_output_path"] = export_output_path
         if "vault_path" in yaml_data:
-            config_kwargs["vault_path"] = Path(
-                str(yaml_data["vault_path"])).expanduser().resolve()
+            config_kwargs["vault_path"] = (
+                Path(str(yaml_data["vault_path"])).expanduser().resolve()
+            )
         if "source_dir" in yaml_data:
             config_kwargs["source_dir"] = Path(str(yaml_data["source_dir"]))
         if "db_path" in yaml_data:

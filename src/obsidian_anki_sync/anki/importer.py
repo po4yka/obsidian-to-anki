@@ -101,14 +101,14 @@ def import_cards_from_csv(
 
                 # Parse tags if they're space-separated
                 if "tags" in card_data and isinstance(card_data["tags"], str):
-                    card_data["tags"] = card_data["tags"].split(
-                    ) if card_data["tags"] else []
+                    card_data["tags"] = (
+                        card_data["tags"].split() if card_data["tags"] else []
+                    )
 
                 # Parse manifest if it's a JSON string
                 if "manifest" in card_data and isinstance(card_data["manifest"], str):
                     try:
-                        card_data["manifest"] = json.loads(
-                            card_data["manifest"])
+                        card_data["manifest"] = json.loads(card_data["manifest"])
                     except json.JSONDecodeError:
                         card_data["manifest"] = {}
 
@@ -204,8 +204,7 @@ def _import_cards(
     for card_data in cards_data:
         try:
             # Extract fields (exclude metadata fields)
-            metadata_fields = {"noteId", "slug",
-                               "noteType", "tags", "manifest"}
+            metadata_fields = {"noteId", "slug", "noteType", "tags", "manifest"}
             fields = {
                 k: v for k, v in card_data.items() if k not in metadata_fields and v
             }
@@ -238,8 +237,9 @@ def _import_cards(
                 if tags:
                     client.add_tags([note_id], " ".join(tags))
                 updated += 1
-                logger.debug("note_updated", note_id=note_id,
-                             slug=card_data.get("slug"))
+                logger.debug(
+                    "note_updated", note_id=note_id, slug=card_data.get("slug")
+                )
             else:
                 # Create new note
                 new_note_id = client.add_note(
@@ -251,8 +251,9 @@ def _import_cards(
                     guid=card_data.get("noteId"),
                 )
                 created += 1
-                logger.debug("note_created", note_id=new_note_id,
-                             slug=card_data.get("slug"))
+                logger.debug(
+                    "note_created", note_id=new_note_id, slug=card_data.get("slug")
+                )
 
         except (AnkiError, KeyError, ValueError) as e:
             errors += 1

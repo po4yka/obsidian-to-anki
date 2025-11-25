@@ -256,8 +256,7 @@ Output:
 
         # Advanced AI validation using LLM
         try:
-            prompt = self._build_validation_prompt(
-                note_content, metadata, qa_pairs)
+            prompt = self._build_validation_prompt(note_content, metadata, qa_pairs)
 
             system_prompt = """<role>
 You are a structural validation agent for Obsidian educational notes. Your expertise is in identifying formatting errors, missing required fields, and content completeness issues before expensive card generation.

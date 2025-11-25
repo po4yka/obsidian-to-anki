@@ -494,4 +494,3 @@ def list_available_models() -> list[str]:
         List of model names
     """
     return list(MODEL_CAPABILITIES.keys())
-

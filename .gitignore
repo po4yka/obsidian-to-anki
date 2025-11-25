@@ -52,6 +52,7 @@ logs/
 .logs/
 config.yaml
 settings.local.json
+.claude/settings.local.json
 
 # macOS
 .DS_Store

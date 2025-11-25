@@ -115,4 +115,3 @@ class TestLogAnalyzer:
         assert "INFO" in summary["levels"]
         assert "WARNING" in summary["levels"]
         assert summary["errors"]["total_errors"] >= 1
-

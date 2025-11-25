@@ -114,8 +114,7 @@ def configure_logging(
     if project_log_dir is None:
         project_log_dir = Path("./logs")
     project_log_dir.mkdir(exist_ok=True, parents=True)
-    project_log_path = project_log_dir / \
-        "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
+    project_log_path = project_log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
 
     logger.add(
         project_log_path,
@@ -147,21 +146,23 @@ def configure_logging(
         backtrace=True,
         diagnose=True,
         enqueue=True,
-        filter=lambda record: error_filter(
-            record) and _add_formatted_extra(record),
+        filter=lambda record: error_filter(record) and _add_formatted_extra(record),
     )
 
     if very_verbose:
         # Add a separate handler for very verbose LLM logging
-        verbose_log_path = log_path.parent / \
-            f"{log_path.stem}_verbose{log_path.suffix}" if log_file else log_dir / \
-            "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
+        verbose_log_path = (
+            log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
+            if log_file
+            else log_dir / "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
+        )
         logger.add(
             verbose_log_path,
             format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}\n{exception}",
             level="DEBUG",
-            filter=lambda record: "llm" in record["name"].lower(
-            ) or "prompt" in record["message"].lower() or "response" in record["message"].lower(),
+            filter=lambda record: "llm" in record["name"].lower()
+            or "prompt" in record["message"].lower()
+            or "response" in record["message"].lower(),
             rotation="00:00" if not log_file else None,
             retention="7 days",  # Keep verbose logs for shorter time
             compression="zip",

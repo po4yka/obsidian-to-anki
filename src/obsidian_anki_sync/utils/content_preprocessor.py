@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 @dataclass
 class ContentValidationResult:
     """Result of content validation with warnings and suggestions."""
+
     is_valid: bool
     warnings: List[str]
     suggestions: List[str]
@@ -25,6 +26,7 @@ class ContentValidationResult:
 @dataclass
 class PreprocessingConfig:
     """Configuration for content preprocessing."""
+
     sanitize_code_fences: bool = True
     add_missing_languages: bool = True
     normalize_whitespace: bool = True
@@ -54,22 +56,24 @@ class ContentPreprocessor:
         # Apply preprocessing steps
         if self.config.normalize_whitespace:
             processed_content, ws_warnings = self._normalize_whitespace(
-                processed_content)
+                processed_content
+            )
             warnings.extend(ws_warnings)
 
         if self.config.sanitize_code_fences:
             processed_content, fence_warnings = self._sanitize_code_fences(
-                processed_content)
+                processed_content
+            )
             warnings.extend(fence_warnings)
 
         if self.config.add_missing_languages:
             processed_content, lang_warnings = self._add_missing_language_hints(
-                processed_content)
+                processed_content
+            )
             warnings.extend(lang_warnings)
 
         if self.config.fix_malformed_frontmatter:
-            processed_content, fm_warnings = self._fix_frontmatter(
-                processed_content)
+            processed_content, fm_warnings = self._fix_frontmatter(processed_content)
             warnings.extend(fm_warnings)
 
         return processed_content, warnings
@@ -93,8 +97,7 @@ class ContentPreprocessor:
         warnings.extend(self._check_content_structure(content))
 
         # Generate suggestions
-        suggestions.extend(
-            self._generate_improvement_suggestions(content, warnings))
+        suggestions.extend(self._generate_improvement_suggestions(content, warnings))
 
         # Determine if content is valid (warnings are acceptable)
         is_valid = len([w for w in warnings if "critical" in w.lower()]) == 0
@@ -103,7 +106,7 @@ class ContentPreprocessor:
             is_valid=is_valid,
             warnings=warnings,
             suggestions=suggestions,
-            sanitized_content=None  # Will be set if preprocessing is applied
+            sanitized_content=None,  # Will be set if preprocessing is applied
         )
 
     def _normalize_whitespace(self, content: str) -> Tuple[str, List[str]]:
@@ -118,7 +121,7 @@ class ContentPreprocessor:
                 warnings.append(f"Line {i+1}: Trailing whitespace detected")
 
             # Check for mixed tabs and spaces (common issue)
-            if '\t' in line and ' ' in line[:4]:  # Mixed indentation
+            if "\t" in line and " " in line[:4]:  # Mixed indentation
                 warnings.append(f"Line {i+1}: Mixed tabs and spaces detected")
 
             # Normalize line endings
@@ -136,7 +139,7 @@ class ContentPreprocessor:
                 blank_count = 0
                 result_lines.append(line)
 
-        return '\n'.join(result_lines), warnings
+        return "\n".join(result_lines), warnings
 
     def _sanitize_code_fences(self, content: str) -> Tuple[str, List[str]]:
         """Sanitize code fences to prevent parsing issues."""
@@ -162,7 +165,8 @@ class ContentPreprocessor:
                 else:
                     # Too many unbalanced fences, skip this one
                     warnings.append(
-                        f"Line {i+1}: Excessive unbalanced code fence ignored")
+                        f"Line {i+1}: Excessive unbalanced code fence ignored"
+                    )
             else:
                 sanitized_lines.append(line)
 
@@ -173,7 +177,7 @@ class ContentPreprocessor:
             sanitized_lines.append("```")
             warnings.append("Added missing code fence closure")
 
-        return '\n'.join(sanitized_lines), warnings
+        return "\n".join(sanitized_lines), warnings
 
     def _add_missing_language_hints(self, content: str) -> Tuple[str, List[str]]:
         """Add language hints to code blocks that lack them."""
@@ -190,7 +194,8 @@ class ContentPreprocessor:
                 if detected_lang:
                     new_fence = f"```{detected_lang}"
                     warnings.append(
-                        f"Added language hint '{detected_lang}' to code block")
+                        f"Added language hint '{detected_lang}' to code block"
+                    )
                     return f"{new_fence}\n{content}\n```"
                 else:
                     warnings.append("Could not detect language for code block")
@@ -198,9 +203,8 @@ class ContentPreprocessor:
             return match.group(0)  # No change needed
 
         # Match code blocks: ```language\ncontent\n```
-        pattern = r'(```[^\n]*)\n(.*?)\n```'
-        modified_content = re.sub(
-            pattern, replace_code_block, content, flags=re.DOTALL)
+        pattern = r"(```[^\n]*)\n(.*?)\n```"
+        modified_content = re.sub(pattern, replace_code_block, content, flags=re.DOTALL)
 
         return modified_content, warnings
 
@@ -209,7 +213,7 @@ class ContentPreprocessor:
         warnings = []
 
         # Check for frontmatter markers
-        if not content.startswith('---'):
+        if not content.startswith("---"):
             warnings.append("Missing frontmatter opening marker")
             return content, warnings
 
@@ -220,7 +224,7 @@ class ContentPreprocessor:
         # Find closing marker
         closing_idx = -1
         for i, line in enumerate(lines[1:], 1):
-            if line.strip() == '---':
+            if line.strip() == "---":
                 closing_idx = i
                 break
 
@@ -228,12 +232,12 @@ class ContentPreprocessor:
             warnings.append("Missing frontmatter closing marker")
             # Try to add one before first heading
             for i, line in enumerate(lines):
-                if line.startswith('#') and i > 0:
-                    lines.insert(i, '---')
+                if line.startswith("#") and i > 0:
+                    lines.insert(i, "---")
                     warnings.append("Added missing frontmatter closing marker")
                     break
 
-        return '\n'.join(lines), warnings
+        return "\n".join(lines), warnings
 
     def _check_code_fence_balance(self, content: str) -> List[str]:
         """Check for code fence balance issues."""
@@ -246,8 +250,7 @@ class ContentPreprocessor:
                 fence_count += 1
 
         if fence_count % 2 != 0:
-            warnings.append(
-                f"Unbalanced code fences detected ({fence_count} total)")
+            warnings.append(f"Unbalanced code fences detected ({fence_count} total)")
 
         return warnings
 
@@ -255,7 +258,7 @@ class ContentPreprocessor:
         """Check frontmatter structure."""
         warnings = []
 
-        if not content.startswith('---'):
+        if not content.startswith("---"):
             warnings.append("Missing frontmatter opening marker")
             return warnings
 
@@ -264,7 +267,7 @@ class ContentPreprocessor:
             return warnings
 
         # Check for closing marker
-        has_closing = any(line.strip() == '---' for line in lines[1:])
+        has_closing = any(line.strip() == "---" for line in lines[1:])
         if not has_closing:
             warnings.append("Missing frontmatter closing marker")
 
@@ -281,18 +284,20 @@ class ContentPreprocessor:
         languages = []
         in_frontmatter = False
         for line in lines:
-            if line.strip() == '---':
+            if line.strip() == "---":
                 in_frontmatter = not in_frontmatter
                 continue
-            if in_frontmatter and line.startswith('language_tags:'):
+            if in_frontmatter and line.startswith("language_tags:"):
                 # Extract languages from YAML list
-                lang_match = re.search(r'language_tags:\s*\[(.*?)\]', line)
+                lang_match = re.search(r"language_tags:\s*\[(.*?)\]", line)
                 if lang_match:
-                    languages = [lang.strip().strip('"\'')
-                                 for lang in lang_match.group(1).split(',')]
+                    languages = [
+                        lang.strip().strip("\"'")
+                        for lang in lang_match.group(1).split(",")
+                    ]
 
         # Check for required sections
-        content_str = '\n'.join(lines)
+        content_str = "\n".join(lines)
         for lang in languages:
             question_marker = f"# Question ({lang.upper()})"
             answer_marker = f"## Answer ({lang.upper()})"
@@ -304,25 +309,29 @@ class ContentPreprocessor:
 
         return warnings
 
-    def _generate_improvement_suggestions(self, content: str, warnings: List[str]) -> List[str]:
+    def _generate_improvement_suggestions(
+        self, content: str, warnings: List[str]
+    ) -> List[str]:
         """Generate improvement suggestions based on warnings."""
         suggestions = []
 
         if any("code fence" in w.lower() for w in warnings):
             suggestions.append(
-                "Consider using the content preprocessor to automatically fix code fence issues")
+                "Consider using the content preprocessor to automatically fix code fence issues"
+            )
 
         if any("frontmatter" in w.lower() for w in warnings):
             suggestions.append(
-                "Ensure frontmatter has proper opening (---) and closing (---) markers")
+                "Ensure frontmatter has proper opening (---) and closing (---) markers"
+            )
 
         if any("language" in w.lower() for w in warnings):
             suggestions.append(
-                "Add language identifiers to code blocks for better syntax highlighting")
+                "Add language identifiers to code blocks for better syntax highlighting"
+            )
 
         if any("whitespace" in w.lower() for w in warnings):
-            suggestions.append(
-                "Remove trailing whitespace and normalize indentation")
+            suggestions.append("Remove trailing whitespace and normalize indentation")
 
         return suggestions
 
@@ -337,20 +346,53 @@ class ContentPreprocessor:
         code_lower = code.lower().strip()
 
         # Kotlin indicators
-        if any(keyword in code_lower for keyword in ['fun ', 'val ', 'var ', 'class ', 'interface ', 'suspend ', 'coroutine']):
-            return 'kotlin'
+        if any(
+            keyword in code_lower
+            for keyword in [
+                "fun ",
+                "val ",
+                "var ",
+                "class ",
+                "interface ",
+                "suspend ",
+                "coroutine",
+            ]
+        ):
+            return "kotlin"
 
         # Java indicators
-        if any(keyword in code_lower for keyword in ['public class', 'private class', 'static void', 'system.out', 'import java']):
-            return 'java'
+        if any(
+            keyword in code_lower
+            for keyword in [
+                "public class",
+                "private class",
+                "static void",
+                "system.out",
+                "import java",
+            ]
+        ):
+            return "java"
 
         # Python indicators
-        if any(keyword in code_lower for keyword in ['def ', 'import ', 'from ', 'class ', 'print(', 'if __name__']):
-            return 'python'
+        if any(
+            keyword in code_lower
+            for keyword in [
+                "def ",
+                "import ",
+                "from ",
+                "class ",
+                "print(",
+                "if __name__",
+            ]
+        ):
+            return "python"
 
         # JavaScript indicators
-        if any(keyword in code_lower for keyword in ['function ', 'const ', 'let ', 'var ', 'console.log', '=>']):
-            return 'javascript'
+        if any(
+            keyword in code_lower
+            for keyword in ["function ", "const ", "let ", "var ", "console.log", "=>"]
+        ):
+            return "javascript"
 
         # Default to 'text' if nothing detected
-        return 'text'
+        return "text"

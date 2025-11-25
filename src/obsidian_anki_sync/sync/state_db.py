@@ -14,6 +14,7 @@ Security Note:
 
 import json
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -31,9 +32,9 @@ class StateDB:
     """SQLite database for tracking card state.
 
     Thread Safety:
-        SQLite connections are not thread-safe. This class should be used from
-        a single thread or with proper synchronization. The connection is created
-        once and reused for all operations.
+        This class is thread-safe. Each thread gets its own SQLite connection
+        via thread-local storage. The database uses WAL mode for concurrent
+        access. All connections are tracked and properly closed on exit.
 
     Async Compatibility:
         This class uses synchronous sqlite3. If used in async contexts, it will
@@ -42,32 +43,77 @@ class StateDB:
 
     WAL Mode:
         The database uses WAL (Write-Ahead Logging) mode for better concurrency.
-        WAL mode allows concurrent reads while writes are in progress, but still
-        requires proper synchronization for multi-threaded access.
+        WAL mode allows concurrent reads while writes are in progress.
+
+    Usage:
+        # As context manager (recommended)
+        with StateDB(db_path) as db:
+            db.insert_card(card, anki_guid)
+
+        # Direct usage
+        db = StateDB(db_path)
+        try:
+            db.insert_card(card, anki_guid)
+        finally:
+            db.close()
     """
 
     def __init__(self, db_path: Path):
-        """Initialize database connection.
+        """Initialize database connection manager.
 
         Args:
             db_path: Path to SQLite database file
 
         Note:
-            Creates a synchronous SQLite connection. For async contexts, consider
-            using aiosqlite or running operations in a thread pool executor.
+            Creates thread-local connections on-demand. The schema is initialized
+            once using a temporary connection. Each thread that accesses the
+            database will get its own connection automatically.
         """
-        self.db_path = db_path
-        self.conn = sqlite3.connect(str(db_path))
-        self.conn.row_factory = sqlite3.Row
+        self._db_path = db_path
+        self._local = threading.local()
+        self._connections: list[sqlite3.Connection] = []
+        self._connections_lock = threading.Lock()
         self._init_schema()
 
-    def _init_schema(self) -> None:
-        """Create tables if they don't exist."""
-        # Enable WAL mode for better concurrency
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA synchronous=NORMAL")
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get thread-local SQLite connection.
 
-        cursor = self.conn.cursor()
+        Creates a new connection for the current thread if one doesn't exist.
+        Each connection is configured with WAL mode and tracked for cleanup.
+
+        Returns:
+            Thread-local SQLite connection
+        """
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            self._local.conn = conn
+            with self._connections_lock:
+                self._connections.append(conn)
+            logger.debug(
+                "created_thread_local_connection",
+                thread_id=threading.get_ident(),
+                total_connections=len(self._connections),
+            )
+        return self._local.conn  # type: ignore[no-any-return]
+
+    def _init_schema(self) -> None:
+        """Create tables if they don't exist.
+
+        Uses a temporary connection to initialize the schema once during
+        construction. This connection is not stored in thread-local storage.
+        """
+        # Create temporary connection for schema initialization
+        conn = sqlite3.connect(str(self._db_path))
+        conn.row_factory = sqlite3.Row
+
+        # Enable WAL mode for better concurrency
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+
+        cursor = conn.cursor()
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS cards (
@@ -244,9 +290,10 @@ class StateDB:
         """
         )
 
-        self.conn.commit()
+        conn.commit()
+        conn.close()
 
-    def _add_extended_schema_columns(self, cursor) -> None:
+    def _add_extended_schema_columns(self, cursor: sqlite3.Cursor) -> None:
         """Add extended columns for full card tracking and atomicity.
 
         These columns store complete card content for recovery and enable
@@ -254,14 +301,14 @@ class StateDB:
         """
         # Define columns to add with their SQL types
         columns_to_add = {
-            'apf_html': 'TEXT',
-            'fields_json': 'TEXT',
-            'tags_json': 'TEXT',
-            'deck_name': 'TEXT',
-            'creation_status': 'TEXT DEFAULT "success"',
-            'last_error': 'TEXT',
-            'retry_count': 'INTEGER DEFAULT 0',
-            'synced_at': 'TIMESTAMP'
+            "apf_html": "TEXT",
+            "fields_json": "TEXT",
+            "tags_json": "TEXT",
+            "deck_name": "TEXT",
+            "creation_status": 'TEXT DEFAULT "success"',
+            "last_error": "TEXT",
+            "retry_count": "INTEGER DEFAULT 0",
+            "synced_at": "TIMESTAMP",
         }
 
         # Get existing columns
@@ -276,7 +323,8 @@ class StateDB:
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
         """Insert a new card record."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO cards (
@@ -300,11 +348,12 @@ class StateDB:
                 card.guid,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def update_card(self, card: Card) -> None:
         """Update existing card record."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE cards
@@ -323,31 +372,35 @@ class StateDB:
                 card.slug,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def get_by_slug(self, slug: str) -> dict | None:
         """Get card by slug."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM cards WHERE slug = ?", (slug,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
     def get_by_guid(self, anki_guid: int) -> dict | None:
         """Get card by Anki GUID."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM cards WHERE anki_guid = ?", (anki_guid,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
     def get_by_source(self, source_path: str) -> list[dict]:
         """Get all cards from a source note."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM cards WHERE source_path = ?", (source_path,))
         return [dict(row) for row in cursor.fetchall()]
 
     def get_all_cards(self) -> list[dict]:
         """Get all cards."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM cards")
         return [dict(row) for row in cursor.fetchall()]
 
@@ -357,15 +410,17 @@ class StateDB:
         Returns:
             Set of source_path values from cards that have been synced
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT source_path FROM cards")
         return {row["source_path"] for row in cursor.fetchall()}
 
     def delete_card(self, slug: str) -> None:
         """Delete a card record."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
-        self.conn.commit()
+        conn.commit()
 
     def insert_card_extended(
         self,
@@ -374,7 +429,7 @@ class StateDB:
         fields: dict[str, str],
         tags: list[str],
         deck_name: str,
-        apf_html: str
+        apf_html: str,
     ) -> None:
         """Insert card with full content storage for atomicity support.
 
@@ -386,7 +441,8 @@ class StateDB:
             deck_name: Target deck name
             apf_html: Full APF HTML content
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO cards (
@@ -413,17 +469,13 @@ class StateDB:
                 json.dumps(fields),
                 json.dumps(tags),
                 deck_name,
-                'success'
+                "success",
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def update_card_extended(
-        self,
-        card: Card,
-        fields: dict[str, str],
-        tags: list[str],
-        apf_html: str
+        self, card: Card, fields: dict[str, str], tags: list[str], apf_html: str
     ) -> None:
         """Update card with full content for atomicity support.
 
@@ -433,7 +485,8 @@ class StateDB:
             tags: List of tags
             apf_html: Full APF HTML content
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE cards
@@ -459,7 +512,7 @@ class StateDB:
                 card.slug,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def insert_cards_batch(
         self,
@@ -475,28 +528,31 @@ class StateDB:
         if not cards_data:
             return
 
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         insert_data = []
         for card, anki_guid, fields, tags, apf_html in cards_data:
-            insert_data.append((
-                card.slug,
-                card.manifest.slug_base,
-                card.lang,
-                card.manifest.source_path,
-                card.manifest.source_anchor,
-                card.manifest.card_index,
-                anki_guid,
-                card.content_hash,
-                card.manifest.note_id,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-                apf_html,
-                json.dumps(fields),
-                json.dumps(tags),
-                deck_name,
-                'success'
-            ))
+            insert_data.append(
+                (
+                    card.slug,
+                    card.manifest.slug_base,
+                    card.lang,
+                    card.manifest.source_path,
+                    card.manifest.source_anchor,
+                    card.manifest.card_index,
+                    anki_guid,
+                    card.content_hash,
+                    card.manifest.note_id,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    apf_html,
+                    json.dumps(fields),
+                    json.dumps(tags),
+                    deck_name,
+                    "success",
+                )
+            )
 
         cursor.executemany(
             """
@@ -509,7 +565,7 @@ class StateDB:
             """,
             insert_data,
         )
-        self.conn.commit()
+        conn.commit()
         logger.info("cards_inserted_batch", count=len(cards_data))
 
     def update_cards_batch(
@@ -524,19 +580,22 @@ class StateDB:
         if not cards_data:
             return
 
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         update_data = []
         for card, fields, tags in cards_data:
-            update_data.append((
-                card.content_hash,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-                card.apf_html,
-                json.dumps(fields),
-                json.dumps(tags),
-                card.slug,
-            ))
+            update_data.append(
+                (
+                    card.content_hash,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    card.apf_html,
+                    json.dumps(fields),
+                    json.dumps(tags),
+                    card.slug,
+                )
+            )
 
         cursor.executemany(
             """
@@ -554,7 +613,7 @@ class StateDB:
             """,
             update_data,
         )
-        self.conn.commit()
+        conn.commit()
         logger.info("cards_updated_batch", count=len(cards_data))
 
     def delete_cards_batch(self, slugs: list[str]) -> None:
@@ -566,12 +625,13 @@ class StateDB:
         if not slugs:
             return
 
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.executemany(
             "DELETE FROM cards WHERE slug = ?",
             [(slug,) for slug in slugs],
         )
-        self.conn.commit()
+        conn.commit()
         logger.info("cards_deleted_batch", count=len(slugs))
 
     def update_card_status(
@@ -579,7 +639,7 @@ class StateDB:
         slug: str,
         status: str,
         error_message: str | None = None,
-        increment_retry: bool = False
+        increment_retry: bool = False,
     ) -> None:
         """Update card creation/update status for error tracking.
 
@@ -589,7 +649,8 @@ class StateDB:
             error_message: Optional error message
             increment_retry: Whether to increment retry counter
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         if increment_retry:
             cursor.execute(
                 """
@@ -613,7 +674,7 @@ class StateDB:
                 """,
                 (status, error_message, slug),
             )
-        self.conn.commit()
+        conn.commit()
 
     def save_progress(self, progress: "SyncProgress") -> None:
         """Save sync progress state.
@@ -621,7 +682,8 @@ class StateDB:
         Args:
             progress: SyncProgress instance
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
 
         # Serialize note progress
         note_progress_json = json.dumps(
@@ -670,7 +732,7 @@ class StateDB:
                 note_progress_json,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def get_progress(self, session_id: str) -> "SyncProgress | None":
         """Get sync progress by session ID.
@@ -683,7 +745,8 @@ class StateDB:
         """
         from .progress import NoteProgress, SyncPhase, SyncProgress
 
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM sync_progress WHERE session_id = ?", (session_id,)
         )
@@ -747,7 +810,8 @@ class StateDB:
             List of progress record dictionaries
         """
 
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             SELECT session_id, phase, started_at, updated_at, completed_at,
@@ -782,7 +846,8 @@ class StateDB:
         Returns:
             List of progress records with incomplete syncs
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             SELECT session_id, phase, started_at, updated_at,
@@ -815,9 +880,10 @@ class StateDB:
         Args:
             session_id: Session identifier
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
-        self.conn.commit()
+        conn.commit()
 
     # Note Index Methods
 
@@ -844,7 +910,8 @@ class StateDB:
             file_modified_at: File modification timestamp
             metadata_json: JSON string of full metadata
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO note_index (
@@ -872,7 +939,7 @@ class StateDB:
                 metadata_json,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def update_note_sync_status(
         self, source_path: str, status: str, error_message: str | None = None
@@ -884,7 +951,8 @@ class StateDB:
             status: Sync status (pending, processing, completed, failed)
             error_message: Optional error message if failed
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE note_index
@@ -895,7 +963,7 @@ class StateDB:
         """,
             (status, error_message, source_path),
         )
-        self.conn.commit()
+        conn.commit()
 
     def get_note_index(self, source_path: str) -> dict | None:
         """Get note index entry.
@@ -906,7 +974,8 @@ class StateDB:
         Returns:
             Note index record or None
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -917,7 +986,8 @@ class StateDB:
         Returns:
             List of note index records
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM note_index ORDER BY source_path")
         return [dict(row) for row in cursor.fetchall()]
 
@@ -930,7 +1000,8 @@ class StateDB:
         Returns:
             List of note index records
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM note_index WHERE sync_status = ? ORDER BY source_path",
             (status,),
@@ -970,7 +1041,8 @@ class StateDB:
             in_anki: Whether card exists in Anki
             in_database: Whether card exists in sync database
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO card_index (
@@ -1005,7 +1077,7 @@ class StateDB:
                 in_database,
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
     def get_card_index_by_source(self, source_path: str) -> list[dict]:
         """Get all cards for a note.
@@ -1016,7 +1088,8 @@ class StateDB:
         Returns:
             List of card index records
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM card_index WHERE source_path = ? ORDER BY card_index, lang",
             (source_path,),
@@ -1032,7 +1105,8 @@ class StateDB:
         Returns:
             Card index record or None
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM card_index WHERE slug = ?", (slug,))
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -1043,7 +1117,8 @@ class StateDB:
         Returns:
             Dictionary with index statistics
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
 
         # Note statistics
         cursor.execute("SELECT COUNT(*) FROM note_index")
@@ -1082,10 +1157,11 @@ class StateDB:
 
     def clear_index(self) -> None:
         """Clear all index data (for rebuilding)."""
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
         cursor.execute("DELETE FROM note_index")
         cursor.execute("DELETE FROM card_index")
-        self.conn.commit()
+        conn.commit()
 
     # Checkpoint Methods
 
@@ -1097,14 +1173,15 @@ class StateDB:
                 Expected keys: session_id, checkpoint_type, stage, notes_processed,
                 cards_generated, additional_data (optional)
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
 
-        session_id = checkpoint_data.get('session_id', 'default')
-        checkpoint_type = checkpoint_data.get('checkpoint_type', 'periodic')
-        stage = checkpoint_data.get('stage', 'unknown')
-        notes_processed = checkpoint_data.get('notes_processed', 0)
-        cards_generated = checkpoint_data.get('cards_generated', 0)
-        additional_data = checkpoint_data.get('additional_data', {})
+        session_id = checkpoint_data.get("session_id", "default")
+        checkpoint_type = checkpoint_data.get("checkpoint_type", "periodic")
+        stage = checkpoint_data.get("stage", "unknown")
+        notes_processed = checkpoint_data.get("notes_processed", 0)
+        cards_generated = checkpoint_data.get("cards_generated", 0)
+        additional_data = checkpoint_data.get("additional_data", {})
 
         cursor.execute(
             """
@@ -1122,7 +1199,7 @@ class StateDB:
                 json.dumps(additional_data),
             ),
         )
-        self.conn.commit()
+        conn.commit()
 
         logger.info(
             "checkpoint_saved",
@@ -1132,7 +1209,9 @@ class StateDB:
             cards_generated=cards_generated,
         )
 
-    def get_last_checkpoint(self, session_id: str | None = None) -> dict[str, Any] | None:
+    def get_last_checkpoint(
+        self, session_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Get the most recent checkpoint for resuming sync.
 
         Args:
@@ -1141,7 +1220,8 @@ class StateDB:
         Returns:
             Dictionary with checkpoint data or None if no checkpoint exists
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
 
         if session_id:
             cursor.execute(
@@ -1168,31 +1248,34 @@ class StateDB:
             return None
 
         checkpoint = {
-            'id': row['id'],
-            'session_id': row['session_id'],
-            'checkpoint_type': row['checkpoint_type'],
-            'stage': row['stage'],
-            'notes_processed': row['notes_processed'],
-            'cards_generated': row['cards_generated'],
-            'timestamp': row['timestamp'],
+            "id": row["id"],
+            "session_id": row["session_id"],
+            "checkpoint_type": row["checkpoint_type"],
+            "stage": row["stage"],
+            "notes_processed": row["notes_processed"],
+            "cards_generated": row["cards_generated"],
+            "timestamp": row["timestamp"],
         }
 
-        if row['checkpoint_data']:
+        if row["checkpoint_data"]:
             try:
-                checkpoint['additional_data'] = json.loads(row['checkpoint_data'])
+                checkpoint["additional_data"] = json.loads(row["checkpoint_data"])
             except json.JSONDecodeError:
-                checkpoint['additional_data'] = {}
+                checkpoint["additional_data"] = {}
 
         return checkpoint
 
-    def delete_checkpoints(self, session_id: str | None = None, older_than_days: int | None = None) -> None:
+    def delete_checkpoints(
+        self, session_id: str | None = None, older_than_days: int | None = None
+    ) -> None:
         """Delete checkpoints by session or age.
 
         Args:
             session_id: Optional session ID to delete checkpoints for
             older_than_days: Optional age threshold in days
         """
-        cursor = self.conn.cursor()
+        conn = self._get_connection()
+        cursor = conn.cursor()
 
         if session_id:
             cursor.execute(
@@ -1205,18 +1288,44 @@ class StateDB:
                 DELETE FROM sync_checkpoints
                 WHERE timestamp < datetime('now', ? || ' days')
                 """,
-                (f'-{older_than_days}',),
+                (f"-{older_than_days}",),
             )
         else:
             logger.warning("delete_checkpoints_called_without_filter")
             return
 
-        self.conn.commit()
-        logger.info("checkpoints_deleted", session_id=session_id, older_than_days=older_than_days)
+        conn.commit()
+        logger.info(
+            "checkpoints_deleted",
+            session_id=session_id,
+            older_than_days=older_than_days,
+        )
 
     def close(self) -> None:
-        """Close database connection."""
-        self.conn.close()
+        """Close all thread-local database connections.
+
+        This method properly closes all connections that were created across
+        different threads. It's safe to call multiple times.
+        """
+        with self._connections_lock:
+            for conn in self._connections:
+                try:
+                    conn.close()
+                except Exception as e:
+                    logger.warning(
+                        "error_closing_connection",
+                        error=str(e),
+                    )
+            self._connections.clear()
+
+        # Clear thread-local connection for current thread
+        if hasattr(self._local, "conn"):
+            self._local.conn = None
+
+        logger.debug(
+            "closed_all_connections",
+            thread_id=threading.get_ident(),
+        )
 
     def __enter__(self) -> "StateDB":
         """Context manager entry."""

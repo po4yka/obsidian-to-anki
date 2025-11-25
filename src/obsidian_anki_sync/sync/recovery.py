@@ -53,14 +53,14 @@ class CardRecovery:
             - 'inconsistent': Card slugs with different content (future use)
         """
         results = {
-            'orphaned_in_anki': [],    # In Anki but not in DB
-            'orphaned_in_db': [],       # In DB but not in Anki
-            'inconsistent': []          # Different content in Anki vs DB
+            "orphaned_in_anki": [],  # In Anki but not in DB
+            "orphaned_in_db": [],  # In DB but not in Anki
+            "inconsistent": [],  # Different content in Anki vs DB
         }
 
         # Get all cards from database
         db_cards = self.db.get_all_cards()
-        db_by_guid = {c['anki_guid']: c for c in db_cards if c.get('anki_guid')}
+        db_by_guid = {c["anki_guid"]: c for c in db_cards if c.get("anki_guid")}
 
         logger.info("checking_for_orphaned_cards", db_cards=len(db_cards))
 
@@ -71,31 +71,31 @@ class CardRecovery:
 
             for guid in all_anki_guids:
                 if guid not in db_by_guid:
-                    results['orphaned_in_anki'].append(guid)
+                    results["orphaned_in_anki"].append(guid)
 
         except AnkiConnectError as e:
             logger.error("failed_to_fetch_anki_cards", error=str(e))
 
         # Check DB cards that should be in Anki
         for card in db_cards:
-            if not card.get('anki_guid'):
+            if not card.get("anki_guid"):
                 # Card has no Anki GUID recorded
-                results['orphaned_in_db'].append(card['slug'])
+                results["orphaned_in_db"].append(card["slug"])
                 continue
 
             try:
-                anki_info = self.anki.notes_info([card['anki_guid']])
+                anki_info = self.anki.notes_info([card["anki_guid"]])
                 if not anki_info:
                     # Card deleted from Anki but still in DB
-                    results['orphaned_in_db'].append(card['slug'])
+                    results["orphaned_in_db"].append(card["slug"])
             except AnkiConnectError:
                 # Failed to query - assume orphaned
-                results['orphaned_in_db'].append(card['slug'])
+                results["orphaned_in_db"].append(card["slug"])
 
         logger.info(
             "orphaned_cards_found",
-            orphaned_in_anki=len(results['orphaned_in_anki']),
-            orphaned_in_db=len(results['orphaned_in_db'])
+            orphaned_in_anki=len(results["orphaned_in_anki"]),
+            orphaned_in_db=len(results["orphaned_in_db"]),
         )
 
         return results
@@ -110,14 +110,16 @@ class CardRecovery:
             True if card is consistent, False otherwise
         """
         db_card = self.db.get_by_slug(slug)
-        if not db_card or not db_card.get('anki_guid'):
+        if not db_card or not db_card.get("anki_guid"):
             logger.warning("card_not_found_in_db", slug=slug)
             return False
 
         try:
-            anki_info = self.anki.notes_info([db_card['anki_guid']])
+            anki_info = self.anki.notes_info([db_card["anki_guid"]])
             if not anki_info:
-                logger.warning("card_not_found_in_anki", slug=slug, anki_guid=db_card['anki_guid'])
+                logger.warning(
+                    "card_not_found_in_anki", slug=slug, anki_guid=db_card["anki_guid"]
+                )
                 return False
 
             logger.info("card_is_consistent", slug=slug)
@@ -134,10 +136,7 @@ class CardRecovery:
             List of card records with 'failed' status
         """
         all_cards = self.db.get_all_cards()
-        failed_cards = [
-            c for c in all_cards
-            if c.get('creation_status') == 'failed'
-        ]
+        failed_cards = [c for c in all_cards if c.get("creation_status") == "failed"]
 
         logger.info("found_failed_cards", count=len(failed_cards))
         return failed_cards
@@ -152,10 +151,7 @@ class CardRecovery:
             List of card records eligible for retry
         """
         failed_cards = self.get_failed_cards()
-        retry_cards = [
-            c for c in failed_cards
-            if c.get('retry_count', 0) < max_retries
-        ]
+        retry_cards = [c for c in failed_cards if c.get("retry_count", 0) < max_retries]
 
         logger.info("found_cards_needing_retry", count=len(retry_cards))
         return retry_cards

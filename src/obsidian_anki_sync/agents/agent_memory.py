@@ -291,7 +291,9 @@ class AgentMemoryStore:
                     memory_id = results["ids"][0][i]
                     metadata = results["metadatas"][0][i]
                     document = results["documents"][0][i]
-                    distance = results["distances"][0][i] if "distances" in results else None
+                    distance = (
+                        results["distances"][0][i] if "distances" in results else None
+                    )
 
                     similar_failures.append(
                         {
