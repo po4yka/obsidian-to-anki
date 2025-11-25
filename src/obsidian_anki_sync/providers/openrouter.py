@@ -93,6 +93,9 @@ MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
     "anthropic/claude-3-sonnet",
     "anthropic/claude-3-haiku",
     "qwen/qwen3-max",
+    # xAI Grok 4.1 Fast - excellent structured output support
+    # Best practices: temperature=0 for deterministic output, disable reasoning for JSON
+    "x-ai/grok-4.1-fast",
 }
 
 HTTP_STATUS_RETRYABLE = {429, 500, 502, 503, 504}
@@ -361,15 +364,36 @@ class OpenRouterProvider(BaseLLMProvider):
             )
 
         # Build payload (same as sync version)
+        # For Grok 4.1 Fast with JSON schema: use temperature=0 for deterministic output
+        effective_temperature = temperature
+        if json_schema and model in MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS:
+            if "grok" in model.lower() and temperature > 0:
+                effective_temperature = 0.0
+                logger.debug(
+                    "grok_temperature_override_for_json_async",
+                    model=model,
+                    original_temperature=temperature,
+                    effective_temperature=0.0,
+                    reason="xAI recommends temperature=0 for deterministic structured output",
+                )
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "temperature": temperature,
+            "temperature": effective_temperature,
             "max_tokens": effective_max_tokens,
             "stream": False,
         }
 
-        if reasoning_enabled and not json_schema:
+        # For Grok models: explicitly disable reasoning when using JSON schema
+        if "grok" in model.lower() and json_schema:
+            payload["reasoning"] = {"enabled": False}
+            logger.debug(
+                "grok_reasoning_disabled_for_json_async",
+                model=model,
+                reason="Reasoning disabled to prevent token consumption on structured output",
+            )
+        elif reasoning_enabled and not json_schema:
             payload["reasoning_enabled"] = True
 
         # Handle structured output
@@ -1243,13 +1267,37 @@ class OpenRouterProvider(BaseLLMProvider):
             )
 
         # Build payload
+        # For Grok 4.1 Fast with JSON schema: use temperature=0 for deterministic output
+        # xAI docs recommend temperature=0 for structured outputs to prevent truncation
+        effective_temperature = temperature
+        if json_schema and model in MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS:
+            if "grok" in model.lower() and temperature > 0:
+                effective_temperature = 0.0
+                logger.debug(
+                    "grok_temperature_override_for_json",
+                    model=model,
+                    original_temperature=temperature,
+                    effective_temperature=0.0,
+                    reason="xAI recommends temperature=0 for deterministic structured output",
+                )
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "temperature": temperature,
+            "temperature": effective_temperature,
             "max_tokens": effective_max_tokens,
             "stream": False,
         }
+
+        # For Grok models: explicitly disable reasoning when using JSON schema
+        # This prevents the model from "thinking" and consuming output tokens
+        if "grok" in model.lower() and json_schema:
+            payload["reasoning"] = {"enabled": False}
+            logger.debug(
+                "grok_reasoning_disabled_for_json",
+                model=model,
+                reason="Reasoning disabled to prevent token consumption on structured output",
+            )
 
         if json_schema and effective_max_tokens > self.max_tokens:
             logger.debug(
