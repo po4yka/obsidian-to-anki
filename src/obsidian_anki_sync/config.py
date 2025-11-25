@@ -353,6 +353,12 @@ class Config(BaseSettings):
     langgraph_auto_fix: bool = True
     langgraph_strict_mode: bool = True
     langgraph_checkpoint_enabled: bool = True  # Enable state persistence
+    langgraph_max_steps: int = Field(
+        default=20,
+        ge=5,
+        le=100,
+        description="Maximum steps allowed in LangGraph workflow (prevents infinite loops)",
+    )
 
     # Enhancement Agents (optional quality improvements)
     enable_card_splitting: bool = True  # Analyze if note should be split
