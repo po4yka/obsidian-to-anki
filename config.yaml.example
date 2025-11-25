@@ -69,18 +69,18 @@ default_llm_model: "openrouter/polaris-alpha"
 # default_llm_model: "meta-llama/llama-3.1-70b-instruct"
 
 # -----------------------------------------------------------------------------
-# Individual Agent Model Overrides (optional)
+# Per-Agent Model Overrides (optional)
 # -----------------------------------------------------------------------------
 # Leave these EMPTY to use default_llm_model for all agents.
 # Only set them if you want specific agents to use different models.
 #
 # Example: Use expensive model for generation, cheap for validation
-# pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"
-# pydantic_ai_pre_validator_model: "openai/gpt-4o-mini"
+# generator_model: "anthropic/claude-3-5-sonnet"
+# pre_validator_model: "openai/gpt-4o-mini"
 #
-pydantic_ai_pre_validator_model: ""  # Empty = use default
-pydantic_ai_generator_model: ""  # Empty = use default
-pydantic_ai_post_validator_model: ""  # Empty = use default
+pre_validator_model: ""  # Empty = use default
+generator_model: ""  # Empty = use default
+post_validator_model: ""  # Empty = use default
 context_enrichment_model: ""  # Empty = use default
 memorization_quality_model: ""  # Empty = use default
 card_splitting_model: ""  # Empty = use default

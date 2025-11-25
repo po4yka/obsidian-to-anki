@@ -25,10 +25,10 @@ Edit `config.yaml`:
 # Unified model configuration (2025 optimized)
 default_llm_model: "qwen/qwen-2.5-72b-instruct"
 
-# Individual agent overrides (optimized for each task)
-pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"
-pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"
-pydantic_ai_post_validator_model: "deepseek/deepseek-chat"
+# Per-agent model overrides (optimized for each task)
+pre_validator_model: "qwen/qwen-2.5-32b-instruct"
+generator_model: "qwen/qwen-2.5-72b-instruct"
+post_validator_model: "deepseek/deepseek-chat"
 context_enrichment_model: "minimax/minimax-m2"
 memorization_quality_model: "moonshotai/kimi-k2"
 card_splitting_model: "moonshotai/kimi-k2-thinking"
@@ -67,7 +67,7 @@ If you want a specific agent to use a different model, set its individual config
 ```yaml
 # All use default EXCEPT generator
 default_llm_model: "openai/gpt-4o-mini"
-pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"  # Override
+generator_model: "anthropic/claude-3-5-sonnet"  # Override
 ```
 
 **Rule**: Empty string (`""`) = use `default_llm_model`
@@ -148,9 +148,9 @@ anthropic_api_key: "${ANTHROPIC_API_KEY}"
 
 ```yaml
 default_llm_model: "qwen/qwen-2.5-72b-instruct"
-pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"  # Fast validation
-pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"  # High quality
-pydantic_ai_post_validator_model: "deepseek/deepseek-chat"  # Strong reasoning
+pre_validator_model: "qwen/qwen-2.5-32b-instruct"  # Fast validation
+generator_model: "qwen/qwen-2.5-72b-instruct"  # High quality
+post_validator_model: "deepseek/deepseek-chat"  # Strong reasoning
 context_enrichment_model: "minimax/minimax-m2"  # Creative examples
 memorization_quality_model: "moonshotai/kimi-k2"  # Analytical
 card_splitting_model: "moonshotai/kimi-k2-thinking"  # Advanced reasoning
@@ -165,9 +165,9 @@ duplicate_detection_model: "qwen/qwen-2.5-32b-instruct"  # Efficient
 
 ```yaml
 default_llm_model: "qwen/qwen-2.5-72b-instruct"
-pydantic_ai_pre_validator_model: ""
-pydantic_ai_generator_model: ""
-pydantic_ai_post_validator_model: ""
+pre_validator_model: ""
+generator_model: ""
+post_validator_model: ""
 context_enrichment_model: ""
 memorization_quality_model: ""
 card_splitting_model: ""
@@ -194,9 +194,9 @@ enable_memorization_quality: false
 
 ```yaml
 default_llm_model: "qwen/qwen-2.5-32b-instruct"  # Use 32B for all
-pydantic_ai_pre_validator_model: ""
-pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"  # Only upgrade generator
-pydantic_ai_post_validator_model: ""
+pre_validator_model: ""
+generator_model: "qwen/qwen-2.5-72b-instruct"  # Only upgrade generator
+post_validator_model: ""
 context_enrichment_model: ""
 memorization_quality_model: ""
 card_splitting_model: ""
@@ -235,9 +235,9 @@ enable_memorization_quality: true
 ### Before (Scattered Models)
 
 ```yaml
-pydantic_ai_pre_validator_model: "openai/gpt-4o-mini"
-pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"
-pydantic_ai_post_validator_model: "openai/gpt-4o-mini"
+pre_validator_model: "openai/gpt-4o-mini"
+generator_model: "anthropic/claude-3-5-sonnet"
+post_validator_model: "openai/gpt-4o-mini"
 context_enrichment_model: "openai/gpt-4o-mini"
 memorization_quality_model: "openai/gpt-4o-mini"
 ```
@@ -248,7 +248,7 @@ memorization_quality_model: "openai/gpt-4o-mini"
 
 ```yaml
 default_llm_model: "openrouter/polaris-alpha"
-pydantic_ai_generator_model: "anthropic/claude-3-5-sonnet"  # Only override if needed
+generator_model: "anthropic/claude-3-5-sonnet"  # Only override if needed
 # All others empty = use default
 ```
 
@@ -351,7 +351,7 @@ print(f"Generator using: {model_name}")
 
 ```python
 # Override config
-config.pydantic_ai_generator_model = "anthropic/claude-3-5-sonnet"
+config.generator_model = "anthropic/claude-3-5-sonnet"
 model_name = config.get_model_for_agent("generator")
 # Returns "anthropic/claude-3-5-sonnet"
 ```
@@ -379,9 +379,9 @@ model_name = config.get_model_for_agent("generator")
 ### Old Way (Complex)
 ```yaml
 # 6 different places to maintain
-pydantic_ai_pre_validator_model: "openai/gpt-4o-mini"
-pydantic_ai_generator_model: "openai/gpt-4o-mini"
-pydantic_ai_post_validator_model: "openai/gpt-4o-mini"
+pre_validator_model: "openai/gpt-4o-mini"
+generator_model: "openai/gpt-4o-mini"
+post_validator_model: "openai/gpt-4o-mini"
 context_enrichment_model: "openai/gpt-4o-mini"
 memorization_quality_model: "openai/gpt-4o-mini"
 card_splitting_model: "openai/gpt-4o-mini"
@@ -391,15 +391,15 @@ card_splitting_model: "openai/gpt-4o-mini"
 ```yaml
 # Specialized models for optimal performance
 default_llm_model: "qwen/qwen-2.5-72b-instruct"
-pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"
-pydantic_ai_post_validator_model: "deepseek/deepseek-chat"
+pre_validator_model: "qwen/qwen-2.5-32b-instruct"
+post_validator_model: "deepseek/deepseek-chat"
 context_enrichment_model: "minimax/minimax-m2"
 memorization_quality_model: "moonshotai/kimi-k2"
 card_splitting_model: "moonshotai/kimi-k2-thinking"
 duplicate_detection_model: "qwen/qwen-2.5-32b-instruct"
 ```
 
-**Result**: Latest 2025 models, task-optimized, better performance! 🎉
+**Result**: Latest 2025 models, task-optimized, better performance!
 
 ## Related Documentation
 

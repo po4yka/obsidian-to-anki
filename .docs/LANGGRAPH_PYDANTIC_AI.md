@@ -58,45 +58,45 @@ This document describes the new agentic system for card generation using **LangG
 
 ```
 
-‚                    LangGraph Workflow                       ‚
-‚                                                             ‚
-‚               ‚
-‚  ‚ Pre-Validator ‚>‚   Generator   ‚>‚  Post-  ‚ ‚
-‚  ‚    Agent      ‚      ‚     Agent     ‚      ‚Validator‚ ‚
-‚  ¬˜      ˜      ¬˜ ‚
-‚          ‚                                           ‚      ‚
-‚          ‚                                           ‚      ‚
-‚                        ˜      ‚
-‚                          ‚              ‚                   ‚
-‚                     ¼¼              ‚
-‚                     ‚  Conditional Routing   ‚              ‚
-‚                     ‚  (Retry/Complete/Fail) ‚              ‚
-‚                     ˜              ‚
-˜
-                              ‚
-                              ¼
+ï¿½                    LangGraph Workflow                       ï¿½
+ï¿½                                                             ï¿½
+ï¿½               ï¿½
+ï¿½  ï¿½ Pre-Validator ï¿½>ï¿½   Generator   ï¿½>ï¿½  Post-  ï¿½ ï¿½
+ï¿½  ï¿½    Agent      ï¿½      ï¿½     Agent     ï¿½      ï¿½Validatorï¿½ ï¿½
+ï¿½  ï¿½ï¿½      ï¿½      ï¿½ï¿½ ï¿½
+ï¿½          ï¿½                                           ï¿½      ï¿½
+ï¿½          ï¿½                                           ï¿½      ï¿½
+ï¿½                        ï¿½      ï¿½
+ï¿½                          ï¿½              ï¿½                   ï¿½
+ï¿½                     ï¿½ï¿½              ï¿½
+ï¿½                     ï¿½  Conditional Routing   ï¿½              ï¿½
+ï¿½                     ï¿½  (Retry/Complete/Fail) ï¿½              ï¿½
+ï¿½                     ï¿½              ï¿½
+ï¿½
+                              ï¿½
+                              ï¿½
 
-‚                     PydanticAI Agents                       ‚
-‚                                                             ‚
-‚       ‚
-‚  ‚ PreValidatorAI   ‚  ‚  GeneratorAI     ‚  ‚PostValidatorAI‚
-‚  ‚                  ‚  ‚                  ‚  ‚           ‚ ‚
-‚  ‚ Result:          ‚  ‚ Result:          ‚  ‚ Result:   ‚ ‚
-‚  ‚ PreValidation    ‚  ‚ CardGeneration   ‚  ‚PostValidation‚
-‚  ‚ Output           ‚  ‚ Output           ‚  ‚ Output    ‚ ‚
-‚  ¬˜  ¬˜  ¬˜ ‚
-‚           ‚                     ‚                   ‚       ‚
-¼¼¼˜
-            ‚                     ‚                   ‚
-            ¼                     ¼                   ¼
+ï¿½                     PydanticAI Agents                       ï¿½
+ï¿½                                                             ï¿½
+ï¿½       ï¿½
+ï¿½  ï¿½ PreValidatorAI   ï¿½  ï¿½  GeneratorAI     ï¿½  ï¿½PostValidatorAIï¿½
+ï¿½  ï¿½                  ï¿½  ï¿½                  ï¿½  ï¿½           ï¿½ ï¿½
+ï¿½  ï¿½ Result:          ï¿½  ï¿½ Result:          ï¿½  ï¿½ Result:   ï¿½ ï¿½
+ï¿½  ï¿½ PreValidation    ï¿½  ï¿½ CardGeneration   ï¿½  ï¿½PostValidationï¿½
+ï¿½  ï¿½ Output           ï¿½  ï¿½ Output           ï¿½  ï¿½ Output    ï¿½ ï¿½
+ï¿½  ï¿½ï¿½  ï¿½ï¿½  ï¿½ï¿½ ï¿½
+ï¿½           ï¿½                     ï¿½                   ï¿½       ï¿½
+ï¿½ï¿½ï¿½ï¿½
+            ï¿½                     ï¿½                   ï¿½
+            ï¿½                     ï¿½                   ï¿½
 
-‚                      OpenRouter API                         ‚
-‚                                                             ‚
-‚            ‚
-‚  ‚ GPT-4o-mini  ‚  ‚ Claude 3.5   ‚  ‚ GPT-4o-mini  ‚      ‚
-‚  ‚ (Validator)  ‚  ‚  (Generator) ‚  ‚ (Validator)  ‚      ‚
-‚  ˜  ˜  ˜      ‚
-˜
+ï¿½                      OpenRouter API                         ï¿½
+ï¿½                                                             ï¿½
+ï¿½            ï¿½
+ï¿½  ï¿½ GPT-4o-mini  ï¿½  ï¿½ Claude 3.5   ï¿½  ï¿½ GPT-4o-mini  ï¿½      ï¿½
+ï¿½  ï¿½ (Validator)  ï¿½  ï¿½  (Generator) ï¿½  ï¿½ (Validator)  ï¿½      ï¿½
+ï¿½  ï¿½  ï¿½  ï¿½      ï¿½
+ï¿½
 ```
 
 ### Component Layers
@@ -144,9 +144,9 @@ The workflow automatically retries failed validations:
 
 ```
 Pre-Validation > Generation > Post-Validation
-                         ²                    ‚
-                         ‚                    ‚ (failed)
-                         ˜
+                         ï¿½                    ï¿½
+                         ï¿½                    ï¿½ (failed)
+                         ï¿½
                          (retry with fixes)
 ```
 
@@ -206,9 +206,9 @@ use_pydantic_ai: true
 llm_provider: openrouter
 
 # Model selection
-pydantic_ai_pre_validator_model: openai/gpt-4o-mini
-pydantic_ai_generator_model: anthropic/claude-3-5-sonnet
-pydantic_ai_post_validator_model: openai/gpt-4o-mini
+pre_validator_model: openai/gpt-4o-mini
+generator_model: anthropic/claude-3-5-sonnet
+post_validator_model: openai/gpt-4o-mini
 
 # Workflow settings
 langgraph_max_retries: 3
@@ -324,35 +324,35 @@ else:
 
 ```
 
-‚    START     ‚
-¬˜
-       ‚
-       ¼
+ï¿½    START     ï¿½
+ï¿½ï¿½
+       ï¿½
+       ï¿½
 
-‚Pre-Validation‚
-¬˜
-       ‚
+ï¿½Pre-Validationï¿½
+ï¿½ï¿½
+       ï¿½
        (valid)
-       ‚                                  ‚
-       (invalid)> FAILED               ‚
-       ‚                                  ‚
-       ¼                                  ¼
+       ï¿½                                  ï¿½
+       (invalid)> FAILED               ï¿½
+       ï¿½                                  ï¿½
+       ï¿½                                  ï¿½
 
-‚  Generation  ‚                   ‚ Generation  ‚
-¬˜                   ¬˜
-       ‚                                  ‚
-       ¼                                  ¼
+ï¿½  Generation  ï¿½                   ï¿½ Generation  ï¿½
+ï¿½ï¿½                   ï¿½ï¿½
+       ï¿½                                  ï¿½
+       ï¿½                                  ï¿½
 
-‚Post-Validation‚                  ‚Post-Validation‚
-¬˜                   ¬˜
-       ‚                                  ‚
-       (valid)> COMPLETE               ‚
-       ‚                                  ‚
-       (retry<max)> Generation         ‚
-       ‚              (with fixes)         ‚
-       ‚                                  ‚
-       (retry‰¥max)> FAILED             ‚
-                                          ‚
+ï¿½Post-Validationï¿½                  ï¿½Post-Validationï¿½
+ï¿½ï¿½                   ï¿½ï¿½
+       ï¿½                                  ï¿½
+       (valid)> COMPLETE               ï¿½
+       ï¿½                                  ï¿½
+       (retry<max)> Generation         ï¿½
+       ï¿½              (with fixes)         ï¿½
+       ï¿½                                  ï¿½
+       (retryï¿½ï¿½max)> FAILED             ï¿½
+                                          ï¿½
                                     (successful path)
 ```
 
@@ -508,9 +508,9 @@ post_validator_model: qwen3:14b
 # New
 use_langgraph: true
 use_pydantic_ai: true
-pydantic_ai_pre_validator_model: openai/gpt-4o-mini
-pydantic_ai_generator_model: anthropic/claude-3-5-sonnet
-pydantic_ai_post_validator_model: openai/gpt-4o-mini
+pre_validator_model: openai/gpt-4o-mini
+generator_model: anthropic/claude-3-5-sonnet
+post_validator_model: openai/gpt-4o-mini
 ```
 
 ### API Compatibility
@@ -575,9 +575,9 @@ def main():
 **Solution**: Use cheaper models for validation:
 
 ```yaml
-pydantic_ai_pre_validator_model: openai/gpt-4o-mini # Cheap
-pydantic_ai_generator_model: anthropic/claude-3-5-sonnet # Expensive but good
-pydantic_ai_post_validator_model: openai/gpt-4o-mini # Cheap
+pre_validator_model: openai/gpt-4o-mini # Cheap
+generator_model: anthropic/claude-3-5-sonnet # Expensive but good
+post_validator_model: openai/gpt-4o-mini # Cheap
 langgraph_max_retries: 1 # Reduce retries
 ```
 

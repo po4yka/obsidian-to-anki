@@ -248,9 +248,9 @@ default_llm_model: "qwen3:32b"
 
 # Enable agent system for multi-stage validation
 use_langgraph: true
-pydantic_ai_pre_validator_model: "qwen3:8b"
-pydantic_ai_generator_model: "qwen3:32b"
-pydantic_ai_post_validator_model: "qwen3:14b"
+pre_validator_model: "qwen3:8b"
+generator_model: "qwen3:32b"
+post_validator_model: "qwen3:14b"
 ```
 
 #### For OpenAI Users
@@ -260,8 +260,8 @@ llm_provider: "openai"
 default_llm_model: "gpt-4o-mini"
 
 # Optional: Use different models for different agents
-# pydantic_ai_generator_model: "gpt-4o"
-# pydantic_ai_pre_validator_model: "gpt-4o-mini"
+# generator_model: "gpt-4o"
+# pre_validator_model: "gpt-4o-mini"
 ```
 
 #### Optional: Multiple Source Directories
@@ -513,7 +513,7 @@ vault_path: "/Users/yourname/Documents/ObsidianVault"
 - Ensure sufficient RAM (32GB+ for multi-agent)
 - Use smaller models for agents:
   ```yaml
-  pydantic_ai_pre_validator_model: "qwen3:8b"
+  pre_validator_model: "qwen3:8b"
   ```
 
 - Increase timeout in config:
