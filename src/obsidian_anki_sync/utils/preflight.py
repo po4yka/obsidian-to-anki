@@ -47,7 +47,9 @@ class PreflightChecker:
         Returns:
             Tuple of (all_passed, results)
         """
-        logger.info("preflight_checks_started", check_anki=check_anki, check_llm=check_llm)
+        logger.info(
+            "preflight_checks_started", check_anki=check_anki, check_llm=check_llm
+        )
 
         self.results = []
 

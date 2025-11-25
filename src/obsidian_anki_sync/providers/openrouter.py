@@ -5,7 +5,8 @@ import os
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -480,20 +481,30 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             raise
 
-    def __enter__(self):
+    def __enter__(self) -> "OpenRouterProvider":
         """Enter context manager for synchronous usage."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
         """Exit context manager and cleanup resources."""
         self.close()
         return False
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "OpenRouterProvider":
         """Enter async context manager for asynchronous usage."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
         """Exit async context manager and cleanup resources."""
         await self.close_async()
         return False
@@ -501,26 +512,43 @@ class OpenRouterProvider(BaseLLMProvider):
     def close(self) -> None:
         """Close synchronous HTTP client.
 
-        This method is safe to call multiple times and will silently
-        ignore errors during cleanup.
+        This method is safe to call multiple times and will log
+        cleanup failures but not raise exceptions.
         """
         if hasattr(self, "client") and self.client:
             try:
                 self.client.close()
-            except Exception:
-                pass
+                logger.debug(
+                    "openrouter_client_closed",
+                    base_url=self.base_url,
+                )
+            except Exception as e:
+                logger.warning(
+                    "openrouter_client_cleanup_failed",
+                    base_url=self.base_url,
+                    error=str(e),
+                )
 
     async def close_async(self) -> None:
         """Close asynchronous HTTP client.
 
         This method is safe to call multiple times and will close both
-        async and sync clients. It will silently ignore errors during cleanup.
+        async and sync clients. It will log cleanup failures but not
+        raise exceptions.
         """
         if hasattr(self, "_async_client") and self._async_client:
             try:
                 await self._async_client.aclose()
-            except Exception:
-                pass
+                logger.debug(
+                    "openrouter_async_client_closed",
+                    base_url=self.base_url,
+                )
+            except Exception as e:
+                logger.warning(
+                    "openrouter_async_client_cleanup_failed",
+                    base_url=self.base_url,
+                    error=str(e),
+                )
         # Also close sync client
         self.close()
 
@@ -726,9 +754,11 @@ class OpenRouterProvider(BaseLLMProvider):
         # Handle incomplete array/object values
         # If we're in the middle of a value after a colon, we need to complete it
         if last_key_pos >= 0:
-            after_colon = repaired[last_key_pos + 1:].lstrip()
+            after_colon = repaired[last_key_pos + 1 :].lstrip()
             # If after colon is empty or incomplete, add a placeholder
-            if not after_colon or (after_colon.startswith('"') and after_colon.count('"') == 1):
+            if not after_colon or (
+                after_colon.startswith('"') and after_colon.count('"') == 1
+            ):
                 # Incomplete string value - close it if needed
                 if after_colon.startswith('"') and not repaired.endswith('"'):
                     repaired += '"'
@@ -750,8 +780,13 @@ class OpenRouterProvider(BaseLLMProvider):
         # Validate the repaired JSON
         try:
             import json
+
             json.loads(repaired)
-            logger.debug("json_repair_successful", original_length=len(text), repaired_length=len(repaired))
+            logger.debug(
+                "json_repair_successful",
+                original_length=len(text),
+                repaired_length=len(repaired),
+            )
             return repaired
         except json.JSONDecodeError as e:
             # Repair failed - try a more aggressive approach
@@ -778,13 +813,18 @@ class OpenRouterProvider(BaseLLMProvider):
                     partial_json = repaired[:end_pos]
                     try:
                         json.loads(partial_json)
-                        logger.debug("json_repair_partial_success", extracted_length=len(partial_json))
+                        logger.debug(
+                            "json_repair_partial_success",
+                            extracted_length=len(partial_json),
+                        )
                         return partial_json
                     except json.JSONDecodeError:
                         pass
 
             # Last resort: return minimal valid JSON
-            logger.warning("json_repair_failed_using_fallback", original_preview=text[:100])
+            logger.warning(
+                "json_repair_failed_using_fallback", original_preview=text[:100]
+            )
             return "{}"
 
     def _clean_json_response(self, text: str, model: str) -> str:
@@ -1502,7 +1542,6 @@ class OpenRouterProvider(BaseLLMProvider):
             # DeepSeek may add markdown fences, reasoning text, or special tokens
             json_truncated = False
             if completion and json_schema:
-                original_completion = completion
                 completion = self._clean_json_response(completion, model)
 
                 # Check if JSON appears truncated by validating it

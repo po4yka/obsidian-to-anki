@@ -10,19 +10,19 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils.logging import get_logger
 from ..utils.resilience import (
+    Bulkhead,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerError,
     ConfidenceValidator,
+    LowConfidenceError,
     RateLimiter,
-    Bulkhead,
     RateLimitExceededError,
     ResourceExhaustedError,
-    LowConfidenceError,
 )
 from .json_schemas import get_qa_extraction_schema
 from .llm_errors import categorize_llm_error, log_llm_error
@@ -34,6 +34,7 @@ logger = get_logger(__name__)
 @dataclass
 class RepairResult:
     """Result from content repair operation."""
+
     success: bool
     repaired_content: Optional[str] = None
     confidence: float = 0.0
@@ -52,7 +53,9 @@ class ContentRepairAgent:
     def __init__(self, model: str = "qwen3:8b"):
         self.model = model
 
-    def generate_repair(self, content: str, prompt: str, max_retries: int = 2) -> RepairResult:
+    def generate_repair(
+        self, content: str, prompt: str, max_retries: int = 2
+    ) -> RepairResult:
         """Generate content repair using LLM."""
         # For now, return a placeholder - in a full implementation, this would call an LLM
         # Since we don't have LLM integration set up in this test environment,
@@ -60,12 +63,13 @@ class ContentRepairAgent:
         return RepairResult(
             success=False,
             error_message="LLM repair not implemented in test environment",
-            warnings=["LLM-based repair requires full LLM integration"]
+            warnings=["LLM-based repair requires full LLM integration"],
         )
 
 
 class ProblemDomain(Enum):
     """Types of problems that can be handled by specialized agents."""
+
     YAML_FRONTMATTER = "yaml_frontmatter"
     CONTENT_STRUCTURE = "content_structure"
     CONTENT_CORRUPTION = "content_corruption"
@@ -78,6 +82,7 @@ class ProblemDomain(Enum):
 @dataclass
 class AgentResult:
     """Result from a specialized agent."""
+
     success: bool
     content: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -114,7 +119,8 @@ class ProblemRouter:
         self.rate_limiters: Dict[ProblemDomain, RateLimiter] = {}
         self.bulkheads: Dict[ProblemDomain, Bulkhead] = {}
         self.confidence_validator = ConfidenceValidator(
-            min_confidence=confidence_threshold)
+            min_confidence=confidence_threshold
+        )
 
         self._initialize_agents()
         self._initialize_resilience_patterns(
@@ -142,7 +148,8 @@ class ProblemRouter:
             logger.warning("QAExtractionAgent not available", error=str(e))
             # Create a fallback agent
             agents[ProblemDomain.QA_EXTRACTION] = FallbackAgent(
-                "QA extraction requires LLM provider")
+                "QA extraction requires LLM provider"
+            )
 
         self.agents = agents
 
@@ -179,11 +186,9 @@ class ProblemRouter:
 
             # Rate limiter
             rate_limit = rate_limit_config.get(
-                domain.value, rate_limit_config.get(
-                    "default", default_rate_limit)
+                domain.value, rate_limit_config.get("default", default_rate_limit)
             )
-            self.rate_limiters[domain] = RateLimiter(
-                max_calls_per_minute=rate_limit)
+            self.rate_limiters[domain] = RateLimiter(max_calls_per_minute=rate_limit)
 
             # Bulkhead
             bulkhead_max = bulkhead_config.get(
@@ -191,7 +196,9 @@ class ProblemRouter:
             )
             self.bulkheads[domain] = Bulkhead(max_concurrent=bulkhead_max)
 
-    def diagnose_and_route(self, content: str, error_context: Dict[str, Any]) -> List[Tuple[ProblemDomain, float]]:
+    def diagnose_and_route(
+        self, content: str, error_context: Dict[str, Any]
+    ) -> List[Tuple[ProblemDomain, float]]:
         """
         Diagnose the problem and return prioritized list of agents to try.
 
@@ -204,15 +211,21 @@ class ProblemRouter:
         """
         diagnoses = []
 
-        error_msg = error_context.get('error_message', '').lower()
-        processing_stage = error_context.get('processing_stage', '')
+        error_msg = error_context.get("error_message", "").lower()
+        processing_stage = error_context.get("processing_stage", "")
 
         # YAML/Frontmatter issues
-        if any(keyword in error_msg for keyword in ['yaml', 'frontmatter', 'mapping values', 'expected']):
+        if any(
+            keyword in error_msg
+            for keyword in ["yaml", "frontmatter", "mapping values", "expected"]
+        ):
             diagnoses.append((ProblemDomain.YAML_FRONTMATTER, 0.9))
 
         # Content structure issues
-        if any(keyword in error_msg for keyword in ['missing', 'section', 'required for language']):
+        if any(
+            keyword in error_msg
+            for keyword in ["missing", "section", "required for language"]
+        ):
             diagnoses.append((ProblemDomain.CONTENT_STRUCTURE, 0.8))
 
         # Content corruption (patterns like a1a1a1, corruption markers)
@@ -220,15 +233,17 @@ class ProblemRouter:
             diagnoses.append((ProblemDomain.CONTENT_CORRUPTION, 0.85))
 
         # Code block issues
-        if any(keyword in error_msg for keyword in ['code fence', 'backtick', '```']):
+        if any(keyword in error_msg for keyword in ["code fence", "backtick", "```"]):
             diagnoses.append((ProblemDomain.CODE_BLOCKS, 0.8))
 
         # HTML validation issues
-        if processing_stage == 'card_generation' and any(keyword in error_msg for keyword in ['html', 'language-', '<code>', '<pre>']):
+        if processing_stage == "card_generation" and any(
+            keyword in error_msg for keyword in ["html", "language-", "<code>", "<pre>"]
+        ):
             diagnoses.append((ProblemDomain.HTML_VALIDATION, 0.9))
 
         # QA extraction issues
-        if processing_stage in ['parsing', 'indexing'] and 'qa' in error_msg.lower():
+        if processing_stage in ["parsing", "indexing"] and "qa" in error_msg.lower():
             diagnoses.append((ProblemDomain.QA_EXTRACTION, 0.7))
 
         # Quality assurance (fallback for general issues)
@@ -242,10 +257,10 @@ class ProblemRouter:
         """Detect patterns indicative of content corruption."""
         # Look for repetitive patterns that indicate corruption
         corruption_patterns = [
-            r'a1a1a1+',  # Repetitive a1 patterns
-            r'b\d+b\d+',  # b[number]b patterns
-            r'\w{1,2}\d{1,2}\w{1,2}\d{1,2}',  # Mixed alphanumeric corruption
-            r'[\u0080-\uFFFF]{5,}',  # Unusual unicode sequences
+            r"a1a1a1+",  # Repetitive a1 patterns
+            r"b\d+b\d+",  # b[number]b patterns
+            r"\w{1,2}\d{1,2}\w{1,2}\d{1,2}",  # Mixed alphanumeric corruption
+            r"[\u0080-\uFFFF]{5,}",  # Unusual unicode sequences
         ]
 
         for pattern in corruption_patterns:
@@ -254,7 +269,9 @@ class ProblemRouter:
 
         return False
 
-    def solve_problem(self, domain: ProblemDomain, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve_problem(
+        self, domain: ProblemDomain, content: str, context: Dict[str, Any]
+    ) -> AgentResult:
         """
         Route problem to the appropriate specialized agent with resilience patterns.
 
@@ -270,7 +287,7 @@ class ProblemRouter:
             return AgentResult(
                 success=False,
                 reasoning=f"No agent available for domain: {domain}",
-                warnings=["Unknown problem domain"]
+                warnings=["Unknown problem domain"],
             )
 
         agent = self.agents[domain]
@@ -282,7 +299,7 @@ class ProblemRouter:
                 "routing_to_specialized_agent",
                 domain=domain.value,
                 agent_type=agent.__class__.__name__,
-                content_length=len(content)
+                content_length=len(content),
             )
 
             result = agent.solve(content, context)
@@ -295,7 +312,7 @@ class ProblemRouter:
                     domain=domain.value,
                     confidence=result.confidence,
                     reason=validation.reason,
-                    patterns=validation.suspicious_patterns
+                    patterns=validation.suspicious_patterns,
                 )
                 raise LowConfidenceError(validation.reason)
 
@@ -304,7 +321,7 @@ class ProblemRouter:
                 domain=domain.value,
                 success=result.success,
                 confidence=result.confidence,
-                warnings=len(result.warnings)
+                warnings=len(result.warnings),
             )
 
             return result
@@ -315,12 +332,10 @@ class ProblemRouter:
                 """Execute with bulkhead protection."""
                 # Check rate limit
                 if not self.rate_limiters[domain].acquire():
-                    logger.warning(
-                        "rate_limit_exceeded",
-                        domain=domain.value
-                    )
+                    logger.warning("rate_limit_exceeded", domain=domain.value)
                     raise RateLimitExceededError(
-                        f"Rate limit exceeded for {domain.value}")
+                        f"Rate limit exceeded for {domain.value}"
+                    )
 
                 # Execute with circuit breaker
                 return self.circuit_breakers[domain].call(_execute_agent)
@@ -331,64 +346,44 @@ class ProblemRouter:
             return result
 
         except CircuitBreakerError as e:
-            logger.warning(
-                "circuit_breaker_open",
-                domain=domain.value,
-                error=str(e)
-            )
+            logger.warning("circuit_breaker_open", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Circuit breaker is open: {e}",
-                warnings=["Circuit breaker prevented execution"]
+                warnings=["Circuit breaker prevented execution"],
             )
 
         except RateLimitExceededError as e:
-            logger.warning(
-                "rate_limit_exceeded",
-                domain=domain.value,
-                error=str(e)
-            )
+            logger.warning("rate_limit_exceeded", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Rate limit exceeded: {e}",
-                warnings=["Rate limit prevented execution"]
+                warnings=["Rate limit prevented execution"],
             )
 
         except ResourceExhaustedError as e:
-            logger.warning(
-                "bulkhead_exhausted",
-                domain=domain.value,
-                error=str(e)
-            )
+            logger.warning("bulkhead_exhausted", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Resources exhausted: {e}",
-                warnings=["Bulkhead prevented execution"]
+                warnings=["Bulkhead prevented execution"],
             )
 
         except LowConfidenceError as e:
-            logger.warning(
-                "low_confidence_rejected",
-                domain=domain.value,
-                error=str(e)
-            )
+            logger.warning("low_confidence_rejected", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Low confidence rejected: {e}",
-                warnings=["Confidence validation failed"]
+                warnings=["Confidence validation failed"],
             )
 
         except Exception as e:
-            logger.error(
-                "specialized_agent_failed",
-                domain=domain.value,
-                error=str(e)
-            )
+            logger.error("specialized_agent_failed", domain=domain.value, error=str(e))
 
             return AgentResult(
                 success=False,
                 reasoning=f"Agent failed: {e}",
-                warnings=["Agent execution failed"]
+                warnings=["Agent execution failed"],
             )
 
 
@@ -472,7 +467,7 @@ class FallbackAgent(BaseSpecializedAgent):
         return AgentResult(
             success=False,
             reasoning=f"Agent not available: {self.reason}",
-            warnings=["Specialized agent dependency not met"]
+            warnings=["Specialized agent dependency not met"],
         )
 
 
@@ -489,9 +484,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
 
         try:
             result = self.agent.generate_repair(
-                content=content,
-                prompt=prompt,
-                max_retries=2
+                content=content, prompt=prompt, max_retries=2
             )
 
             if result.success and result.repaired_content:
@@ -502,31 +495,31 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
                         content=result.repaired_content,
                         confidence=result.confidence,
                         reasoning=result.reasoning,
-                        warnings=result.warnings
+                        warnings=result.warnings,
                     )
                 else:
                     return AgentResult(
                         success=False,
                         reasoning="YAML repair validation failed",
-                        warnings=["Repaired content is still invalid YAML"]
+                        warnings=["Repaired content is still invalid YAML"],
                     )
             else:
                 return AgentResult(
                     success=False,
                     reasoning=result.error_message or "YAML repair failed",
-                    warnings=["YAML frontmatter repair unsuccessful"]
+                    warnings=["YAML frontmatter repair unsuccessful"],
                 )
 
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"YAML agent error: {e}",
-                warnings=["YAML agent execution failed"]
+                warnings=["YAML agent execution failed"],
             )
 
     def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
         """Create YAML repair prompt."""
-        error_msg = context.get('error_message', '')
+        error_msg = context.get("error_message", "")
 
         return f"""You are a YAML frontmatter repair specialist. Fix the corrupted YAML frontmatter in this Obsidian note.
 
@@ -548,6 +541,7 @@ Return ONLY the repaired frontmatter section, properly formatted as valid YAML."
         """Validate that the YAML repair is correct."""
         try:
             import frontmatter
+
             # Try to parse the frontmatter
             post = frontmatter.loads(content)
             return post.metadata is not None
@@ -574,9 +568,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
 
         try:
             result = self.agent.generate_repair(
-                content=content,
-                prompt=prompt,
-                max_retries=2
+                content=content, prompt=prompt, max_retries=2
             )
 
             if result.success and result.repaired_content:
@@ -585,20 +577,20 @@ class ContentStructureAgent(BaseSpecializedAgent):
                     content=result.repaired_content,
                     confidence=result.confidence,
                     reasoning=result.reasoning,
-                    warnings=result.warnings
+                    warnings=result.warnings,
                 )
             else:
                 return AgentResult(
                     success=False,
                     reasoning=result.error_message or "Content structure repair failed",
-                    warnings=["Content structure repair unsuccessful"]
+                    warnings=["Content structure repair unsuccessful"],
                 )
 
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"Content structure agent error: {e}",
-                warnings=["Content structure agent execution failed"]
+                warnings=["Content structure agent execution failed"],
             )
 
     def _rule_based_repair(self, content: str, context: Dict[str, Any]) -> AgentResult:
@@ -607,7 +599,9 @@ class ContentStructureAgent(BaseSpecializedAgent):
             # Extract languages from frontmatter
             languages = self._extract_languages_from_frontmatter(content)
             if not languages:
-                return AgentResult(success=False, reasoning="Could not determine languages")
+                return AgentResult(
+                    success=False, reasoning="Could not determine languages"
+                )
 
             lines = content.splitlines()
             repaired_lines = list(lines)
@@ -625,28 +619,38 @@ class ContentStructureAgent(BaseSpecializedAgent):
                     repaired_lines.insert(insert_pos + 1, question_marker)
                     repaired_lines.insert(insert_pos + 2, "")
                     repaired_lines.insert(
-                        insert_pos + 3, f"[Question content in {lang.upper()}]")
+                        insert_pos + 3, f"[Question content in {lang.upper()}]"
+                    )
 
             # Check for missing answer sections
             for lang in languages:
                 answer_marker = f"## Answer ({lang.upper()})"
                 if not any(answer_marker in line for line in lines):
                     # Add missing answer section after question
-                    question_idx = next((i for i, line in enumerate(
-                        repaired_lines) if question_marker in line), -1)
+                    question_idx = next(
+                        (
+                            i
+                            for i, line in enumerate(repaired_lines)
+                            if question_marker in line
+                        ),
+                        -1,
+                    )
                     if question_idx >= 0:
                         # Find end of question section
                         insert_pos = question_idx + 1
-                        while insert_pos < len(repaired_lines) and not repaired_lines[insert_pos].startswith('##'):
+                        while insert_pos < len(repaired_lines) and not repaired_lines[
+                            insert_pos
+                        ].startswith("##"):
                             insert_pos += 1
 
                         repaired_lines.insert(insert_pos, "")
                         repaired_lines.insert(insert_pos + 1, answer_marker)
                         repaired_lines.insert(insert_pos + 2, "")
                         repaired_lines.insert(
-                            insert_pos + 3, f"[Answer content in {lang.upper()}]")
+                            insert_pos + 3, f"[Answer content in {lang.upper()}]"
+                        )
 
-            repaired_content = '\n'.join(repaired_lines)
+            repaired_content = "\n".join(repaired_lines)
 
             if repaired_content != content:
                 return AgentResult(
@@ -654,13 +658,18 @@ class ContentStructureAgent(BaseSpecializedAgent):
                     content=repaired_content,
                     confidence=0.8,
                     reasoning="Added missing structural sections using rules",
-                    warnings=["Added placeholder content for missing sections"]
+                    warnings=["Added placeholder content for missing sections"],
                 )
 
-            return AgentResult(success=False, reasoning="No structural issues found with rule-based approach")
+            return AgentResult(
+                success=False,
+                reasoning="No structural issues found with rule-based approach",
+            )
 
         except Exception as e:
-            return AgentResult(success=False, reasoning=f"Rule-based repair failed: {e}")
+            return AgentResult(
+                success=False, reasoning=f"Rule-based repair failed: {e}"
+            )
 
     def _extract_languages_from_frontmatter(self, content: str) -> List[str]:
         """Extract language tags from frontmatter."""
@@ -668,30 +677,32 @@ class ContentStructureAgent(BaseSpecializedAgent):
         in_frontmatter = False
 
         for line in lines:
-            if line.strip() == '---':
+            if line.strip() == "---":
                 in_frontmatter = not in_frontmatter
                 if not in_frontmatter:
                     break
                 continue
 
-            if in_frontmatter and line.startswith('language_tags:'):
+            if in_frontmatter and line.startswith("language_tags:"):
                 # Extract from YAML list format
-                match = re.search(r'language_tags:\s*\[(.*?)\]', line)
+                match = re.search(r"language_tags:\s*\[(.*?)\]", line)
                 if match:
-                    return [lang.strip().strip('"\'') for lang in match.group(1).split(',')]
+                    return [
+                        lang.strip().strip("\"'") for lang in match.group(1).split(",")
+                    ]
 
-        return ['en']  # Default fallback
+        return ["en"]  # Default fallback
 
     def _find_frontmatter_end(self, lines: List[str]) -> int:
         """Find the end of frontmatter."""
         for i, line in enumerate(lines):
-            if line.strip() == '---' and i > 0:
+            if line.strip() == "---" and i > 0:
                 return i
         return 0
 
     def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
         """Create content structure repair prompt."""
-        error_msg = context.get('error_message', '')
+        error_msg = context.get("error_message", "")
 
         return f"""You are a content structure repair specialist. Fix missing or malformed sections in this Obsidian interview note.
 
@@ -729,9 +740,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
 
         try:
             result = self.agent.generate_repair(
-                content=content,
-                prompt=prompt,
-                max_retries=2
+                content=content, prompt=prompt, max_retries=2
             )
 
             if result.success and result.repaired_content:
@@ -740,20 +749,21 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
                     content=result.repaired_content,
                     confidence=result.confidence,
                     reasoning=result.reasoning,
-                    warnings=result.warnings
+                    warnings=result.warnings,
                 )
             else:
                 return AgentResult(
                     success=False,
-                    reasoning=result.error_message or "Content corruption repair failed",
-                    warnings=["Content corruption repair unsuccessful"]
+                    reasoning=result.error_message
+                    or "Content corruption repair failed",
+                    warnings=["Content corruption repair unsuccessful"],
                 )
 
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"Content corruption agent error: {e}",
-                warnings=["Content corruption agent execution failed"]
+                warnings=["Content corruption agent execution failed"],
             )
 
     def _rule_based_corruption_repair(self, content: str) -> AgentResult:
@@ -763,16 +773,16 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
 
             # Remove repetitive alphanumeric corruption patterns
             # Remove "a1", "b2", etc. patterns
-            content = re.sub(r'[a-zA-Z]\d{1,2}\s*', '', content)
+            content = re.sub(r"[a-zA-Z]\d{1,2}\s*", "", content)
             # Remove "1a", "2b", etc. patterns
-            content = re.sub(r'\d{1,2}[a-zA-Z]\s*', '', content)
+            content = re.sub(r"\d{1,2}[a-zA-Z]\s*", "", content)
             # Remove excessive character repetition (more than 2)
-            content = re.sub(r'(.)\1{2,}', r'\1', content)
+            content = re.sub(r"(.)\1{2,}", r"\1", content)
 
             # Clean up spacing issues caused by removals
-            content = re.sub(r'\s+', ' ', content)  # Normalize multiple spaces
+            content = re.sub(r"\s+", " ", content)  # Normalize multiple spaces
             # Remove excessive blank lines
-            content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
+            content = re.sub(r"\n\s*\n\s*\n", "\n\n", content)
 
             if content != original_content:
                 return AgentResult(
@@ -780,17 +790,21 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
                     content=content,
                     confidence=0.7,
                     reasoning="Removed corruption patterns using rules",
-                    warnings=["Content was cleaned of corruption patterns"]
+                    warnings=["Content was cleaned of corruption patterns"],
                 )
 
-            return AgentResult(success=False, reasoning="No corruption patterns detected")
+            return AgentResult(
+                success=False, reasoning="No corruption patterns detected"
+            )
 
         except Exception as e:
-            return AgentResult(success=False, reasoning=f"Rule-based corruption repair failed: {e}")
+            return AgentResult(
+                success=False, reasoning=f"Rule-based corruption repair failed: {e}"
+            )
 
     def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
         """Create content corruption repair prompt."""
-        error_msg = context.get('error_message', '')
+        error_msg = context.get("error_message", "")
 
         return f"""You are a content corruption repair specialist. Fix corrupted text patterns in this document.
 
@@ -823,13 +837,13 @@ class CodeBlockAgent(BaseSpecializedAgent):
                 content=repaired_content,
                 confidence=0.8,
                 reasoning="Repaired code fence issues with pattern matching",
-                warnings=[]
+                warnings=[],
             )
         else:
             return AgentResult(
                 success=False,
                 reasoning="No code fence issues detected or repairable",
-                warnings=["Code block agent could not find issues to repair"]
+                warnings=["Code block agent could not find issues to repair"],
             )
 
     def _repair_code_fences(self, content: str) -> str:
@@ -858,7 +872,7 @@ class CodeBlockAgent(BaseSpecializedAgent):
             repaired_lines.append("```")
             fence_stack.pop()
 
-        return '\n'.join(repaired_lines)
+        return "\n".join(repaired_lines)
 
 
 class HTMLValidationAgent(BaseSpecializedAgent):
@@ -886,20 +900,20 @@ class HTMLValidationAgent(BaseSpecializedAgent):
                         content=result.html,
                         confidence=0.9,
                         reasoning="Regenerated HTML using structured templates",
-                        warnings=result.warnings
+                        warnings=result.warnings,
                     )
 
             return AgentResult(
                 success=False,
                 reasoning="Could not extract card data for HTML regeneration",
-                warnings=["HTML validation agent needs structured card data"]
+                warnings=["HTML validation agent needs structured card data"],
             )
 
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"HTML validation agent error: {e}",
-                warnings=["HTML validation agent execution failed"]
+                warnings=["HTML validation agent execution failed"],
             )
 
     def _extract_card_data(self, content: str) -> Optional[Dict[str, Any]]:
@@ -916,6 +930,7 @@ class QAExtractionAgent(BaseSpecializedAgent):
         super().__init__()
         # This would use the existing QA extraction agent
         from .qa_extractor import QAExtractorAgent
+
         self.qa_agent = QAExtractorAgent(model=self.model)
 
     def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
@@ -926,13 +941,13 @@ class QAExtractionAgent(BaseSpecializedAgent):
             return AgentResult(
                 success=False,
                 reasoning="QA extraction agent needs integration with existing QA pipeline",
-                warnings=["QA extraction agent not fully implemented"]
+                warnings=["QA extraction agent not fully implemented"],
             )
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"QA extraction agent error: {e}",
-                warnings=["QA extraction agent execution failed"]
+                warnings=["QA extraction agent execution failed"],
             )
 
 
@@ -949,9 +964,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
 
         try:
             result = self.agent.generate_repair(
-                content=content,
-                prompt=prompt,
-                max_retries=2
+                content=content, prompt=prompt, max_retries=2
             )
 
             if result.success and result.repaired_content:
@@ -960,25 +973,25 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
                     content=result.repaired_content,
                     confidence=result.confidence,
                     reasoning=result.reasoning,
-                    warnings=result.warnings
+                    warnings=result.warnings,
                 )
             else:
                 return AgentResult(
                     success=False,
                     reasoning=result.error_message or "Quality assurance repair failed",
-                    warnings=["Quality assurance repair unsuccessful"]
+                    warnings=["Quality assurance repair unsuccessful"],
                 )
 
         except Exception as e:
             return AgentResult(
                 success=False,
                 reasoning=f"Quality assurance agent error: {e}",
-                warnings=["Quality assurance agent execution failed"]
+                warnings=["Quality assurance agent execution failed"],
             )
 
     def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
         """Create general quality assurance prompt."""
-        error_msg = context.get('error_message', '')
+        error_msg = context.get("error_message", "")
 
         return f"""You are a general quality assurance specialist. Fix any issues in this document to make it valid and usable.
 
@@ -1000,7 +1013,9 @@ Return the repaired content."""
 problem_router = ProblemRouter()
 
 
-def diagnose_and_solve_problems(content: str, error_context: Dict[str, Any]) -> List[AgentResult]:
+def diagnose_and_solve_problems(
+    content: str, error_context: Dict[str, Any]
+) -> List[AgentResult]:
     """
     Diagnose problems and attempt solutions using specialized agents.
 
@@ -1016,9 +1031,7 @@ def diagnose_and_solve_problems(content: str, error_context: Dict[str, Any]) -> 
 
     for domain, confidence in diagnoses:
         logger.info(
-            "trying_specialized_agent",
-            domain=domain.value,
-            confidence=confidence
+            "trying_specialized_agent", domain=domain.value, confidence=confidence
         )
 
         result = problem_router.solve_problem(domain, content, error_context)
@@ -1029,7 +1042,7 @@ def diagnose_and_solve_problems(content: str, error_context: Dict[str, Any]) -> 
             logger.info(
                 "specialized_agent_success",
                 domain=domain.value,
-                confidence=result.confidence
+                confidence=result.confidence,
             )
             break
 

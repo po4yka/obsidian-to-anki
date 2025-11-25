@@ -25,6 +25,10 @@ def patch_openai(monkeypatch):
 @pytest.fixture
 def dummy_config(tmp_path):
     """Create a minimal config for APFGenerator."""
+    # Create source directory in vault
+    source_dir = tmp_path / "interview_questions" / "InterviewQuestions"
+    source_dir.mkdir(parents=True, exist_ok=True)
+
     return Config(
         vault_path=tmp_path,
         source_dir=Path("interview_questions/InterviewQuestions"),

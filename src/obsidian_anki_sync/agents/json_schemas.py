@@ -311,7 +311,12 @@ def get_parser_repair_schema() -> dict[str, Any]:
                         "properties": {
                             "section_type": {
                                 "type": "string",
-                                "enum": ["question_en", "question_ru", "answer_en", "answer_ru"],
+                                "enum": [
+                                    "question_en",
+                                    "question_ru",
+                                    "answer_en",
+                                    "answer_ru",
+                                ],
                             },
                             "method": {
                                 "type": "string",

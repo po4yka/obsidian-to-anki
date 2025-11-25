@@ -15,7 +15,8 @@ class TestStateDB:
 
         with StateDB(db_path) as db:
             # Should create tables
-            cursor = db.conn.cursor()
+            conn = db._get_connection()
+            cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
 

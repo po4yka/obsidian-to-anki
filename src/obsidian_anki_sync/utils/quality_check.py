@@ -59,7 +59,10 @@ Your response must be a JSON object with two keys:
                 model=check_model,
                 temperature=0.0,  # Deterministic for quality checks
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that returns only valid JSON."},
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that returns only valid JSON.",
+                    },
                     {"role": "user", "content": prompt},
                 ],
             )
@@ -67,7 +70,8 @@ Your response must be a JSON object with two keys:
         else:
             # Generic interface
             result_text = llm_client.generate(
-                prompt, model=check_model, temperature=0.0)
+                prompt, model=check_model, temperature=0.0
+            )
 
         # Parse JSON response
         result = json.loads(result_text)

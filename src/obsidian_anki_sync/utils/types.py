@@ -9,6 +9,7 @@ from ..models import NoteMetadata, QAPair
 @dataclass
 class RecoveryResult:
     """Result of error recovery attempt."""
+
     success: bool
     metadata: Optional[NoteMetadata] = None
     qa_pairs: Optional[List[QAPair]] = None

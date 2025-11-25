@@ -64,7 +64,9 @@ class ProgressDisplay:
         if self.current_note:
             # Truncate long note names
             note_display = (
-                self.current_note[:60] + "..." if len(self.current_note) > 60 else self.current_note
+                self.current_note[:60] + "..."
+                if len(self.current_note) > 60
+                else self.current_note
             )
             status_text += f"\n[cyan]Note:[/cyan] {note_display}"
 
@@ -82,8 +84,14 @@ class ProgressDisplay:
         # Show last N reflections
         recent_reflections = self.reflections[-self.max_reflections :]
         reflection_text = "\n".join(
-            [f"[dim]•[/dim] {reflection[:200]}..." if len(reflection) > 200 else f"[dim]•[/dim] {reflection}"
-             for reflection in recent_reflections]
+            [
+                (
+                    f"[dim]•[/dim] {reflection[:200]}..."
+                    if len(reflection) > 200
+                    else f"[dim]•[/dim] {reflection}"
+                )
+                for reflection in recent_reflections
+            ]
         )
 
         return Panel(
@@ -188,7 +196,11 @@ class ProgressDisplay:
         Returns:
             Table instance
         """
-        table = Table(title="[bold]Statistics[/bold]", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="[bold]Statistics[/bold]",
+            show_header=True,
+            header_style="bold magenta",
+        )
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green")
 
@@ -227,4 +239,3 @@ def extract_reasoning_from_response(response: dict[str, Any], model: str) -> str
             return notes
 
     return None
-

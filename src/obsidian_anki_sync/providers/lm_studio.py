@@ -262,7 +262,11 @@ class LMStudioProvider(BaseLLMProvider):
                 "lm_studio_json_parse_error",
                 model=model,
                 error=str(e),
-                error_position=f"line {e.lineno}, col {e.colno}" if hasattr(e, "lineno") else "unknown",
+                error_position=(
+                    f"line {e.lineno}, col {e.colno}"
+                    if hasattr(e, "lineno")
+                    else "unknown"
+                ),
                 response_text=response_text,
                 response_length=len(response_text),
             )

@@ -163,8 +163,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             state["pre_validation"] = pre_result.model_dump()
             state["stage_times"]["pre_validation"] = pre_result.validation_time
             state["current_stage"] = "generation"
-            state["messages"].append(
-                f"Pre-validation: {pre_result.error_type}")
+            state["messages"].append(f"Pre-validation: {pre_result.error_type}")
             return state
 
     # Create pre-validator agent
@@ -180,8 +179,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         )
         pre_result.validation_time = time.time() - start_time
     except PreValidationError as e:
-        logger.error("langgraph_pre_validation_error",
-                     error=str(e), details=e.details)
+        logger.error("langgraph_pre_validation_error", error=str(e), details=e.details)
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -203,8 +201,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
     except Exception as e:
-        logger.exception(
-            "langgraph_pre_validation_unexpected_error", error=str(e))
+        logger.exception("langgraph_pre_validation_unexpected_error", error=str(e))
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -267,14 +264,12 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("card_splitting")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
-            logger.warning(
-                "failed_to_create_card_splitting_model", error=str(e))
+            logger.warning("failed_to_create_card_splitting_model", error=str(e))
             # Fallback: skip card splitting analysis
             state["card_splitting"] = None
             state["current_stage"] = "generation"
             state["stage_times"]["card_splitting"] = time.time() - start_time
-            state["messages"].append(
-                "Card splitting skipped (model unavailable)")
+            state["messages"].append("Card splitting skipped (model unavailable)")
             return state
 
     # Create card splitting agent
@@ -420,8 +415,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import PostValidatorAgentAI
 
-    logger.info("langgraph_post_validation_start",
-                retry_count=state["retry_count"])
+    logger.info("langgraph_post_validation_start", retry_count=state["retry_count"])
     start_time = time.time()
 
     # Deserialize data
@@ -443,8 +437,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("post_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning(
-                "failed_to_create_post_validator_model", error=str(e))
+            logger.warning("failed_to_create_post_validator_model", error=str(e))
             # Assume valid if validator unavailable
             post_result = PostValidationResult(
                 is_valid=True,
@@ -494,8 +487,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
 
     state["post_validation"] = post_result.model_dump()
     state["stage_times"]["post_validation"] = (
-        state["stage_times"].get("post_validation", 0.0) +
-        post_result.validation_time
+        state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
     )
 
     # Determine next stage based on validation result
@@ -574,13 +566,11 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
         model = state.get("context_enrichment_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "context_enrichment")
+            model_name = state["config"].get_model_for_agent("context_enrichment")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create enrichment agent
-        enrichment_agent = ContextEnrichmentAgentAI(
-            model=model, temperature=0.3)
+        enrichment_agent = ContextEnrichmentAgentAI(model=model, temperature=0.3)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -614,8 +604,7 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
                 enriched_cards.append(card)  # Keep original
 
         # Update generation with enriched cards
-        state["generation"]["cards"] = [card.model_dump()
-                                        for card in enriched_cards]
+        state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
 
         # Create enrichment result summary
         enrichment_result = ContextEnrichmentResult(
@@ -692,13 +681,11 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
         model = state.get("memorization_quality_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "memorization_quality")
+            model_name = state["config"].get_model_for_agent("memorization_quality")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create memorization quality agent
-        quality_agent = MemorizationQualityAgentAI(
-            model=model, temperature=0.0)
+        quality_agent = MemorizationQualityAgentAI(model=model, temperature=0.0)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -800,13 +787,11 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         model = state.get("duplicate_detection_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "duplicate_detection")
+            model_name = state["config"].get_model_for_agent("duplicate_detection")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create duplicate detection agent
-        detection_agent = DuplicateDetectionAgentAI(
-            model=model, temperature=0.0)
+        detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
 
         # Deserialize cards
         new_cards = [
@@ -1076,30 +1061,19 @@ class LangGraphOrchestrator:
             self.post_validator_model = PydanticAIModelFactory.create_from_config(
                 config, model_name=config.get_model_for_agent("post_validator")
             )
-            self.context_enrichment_model = (
-                PydanticAIModelFactory.create_from_config(
-                    config, model_name=config.get_model_for_agent(
-                        "context_enrichment")
-                )
+            self.context_enrichment_model = PydanticAIModelFactory.create_from_config(
+                config, model_name=config.get_model_for_agent("context_enrichment")
             )
-            self.memorization_quality_model = (
-                PydanticAIModelFactory.create_from_config(
-                    config,
-                    model_name=config.get_model_for_agent(
-                        "memorization_quality"),
-                )
+            self.memorization_quality_model = PydanticAIModelFactory.create_from_config(
+                config,
+                model_name=config.get_model_for_agent("memorization_quality"),
             )
-            self.duplicate_detection_model = (
-                PydanticAIModelFactory.create_from_config(
-                    config, model_name=config.get_model_for_agent(
-                        "duplicate_detection")
-                )
+            self.duplicate_detection_model = PydanticAIModelFactory.create_from_config(
+                config, model_name=config.get_model_for_agent("duplicate_detection")
             )
             logger.info("pydantic_ai_models_cached", models_created=7)
         except Exception as e:
-            logger.warning(
-                "failed_to_cache_models_will_create_on_demand", error=str(e)
-            )
+            logger.warning("failed_to_cache_models_will_create_on_demand", error=str(e))
             # Set to None - nodes will create models on demand as fallback
             self.pre_validator_model = None
             self.card_splitting_model = None
@@ -1114,22 +1088,23 @@ class LangGraphOrchestrator:
         if getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
             try:
                 memory_storage_path = getattr(
-                    config, "memory_storage_path", Path(".agent_memory"))
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                    config, "memory_storage_path", Path(".agent_memory")
+                )
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
                 embedding_model = getattr(
-                    config, "embedding_model", "text-embedding-3-small")
+                    config, "embedding_model", "text-embedding-3-small"
+                )
 
                 self.memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
                     embedding_model=embedding_model,
                     enable_semantic_search=enable_semantic_search,
                 )
-                logger.info("langgraph_memory_store_initialized",
-                            path=str(memory_storage_path))
+                logger.info(
+                    "langgraph_memory_store_initialized", path=str(memory_storage_path)
+                )
             except Exception as e:
-                logger.warning(
-                    "langgraph_memory_store_init_failed", error=str(e))
+                logger.warning("langgraph_memory_store_init_failed", error=str(e))
 
         # Build the workflow graph
         self.workflow = self._build_workflow()

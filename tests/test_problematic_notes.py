@@ -15,8 +15,7 @@ class TestProblematicNotesArchiver:
     def test_archiver_initialization(self, temp_dir):
         """Test archiver initialization."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         assert archiver.archive_dir == archive_dir
         assert archiver.enabled is True
@@ -26,8 +25,7 @@ class TestProblematicNotesArchiver:
     def test_archiver_disabled(self, temp_dir):
         """Test archiver when disabled."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=False)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=False)
 
         assert archiver.enabled is False
         result = archiver.archive_note(
@@ -39,8 +37,7 @@ class TestProblematicNotesArchiver:
     def test_archive_note_parser_error(self, temp_dir, sample_note_content):
         """Test archiving a note with parser error."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test_note.md"
         note_path.write_text(sample_note_content, encoding="utf-8")
@@ -76,8 +73,7 @@ class TestProblematicNotesArchiver:
     def test_archive_note_with_context(self, temp_dir, sample_note_content):
         """Test archiving with additional context."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test_note.md"
         note_path.write_text(sample_note_content, encoding="utf-8")
@@ -105,8 +101,7 @@ class TestProblematicNotesArchiver:
     def test_get_archived_notes(self, temp_dir, sample_note_content):
         """Test retrieving archived notes."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         # Archive multiple notes
         for i in range(3):
@@ -139,8 +134,7 @@ class TestProblematicNotesArchiver:
     def test_error_category_mapping(self, temp_dir):
         """Test error type to category mapping."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test.md"
         note_path.write_text("test", encoding="utf-8")
@@ -161,8 +155,7 @@ class TestProblematicNotesArchiver:
     def test_cleanup_old_archives(self, temp_dir, sample_note_content):
         """Test cleanup of old archived notes."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         # Archive a note
         note_path = temp_dir / "test.md"
@@ -175,4 +168,3 @@ class TestProblematicNotesArchiver:
         # Cleanup with very short retention (should keep everything recent)
         cleaned = archiver.cleanup_old_archives(max_age_days=0)
         assert cleaned == 0  # Recent notes should not be cleaned
-

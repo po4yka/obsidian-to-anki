@@ -85,9 +85,9 @@ class AgentOrchestrator:
             model=pre_val_model,
             temperature=getattr(config, "pre_validator_temperature", 0.0),
             enable_content_generation=getattr(
-                config, "enable_content_generation", True),
-            repair_missing_sections=getattr(
-                config, "repair_missing_sections", True),
+                config, "enable_content_generation", True
+            ),
+            repair_missing_sections=getattr(config, "repair_missing_sections", True),
         )
 
         self.generator = GeneratorAgent(
@@ -111,12 +111,9 @@ class AgentOrchestrator:
             pre_val_temp=getattr(config, "pre_validator_temperature", 0.0),
             gen_temp=getattr(config, "generator_temperature", 0.3),
             post_val_temp=getattr(config, "post_validator_temperature", 0.0),
-            post_val_max_retries=getattr(
-                config, "post_validation_max_retries", 3),
-            post_val_auto_fix=getattr(
-                config, "post_validation_auto_fix", True),
-            post_val_strict=getattr(
-                config, "post_validation_strict_mode", True),
+            post_val_max_retries=getattr(config, "post_validation_max_retries", 3),
+            post_val_auto_fix=getattr(config, "post_validation_auto_fix", True),
+            post_val_strict=getattr(config, "post_validation_strict_mode", True),
         )
 
     def process_note(
@@ -156,8 +153,7 @@ class AgentOrchestrator:
         )
 
         # Stage 1: Pre-validation
-        pre_validation_enabled = getattr(
-            self.config, "pre_validation_enabled", True)
+        pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
         pre_val_start = time.time()
 
         if pre_validation_enabled:
@@ -444,8 +440,7 @@ class AgentOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(
-                    qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")

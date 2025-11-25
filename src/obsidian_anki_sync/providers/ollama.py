@@ -1,7 +1,8 @@
 """Ollama provider implementation (local and cloud)."""
 
 import time
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -85,10 +86,42 @@ class OllamaProvider(BaseLLMProvider):
             safety_enabled=enable_safety,
         )
 
+    def close(self) -> None:
+        """Close HTTP client and cleanup resources."""
+        if hasattr(self, "client") and self.client:
+            try:
+                self.client.close()
+                logger.debug(
+                    "ollama_client_closed",
+                    base_url=self.base_url,
+                )
+            except Exception as e:
+                logger.warning(
+                    "ollama_client_cleanup_failed",
+                    base_url=self.base_url,
+                    error=str(e),
+                )
+
+    def __enter__(self) -> "OllamaProvider":
+        """Context manager entry."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
+        """Context manager exit with cleanup."""
+        self.close()
+        return False
+
     def __del__(self) -> None:
-        """Clean up client resources."""
-        if hasattr(self, "client"):
-            self.client.close()
+        """Clean up client resources on deletion."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def check_connection(self) -> bool:
         """Check if Ollama is running and accessible.

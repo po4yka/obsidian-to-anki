@@ -349,10 +349,14 @@ You are an expert Q&A extraction system specializing in educational note analysi
 
             # Ensure we have reasonable tokens for complex extractions
             # But respect model-specific output limits (not context window limits)
-            from ..providers.openrouter import MODEL_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS
+            from ..providers.openrouter import (
+                DEFAULT_MAX_OUTPUT_TOKENS,
+                MODEL_MAX_OUTPUT_TOKENS,
+            )
 
             model_max_output = MODEL_MAX_OUTPUT_TOKENS.get(
-                self.model, DEFAULT_MAX_OUTPUT_TOKENS)
+                self.model, DEFAULT_MAX_OUTPUT_TOKENS
+            )
 
             # Add safety margin: use 90% of model's max output to prevent hitting hard limits
             safe_max_output = int(model_max_output * 0.9)
@@ -360,14 +364,13 @@ You are an expert Q&A extraction system specializing in educational note analysi
             # Set minimum to 4096 for QA extraction (reasonable for most models)
             # But don't exceed model's safe output limit
             min_tokens_for_extraction = min(4096, safe_max_output)
-            estimated_max_tokens = max(
-                estimated_max_tokens, min_tokens_for_extraction)
+            estimated_max_tokens = max(estimated_max_tokens, min_tokens_for_extraction)
             estimated_max_tokens = min(estimated_max_tokens, safe_max_output)
 
             # Temporarily adjust max_tokens for this extraction to ensure complete responses
             # Store original max_tokens to restore later
             original_max_tokens = None
-            if hasattr(self.llm_provider, 'max_tokens'):
+            if hasattr(self.llm_provider, "max_tokens"):
                 original_max_tokens = self.llm_provider.max_tokens
                 # Always use the larger of: configured max or estimated needed
                 # This ensures we don't truncate responses
@@ -383,11 +386,10 @@ You are an expert Q&A extraction system specializing in educational note analysi
                     )
 
             # Update progress display if available
-            progress_display = getattr(self, 'progress_display', None)
+            progress_display = getattr(self, "progress_display", None)
             if progress_display:
                 note_name = metadata.title[:50] if metadata.title else "Unknown"
-                progress_display.update_operation(
-                    "Extracting Q&A pairs", note_name)
+                progress_display.update_operation("Extracting Q&A pairs", note_name)
 
             try:
                 result = self.llm_provider.generate_json(
@@ -402,20 +404,25 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 # Extract and display reflections if available
                 if progress_display:
                     from ..utils.progress_display import extract_reasoning_from_response
-                    reasoning = extract_reasoning_from_response(
-                        result, self.model)
+
+                    reasoning = extract_reasoning_from_response(result, self.model)
                     if reasoning:
                         progress_display.add_reflection(
-                            f"Extraction reasoning: {reasoning[:200]}")
+                            f"Extraction reasoning: {reasoning[:200]}"
+                        )
 
                     # Also check extraction_notes
                     extraction_notes = result.get("extraction_notes", "")
                     if extraction_notes and len(extraction_notes) > 30:
                         progress_display.add_reflection(
-                            f"Extraction notes: {extraction_notes[:200]}")
+                            f"Extraction notes: {extraction_notes[:200]}"
+                        )
             finally:
                 # Restore original max_tokens
-                if hasattr(self.llm_provider, 'max_tokens') and original_max_tokens is not None:
+                if (
+                    hasattr(self.llm_provider, "max_tokens")
+                    and original_max_tokens is not None
+                ):
                     self.llm_provider.max_tokens = original_max_tokens
 
             llm_duration = time.time() - llm_start_time
@@ -448,8 +455,7 @@ You are an expert Q&A extraction system specializing in educational note analysi
             for qa_data in qa_pairs_data:
                 try:
                     qa_pair = QAPair(
-                        card_index=qa_data.get(
-                            "card_index", len(qa_pairs) + 1),
+                        card_index=qa_data.get("card_index", len(qa_pairs) + 1),
                         question_en=qa_data.get("question_en", "").strip(),
                         question_ru=qa_data.get("question_ru", "").strip(),
                         answer_en=qa_data.get("answer_en", "").strip(),
@@ -466,7 +472,10 @@ You are an expert Q&A extraction system specializing in educational note analysi
 
                     valid = True
                     if has_en and (not qa_pair.question_en or not qa_pair.answer_en):
-                        if self.enable_content_generation and self.repair_missing_sections:
+                        if (
+                            self.enable_content_generation
+                            and self.repair_missing_sections
+                        ):
                             # Generate missing EN content from RU if available
                             if has_ru and qa_pair.question_ru and qa_pair.answer_ru:
                                 if not qa_pair.question_en:
@@ -503,7 +512,10 @@ You are an expert Q&A extraction system specializing in educational note analysi
                             valid = False
 
                     if has_ru and (not qa_pair.question_ru or not qa_pair.answer_ru):
-                        if self.enable_content_generation and self.repair_missing_sections:
+                        if (
+                            self.enable_content_generation
+                            and self.repair_missing_sections
+                        ):
                             # Generate missing RU content from EN if available
                             if has_en and qa_pair.question_en and qa_pair.answer_en:
                                 if not qa_pair.question_ru:
@@ -571,7 +583,9 @@ You are an expert Q&A extraction system specializing in educational note analysi
             return qa_pairs
 
         except Exception as e:
-            llm_duration = time.time() - llm_start_time if "llm_start_time" in locals() else 0
+            llm_duration = (
+                time.time() - llm_start_time if "llm_start_time" in locals() else 0
+            )
             total_duration = time.time() - start_time
 
             # Categorize and log the error

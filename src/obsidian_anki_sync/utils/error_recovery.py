@@ -8,24 +8,24 @@ import re
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from ..models import NoteMetadata, QAPair
-from ..obsidian.parser import parse_note
-from ..exceptions import ParserError
-from ..utils.logging import get_logger
-from ..utils.types import RecoveryResult
-from ..agents.specialized_agents import (
-    ProblemRouter,
-    ProblemDomain,
-    diagnose_and_solve_problems,
-)
 from ..agents.agent_learning import AdaptiveRouter
 from ..agents.agent_monitoring import (
     AgentHealthMonitor,
+    DatabaseMetricsStorage,
+    InMemoryMetricsStorage,
     MetricsCollector,
     PerformanceTracker,
-    InMemoryMetricsStorage,
-    DatabaseMetricsStorage,
 )
+from ..agents.specialized_agents import (
+    ProblemDomain,
+    ProblemRouter,
+    diagnose_and_solve_problems,
+)
+from ..exceptions import ParserError
+from ..models import NoteMetadata, QAPair
+from ..obsidian.parser import parse_note
+from ..utils.logging import get_logger
+from ..utils.types import RecoveryResult
 
 # Import memory store if available
 try:
@@ -91,7 +91,8 @@ class ErrorRecoveryManager:
                 db_path = getattr(config, "db_path", None)
             if db_path:
                 metrics_storage = DatabaseMetricsStorage(
-                    Path(db_path) / "agent_metrics.db")
+                    Path(db_path) / "agent_metrics.db"
+                )
             else:
                 metrics_storage = InMemoryMetricsStorage()
         else:
@@ -102,22 +103,23 @@ class ErrorRecoveryManager:
         if config and getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
             try:
                 memory_storage_path = getattr(
-                    config, "memory_storage_path", Path(".agent_memory"))
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                    config, "memory_storage_path", Path(".agent_memory")
+                )
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
                 embedding_model = getattr(
-                    config, "embedding_model", "text-embedding-3-small")
+                    config, "embedding_model", "text-embedding-3-small"
+                )
 
                 memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
                     embedding_model=embedding_model,
                     enable_semantic_search=enable_semantic_search,
                 )
-                logger.info("agent_memory_store_initialized",
-                            path=str(memory_storage_path))
+                logger.info(
+                    "agent_memory_store_initialized", path=str(memory_storage_path)
+                )
             except Exception as e:
-                logger.warning(
-                    "memory_store_initialization_failed", error=str(e))
+                logger.warning("memory_store_initialization_failed", error=str(e))
 
         self.metrics_collector = MetricsCollector(metrics_storage)
         self.performance_tracker = PerformanceTracker(
@@ -135,8 +137,7 @@ class ErrorRecoveryManager:
         confidence_threshold = 0.7
 
         if config:
-            circuit_breaker_config = getattr(
-                config, "circuit_breaker_config", {})
+            circuit_breaker_config = getattr(config, "circuit_breaker_config", {})
             rate_limit_config = getattr(config, "rate_limit_config", {})
             bulkhead_config = getattr(config, "bulkhead_config", {})
             confidence_threshold = getattr(config, "confidence_threshold", 0.7)
@@ -184,11 +185,10 @@ class ErrorRecoveryManager:
                 success=True,
                 metadata=metadata,
                 qa_pairs=qa_pairs,
-                method_used="normal_parsing"
+                method_used="normal_parsing",
             )
         except ParserError as e:
-            logger.warning("initial_parsing_failed",
-                           file=str(file_path), error=str(e))
+            logger.warning("initial_parsing_failed", file=str(file_path), error=str(e))
             original_error = str(e)
 
         # Strategy 2: Preprocess and retry
@@ -196,18 +196,16 @@ class ErrorRecoveryManager:
             processed_content, warnings = self._preprocess_file(file_path)
             if processed_content:
                 # Write processed content to temp file and parse
-                temp_path = self._create_temp_file(
-                    processed_content, file_path)
+                temp_path = self._create_temp_file(processed_content, file_path)
                 try:
-                    metadata, qa_pairs = parse_note(
-                        temp_path, tolerant_parsing=True)
+                    metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
                         method_used="preprocessing_recovery",
                         warnings=warnings,
-                        original_error=original_error
+                        original_error=original_error,
                     )
                 finally:
                     # Clean up temp file
@@ -226,7 +224,7 @@ class ErrorRecoveryManager:
                     qa_pairs=qa_pairs,
                     method_used="specialized_agent_recovery",
                     warnings=["Content was repaired by specialized agent"],
-                    original_error=original_error
+                    original_error=original_error,
                 )
         except Exception as e:
             logger.warning("specialized_agent_recovery_failed", error=str(e))
@@ -237,15 +235,14 @@ class ErrorRecoveryManager:
             if repaired_content:
                 temp_path = self._create_temp_file(repaired_content, file_path)
                 try:
-                    metadata, qa_pairs = parse_note(
-                        temp_path, tolerant_parsing=True)
+                    metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
                         method_used="auto_repair_recovery",
                         warnings=["Content was automatically repaired"],
-                        original_error=original_error
+                        original_error=original_error,
                     )
                 finally:
                     temp_path.unlink(missing_ok=True)
@@ -260,9 +257,8 @@ class ErrorRecoveryManager:
                 metadata=metadata,
                 qa_pairs=qa_pairs,
                 method_used="minimal_structure_fallback",
-                warnings=[
-                    "Created minimal valid structure due to parsing failures"],
-                original_error=original_error
+                warnings=["Created minimal valid structure due to parsing failures"],
+                original_error=original_error,
             )
         except Exception as e:
             logger.error("minimal_structure_fallback_failed", error=str(e))
@@ -272,15 +268,14 @@ class ErrorRecoveryManager:
             success=False,
             method_used="all_recovery_failed",
             warnings=["All recovery strategies failed"],
-            original_error=original_error
+            original_error=original_error,
         )
 
     def _preprocess_file(self, file_path: Path) -> Tuple[Optional[str], List[str]]:
         """Preprocess file content to fix common issues."""
         try:
-            content = file_path.read_text(encoding='utf-8')
-            processed_content, warnings = self.preprocessor.preprocess_content(
-                content)
+            content = file_path.read_text(encoding="utf-8")
+            processed_content, warnings = self.preprocessor.preprocess_content(content)
             return processed_content, warnings
         except Exception as e:
             logger.error("preprocessing_failed", error=str(e))
@@ -289,7 +284,7 @@ class ErrorRecoveryManager:
     def _auto_repair_file(self, file_path: Path) -> Optional[str]:
         """Apply targeted auto-repair to file content."""
         try:
-            content = file_path.read_text(encoding='utf-8')
+            content = file_path.read_text(encoding="utf-8")
 
             # Apply specific repairs
             content = self._repair_code_fences(content)
@@ -327,20 +322,20 @@ class ErrorRecoveryManager:
             repaired_lines.append("```")
             fence_stack.pop()
 
-        return '\n'.join(repaired_lines)
+        return "\n".join(repaired_lines)
 
     def _repair_frontmatter(self, content: str) -> str:
         """Repair frontmatter issues."""
         lines = content.splitlines()
 
         # Ensure opening marker
-        if not lines or lines[0].strip() != '---':
-            lines.insert(0, '---')
+        if not lines or lines[0].strip() != "---":
+            lines.insert(0, "---")
 
         # Find or add closing marker
         found_closing = False
         for i, line in enumerate(lines[1:], 1):
-            if line.strip() == '---':
+            if line.strip() == "---":
                 found_closing = True
                 break
 
@@ -348,12 +343,12 @@ class ErrorRecoveryManager:
             # Add closing marker before first heading or at end
             insert_pos = len(lines)
             for i, line in enumerate(lines):
-                if line.startswith('#') and i > 0:
+                if line.startswith("#") and i > 0:
                     insert_pos = i
                     break
-            lines.insert(insert_pos, '---')
+            lines.insert(insert_pos, "---")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _repair_missing_sections(self, content: str) -> str:
         """Add missing required sections based on detected languages."""
@@ -361,7 +356,7 @@ class ErrorRecoveryManager:
         languages = self._extract_languages_from_frontmatter(content)
 
         lines = content.splitlines()
-        content_str = '\n'.join(lines)
+        content_str = "\n".join(lines)
 
         # Add missing sections for each language
         for lang in languages:
@@ -374,53 +369,56 @@ class ErrorRecoveryManager:
                 lines.insert(frontmatter_end + 1, "")
                 lines.insert(frontmatter_end + 2, question_marker)
                 lines.insert(frontmatter_end + 3, "")
-                lines.insert(frontmatter_end + 4,
-                             "[Question content to be added]")
+                lines.insert(frontmatter_end + 4, "[Question content to be added]")
 
             if answer_marker not in content_str:
                 # Add after question section
-                question_idx = next((i for i, line in enumerate(
-                    lines) if question_marker in line), -1)
+                question_idx = next(
+                    (i for i, line in enumerate(lines) if question_marker in line), -1
+                )
                 if question_idx >= 0:
                     # Find end of question section
                     insert_pos = question_idx + 1
-                    while insert_pos < len(lines) and not lines[insert_pos].startswith('##'):
+                    while insert_pos < len(lines) and not lines[insert_pos].startswith(
+                        "##"
+                    ):
                         insert_pos += 1
 
                     lines.insert(insert_pos, "")
                     lines.insert(insert_pos + 1, answer_marker)
                     lines.insert(insert_pos + 2, "")
-                    lines.insert(insert_pos + 3,
-                                 "[Answer content to be added]")
+                    lines.insert(insert_pos + 3, "[Answer content to be added]")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
-    def _create_minimal_structure(self, file_path: Path) -> Tuple[NoteMetadata, List[QAPair]]:
+    def _create_minimal_structure(
+        self, file_path: Path
+    ) -> Tuple[NoteMetadata, List[QAPair]]:
         """Create a minimal valid note structure when all else fails."""
         from ..models import NoteMetadata, QAPair
 
         # Extract basic info from filename
         filename = file_path.stem
-        parts = filename.split('--')
+        parts = filename.split("--")
 
         # Create minimal metadata
         metadata = NoteMetadata(
             id=filename,
-            title=filename.replace('-', ' ').title(),
-            topic=parts[1] if len(parts) > 1 else 'unknown',
+            title=filename.replace("-", " ").title(),
+            topic=parts[1] if len(parts) > 1 else "unknown",
             subtopics=[],
-            question_kind='theory',
-            difficulty='medium',
-            language_tags=['en'],
-            original_language='en',
+            question_kind="theory",
+            difficulty="medium",
+            language_tags=["en"],
+            original_language="en",
             aliases=[],
-            source='unknown',
-            source_note='Auto-generated minimal structure',
-            status='draft',
+            source="unknown",
+            source_note="Auto-generated minimal structure",
+            status="draft",
             related=[],
-            created='2024-01-01',
-            updated='2024-01-01',
-            tags=[]
+            created="2024-01-01",
+            updated="2024-01-01",
+            tags=[],
         )
 
         # Create minimal QA pair
@@ -441,7 +439,7 @@ class ErrorRecoveryManager:
         temp_dir = Path(tempfile.gettempdir())
         temp_file = temp_dir / f"obsidian_recovery_{original_path.name}"
 
-        temp_file.write_text(content, encoding='utf-8')
+        temp_file.write_text(content, encoding="utf-8")
         return temp_file
 
     def _extract_languages_from_frontmatter(self, content: str) -> List[str]:
@@ -451,36 +449,39 @@ class ErrorRecoveryManager:
 
         in_frontmatter = False
         for line in lines:
-            if line.strip() == '---':
+            if line.strip() == "---":
                 in_frontmatter = not in_frontmatter
                 if not in_frontmatter:
                     break
                 continue
 
-            if in_frontmatter and line.startswith('language_tags:'):
+            if in_frontmatter and line.startswith("language_tags:"):
                 # Extract from YAML list format
-                match = re.search(r'language_tags:\s*\[(.*?)\]', line)
+                match = re.search(r"language_tags:\s*\[(.*?)\]", line)
                 if match:
-                    languages = [lang.strip().strip('"\'')
-                                 for lang in match.group(1).split(', ')]
+                    languages = [
+                        lang.strip().strip("\"'") for lang in match.group(1).split(", ")
+                    ]
                     break
 
-        return languages or ['en']  # Default to English
+        return languages or ["en"]  # Default to English
 
-    def _try_specialized_agents(self, file_path: Path, original_error: str) -> Optional[Tuple[NoteMetadata, List[QAPair]]]:
+    def _try_specialized_agents(
+        self, file_path: Path, original_error: str
+    ) -> Optional[Tuple[NoteMetadata, List[QAPair]]]:
         """Try specialized agents to repair the content."""
         import time
 
         try:
             # Read the original content
-            content = file_path.read_text(encoding='utf-8')
+            content = file_path.read_text(encoding="utf-8")
 
             # Prepare error context
             error_context = {
-                'error_message': original_error,
-                'processing_stage': 'parsing',
-                'file_path': str(file_path),
-                'error_type': 'ParserError',
+                "error_message": original_error,
+                "processing_stage": "parsing",
+                "file_path": str(file_path),
+                "error_type": "ParserError",
             }
 
             # Query memory for similar past failures if memory store available
@@ -493,8 +494,9 @@ class ErrorRecoveryManager:
                         logger.info(
                             "similar_failures_found_in_memory",
                             count=len(similar_failures),
-                            similarities=[f.get("similarity")
-                                          for f in similar_failures],
+                            similarities=[
+                                f.get("similarity") for f in similar_failures
+                            ],
                         )
                 except Exception as e:
                     logger.warning("memory_query_failed", error=str(e))
@@ -508,7 +510,7 @@ class ErrorRecoveryManager:
 
                 try:
                     # Check health if monitoring enabled
-                    if self.enable_monitoring and hasattr(self, 'health_monitor'):
+                    if self.enable_monitoring and hasattr(self, "health_monitor"):
                         agent_name = domain.value
                         if self.health_monitor.should_check(agent_name):
                             health_result = self.health_monitor.check_health(
@@ -523,12 +525,11 @@ class ErrorRecoveryManager:
                                 continue
 
                     # Solve problem using router (includes all resilience patterns)
-                    result = self.router.solve_problem(
-                        domain, content, error_context)
+                    result = self.router.solve_problem(domain, content, error_context)
                     duration = time.time() - start_time
 
                     # Record metrics if monitoring enabled
-                    if self.enable_monitoring and hasattr(self, 'performance_tracker'):
+                    if self.enable_monitoring and hasattr(self, "performance_tracker"):
                         self.performance_tracker.record_call(
                             agent_name=domain.value,
                             success=result.success,
@@ -541,19 +542,25 @@ class ErrorRecoveryManager:
                             "specialized_agent_repair_attempt",
                             domain=domain.value,
                             confidence=result.confidence,
-                            reasoning=result.reasoning[:100] + "..." if len(
-                                result.reasoning) > 100 else result.reasoning
+                            reasoning=(
+                                result.reasoning[:100] + "..."
+                                if len(result.reasoning) > 100
+                                else result.reasoning
+                            ),
                         )
 
                         # Try to parse the repaired content
                         try:
                             temp_path = self._create_temp_file(
-                                result.content, file_path)
+                                result.content, file_path
+                            )
                             metadata, qa_pairs = parse_note(temp_path)
                             temp_path.unlink(missing_ok=True)
 
                             # Record success for learning
-                            if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                            if self.enable_learning and hasattr(
+                                self.router, "failure_analyzer"
+                            ):
                                 self.router.failure_analyzer.analyze_success(
                                     error_context, domain
                                 )
@@ -564,17 +571,21 @@ class ErrorRecoveryManager:
                             logger.warning(
                                 "specialized_agent_repair_parse_failed",
                                 domain=domain.value,
-                                parse_error=str(parse_error)
+                                parse_error=str(parse_error),
                             )
                             # Record failure for learning
-                            if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                            if self.enable_learning and hasattr(
+                                self.router, "failure_analyzer"
+                            ):
                                 self.router.failure_analyzer.analyze_failure(
                                     error_context, [domain]
                                 )
                             continue
                     else:
                         # Record failure for learning
-                        if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                        if self.enable_learning and hasattr(
+                            self.router, "failure_analyzer"
+                        ):
                             self.router.failure_analyzer.analyze_failure(
                                 error_context, [domain]
                             )
@@ -588,7 +599,7 @@ class ErrorRecoveryManager:
                     )
 
                     # Record failure
-                    if self.enable_monitoring and hasattr(self, 'performance_tracker'):
+                    if self.enable_monitoring and hasattr(self, "performance_tracker"):
                         self.performance_tracker.record_call(
                             agent_name=domain.value,
                             success=False,
@@ -597,15 +608,16 @@ class ErrorRecoveryManager:
                         )
 
                     # Record failure for learning
-                    if self.enable_learning and hasattr(self.router, 'failure_analyzer'):
+                    if self.enable_learning and hasattr(
+                        self.router, "failure_analyzer"
+                    ):
                         self.router.failure_analyzer.analyze_failure(
                             error_context, [domain]
                         )
 
                     continue
 
-            logger.info("no_specialized_agent_succeeded",
-                        attempts=len(diagnoses))
+            logger.info("no_specialized_agent_succeeded", attempts=len(diagnoses))
             return None
 
         except Exception as e:
@@ -615,7 +627,7 @@ class ErrorRecoveryManager:
     def _find_frontmatter_end(self, lines: List[str]) -> int:
         """Find the end of frontmatter."""
         for i, line in enumerate(lines):
-            if line.strip() == '---' and i > 0:
+            if line.strip() == "---" and i > 0:
                 return i
         return 0
 
@@ -634,7 +646,9 @@ def parse_note_with_recovery(file_path: Path) -> RecoveryResult:
     return recovery_manager.parse_with_recovery(file_path)
 
 
-def parse_note_with_error_recovery(file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
+def parse_note_with_error_recovery(
+    file_path: Path,
+) -> tuple[NoteMetadata, list[QAPair]]:
     """
     Parse an Obsidian note with comprehensive error recovery.
 
@@ -661,13 +675,12 @@ def parse_note_with_error_recovery(file_path: Path) -> tuple[NoteMetadata, list[
             file=str(file_path),
             method=result.method_used,
             qa_pairs_count=len(result.qa_pairs) if result.qa_pairs else 0,
-            warnings=result.warnings
+            warnings=result.warnings,
         )
 
         if result.warnings:
             for warning in result.warnings:
-                logger.warning("recovery_warning",
-                               warning=warning, file=str(file_path))
+                logger.warning("recovery_warning", warning=warning, file=str(file_path))
 
         return result.metadata, result.qa_pairs
     else:
@@ -679,7 +692,7 @@ def parse_note_with_error_recovery(file_path: Path) -> tuple[NoteMetadata, list[
             "parse_recovery_failed",
             file=str(file_path),
             original_error=result.original_error,
-            warnings=result.warnings
+            warnings=result.warnings,
         )
 
         raise ParserError(error_msg)

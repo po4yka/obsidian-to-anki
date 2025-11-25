@@ -1,37 +1,37 @@
 """Tests for resilience patterns in specialized agent system."""
 
-import time
 import threading
+import time
 from pathlib import Path
 
 import pytest
 
-from obsidian_anki_sync.utils.resilience import (
-    CircuitBreaker,
-    CircuitBreakerConfig,
-    CircuitBreakerState,
-    CircuitBreakerError,
-    RetryWithJitter,
-    RateLimiter,
-    RateLimitExceededError,
-    Bulkhead,
-    ResourceExhaustedError,
-    ConfidenceValidator,
-    LowConfidenceError,
+from obsidian_anki_sync.agents.agent_learning import AdaptiveRouter, FailureAnalyzer
+from obsidian_anki_sync.agents.agent_monitoring import (
+    AgentHealthMonitor,
+    HealthStatus,
+    InMemoryMetricsStorage,
+    MetricsCollector,
+    PerformanceTracker,
 )
 from obsidian_anki_sync.agents.specialized_agents import (
     AgentResult,
     ProblemDomain,
     ProblemRouter,
 )
-from obsidian_anki_sync.agents.agent_monitoring import (
-    AgentHealthMonitor,
-    MetricsCollector,
-    PerformanceTracker,
-    InMemoryMetricsStorage,
-    HealthStatus,
+from obsidian_anki_sync.utils.resilience import (
+    Bulkhead,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    CircuitBreakerState,
+    ConfidenceValidator,
+    LowConfidenceError,
+    RateLimiter,
+    RateLimitExceededError,
+    ResourceExhaustedError,
+    RetryWithJitter,
 )
-from obsidian_anki_sync.agents.agent_learning import AdaptiveRouter, FailureAnalyzer
 
 
 class TestCircuitBreaker:
@@ -39,8 +39,9 @@ class TestCircuitBreaker:
 
     def test_circuit_breaker_closed_state(self):
         """Test circuit breaker in closed state allows calls."""
-        cb = CircuitBreaker("test", CircuitBreakerConfig(
-            failure_threshold=3, timeout=60))
+        cb = CircuitBreaker(
+            "test", CircuitBreakerConfig(failure_threshold=3, timeout=60)
+        )
 
         def success_func():
             return "success"
@@ -51,8 +52,9 @@ class TestCircuitBreaker:
 
     def test_circuit_breaker_opens_after_threshold(self):
         """Test circuit breaker opens after failure threshold."""
-        cb = CircuitBreaker("test", CircuitBreakerConfig(
-            failure_threshold=2, timeout=60))
+        cb = CircuitBreaker(
+            "test", CircuitBreakerConfig(failure_threshold=2, timeout=60)
+        )
 
         def failing_func():
             raise ValueError("Test error")
@@ -77,8 +79,9 @@ class TestCircuitBreaker:
 
     def test_circuit_breaker_half_open_recovery(self):
         """Test circuit breaker transitions to half-open and recovers."""
-        cb = CircuitBreaker("test", CircuitBreakerConfig(
-            failure_threshold=2, timeout=1))
+        cb = CircuitBreaker(
+            "test", CircuitBreakerConfig(failure_threshold=2, timeout=1)
+        )
 
         def failing_func():
             raise ValueError("Test error")
@@ -220,8 +223,7 @@ class TestConfidenceValidator:
 
     def test_confidence_validator_detects_suspicious_patterns(self):
         """Test validator detects suspicious patterns."""
-        validator = ConfidenceValidator(
-            min_confidence=0.5, validate_patterns=True)
+        validator = ConfidenceValidator(min_confidence=0.5, validate_patterns=True)
 
         # Content with excessive placeholders
         content = "[PLACEHOLDER] " * 100
@@ -266,10 +268,10 @@ class TestAgentMonitoring:
         storage = InMemoryMetricsStorage()
         collector = MetricsCollector(storage)
 
-        collector.record_success(
-            "test_agent", confidence=0.9, response_time=1.5)
+        collector.record_success("test_agent", confidence=0.9, response_time=1.5)
         collector.record_failure(
-            "test_agent", error_type="ValueError", response_time=0.5)
+            "test_agent", error_type="ValueError", response_time=0.5
+        )
 
         summary = collector.get_metrics_summary()
         assert "test_agent.success" in summary
@@ -281,10 +283,12 @@ class TestAgentMonitoring:
         collector = MetricsCollector(storage)
         tracker = PerformanceTracker(collector)
 
-        tracker.record_call("test_agent", success=True,
-                            confidence=0.9, response_time=1.0)
-        tracker.record_call("test_agent", success=True,
-                            confidence=0.8, response_time=1.0)
+        tracker.record_call(
+            "test_agent", success=True, confidence=0.9, response_time=1.0
+        )
+        tracker.record_call(
+            "test_agent", success=True, confidence=0.8, response_time=1.0
+        )
         tracker.record_call("test_agent", success=False, response_time=0.5)
 
         success_rate = tracker.get_success_rate("test_agent")
@@ -318,24 +322,25 @@ class TestAdaptiveRouter:
         router = AdaptiveRouter(performance_tracker=tracker)
 
         # Record some successful calls for one agent
-        tracker.record_call("yaml_frontmatter", success=True,
-                            confidence=0.9, response_time=1.0)
-        tracker.record_call("yaml_frontmatter", success=True,
-                            confidence=0.8, response_time=1.0)
+        tracker.record_call(
+            "yaml_frontmatter", success=True, confidence=0.9, response_time=1.0
+        )
+        tracker.record_call(
+            "yaml_frontmatter", success=True, confidence=0.8, response_time=1.0
+        )
 
         # Record failures for another agent
-        tracker.record_call("content_corruption",
-                            success=False, response_time=0.5)
+        tracker.record_call("content_corruption", success=False, response_time=0.5)
 
         content = "test content"
-        error_context = {"error_message": "YAML error",
-                         "error_type": "ParserError"}
+        error_context = {"error_message": "YAML error", "error_type": "ParserError"}
 
         diagnoses = router.diagnose_and_route(content, error_context)
 
         # YAML agent should have higher confidence due to good performance
-        yaml_domain = next((d for d, _ in diagnoses if d ==
-                           ProblemDomain.YAML_FRONTMATTER), None)
+        yaml_domain = next(
+            (d for d, _ in diagnoses if d == ProblemDomain.YAML_FRONTMATTER), None
+        )
         assert yaml_domain is not None
 
 
@@ -352,8 +357,7 @@ class TestFailureAnalyzer:
         }
 
         # Record failure
-        analyzer.analyze_failure(
-            error_context, [ProblemDomain.CONTENT_STRUCTURE])
+        analyzer.analyze_failure(error_context, [ProblemDomain.CONTENT_STRUCTURE])
         assert len(analyzer.failure_patterns) > 0
 
         # Record success

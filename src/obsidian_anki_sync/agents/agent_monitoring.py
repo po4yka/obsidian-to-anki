@@ -27,6 +27,7 @@ except ImportError:
 
 class HealthStatus(str, Enum):
     """Agent health status."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -36,6 +37,7 @@ class HealthStatus(str, Enum):
 @dataclass
 class AgentMetrics:
     """Metrics for a single agent."""
+
     success_count: int = 0
     failure_count: int = 0
     total_calls: int = 0
@@ -49,6 +51,7 @@ class AgentMetrics:
 @dataclass
 class HealthCheckResult:
     """Result of health check."""
+
     status: HealthStatus
     response_time: float
     error: Optional[str] = None
@@ -59,7 +62,11 @@ class MetricsStorage:
     """Abstract base class for metrics storage."""
 
     def record_metric(
-        self, agent_name: str, metric: str, value: float, timestamp: Optional[float] = None
+        self,
+        agent_name: str,
+        metric: str,
+        value: float,
+        timestamp: Optional[float] = None,
     ) -> None:
         """Record a metric."""
         raise NotImplementedError
@@ -83,7 +90,11 @@ class InMemoryMetricsStorage(MetricsStorage):
         self.lock = threading.Lock()
 
     def record_metric(
-        self, agent_name: str, metric: str, value: float, timestamp: Optional[float] = None
+        self,
+        agent_name: str,
+        metric: str,
+        value: float,
+        timestamp: Optional[float] = None,
     ) -> None:
         """Record a metric."""
         with self.lock:
@@ -108,12 +119,10 @@ class InMemoryMetricsStorage(MetricsStorage):
             filtered = self.metrics
 
             if agent_name:
-                filtered = [
-                    m for m in filtered if m["agent_name"] == agent_name]
+                filtered = [m for m in filtered if m["agent_name"] == agent_name]
 
             if start_time:
-                filtered = [
-                    m for m in filtered if m["timestamp"] >= start_time]
+                filtered = [m for m in filtered if m["timestamp"] >= start_time]
 
             return filtered
 
@@ -184,7 +193,11 @@ class DatabaseMetricsStorage(MetricsStorage):
             conn.commit()
 
     def record_metric(
-        self, agent_name: str, metric: str, value: float, timestamp: Optional[float] = None
+        self,
+        agent_name: str,
+        metric: str,
+        value: float,
+        timestamp: Optional[float] = None,
     ) -> None:
         """Record a metric."""
         with self.lock:
@@ -202,7 +215,9 @@ class DatabaseMetricsStorage(MetricsStorage):
         self, agent_name: Optional[str] = None, start_time: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """Get metrics."""
-        query = "SELECT agent_name, metric, value, timestamp FROM agent_metrics WHERE 1=1"
+        query = (
+            "SELECT agent_name, metric, value, timestamp FROM agent_metrics WHERE 1=1"
+        )
         params = []
 
         if agent_name:
@@ -337,7 +352,11 @@ class MetricsCollector:
         self.storage = storage
 
     def record_metric(
-        self, agent_name: str, metric: str, value: float, timestamp: Optional[float] = None
+        self,
+        agent_name: str,
+        metric: str,
+        value: float,
+        timestamp: Optional[float] = None,
     ) -> None:
         """Record a metric.
 
@@ -374,8 +393,9 @@ class MetricsCollector:
             response_time: Response time in seconds
         """
         self.record_metric(agent_name, "failure", 1.0)
-        self.record_metric(agent_name, "error_type", hash(
-            error_type))  # Store hash for privacy
+        self.record_metric(
+            agent_name, "error_type", hash(error_type)
+        )  # Store hash for privacy
         self.record_metric(agent_name, "response_time", response_time)
 
     def get_metrics_summary(self) -> Dict[str, Any]:
@@ -434,12 +454,10 @@ class PerformanceTracker:
                 metrics.avg_confidence = confidence
             else:
                 metrics.avg_confidence = (
-                    metrics.avg_confidence *
-                    (metrics.total_calls - 1) + confidence
+                    metrics.avg_confidence * (metrics.total_calls - 1) + confidence
                 ) / metrics.total_calls
 
-            self.metrics_collector.record_success(
-                agent_name, confidence, response_time)
+            self.metrics_collector.record_success(agent_name, confidence, response_time)
 
             # Store in persistent memory if available
             if self.memory_store:
@@ -448,22 +466,25 @@ class PerformanceTracker:
                         agent_name=agent_name,
                         metric_name="success",
                         value=1.0,
-                        metadata={"confidence": confidence,
-                                  "response_time": response_time},
+                        metadata={
+                            "confidence": confidence,
+                            "response_time": response_time,
+                        },
                     )
                 except Exception as e:
-                    logger.warning(
-                        "performance_metric_store_failed", error=str(e))
+                    logger.warning("performance_metric_store_failed", error=str(e))
         else:
             metrics.failure_count += 1
             metrics.last_failure_time = time.time()
 
             if error_type:
-                metrics.error_types[error_type] = metrics.error_types.get(
-                    error_type, 0) + 1
+                metrics.error_types[error_type] = (
+                    metrics.error_types.get(error_type, 0) + 1
+                )
 
             self.metrics_collector.record_failure(
-                agent_name, error_type or "unknown", response_time)
+                agent_name, error_type or "unknown", response_time
+            )
 
             # Store in persistent memory if available
             if self.memory_store:
@@ -472,20 +493,20 @@ class PerformanceTracker:
                         agent_name=agent_name,
                         metric_name="failure",
                         value=1.0,
-                        metadata={"error_type": error_type or "unknown",
-                                  "response_time": response_time},
+                        metadata={
+                            "error_type": error_type or "unknown",
+                            "response_time": response_time,
+                        },
                     )
                 except Exception as e:
-                    logger.warning(
-                        "performance_metric_store_failed", error=str(e))
+                    logger.warning("performance_metric_store_failed", error=str(e))
 
         # Update running average response time
         if metrics.total_calls == 1:
             metrics.avg_response_time = response_time
         else:
             metrics.avg_response_time = (
-                metrics.avg_response_time *
-                (metrics.total_calls - 1) + response_time
+                metrics.avg_response_time * (metrics.total_calls - 1) + response_time
             ) / metrics.total_calls
 
         # Store response time metric

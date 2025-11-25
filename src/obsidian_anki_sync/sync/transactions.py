@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class CardOperationError(Exception):
     """Error during card operation."""
+
     pass
 
 
@@ -116,20 +117,20 @@ class CardTransaction:
                             note_type=model_name,
                             fields=field_dict,
                             tags=tags,
-                            guid=guid
+                            guid=guid,
                         )
                         logger.info(
                             "rolled_back_deleted_note",
                             old_note_id=old_note_id,
                             new_note_id=new_note_id,
-                            note="Scheduling data and review history not preserved"
+                            note="Scheduling data and review history not preserved",
                         )
                     except Exception as recreate_error:
                         logger.error(
                             "rollback_recreate_failed",
                             old_note_id=old_note_id,
                             error=str(recreate_error),
-                            note="Unable to restore deleted note"
+                            note="Unable to restore deleted note",
                         )
 
             except Exception as e:

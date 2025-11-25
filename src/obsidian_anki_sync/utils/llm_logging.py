@@ -13,20 +13,24 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 # Global session tracking for cumulative metrics
-_session_metrics: dict[str, dict[str, Any]] = defaultdict(lambda: {
-    "total_cost": 0.0,
-    "total_tokens": 0,
-    "total_requests": 0,
-    "total_duration": 0.0,
-    "slow_requests": 0,
-    "errors": 0,
-    "by_model": defaultdict(lambda: {
-        "cost": 0.0,
-        "tokens": 0,
-        "requests": 0,
-        "duration": 0.0,
-    }),
-})
+_session_metrics: dict[str, dict[str, Any]] = defaultdict(
+    lambda: {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "total_requests": 0,
+        "total_duration": 0.0,
+        "slow_requests": 0,
+        "errors": 0,
+        "by_model": defaultdict(
+            lambda: {
+                "cost": 0.0,
+                "tokens": 0,
+                "requests": 0,
+                "duration": 0.0,
+            }
+        ),
+    }
+)
 
 # OpenRouter pricing (per 1M tokens) - update as needed
 # Source: https://openrouter.ai/models (approximate pricing)
@@ -76,7 +80,9 @@ def estimate_cost(
     }
 
 
-def calculate_tokens_per_second(completion_tokens: int, duration_seconds: float) -> float:
+def calculate_tokens_per_second(
+    completion_tokens: int, duration_seconds: float
+) -> float:
     """Calculate tokens per second for completion.
 
     Args:
@@ -378,8 +384,16 @@ def log_session_summary(session_id: str | None = None) -> None:
     if metrics["total_requests"] == 0:
         return  # No requests to summarize
 
-    avg_duration = metrics["total_duration"] / metrics["total_requests"] if metrics["total_requests"] > 0 else 0
-    avg_cost_per_request = metrics["total_cost"] / metrics["total_requests"] if metrics["total_requests"] > 0 else 0
+    avg_duration = (
+        metrics["total_duration"] / metrics["total_requests"]
+        if metrics["total_requests"] > 0
+        else 0
+    )
+    avg_cost_per_request = (
+        metrics["total_cost"] / metrics["total_requests"]
+        if metrics["total_requests"] > 0
+        else 0
+    )
 
     logger.info(
         "llm_session_summary",
@@ -397,7 +411,11 @@ def log_session_summary(session_id: str | None = None) -> None:
 
     # Log per-model breakdown
     for model, model_metrics in metrics["by_model"].items():
-        model_avg_duration = model_metrics["duration"] / model_metrics["requests"] if model_metrics["requests"] > 0 else 0
+        model_avg_duration = (
+            model_metrics["duration"] / model_metrics["requests"]
+            if model_metrics["requests"] > 0
+            else 0
+        )
         logger.info(
             "llm_model_summary",
             model=model,
@@ -417,4 +435,3 @@ def reset_session_metrics(session_id: str | None = None) -> None:
     sess_id = session_id or _get_session_id()
     if sess_id in _session_metrics:
         del _session_metrics[sess_id]
-

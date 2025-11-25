@@ -157,40 +157,41 @@ class TestSQLiteConnectionLifecycle:
     """Test SQLite connection lifecycle and thread safety."""
 
     def test_state_db_creates_connection(self, temp_dir):
-        """Test that StateDB creates a connection."""
+        """Test that StateDB creates thread-local connections."""
         db_path = temp_dir / "test.db"
         db = StateDB(db_path)
 
-        # Verify connection exists
-        assert db.conn is not None
+        # Verify connection can be created
+        conn = db._get_connection()
+        assert conn is not None
 
         # Clean up
         db.close()
 
     def test_state_db_connection_is_reused(self, temp_dir):
-        """Test that StateDB reuses the same connection."""
+        """Test that StateDB reuses the same connection within a thread."""
         db_path = temp_dir / "test.db"
         db = StateDB(db_path)
 
-        conn1 = db.conn
+        conn1 = db._get_connection()
 
-        # Access connection again
-        conn2 = db.conn
+        # Access connection again in same thread
+        conn2 = db._get_connection()
 
-        # Verify same connection instance
+        # Verify same connection instance within same thread
         assert conn1 is conn2
 
         db.close()
 
     def test_state_db_closes_connection(self, temp_dir):
-        """Test that StateDB properly closes connections."""
+        """Test that StateDB properly closes all connections."""
         db_path = temp_dir / "test.db"
         db = StateDB(db_path)
 
-        conn = db.conn
+        conn = db._get_connection()
         assert conn is not None
 
-        # Close connection
+        # Close all connections
         db.close()
 
         # Verify connection is closed (can't execute queries)
@@ -207,8 +208,9 @@ class TestSQLiteConnectionLifecycle:
         db_path = temp_dir / "test.db"
         db = StateDB(db_path)
 
-        # Check WAL mode
-        cursor = db.conn.execute("PRAGMA journal_mode")
+        # Check WAL mode on thread-local connection
+        conn = db._get_connection()
+        cursor = conn.execute("PRAGMA journal_mode")
         journal_mode = cursor.fetchone()[0].upper()
 
         # WAL mode should be enabled
@@ -217,21 +219,21 @@ class TestSQLiteConnectionLifecycle:
         db.close()
 
     def test_state_db_thread_safety_note(self, temp_dir):
-        """Test note about SQLite thread safety."""
-        # SQLite with WAL mode is thread-safe for reads
-        # But writes should be serialized
-        # This is documented in state_db.py
+        """Test thread-local connection behavior."""
+        # Each thread gets its own connection via thread-local storage
+        # SQLite with WAL mode supports concurrent readers and single writer
 
         db_path = temp_dir / "test.db"
         db = StateDB(db_path)
 
-        # Verify WAL mode
-        cursor = db.conn.execute("PRAGMA journal_mode")
+        # Verify WAL mode on thread-local connection
+        conn = db._get_connection()
+        cursor = conn.execute("PRAGMA journal_mode")
         journal_mode = cursor.fetchone()[0].upper()
         assert journal_mode == "WAL"
 
-        # Note: Full async support would require aiosqlite
-        # Current implementation is synchronous but thread-safe with WAL
+        # Verify connection is tracked
+        assert len(db._connections) == 1
 
         db.close()
 
@@ -243,11 +245,11 @@ class TestSQLiteConnectionLifecycle:
 
         # Create first instance
         db1 = StateDB(db_path)
-        conn1 = db1.conn
+        conn1 = db1._get_connection()
 
         # Create second instance (should use same file but different connection)
         db2 = StateDB(db_path)
-        conn2 = db2.conn
+        conn2 = db2._get_connection()
 
         # Verify different connection instances
         assert conn1 is not conn2

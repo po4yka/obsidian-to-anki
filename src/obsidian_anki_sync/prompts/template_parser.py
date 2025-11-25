@@ -60,8 +60,7 @@ def parse_template_file(template_path: Path) -> PromptTemplate:
         content = f.read()
 
     # Split frontmatter and body
-    frontmatter_match = re.match(
-        r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
+    frontmatter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", content, re.DOTALL)
 
     if frontmatter_match:
         frontmatter_text = frontmatter_match.group(1)
@@ -84,8 +83,7 @@ def parse_template_file(template_path: Path) -> PromptTemplate:
         deck=config.get("deck"),
         note_type=config.get("noteType") or config.get("note_type"),
         field_map=config.get("fieldMap") or config.get("field_map"),
-        quality_check=config.get(
-            "qualityCheck") or config.get("quality_check"),
+        quality_check=config.get("qualityCheck") or config.get("quality_check"),
         prompt_body=prompt_body.strip(),
     )
 
@@ -118,8 +116,7 @@ def validate_template(template: PromptTemplate) -> list[str]:
     # Check for required placeholders if field_map is specified
     if template.field_map:
         required_placeholders = set(template.field_map.keys())
-        found_placeholders = set(re.findall(
-            r"\{(\w+)\}", template.prompt_body))
+        found_placeholders = set(re.findall(r"\{(\w+)\}", template.prompt_body))
 
         missing = required_placeholders - found_placeholders
         if missing:

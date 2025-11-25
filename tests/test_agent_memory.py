@@ -34,11 +34,12 @@ class TestAgentMemoryStore:
             "error_type": "ParserError",
             "file_path": "/test/file.md",
         }
-        attempted_agents = [ProblemDomain.YAML_FRONTMATTER,
-                            ProblemDomain.CONTENT_STRUCTURE]
+        attempted_agents = [
+            ProblemDomain.YAML_FRONTMATTER,
+            ProblemDomain.CONTENT_STRUCTURE,
+        ]
 
-        memory_id = memory_store.store_failure_pattern(
-            error_context, attempted_agents)
+        memory_id = memory_store.store_failure_pattern(error_context, attempted_agents)
         assert memory_id is not None
         assert memory_id.startswith("failure_")
 
@@ -51,8 +52,7 @@ class TestAgentMemoryStore:
         }
         successful_agent = ProblemDomain.YAML_FRONTMATTER
 
-        memory_id = memory_store.store_success_pattern(
-            error_context, successful_agent)
+        memory_id = memory_store.store_success_pattern(error_context, successful_agent)
         assert memory_id is not None
         assert memory_id.startswith("success_")
 
@@ -87,7 +87,8 @@ class TestAgentMemoryStore:
             "file_path": "/test/file1.md",
         }
         memory_store.store_success_pattern(
-            error_context1, ProblemDomain.YAML_FRONTMATTER)
+            error_context1, ProblemDomain.YAML_FRONTMATTER
+        )
 
         # Get recommendation for similar error
         error_context2 = {
@@ -98,7 +99,9 @@ class TestAgentMemoryStore:
         recommendation = memory_store.get_agent_recommendation(error_context2)
 
         # Should recommend YAML agent (or None if no match found)
-        assert recommendation is None or recommendation == ProblemDomain.YAML_FRONTMATTER
+        assert (
+            recommendation is None or recommendation == ProblemDomain.YAML_FRONTMATTER
+        )
 
     def test_store_performance_metric(self, memory_store):
         """Test storing performance metrics."""
@@ -137,7 +140,8 @@ class TestAgentMemoryStore:
             "error_type": "ParserError",
         }
         memory_store.store_failure_pattern(
-            error_context, [ProblemDomain.YAML_FRONTMATTER])
+            error_context, [ProblemDomain.YAML_FRONTMATTER]
+        )
 
         # Cleanup with very short retention (should delete everything)
         deleted = memory_store.cleanup_old_memories(retention_days=0)
@@ -166,8 +170,7 @@ class TestMemoryIntegration:
             "error_message": "Test error",
             "error_type": "ParserError",
         }
-        store1.store_success_pattern(
-            error_context, ProblemDomain.YAML_FRONTMATTER)
+        store1.store_success_pattern(error_context, ProblemDomain.YAML_FRONTMATTER)
 
         # Create second store (should load existing data)
         store2 = AgentMemoryStore(
@@ -178,5 +181,4 @@ class TestMemoryIntegration:
         # Should be able to query the stored pattern
         recommendation = store2.get_agent_recommendation(error_context)
         # May be None if semantic search is disabled, but should not error
-        assert recommendation is None or isinstance(
-            recommendation, ProblemDomain)
+        assert recommendation is None or isinstance(recommendation, ProblemDomain)

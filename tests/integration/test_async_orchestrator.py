@@ -24,8 +24,13 @@ from obsidian_anki_sync.sync.engine import SyncEngine
 @pytest.fixture
 def test_config_for_integration(temp_dir):
     """Create test config for integration tests."""
+    vault_path = temp_dir / "vault"
+    vault_path.mkdir(parents=True, exist_ok=True)
+    source_dir = vault_path / "test"
+    source_dir.mkdir(parents=True, exist_ok=True)
+
     return Config(
-        vault_path=temp_dir / "vault",
+        vault_path=vault_path,
         source_dir=Path("test"),
         anki_connect_url="http://localhost:8765",
         anki_deck_name="Test Deck",

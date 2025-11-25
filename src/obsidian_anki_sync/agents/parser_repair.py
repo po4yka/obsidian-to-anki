@@ -329,13 +329,14 @@ DO NOT repair (mark as unrepairable):
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error("parser_repair_read_failed",
-                         file=str(file_path), error=str(e))
+            logger.error("parser_repair_read_failed", file=str(file_path), error=str(e))
             raise ParserError(f"Cannot read file for repair: {e}")
 
         # Build repair prompt
         prompt = self._build_repair_prompt(
-            content, str(original_error), enable_content_gen=self.enable_content_generation
+            content,
+            str(original_error),
+            enable_content_gen=self.enable_content_generation,
         )
 
         # System prompt for note repair agent
@@ -402,8 +403,7 @@ ALWAYS:
             )
             return None
         except Exception as e:
-            logger.error("parser_repair_llm_failed",
-                         file=str(file_path), error=str(e))
+            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
             return None
 
         # Check if repairable
@@ -427,7 +427,8 @@ ALWAYS:
         # Log repairs applied
         repairs = repair_result.get("repairs", [])
         content_generation_applied = repair_result.get(
-            "content_generation_applied", False)
+            "content_generation_applied", False
+        )
         generated_sections = repair_result.get("generated_sections", [])
 
         logger.info(
@@ -467,8 +468,7 @@ ALWAYS:
             metadata = parse_frontmatter(temp_content_for_parse, file_path)
 
             # Parse Q/A pairs from repaired content
-            qa_pairs = parse_qa_pairs(
-                temp_content_for_parse, metadata, file_path)
+            qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata, file_path)
 
             if not qa_pairs:
                 logger.warning(

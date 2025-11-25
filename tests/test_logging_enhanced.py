@@ -71,4 +71,3 @@ class TestEnhancedLogging:
         # Verify error log was created
         error_logs = list(project_log_dir.glob("errors_*.log"))
         assert len(error_logs) >= 1
-
