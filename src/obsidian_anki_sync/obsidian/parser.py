@@ -482,6 +482,11 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
             - item3
             - item4
 
+        Or with indentation:
+            field: [item1, item2]
+              - item3
+              - item4
+
         And converts to:
             field:
             - item1
@@ -505,12 +510,13 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
                 field_name = inline_array_match.group(1)
                 array_content = inline_array_match.group(2).strip()
 
-                # Look ahead for orphaned list items (lines starting with "- ")
+                # Look ahead for orphaned list items (lines starting with optional
+                # whitespace followed by "- ")
                 orphaned_items = []
                 j = i + 1
-                while j < len(lines) and re.match(r"^-\s+", lines[j]):
-                    # Extract the item value (remove "- " prefix)
-                    item_match = re.match(r"^-\s+(.+)$", lines[j])
+                while j < len(lines) and re.match(r"^\s*-\s+", lines[j]):
+                    # Extract the item value (remove whitespace and "- " prefix)
+                    item_match = re.match(r"^\s*-\s+(.+)$", lines[j])
                     if item_match:
                         orphaned_items.append(item_match.group(1))
                     j += 1
