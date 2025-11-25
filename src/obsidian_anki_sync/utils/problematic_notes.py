@@ -321,3 +321,4 @@ class ProblematicNotesArchiver:
             self._save_index()
 
         return cleaned
+
