@@ -69,7 +69,7 @@ class PreValidationOutput(BaseModel):
         default_factory=list, description="Suggested fixes for validation errors"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in validation result"
+        default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
     )
 
 
@@ -85,7 +85,7 @@ class CardGenerationOutput(BaseModel):
         default="", description="Notes about the generation process"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Overall generation confidence"
+        default=0.5, ge=0.0, le=1.0, description="Overall generation confidence"
     )
 
 
@@ -106,7 +106,7 @@ class PostValidationOutput(BaseModel):
         default_factory=list, description="Suggested card corrections"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in validation result"
+        default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
     )
 
 
@@ -139,7 +139,7 @@ class MemorizationQualityOutput(BaseModel):
         default_factory=list, description="Actionable improvements"
     )
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in assessment")
+        default=0.5, ge=0.0, le=1.0, description="Confidence in assessment")
 
 
 class CardSplitPlanOutput(BaseModel):
@@ -935,7 +935,7 @@ class DuplicateDetectionOutput(BaseModel):
         default=None, description="'new' or existing card slug if duplicate"
     )
     merge_suggestion: str | None = Field(default=None)
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class DuplicateDetectionDeps(BaseModel):
@@ -1206,7 +1206,7 @@ class ContextEnrichmentOutput(BaseModel):
     additions_summary: str = Field(
         default="", description="Summary of additions")
     rationale: str = Field(default="", description="Why enrichment helps")
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class ContextEnrichmentDeps(BaseModel):

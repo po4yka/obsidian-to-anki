@@ -140,12 +140,15 @@ def handle_node_error(
 
     else:  # RECOVERABLE
         # Recoverable errors may retry if retries available
-        if state["retry_count"] < state["max_retries"]:
+        retry_count = state.get("retry_count") or 0
+        max_retries = state.get("max_retries") or 3
+        if retry_count < max_retries:
             logger.info(
                 "recoverable_error_will_retry",
                 stage=stage,
                 error=str(error),
-                retry_count=state["retry_count"],
+                retry_count=retry_count,
+                max_retries=max_retries,
             )
         else:
             logger.warning(
