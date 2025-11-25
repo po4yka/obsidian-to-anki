@@ -69,7 +69,7 @@ class PreValidationOutput(BaseModel):
         default_factory=list, description="Suggested fixes for validation errors"
     )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
+        default=0.5, description="Confidence in validation result"
     )
 
 
@@ -85,7 +85,7 @@ class CardGenerationOutput(BaseModel):
         default="", description="Notes about the generation process"
     )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Overall generation confidence"
+        default=0.5, description="Overall generation confidence"
     )
 
 
@@ -106,7 +106,7 @@ class PostValidationOutput(BaseModel):
         default_factory=list, description="Suggested card corrections"
     )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
+        default=0.5, description="Confidence in validation result"
     )
 
 
@@ -127,7 +127,7 @@ class MemorizationQualityOutput(BaseModel):
         description="Whether card is suitable for spaced repetition"
     )
     memorization_score: float = Field(
-        ge=0.0, le=1.0, description="Quality score for long-term retention"
+        default=0.5, description="Quality score for long-term retention"
     )
     issues: list[MemorizationIssue] = Field(
         default_factory=list, description="List of memorization issues found"
@@ -139,13 +139,13 @@ class MemorizationQualityOutput(BaseModel):
         default_factory=list, description="Actionable improvements"
     )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Confidence in assessment")
+        default=0.5, description="Confidence in assessment")
 
 
 class CardSplitPlanOutput(BaseModel):
     """Single card plan in split output."""
 
-    card_number: int = Field(ge=1)
+    card_number: int = Field(default=1, ge=1)
     concept: str
     question: str
     answer_summary: str
@@ -157,7 +157,8 @@ class CardSplittingOutput(BaseModel):
 
     should_split: bool = Field(
         description="Whether to split into multiple cards")
-    card_count: int = Field(ge=1, description="Number of cards to generate")
+    card_count: int = Field(
+        default=1, ge=1, description="Number of cards to generate")
     splitting_strategy: str = Field(
         description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware"
     )
@@ -914,7 +915,7 @@ class DuplicateMatchOutput(BaseModel):
     """Output model for a duplicate match."""
 
     card_slug: str = Field(min_length=1)
-    similarity_score: float = Field(ge=0.0, le=1.0)
+    similarity_score: float = Field(default=0.0)
     duplicate_type: str = Field(
         description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(default="")
@@ -925,7 +926,7 @@ class DuplicateDetectionOutput(BaseModel):
 
     is_duplicate: bool = Field(
         description="True if exact or semantic duplicate")
-    similarity_score: float = Field(ge=0.0, le=1.0)
+    similarity_score: float = Field(default=0.0)
     duplicate_type: str = Field(
         description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(description="Explanation of similarity assessment")

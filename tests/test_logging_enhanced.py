@@ -1,10 +1,13 @@
 """Tests for enhanced logging configuration."""
 
-from pathlib import Path
-
 import pytest
 
-from obsidian_anki_sync.utils.logging import configure_logging, get_logger
+from obsidian_anki_sync.utils.logging import (
+    ConsoleNoiseFilter,
+    HighVolumeEventPolicy,
+    configure_logging,
+    get_logger,
+)
 
 
 class TestEnhancedLogging:
@@ -71,6 +74,82 @@ class TestEnhancedLogging:
         # Verify error log was created
         error_logs = list(project_log_dir.glob("errors_*.log"))
         assert len(error_logs) >= 1
+
+
+class LevelStub:
+    """Minimal stand-in for loguru's Level object."""
+
+    _level_map = {
+        "TRACE": 5,
+        "DEBUG": 10,
+        "INFO": 20,
+        "SUCCESS": 25,
+        "WARNING": 30,
+        "ERROR": 40,
+        "CRITICAL": 50,
+    }
+
+    def __init__(self, name: str) -> None:
+        level_name = name.upper()
+        if level_name not in self._level_map:
+            raise ValueError(f"Unsupported level: {name}")
+        self.no = self._level_map[level_name]
+        self.name = level_name
+
+
+def _make_record(
+    *,
+    level: str = "INFO",
+    module: str = "obsidian_anki_sync.providers.factory",
+    message: str = "creating_provider",
+) -> dict:
+    """Create a record dict resembling loguru's filter input."""
+    return {
+        "level": LevelStub(level),
+        "name": module,
+        "message": message,
+        "extra": {},
+    }
+
+
+class TestConsoleNoiseFilter:
+    """Tests for console noise suppression."""
+
+    def test_module_level_override_blocks_low_priority_provider_logs(self) -> None:
+        """Ensure INFO logs from provider modules are suppressed."""
+        filter_fn = ConsoleNoiseFilter(
+            base_filter=lambda record: True,
+            level_overrides={"obsidian_anki_sync.providers": "WARNING"},
+            high_volume_policies={},
+        )
+
+        assert filter_fn(_make_record(level="INFO")) is False
+        # WARNING-level events should still pass through
+        assert filter_fn(_make_record(level="WARNING", message="provider_warning")) is True
+
+    def test_high_volume_policy_rate_limits_events(self) -> None:
+        """Verify repeated events are rate-limited within the window."""
+        current_time = {"value": 0.0}
+
+        def fake_time() -> float:
+            return current_time["value"]
+
+        policy = {"creating_provider": HighVolumeEventPolicy(2, 60.0)}
+        filter_fn = ConsoleNoiseFilter(
+            base_filter=lambda record: True,
+            level_overrides={},
+            high_volume_policies=policy,
+            time_func=fake_time,
+        )
+
+        assert filter_fn(_make_record()) is True
+        assert filter_fn(_make_record()) is True
+        # Third call within the same window should be filtered out
+        assert filter_fn(_make_record()) is False
+
+        # Advance time beyond the window and ensure events are allowed again
+        current_time["value"] = 61.0
+        assert filter_fn(_make_record()) is True
 
 
 

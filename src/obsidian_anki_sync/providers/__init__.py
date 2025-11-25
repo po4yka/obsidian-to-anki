@@ -7,7 +7,18 @@ from .lm_studio import LMStudioProvider
 from .ollama import OllamaProvider
 from .openai import OpenAIProvider
 from .openrouter import OpenRouterProvider
-from .pydantic_ai_models import PydanticAIModelFactory, create_openrouter_model_from_env
+
+try:
+    from .pydantic_ai_models import (
+        PydanticAIModelFactory,
+        create_openrouter_model_from_env,
+    )
+
+    _PYDANTIC_MODELS_AVAILABLE = True
+except ModuleNotFoundError:
+    PydanticAIModelFactory = None  # type: ignore[assignment, misc]
+    create_openrouter_model_from_env = None  # type: ignore[assignment, misc]
+    _PYDANTIC_MODELS_AVAILABLE = False
 
 __all__ = [
     # Core providers
@@ -19,7 +30,12 @@ __all__ = [
     "OllamaProvider",
     "OpenAIProvider",
     "OpenRouterProvider",
-    # PydanticAI providers
-    "PydanticAIModelFactory",
-    "create_openrouter_model_from_env",
 ]
+
+if _PYDANTIC_MODELS_AVAILABLE:
+    __all__.extend(
+        [
+            "PydanticAIModelFactory",
+            "create_openrouter_model_from_env",
+        ]
+    )
