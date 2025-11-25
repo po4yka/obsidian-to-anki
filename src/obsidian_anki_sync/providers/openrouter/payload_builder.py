@@ -54,6 +54,10 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
         if depth > max_depth:
             return 0
 
+        # Skip empty or non-object schemas
+        if not obj or not isinstance(obj, dict):
+            return 0
+
         # Track visited objects to prevent circular reference loops
         if visited is None:
             visited = set()
@@ -69,26 +73,33 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
             complexity += 1
 
         # Check properties
-        props = obj.get("properties", {})
-        if isinstance(props, dict) and len(props) > 3:
+        props = obj.get("properties")
+        if props and isinstance(props, dict) and len(props) > 3:
             complexity += len(props) // 2
 
         # Check for arrays with complex items
-        items = obj.get("items", {})
-        if isinstance(items, dict):
+        items = obj.get("items")
+        if items and isinstance(items, dict) and items.get("type"):
             if items.get("type") == "object" and items.get("properties"):
                 complexity += 2
             complexity += _count_nested_complexity(items, depth + 1, max_depth, visited)
 
-        # Check for nested objects
-        if isinstance(props, dict):
+        # Check for nested objects in properties
+        if props and isinstance(props, dict):
             for prop_schema in props.values():
-                if isinstance(prop_schema, dict):
-                    if prop_schema.get("type") == "object":
+                if isinstance(prop_schema, dict) and prop_schema.get("type"):
+                    if prop_schema.get("type") == "object" and prop_schema.get("properties"):
                         complexity += _count_nested_complexity(
                             prop_schema, depth + 1, max_depth, visited)
                     elif prop_schema.get("type") == "array":
                         complexity += 1
+                        # Also check items of array properties
+                        array_items = prop_schema.get("items")
+                        if array_items and isinstance(array_items, dict):
+                            if array_items.get("type") == "object" and array_items.get("properties"):
+                                complexity += 2  # Array of objects is complex
+                            complexity += _count_nested_complexity(
+                                array_items, depth + 1, max_depth, visited)
 
         return complexity
 
