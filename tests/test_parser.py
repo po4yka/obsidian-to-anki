@@ -140,6 +140,52 @@ Content here.
         # Should be identical to original since no backticks
         assert preprocessed == content
 
+    def test_preprocess_yaml_frontmatter_fixes_orphaned_list_items(self) -> None:
+        """Test YAML preprocessing fixes orphaned list items after inline arrays."""
+        content = """---
+id: test-001
+title: Test Question
+related: [item1, item2]
+- item3
+- item4
+created: 2024-01-01
+---
+
+Content here.
+"""
+        preprocessed = _preprocess_yaml_frontmatter(content)
+        # Orphaned list items should be merged into the related field
+        assert "related: [item1, item2]" not in preprocessed
+        assert "related:" in preprocessed
+        assert "- item1" in preprocessed
+        assert "- item2" in preprocessed
+        assert "- item3" in preprocessed
+        assert "- item4" in preprocessed
+        # Should be valid YAML now
+        import yaml
+        frontmatter_body = preprocessed.split("---")[1]
+        parsed = yaml.safe_load(frontmatter_body)
+        assert parsed["related"] == ["item1", "item2", "item3", "item4"]
+
+    def test_preprocess_yaml_frontmatter_handles_quoted_items(self) -> None:
+        """Test YAML preprocessing handles quoted items in inline arrays."""
+        content = """---
+id: test-001
+sources: ["https://example.com", "https://test.org"]
+- "https://another.com"
+created: 2024-01-01
+---
+
+Content.
+"""
+        preprocessed = _preprocess_yaml_frontmatter(content)
+        # Should merge quoted items correctly
+        assert "sources:" in preprocessed
+        assert "- https://example.com" in preprocessed
+        assert "- https://test.org" in preprocessed
+        # Orphaned items preserve their original format (with quotes)
+        assert '"https://another.com"' in preprocessed
+
 
 class TestQAParsing:
     """Test Q/A pair extraction (UNIT-parse-01, UNIT-parse-02)."""

@@ -445,6 +445,7 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
 
     Fixes issues like:
     - Backticks in YAML arrays/strings (replaces with quotes or removes)
+    - Orphaned list items after inline arrays (converts to block format)
     - Other common YAML syntax problems
 
     Args:
@@ -473,9 +474,123 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
         text = re.sub(r"`([^`]+)`", r"\1", text)
         return text
 
+    def fix_orphaned_list_items(text: str) -> str:
+        """Fix orphaned list items that follow inline arrays.
+
+        Detects patterns like:
+            field: [item1, item2]
+            - item3
+            - item4
+
+        And converts to:
+            field:
+            - item1
+            - item2
+            - item3
+            - item4
+        """
+        lines = text.split("\n")
+        fixed_lines = []
+        i = 0
+
+        while i < len(lines):
+            line = lines[i]
+
+            # Check if this line is a field with an inline array
+            inline_array_match = re.match(
+                r"^(\w[\w\-]*)\s*:\s*\[(.*)\]\s*$", line
+            )
+
+            if inline_array_match:
+                field_name = inline_array_match.group(1)
+                array_content = inline_array_match.group(2).strip()
+
+                # Look ahead for orphaned list items (lines starting with "- ")
+                orphaned_items = []
+                j = i + 1
+                while j < len(lines) and re.match(r"^-\s+", lines[j]):
+                    # Extract the item value (remove "- " prefix)
+                    item_match = re.match(r"^-\s+(.+)$", lines[j])
+                    if item_match:
+                        orphaned_items.append(item_match.group(1))
+                    j += 1
+
+                if orphaned_items:
+                    # Convert inline array + orphaned items to block format
+                    logger.debug(
+                        "fixing_orphaned_list_items",
+                        field=field_name,
+                        orphaned_count=len(orphaned_items),
+                    )
+
+                    # Add field name with colon
+                    fixed_lines.append(f"{field_name}:")
+
+                    # Add original inline array items as block items
+                    if array_content:
+                        # Parse inline array items (handle quoted strings)
+                        inline_items = _parse_inline_array(array_content)
+                        for item in inline_items:
+                            fixed_lines.append(f"- {item}")
+
+                    # Add orphaned items
+                    for item in orphaned_items:
+                        fixed_lines.append(f"- {item}")
+
+                    # Skip the orphaned lines
+                    i = j
+                    continue
+
+            fixed_lines.append(line)
+            i += 1
+
+        return "\n".join(fixed_lines)
+
     fixed_frontmatter = fix_backticks(frontmatter_body)
+    fixed_frontmatter = fix_orphaned_list_items(fixed_frontmatter)
 
     return frontmatter_start + fixed_frontmatter + frontmatter_end + rest_content
+
+
+def _parse_inline_array(array_content: str) -> list[str]:
+    """Parse inline YAML array content into list of items.
+
+    Handles both quoted and unquoted items:
+    - "item1, item2, item3" -> ["item1", "item2", "item3"]
+    - '"quoted, item", unquoted' -> ["quoted, item", "unquoted"]
+
+    Args:
+        array_content: Content inside [...] brackets
+
+    Returns:
+        List of parsed items
+    """
+    items = []
+    current = ""
+    in_quotes = False
+    quote_char = None
+
+    for char in array_content:
+        if char in ('"', "'") and not in_quotes:
+            in_quotes = True
+            quote_char = char
+        elif char == quote_char and in_quotes:
+            in_quotes = False
+            quote_char = None
+        elif char == "," and not in_quotes:
+            item = current.strip().strip("\"'")
+            if item:
+                items.append(item)
+            current = ""
+        else:
+            current += char
+
+    # Don't forget the last item
+    item = current.strip().strip("\"'")
+    if item:
+        items.append(item)
+
+    return items
 
 
 def _detect_content_corruption(content: str, file_path: Path) -> None:
