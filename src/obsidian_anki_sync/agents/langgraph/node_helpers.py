@@ -31,8 +31,8 @@ def increment_step_count(state: PipelineState, stage_name: str) -> bool:
     Returns:
         True if within limits, False if max steps exceeded
     """
-    state["step_count"] = state.get("step_count", 0) + 1
-    max_steps = state.get("max_steps", 20)
+    state["step_count"] = (state.get("step_count") or 0) + 1
+    max_steps = state.get("max_steps") or 20
 
     if state["step_count"] > max_steps:
         logger.error(
@@ -44,7 +44,8 @@ def increment_step_count(state: PipelineState, stage_name: str) -> bool:
         state["current_stage"] = "failed"
         state["last_error"] = f"Max steps ({max_steps}) exceeded at stage {stage_name}"
         state["last_error_severity"] = ErrorSeverity.CRITICAL
-        record_error(state, stage_name, state["last_error"], ErrorSeverity.CRITICAL)
+        record_error(state, stage_name,
+                     state["last_error"], ErrorSeverity.CRITICAL)
         return False
 
     logger.debug(
