@@ -21,6 +21,15 @@ from .retry_policies import (
 )
 from .state import PipelineState
 
+# Optional: Swarm pattern (requires langgraph-swarm package)
+try:
+    from .swarm_orchestrator import LangGraphSwarmOrchestrator, SwarmResult
+    _SWARM_AVAILABLE = True
+except ImportError:
+    LangGraphSwarmOrchestrator = None  # type: ignore[assignment, misc]
+    SwarmResult = None  # type: ignore[assignment, misc]
+    _SWARM_AVAILABLE = False
+
 __all__ = [
     # Main orchestrator
     "LangGraphOrchestrator",
@@ -35,3 +44,7 @@ __all__ = [
     "ErrorSeverity",
     "classify_error_severity",
 ]
+
+# Only export swarm classes if available
+if _SWARM_AVAILABLE:
+    __all__.extend(["LangGraphSwarmOrchestrator", "SwarmResult"])

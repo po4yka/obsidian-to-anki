@@ -12,8 +12,131 @@ from pydantic_ai.models.openai import OpenAIModel
 
 from ..config import Config
 from ..utils.logging import get_logger
+from .openrouter import OpenRouterProvider
 
 logger = get_logger(__name__)
+
+
+class EnhancedOpenRouterModel(OpenAIModel):
+    """Enhanced OpenRouter model that uses OpenRouterProvider for reasoning support.
+
+    This model extends PydanticAI's OpenAIModel but routes requests through
+    the OpenRouterProvider to enable reasoning configuration and other enhancements.
+    """
+
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str | None = None,
+        base_url: str = "https://openrouter.ai/api/v1",
+        site_url: str | None = None,
+        site_name: str | None = None,
+        max_tokens: int | None = None,
+        reasoning_enabled: bool = False,
+        **kwargs: Any,
+    ):
+        """Initialize enhanced OpenRouter model.
+
+        Args:
+            model_name: Model identifier
+            api_key: OpenRouter API key
+            base_url: OpenRouter base URL
+            site_url: Site URL for rankings
+            site_name: Site name for rankings
+            max_tokens: Maximum tokens per request
+            reasoning_enabled: Enable reasoning for this model
+            **kwargs: Additional OpenAIModel arguments
+        """
+        # Initialize with basic config first
+        super().__init__(
+            model_name,
+            base_url=base_url,
+            api_key=api_key or "dummy",  # Will be overridden
+            **kwargs,
+        )
+
+        # Create OpenRouter provider instance
+        self.provider = OpenRouterProvider(
+            api_key=api_key,
+            base_url=base_url,
+            site_url=site_url,
+            site_name=site_name,
+            max_tokens=max_tokens,
+        )
+
+        # Store reasoning configuration
+        self.reasoning_enabled = reasoning_enabled
+
+        logger.info(
+            "enhanced_openrouter_model_created",
+            model=model_name,
+            reasoning_enabled=reasoning_enabled,
+            max_tokens=max_tokens,
+        )
+
+    async def request(
+        self,
+        messages: list[dict[str, Any]],
+        model_settings: dict[str, Any] | None = None,
+        model_request_parameters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Make a request using the OpenRouterProvider with reasoning support.
+
+        This overrides PydanticAI's default request method to use our enhanced
+        OpenRouter provider which supports reasoning configuration.
+
+        Args:
+            messages: Chat messages in OpenAI format
+            model_settings: Model settings (temperature, etc.)
+            model_request_parameters: Additional request parameters
+
+        Returns:
+            Response dictionary in OpenAI format
+        """
+        # Extract parameters
+        temperature = model_settings.get(
+            "temperature", 0.7) if model_settings else 0.7
+        max_tokens = model_settings.get(
+            "max_tokens") if model_settings else None
+
+        # Build system message and user prompt
+        system_message = ""
+        user_messages = []
+
+        for message in messages:
+            if message["role"] == "system":
+                system_message = message["content"]
+            elif message["role"] == "user":
+                user_messages.append(message["content"])
+
+        # Combine user messages (PydanticAI sometimes splits them)
+        prompt = " ".join(user_messages)
+
+        # Make request through OpenRouterProvider
+        response = self.provider.generate(
+            model=self.model_name,
+            prompt=prompt,
+            system=system_message,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            reasoning_enabled=self.reasoning_enabled,
+        )
+
+        # Convert response to OpenAI format expected by PydanticAI
+        return {
+            "choices": [
+                {
+                    "finish_reason": response.get("finish_reason", "stop"),
+                    "index": 0,
+                    "message": {
+                        "content": response["response"],
+                        "role": "assistant",
+                    },
+                }
+            ],
+            "model": response.get("model", self.model_name),
+            "usage": response.get("usage", {}),
+        }
 
 
 class PydanticAIModelFactory:
@@ -25,6 +148,46 @@ class PydanticAIModelFactory:
     - Anthropic (future support)
     - Local models via Ollama (future support)
     """
+
+    @staticmethod
+    def create_enhanced_openrouter_model(
+        model_name: str,
+        api_key: str | None = None,
+        base_url: str = "https://openrouter.ai/api/v1",
+        site_url: str | None = None,
+        site_name: str | None = None,
+        max_tokens: int | None = None,
+        reasoning_enabled: bool = False,
+        **kwargs: Any,
+    ) -> EnhancedOpenRouterModel:
+        """Create an enhanced OpenRouter model with reasoning support.
+
+        This model uses the OpenRouterProvider internally to enable reasoning
+        configuration and other enhancements not available in standard OpenAIModel.
+
+        Args:
+            model_name: Model identifier (e.g., "x-ai/grok-4.1-fast")
+            api_key: OpenRouter API key
+            base_url: OpenRouter API base URL
+            site_url: Site URL for rankings
+            site_name: Site name for rankings
+            max_tokens: Maximum tokens per request
+            reasoning_enabled: Enable reasoning for this model
+            **kwargs: Additional configuration
+
+        Returns:
+            EnhancedOpenRouterModel instance
+        """
+        return EnhancedOpenRouterModel(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            site_url=site_url,
+            site_name=site_name,
+            max_tokens=max_tokens,
+            reasoning_enabled=reasoning_enabled,
+            **kwargs,
+        )
 
     @staticmethod
     def create_openrouter_model(
@@ -105,6 +268,8 @@ class PydanticAIModelFactory:
         config: Config,
         model_name: str | None = None,
         provider: str | None = None,
+        reasoning_enabled: bool | None = None,
+        max_tokens: int | None = None,
     ) -> OpenAIModel:
         """Create a PydanticAI model from service configuration.
 
@@ -112,6 +277,8 @@ class PydanticAIModelFactory:
             config: Service configuration
             model_name: Override model name (uses generator_model from config if not provided)
             provider: Override provider (uses llm_provider from config if not provided)
+            reasoning_enabled: Override reasoning setting
+            max_tokens: Override max tokens setting
 
         Returns:
             Configured PydanticAI model instance
@@ -123,12 +290,15 @@ class PydanticAIModelFactory:
         model_name = model_name or config.generator_model
 
         if provider.lower() == "openrouter":
-            return PydanticAIModelFactory.create_openrouter_model(
+            # Use enhanced OpenRouter model for reasoning support
+            return PydanticAIModelFactory.create_enhanced_openrouter_model(
                 model_name=model_name,
                 api_key=config.openrouter_api_key,
                 base_url=config.openrouter_base_url,
                 site_url=config.openrouter_site_url,
                 site_name=config.openrouter_site_name,
+                max_tokens=max_tokens,
+                reasoning_enabled=reasoning_enabled or False,
             )
         elif provider.lower() in ("ollama", "lm_studio", "lmstudio"):
             # For now, Ollama and LM Studio can use OpenAI-compatible interface

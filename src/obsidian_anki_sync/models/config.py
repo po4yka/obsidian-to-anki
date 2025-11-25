@@ -190,188 +190,228 @@ MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
         ModelTask.QA_EXTRACTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=8192,
+            max_tokens=16384,  # Increased: QA extraction can be complex
+            reasoning_enabled=True,  # Enable reasoning for complex QA analysis
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Parser repair may need detailed analysis
+            reasoning_enabled=True,  # Enable reasoning for error analysis
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=4096,  # Moderate: Pre-validation is typically simpler
+            reasoning_enabled=False,  # Rule-based validation doesn't need reasoning
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
-            max_tokens=8192,
+            max_tokens=24576,  # Increased: Generation benefits from larger outputs
+            reasoning_enabled=True,  # Enable reasoning for high-quality generation
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Post-validation may need detailed feedback
+            reasoning_enabled=True,  # Enable reasoning for quality assessment
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
-            max_tokens=8192,
+            max_tokens=16384,  # Increased: Context enrichment can be creative
+            reasoning_enabled=True,  # Enable reasoning for creative enhancement
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=4096,  # Moderate: Quality assessment is analytical
+            reasoning_enabled=True,  # Enable reasoning for memorization analysis
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Card splitting needs detailed reasoning
+            reasoning_enabled=True,  # Enable reasoning for complex decision making
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=4096,  # Moderate: Duplicate detection is comparative
+            reasoning_enabled=True,  # Enable reasoning for similarity analysis
         ),
     },
     ModelPreset.BALANCED: {
         ModelTask.QA_EXTRACTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=8192,
+            max_tokens=24576,  # Increased: Leverage 2M context for comprehensive QA
+            reasoning_enabled=True,  # Enable reasoning for comprehensive analysis
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=16384,  # Increased: Better error analysis and repair
+            reasoning_enabled=True,  # Enable reasoning for repair logic
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: More thorough pre-validation
+            reasoning_enabled=False,  # Keep simple for speed
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
-            max_tokens=8192,
+            max_tokens=32768,  # Max: Full utilization for high-quality generation
+            reasoning_enabled=True,  # Enable reasoning for balanced quality generation
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=8192,
+            max_tokens=16384,  # Increased: Detailed validation feedback
+            reasoning_enabled=True,  # Enable reasoning for balanced validation
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
-            max_tokens=8192,
+            max_tokens=24576,  # Increased: Rich context and examples
+            reasoning_enabled=True,  # Enable reasoning for balanced enrichment
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Comprehensive quality analysis
+            reasoning_enabled=True,  # Enable reasoning for quality assessment
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=16384,  # Increased: Complex decision reasoning
+            reasoning_enabled=True,  # Enable reasoning for decision making
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Better comparison analysis
+            reasoning_enabled=True,  # Enable reasoning for similarity analysis
         ),
     },
     ModelPreset.HIGH_QUALITY: {
         ModelTask.QA_EXTRACTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=8192,
+            max_tokens=32768,  # Max: Exhaustive QA extraction with full context
+            reasoning_enabled=True,  # Enable reasoning for exhaustive analysis
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=24576,  # Increased: Maximum analysis for complex repairs
+            reasoning_enabled=True,  # Enable reasoning for sophisticated repair logic
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=16384,  # Increased: Rigorous pre-validation
+            reasoning_enabled=False,  # Keep deterministic for reliability
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
-            temperature=0.3,
-            max_tokens=8192,
+            temperature=0.2,  # Lower temperature for higher quality
+            max_tokens=32768,  # Max: Premium quality generation
+            reasoning_enabled=True,  # Enable reasoning for premium quality
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=8192,
+            max_tokens=24576,  # Increased: Comprehensive validation with detailed feedback
+            reasoning_enabled=True,  # Enable reasoning for deep validation analysis
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
-            temperature=0.4,
-            max_tokens=8192,
+            temperature=0.3,  # Lower temperature for consistency
+            max_tokens=32768,  # Max: Rich, detailed context enrichment
+            reasoning_enabled=True,  # Enable reasoning for sophisticated enrichment
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=16384,  # Increased: Deep quality analysis
+            reasoning_enabled=True,  # Enable reasoning for expert quality assessment
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
-            temperature=0.2,
-            max_tokens=4096,
+            temperature=0.1,  # Very low for consistent decisions
+            max_tokens=24576,  # Increased: Sophisticated reasoning for splitting
+            reasoning_enabled=True,  # Enable reasoning for expert decision making
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=16384,  # Increased: Precise duplicate analysis
+            reasoning_enabled=True,  # Enable reasoning for expert similarity analysis
         ),
     },
     ModelPreset.FAST: {
         ModelTask.QA_EXTRACTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=4096,  # Lower limit for speed
+            max_tokens=8192,  # Slightly increased: Still fast but more capable
+            # Skip reasoning for speed - QA extraction is often straightforward
+            reasoning_enabled=False,
         ),
         ModelTask.PARSER_REPAIR: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,  # Moderate increase for better repairs
+            # Enable reasoning for error analysis (critical for repairs)
+            reasoning_enabled=True,
         ),
         ModelTask.PRE_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,  # Increased: Speed-focused but thorough
+            reasoning_enabled=False,  # Keep fast and deterministic
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Faster generation with good quality
+            reasoning_enabled=False,  # Skip reasoning for speed - rely on model training
         ),
         ModelTask.POST_VALIDATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,  # Moderate increase for validation
+            reasoning_enabled=False,  # Keep fast for validation pipeline
         ),
         ModelTask.CONTEXT_ENRICHMENT: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.4,
-            max_tokens=4096,
+            max_tokens=8192,  # Increased: Quick but useful enrichment
+            # Skip reasoning for speed - enrichment can be creative without it
+            reasoning_enabled=False,
         ),
         ModelTask.MEMORIZATION_QUALITY: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,  # Moderate increase for quality checks
+            reasoning_enabled=False,  # Keep fast for quality checks
         ),
         ModelTask.CARD_SPLITTING: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.2,
-            max_tokens=2048,
+            max_tokens=4096,  # Moderate increase for decision making
+            # Enable reasoning for decision making (critical for correctness)
+            reasoning_enabled=True,
         ),
         ModelTask.DUPLICATE_DETECTION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,  # Moderate increase for comparisons
+            reasoning_enabled=False,  # Keep fast - similarity can be pattern-based
         ),
     },
 }

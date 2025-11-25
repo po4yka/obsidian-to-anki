@@ -32,6 +32,12 @@ dependencies = [
     "pydantic-ai>=1.19.0",
     "langgraph>=1.0.3",
     "langgraph-checkpoint>=3.0.1",
+    # Note: langgraph-swarm and langgraph-prebuilt have conflicting dependencies
+    # Uncomment when version compatibility is resolved:
+    # "langgraph-swarm>=0.0.15",  # Swarm pattern for multi-agent collaboration
+    # "langgraph-prebuilt>=1.0.2",  # Pre-built agent architectures
+    "langsmith>=0.1.0",  # NEW: Enhanced observability and monitoring
+    "motor>=3.6.0",  # NEW: MongoDB async driver for advanced memory systems
     "diskcache>=5.6.3",
     "limits>=5.6.0",
     "pydantic-settings>=2.12.0",

@@ -396,6 +396,12 @@ class Config(BaseSettings):
     index_use_llm_extraction: bool = False  # Use LLM extraction during indexing
     verify_card_creation: bool = True  # Verify cards exist in Anki after creation
 
+    # Memory Management Settings
+    # Maximum note content size to keep in memory (MB)
+    max_note_content_size_mb: float = 50.0
+    # Enable aggressive memory cleanup after processing
+    enable_memory_cleanup: bool = True
+
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
 

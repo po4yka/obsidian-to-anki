@@ -851,10 +851,14 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
         if state.get("enable_duplicate_detection", False)
         else "complete"
     )
-    if state["memorization_quality"] is not None:
-        state["messages"].append(
-            f"Memorization quality: score={state['memorization_quality']['memorization_score']:.2f}"
-        )
+    # Safe access to memorization quality score
+    mem_quality = state.get("memorization_quality")
+    if mem_quality is not None and isinstance(mem_quality, dict):
+        mem_score = mem_quality.get("memorization_score")
+        if mem_score is not None:
+            state["messages"].append(
+                f"Memorization quality: score={mem_score:.2f}"
+            )
 
     return state
 

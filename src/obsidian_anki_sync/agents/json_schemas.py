@@ -100,6 +100,79 @@ def get_qa_extraction_schema() -> dict[str, Any]:
     }
 
 
+def get_quality_assessment_schema() -> dict[str, Any]:
+    """Get JSON schema for quality assessment responses.
+
+    Returns:
+        JSON schema dictionary for quality assessment results
+    """
+    return {
+        "name": "quality_assessment",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "overall_score": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Overall quality score",
+                },
+                "dimensions": {
+                    "type": "object",
+                    "description": "Quality scores by dimension",
+                    "properties": {
+                        "content": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "learning_science": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "technical": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "accessibility": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Actionable improvement suggestions",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Confidence in the assessment",
+                },
+            },
+            "required": ["overall_score", "dimensions", "suggestions", "confidence"],
+        },
+    }
+
+
 def get_pre_validation_schema() -> dict[str, Any]:
     """Get JSON schema for pre-validation responses.
 
@@ -150,6 +223,79 @@ def get_pre_validation_schema() -> dict[str, Any]:
     }
 
 
+def get_quality_assessment_schema() -> dict[str, Any]:
+    """Get JSON schema for quality assessment responses.
+
+    Returns:
+        JSON schema dictionary for quality assessment results
+    """
+    return {
+        "name": "quality_assessment",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "overall_score": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Overall quality score",
+                },
+                "dimensions": {
+                    "type": "object",
+                    "description": "Quality scores by dimension",
+                    "properties": {
+                        "content": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "learning_science": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "technical": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "accessibility": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Actionable improvement suggestions",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Confidence in the assessment",
+                },
+            },
+            "required": ["overall_score", "dimensions", "suggestions", "confidence"],
+        },
+    }
+
+
 def get_post_validation_schema() -> dict[str, Any]:
     """Get JSON schema for post-validation responses.
 
@@ -182,6 +328,79 @@ def get_post_validation_schema() -> dict[str, Any]:
             },
             "required": ["is_valid", "error_type", "error_details", "validation_time"],
             "additionalProperties": False,
+        },
+    }
+
+
+def get_quality_assessment_schema() -> dict[str, Any]:
+    """Get JSON schema for quality assessment responses.
+
+    Returns:
+        JSON schema dictionary for quality assessment results
+    """
+    return {
+        "name": "quality_assessment",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "overall_score": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Overall quality score",
+                },
+                "dimensions": {
+                    "type": "object",
+                    "description": "Quality scores by dimension",
+                    "properties": {
+                        "content": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "learning_science": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "technical": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "accessibility": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Actionable improvement suggestions",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Confidence in the assessment",
+                },
+            },
+            "required": ["overall_score", "dimensions", "suggestions", "confidence"],
         },
     }
 
@@ -258,6 +477,79 @@ def get_generation_schema() -> dict[str, Any]:
             },
             "required": ["cards", "total_cards", "generation_time", "model_used"],
             "additionalProperties": False,
+        },
+    }
+
+
+def get_quality_assessment_schema() -> dict[str, Any]:
+    """Get JSON schema for quality assessment responses.
+
+    Returns:
+        JSON schema dictionary for quality assessment results
+    """
+    return {
+        "name": "quality_assessment",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "overall_score": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Overall quality score",
+                },
+                "dimensions": {
+                    "type": "object",
+                    "description": "Quality scores by dimension",
+                    "properties": {
+                        "content": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "learning_science": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "technical": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "accessibility": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Actionable improvement suggestions",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Confidence in the assessment",
+                },
+            },
+            "required": ["overall_score", "dimensions", "suggestions", "confidence"],
         },
     }
 
@@ -482,5 +774,78 @@ def get_parser_repair_schema() -> dict[str, Any]:
                 "repair_time",
             ],
             "additionalProperties": False,
+        },
+    }
+
+
+def get_quality_assessment_schema() -> dict[str, Any]:
+    """Get JSON schema for quality assessment responses.
+
+    Returns:
+        JSON schema dictionary for quality assessment results
+    """
+    return {
+        "name": "quality_assessment",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "overall_score": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Overall quality score",
+                },
+                "dimensions": {
+                    "type": "object",
+                    "description": "Quality scores by dimension",
+                    "properties": {
+                        "content": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "learning_science": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "technical": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "accessibility": {
+                            "type": "object",
+                            "properties": {
+                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                                "issues": {"type": "array", "items": {"type": "string"}},
+                                "strengths": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                    },
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Actionable improvement suggestions",
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Confidence in the assessment",
+                },
+            },
+            "required": ["overall_score", "dimensions", "suggestions", "confidence"],
         },
     }

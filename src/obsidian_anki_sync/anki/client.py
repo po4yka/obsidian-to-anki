@@ -1,5 +1,6 @@
 """AnkiConnect HTTP API client."""
 
+import time
 from types import TracebackType
 from typing import Any, Literal, cast
 
@@ -21,13 +22,14 @@ class AnkiClient:
     async HTTP client in the future.
     """
 
-    def __init__(self, url: str, timeout: float = 30.0):
+    def __init__(self, url: str, timeout: float = 30.0, enable_health_checks: bool = True):
         """
         Initialize client.
 
         Args:
             url: AnkiConnect URL
             timeout: Request timeout in seconds
+            enable_health_checks: Whether to perform periodic health checks
 
         Note:
             Uses synchronous httpx.Client. This is intentional for compatibility
@@ -35,6 +37,11 @@ class AnkiClient:
             synchronization (e.g., asyncio.run() wrapper).
         """
         self.url = url
+        self.enable_health_checks = enable_health_checks
+        self._last_health_check = 0.0
+        self._health_check_interval = 60.0  # Check health every 60 seconds
+        self._is_healthy = True
+
         # Configure connection pooling for better performance
         # Using sync client for compatibility with existing sync code paths
         self.session = httpx.Client(
@@ -43,7 +50,38 @@ class AnkiClient:
                 max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
             ),
         )
-        logger.info("anki_client_initialized", url=url)
+        logger.info("anki_client_initialized", url=url,
+                    health_checks=enable_health_checks)
+
+    def _check_health(self) -> bool:
+        """
+        Check if AnkiConnect is healthy and responding.
+
+        Returns:
+            True if healthy, False otherwise
+        """
+        if not self.enable_health_checks:
+            return True
+
+        current_time = time.time()
+        if current_time - self._last_health_check < self._health_check_interval:
+            return self._is_healthy
+
+        try:
+            # Simple health check using version action (direct call to avoid recursion)
+            payload = {"action": "version", "version": 6, "params": {}}
+            response = self.session.post(self.url, json=payload)
+            response.raise_for_status()
+            result = response.json()
+            if result.get("error"):
+                raise AnkiConnectError(f"AnkiConnect error: {result['error']}")
+            self._is_healthy = True
+        except Exception:
+            self._is_healthy = False
+            logger.warning("anki_health_check_failed", url=self.url)
+
+        self._last_health_check = current_time
+        return self._is_healthy
 
     @retry(
         max_attempts=3,
@@ -64,6 +102,13 @@ class AnkiClient:
         Raises:
             AnkiConnectError: If the action fails
         """
+        # Perform health check before making requests
+        if not self._check_health():
+            logger.warning("anki_unhealthy_skipping_request",
+                           action=action, url=self.url)
+            raise AnkiConnectError(
+                "AnkiConnect is not responding - check if Anki is running")
+
         payload = {"action": action, "version": 6, "params": params or {}}
 
         logger.debug("anki_invoke", action=action)
@@ -72,6 +117,7 @@ class AnkiClient:
             response = self.session.post(self.url, json=payload)
             response.raise_for_status()
         except (httpx.TimeoutException, httpx.ConnectError) as e:
+            self._is_healthy = False  # Mark as unhealthy on connection errors
             raise AnkiConnectError(f"Connection error to AnkiConnect: {e}")
         except httpx.HTTPStatusError as e:
             raise AnkiConnectError(
@@ -148,7 +194,8 @@ class AnkiClient:
 
         result = cast(int, self.invoke("addNote", {"note": note_payload}))
 
-        logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
+        logger.info("note_added", note_id=result,
+                    deck=deck, note_type=note_type)
         return result
 
     def add_notes(
@@ -173,7 +220,8 @@ class AnkiClient:
         if not notes:
             return []
 
-        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
+        result = cast(list[int | None], self.invoke(
+            "addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -195,7 +243,8 @@ class AnkiClient:
             note_id: Note ID
             fields: New field values
         """
-        self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
+        self.invoke("updateNoteFields", {
+                    "note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
 
@@ -434,8 +483,105 @@ class AnkiClient:
             List of field names
         """
         return cast(
-            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
+            list[str], self.invoke("modelFieldNames", {
+                                   "modelName": model_name})
         )
+
+    def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
+        """
+        Check if notes can be added (duplicate prevention).
+
+        Args:
+            notes: List of note payloads to check, each containing:
+                - deckName: str
+                - modelName: str
+                - fields: dict[str, str]
+
+        Returns:
+            List of booleans indicating whether each note can be added
+        """
+        if not notes:
+            return []
+
+        return cast(list[bool], self.invoke("canAddNotes", {"notes": notes}))
+
+    def store_media_file(self, filename: str, data: str) -> str:
+        """
+        Store a media file in Anki's media collection.
+
+        Args:
+            filename: Name of the file to store
+            data: Base64-encoded file data
+
+        Returns:
+            The filename as stored in Anki (may be modified)
+        """
+        return cast(str, self.invoke("storeMediaFile", {"filename": filename, "data": data}))
+
+    def suspend_cards(self, card_ids: list[int]) -> None:
+        """
+        Suspend cards by ID.
+
+        Args:
+            card_ids: List of card IDs to suspend
+        """
+        if not card_ids:
+            return
+
+        self.invoke("suspend", {"cards": card_ids})
+        logger.info("cards_suspended", count=len(card_ids))
+
+    def unsuspend_cards(self, card_ids: list[int]) -> None:
+        """
+        Unsuspend cards by ID.
+
+        Args:
+            card_ids: List of card IDs to unsuspend
+        """
+        if not card_ids:
+            return
+
+        self.invoke("unsuspend", {"cards": card_ids})
+        logger.info("cards_unsuspended", count=len(card_ids))
+
+    def gui_browse(self, query: str) -> list[int]:
+        """
+        Open Anki browser with a search query.
+
+        Args:
+            query: Anki search query
+
+        Returns:
+            List of note IDs matching the query
+        """
+        return cast(list[int], self.invoke("guiBrowse", {"query": query}))
+
+    def get_collection_stats(self) -> str:
+        """
+        Get collection statistics as HTML.
+
+        Returns:
+            HTML string containing collection statistics
+        """
+        return cast(str, self.invoke("getCollectionStatsHtml"))
+
+    def get_model_names_and_ids(self) -> dict[str, int]:
+        """
+        Get note type names and their IDs.
+
+        Returns:
+            Dictionary mapping model names to model IDs
+        """
+        return cast(dict[str, int], self.invoke("modelNamesAndIds"))
+
+    def get_num_cards_reviewed_today(self) -> int:
+        """
+        Get the number of cards reviewed today.
+
+        Returns:
+            Number of cards reviewed in the current day
+        """
+        return cast(int, self.invoke("getNumCardsReviewedToday"))
 
     def sync(self) -> None:
         """Trigger Anki sync."""
@@ -449,7 +595,8 @@ class AnkiClient:
                 self.session.close()
                 logger.debug("anki_client_closed", url=self.url)
             except Exception as e:
-                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
+                logger.warning("anki_client_cleanup_failed",
+                               url=self.url, error=str(e))
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""

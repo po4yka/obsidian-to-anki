@@ -172,14 +172,24 @@ class LMStudioProvider(BaseLLMProvider):
 
             result = response.json()
 
-            # Extract completion from OpenAI format
-            completion = result["choices"][0]["message"]["content"]
+            # Validate response structure
+            choices = result.get("choices", [])
+            if not choices:
+                raise ValueError(
+                    f"LM Studio returned empty choices array. Response: {str(result)[:500]}"
+                )
+
+            # Extract completion from OpenAI format safely
+            first_choice = choices[0]
+            message = first_choice.get("message", {})
+            completion = message.get("content", "")
+            finish_reason = first_choice.get("finish_reason")
 
             # Convert to standard format
             standardized_result = {
                 "response": completion,
                 "model": result.get("model"),
-                "finish_reason": result["choices"][0].get("finish_reason"),
+                "finish_reason": finish_reason,
                 "usage": result.get("usage", {}),
             }
 

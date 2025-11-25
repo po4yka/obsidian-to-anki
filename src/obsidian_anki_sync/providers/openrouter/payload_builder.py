@@ -22,6 +22,82 @@ def build_messages(prompt: str, system: str) -> list[dict[str, str]]:
     return messages
 
 
+def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
+    """Determine if reasoning should be enabled with JSON schema based on complexity.
+
+    Args:
+        json_schema: JSON schema dictionary
+
+    Returns:
+        True if reasoning should be enabled for this schema
+    """
+    schema_dict = json_schema.get("schema", {})
+
+    # Enable reasoning for complex schemas that would benefit from step-by-step thinking
+    if not isinstance(schema_dict, dict):
+        return False
+
+    # Check for complex nested structures
+    properties = schema_dict.get("properties", {})
+    if len(properties) > 5:  # Many properties suggest complex output
+        return True
+
+    # Check for deeply nested objects or arrays
+    def _count_nested_complexity(
+        obj: dict[str, Any],
+        depth: int = 0,
+        max_depth: int = 10,
+        visited: set | None = None
+    ) -> int:
+        """Count nested complexity in schema with recursion protection."""
+        # Protect against infinite recursion
+        if depth > max_depth:
+            return 0
+
+        # Track visited objects to prevent circular reference loops
+        if visited is None:
+            visited = set()
+
+        obj_id = id(obj)
+        if obj_id in visited:
+            return 0
+        visited.add(obj_id)
+
+        complexity = 0
+
+        if depth > 2:  # Deep nesting
+            complexity += 1
+
+        # Check properties
+        props = obj.get("properties", {})
+        if isinstance(props, dict) and len(props) > 3:
+            complexity += len(props) // 2
+
+        # Check for arrays with complex items
+        items = obj.get("items", {})
+        if isinstance(items, dict):
+            if items.get("type") == "object" and items.get("properties"):
+                complexity += 2
+            complexity += _count_nested_complexity(items, depth + 1, max_depth, visited)
+
+        # Check for nested objects
+        if isinstance(props, dict):
+            for prop_schema in props.values():
+                if isinstance(prop_schema, dict):
+                    if prop_schema.get("type") == "object":
+                        complexity += _count_nested_complexity(
+                            prop_schema, depth + 1, max_depth, visited)
+                    elif prop_schema.get("type") == "array":
+                        complexity += 1
+
+        return complexity
+
+    complexity_score = _count_nested_complexity(schema_dict)
+
+    # Enable reasoning for schemas with moderate to high complexity
+    return complexity_score >= 3
+
+
 def optimize_schema_for_request(schema: dict[str, Any]) -> dict[str, Any]:
     """Optimize JSON schema for token efficiency.
 
@@ -122,9 +198,16 @@ def build_payload(
         "stream": False,
     }
 
-    # For Grok models: explicitly disable reasoning when using JSON schema
-    if "grok" in model.lower() and json_schema:
-        payload["reasoning"] = {"enabled": False}
+    # For Grok models: enable reasoning for complex tasks, disable for simple deterministic tasks
+    if "grok" in model.lower():
+        # Grok 4.1 Fast excels at reasoning even with structured outputs
+        # Enable reasoning for complex reasoning tasks or when explicitly requested
+        should_enable_reasoning = (
+            reasoning_enabled or  # Explicitly requested
+            (json_schema and _should_use_reasoning_with_schema(
+                json_schema))  # Complex schema tasks
+        )
+        payload["reasoning"] = {"enabled": should_enable_reasoning}
     elif reasoning_enabled and not json_schema:
         payload["reasoning_enabled"] = True
 
