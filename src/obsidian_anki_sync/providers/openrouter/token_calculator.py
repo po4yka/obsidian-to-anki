@@ -68,7 +68,7 @@ def calculate_effective_max_tokens(
     prompt_tokens_estimate: int,
     schema_overhead: int,
     json_schema: dict[str, Any] | None,
-    configured_max_tokens: int,
+    configured_max_tokens: int | None,
 ) -> int:
     """Calculate the effective max_tokens for a request.
 
@@ -77,13 +77,17 @@ def calculate_effective_max_tokens(
         prompt_tokens_estimate: Estimated prompt token count
         schema_overhead: Schema token overhead
         json_schema: JSON schema dictionary (if any)
-        configured_max_tokens: Configured max_tokens value
+        configured_max_tokens: Configured max_tokens value (can be None)
 
     Returns:
         Effective max_tokens to use
     """
     context_window = get_model_context_window(model)
     model_max_output = get_model_max_output(model)
+
+    # Handle None configured_max_tokens - use model default or reasonable default
+    if configured_max_tokens is None:
+        configured_max_tokens = min(model_max_output, DEFAULT_MAX_OUTPUT_TOKENS)
 
     if json_schema:
         # For structured outputs, be more generous with tokens
