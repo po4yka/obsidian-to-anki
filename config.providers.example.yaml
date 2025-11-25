@@ -93,11 +93,11 @@ post_validation_strict_mode: true
 # llm_provider: "openrouter"
 # openrouter_api_key: "your-api-key"  # Or set OPENROUTER_API_KEY env var
 # # Pre-validator: Fast, efficient validation
-# pydantic_ai_pre_validator_model: "qwen/qwen-2.5-32b-instruct"
+# pre_validator_model: "qwen/qwen-2.5-32b-instruct"
 # # Generator: Powerful content creation
-# pydantic_ai_generator_model: "qwen/qwen-2.5-72b-instruct"
+# generator_model: "qwen/qwen-2.5-72b-instruct"
 # # Post-validator: Strong reasoning and quality checks
-# pydantic_ai_post_validator_model: "deepseek/deepseek-chat"
+# post_validator_model: "deepseek/deepseek-chat"
 # # Card Splitting: Advanced reasoning for decision making
 # card_splitting_model: "moonshotai/kimi-k2-thinking"
 # # Context Enrichment: Excellent for code generation and creative examples

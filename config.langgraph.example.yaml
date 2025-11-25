@@ -60,17 +60,17 @@ use_langgraph: true
 # Enable PydanticAI for type-safe structured outputs
 use_pydantic_ai: true
 
-# Model selection for each agent (OpenRouter model identifiers)
+# Per-agent model overrides (OpenRouter model identifiers)
 # Optimized 2025 models: MiniMax M2, Kimi K2, DeepSeek V3, Qwen 2.5
 
 # Pre-validator: Fast, efficient validation
-pydantic_ai_pre_validator_model: qwen/qwen-2.5-32b-instruct
+pre_validator_model: qwen/qwen-2.5-32b-instruct
 
 # Generator: Powerful content creation
-pydantic_ai_generator_model: qwen/qwen-2.5-72b-instruct
+generator_model: qwen/qwen-2.5-72b-instruct
 
 # Post-validator: Strong reasoning and quality checks
-pydantic_ai_post_validator_model: deepseek/deepseek-chat
+post_validator_model: deepseek/deepseek-chat
 
 # Card Splitting: Advanced reasoning for decision making
 card_splitting_model: moonshotai/kimi-k2-thinking
@@ -91,18 +91,13 @@ langgraph_strict_mode: true  # Use strict validation rules
 langgraph_checkpoint_enabled: true  # Enable state persistence
 
 # =============================================================================
-# Legacy Agent System (for comparison)
+# Legacy Agent System
 # =============================================================================
 
 # Set to false when using LangGraph system
 use_agent_system: false
 
-# Legacy agent models (used when use_agent_system=true and use_langgraph=false)
-pre_validator_model: qwen3:8b
-generator_model: qwen3:32b
-post_validator_model: qwen3:14b
-
-# Legacy agent settings
+# Agent settings (shared between legacy and LangGraph systems)
 pre_validation_enabled: true
 post_validation_max_retries: 3
 post_validation_auto_fix: true

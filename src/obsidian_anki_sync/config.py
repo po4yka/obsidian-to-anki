@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigurationError
 from .utils.path_validator import (
@@ -174,41 +174,19 @@ class Config(BaseSettings):
 
     # Parser-Repair Agent (reactive - only runs when parsing fails)
     parser_repair_enabled: bool = True
-    parser_repair_model: str = "qwen3:8b"
-    parser_repair_temperature: float = 0.0
+    # Model config moved to unified section below (parser_repair_model, etc.)
 
     # Note Correction Agent (optional proactive correction before parsing)
     enable_note_correction: bool = Field(
         default=False,
         description="Enable proactive note correction before parsing (optional pre-processing)",
     )
-    note_correction_model: str = Field(
-        default="x-ai/grok-4.1-fast",
-        description="Model for proactive note correction",
-    )
-    note_correction_temperature: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Temperature for note correction agent",
-    )
-
-    # Q&A Extractor Agent (flexible LLM-based Q&A extraction)
-    qa_extractor_model: str = "qwen3:8b"
-    qa_extractor_temperature: float = 0.0
+    # Model config: note_correction_model in unified section below
 
     # Pre-Validator Agent
-    pre_validator_model: str = "qwen3:8b"
-    pre_validator_temperature: float = 0.0
     pre_validation_enabled: bool = True
 
-    # Generator Agent
-    generator_model: str = "qwen3:32b"
-    generator_temperature: float = 0.3
-
     # Post-Validator Agent
-    post_validator_model: str = "qwen3:14b"
-    post_validator_temperature: float = 0.0
     post_validation_max_retries: int = 3
     post_validation_auto_fix: bool = True
     post_validation_strict_mode: bool = True
@@ -333,32 +311,22 @@ class Config(BaseSettings):
     # Only used if model_preset is not set or for backward compatibility
     default_llm_model: str = "x-ai/grok-4.1-fast"
 
-    # Individual agent model overrides (optional - overrides preset)
-    # Set to empty string ("") to use preset default
-    # Pre-validator: Fast, efficient validation
-    pydantic_ai_pre_validator_model: str = ""
-    # Generator: Powerful content creation
-    pydantic_ai_generator_model: str = ""
-    # Post-validator: Strong reasoning and quality checks
-    pydantic_ai_post_validator_model: str = ""
-    # Context Enrichment: Excellent for code generation and creative examples
-    context_enrichment_model: str = ""
-    # Memorization Quality: Strong analytical capabilities
-    memorization_quality_model: str = ""
-    # Card Splitting: Advanced reasoning for decision making
-    card_splitting_model: str = ""
-    # Duplicate Detection: Efficient comparison
-    duplicate_detection_model: str = ""
-
-    # Per-task model settings (optional - overrides preset defaults)
+    # Per-agent model overrides (optional - overrides preset defaults)
+    # Set model to empty string ("") to use preset default
+    # Set temperature/max_tokens to None to use preset default
+    #
     # QA Extraction
     qa_extractor_model: str = ""
     qa_extractor_temperature: float | None = None
     qa_extractor_max_tokens: int | None = None
-    # Parser Repair
+    # Parser Repair (reactive - only runs when parsing fails)
     parser_repair_model: str = ""
     parser_repair_temperature: float | None = None
     parser_repair_max_tokens: int | None = None
+    # Note Correction (proactive - runs before parsing if enabled)
+    note_correction_model: str = ""
+    note_correction_temperature: float | None = None
+    note_correction_max_tokens: int | None = None
     # Pre-Validation
     pre_validator_model: str = ""
     pre_validator_temperature: float | None = None
@@ -371,6 +339,14 @@ class Config(BaseSettings):
     post_validator_model: str = ""
     post_validator_temperature: float | None = None
     post_validator_max_tokens: int | None = None
+    # Context Enrichment
+    context_enrichment_model: str = ""
+    # Memorization Quality
+    memorization_quality_model: str = ""
+    # Card Splitting
+    card_splitting_model: str = ""
+    # Duplicate Detection
+    duplicate_detection_model: str = ""
 
     # LangGraph Workflow Configuration
     langgraph_max_retries: int = 3
@@ -429,7 +405,6 @@ class Config(BaseSettings):
         from .models.config import (
             ModelPreset,
             ModelTask,
-            get_model_config,
             get_model_for_task,
         )
 
@@ -450,20 +425,18 @@ class Config(BaseSettings):
         task = agent_to_task.get(agent_type)
 
         # Check for explicit override first
+        # Maps agent type to the override field (empty string = use preset)
         agent_model_map = {
-            "pre_validator": self.pydantic_ai_pre_validator_model
-            or self.pre_validator_model,
-            "generator": self.pydantic_ai_generator_model or self.generator_model,
-            "post_validator": self.pydantic_ai_post_validator_model
-            or self.post_validator_model,
+            "pre_validator": self.pre_validator_model,
+            "generator": self.generator_model,
+            "post_validator": self.post_validator_model,
             "context_enrichment": self.context_enrichment_model,
             "memorization_quality": self.memorization_quality_model,
             "card_splitting": self.card_splitting_model,
             "duplicate_detection": self.duplicate_detection_model,
             "qa_extractor": self.qa_extractor_model,
             "parser_repair": self.parser_repair_model,
-            "note_correction": getattr(self, "note_correction_model", "")
-            or self.parser_repair_model,  # Fallback to parser repair model
+            "note_correction": self.note_correction_model or self.parser_repair_model,
         }
 
         explicit_model = agent_model_map.get(agent_type, "")
@@ -492,7 +465,6 @@ class Config(BaseSettings):
             Dictionary with model configuration
         """
         from .models.config import (
-            ModelConfig,
             ModelPreset,
             ModelTask,
             get_model_config,
