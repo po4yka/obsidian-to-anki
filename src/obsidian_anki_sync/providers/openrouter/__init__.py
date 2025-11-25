@@ -1,18 +1,10 @@
-"""OpenRouter provider implementation.
+"""OpenRouter provider package.
 
-This module provides backward compatibility by re-exporting from the
-refactored openrouter package. The actual implementation is now split
-across multiple modules in the openrouter/ directory for better
-maintainability.
-
-For new code, import directly from openrouter package:
-    from .openrouter import OpenRouterProvider
-
-This file will be maintained for backward compatibility.
+This package provides a modular implementation of the OpenRouter LLM provider.
+Components are organized into separate modules for better maintainability.
 """
 
-# Re-export everything from the refactored package
-from .openrouter import (
+from .models import (
     CONTEXT_SAFETY_MARGIN,
     DEFAULT_CONTEXT_WINDOW,
     DEFAULT_MAX_OUTPUT_TOKENS,
@@ -21,8 +13,8 @@ from .openrouter import (
     MODEL_MAX_OUTPUT_TOKENS,
     MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS,
     MODELS_WITH_STRUCTURED_OUTPUT_ISSUES,
-    OpenRouterProvider,
 )
+from .provider import OpenRouterProvider
 
 __all__ = [
     "OpenRouterProvider",
