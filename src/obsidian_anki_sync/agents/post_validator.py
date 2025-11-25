@@ -849,7 +849,7 @@ Missing Sentinels:
 - END_OF_CARDS: Must be the last line (no content after)
 
 Missing Manifest:
-- Every card MUST have a manifest comment: <!-- manifest: {"slug":"...","lang":"...","type":"...","tags":[...]} -->
+- Every card MUST have a manifest comment: <!-- manifest: {{"slug":"...","lang":"...","type":"...","tags":[...]}} -->
 - Manifest must be valid JSON
 - Manifest slug must match header slug exactly
 - Manifest lang must match card language
@@ -913,7 +913,7 @@ Before:
 After:
 <!-- Card 1 | slug: test-card | CardType: Simple | Tags: test example -->
 ...
-<!-- manifest: {"slug":"test-card","lang":"en","type":"Simple","tags":["test","example"]} -->
+<!-- manifest: {{"slug":"test-card","lang":"en","type":"Simple","tags":["test","example"]}} -->
 <!-- END_CARDS -->
 
 Fixes applied:
@@ -966,7 +966,7 @@ Fixes applied:
 <li>Must call super.onCreate()</li>
 </ul>
 
-<!-- manifest: {"slug":"android-lifecycle","lang":"en","type":"Simple","tags":["android","lifecycle","architecture"]} -->
+<!-- manifest: {{"slug":"android-lifecycle","lang":"en","type":"Simple","tags":["android","lifecycle","architecture"]}} -->
 <!-- END_CARDS -->
 END_OF_CARDS
 </example_6_valid_complete_card>

@@ -307,6 +307,22 @@ class GeneratorAgent:
                 if not apf_html or not apf_html.strip():
                     raise ValueError("LLM returned empty response")
 
+                # Check for truncation indicators
+                truncation_indicators = self._detect_truncation(apf_html)
+                if truncation_indicators:
+                    logger.warning(
+                        "possible_response_truncation",
+                        slug=manifest.slug,
+                        indicators=truncation_indicators,
+                        response_length=len(apf_html),
+                        attempt=attempt,
+                    )
+                    # If severely truncated and we have retries left, retry
+                    if attempt < max_retries and len(truncation_indicators) > 1:
+                        raise ValueError(
+                            f"Response appears truncated: {', '.join(truncation_indicators)}"
+                        )
+
                 # Extract token usage if available
                 token_usage = result.get("_token_usage", {})
                 prompt_tokens = token_usage.get("prompt_tokens", 0)
@@ -644,6 +660,65 @@ Now generate the card following this structure:
                 tags.append("general")
 
         return tags[:6]  # Max 6 tags
+
+    def _detect_truncation(self, html: str) -> list[str]:
+        """Detect if a response appears to be truncated.
+
+        Checks for common indicators of truncation:
+        - Unclosed HTML tags (code, pre, ul, li, etc.)
+        - Missing required APF sections
+        - Response ends mid-word or mid-tag
+
+        Args:
+            html: The generated HTML content
+
+        Returns:
+            List of truncation indicators found (empty if none)
+        """
+        indicators = []
+
+        # Check for unclosed code blocks
+        code_opens = html.count("<code")
+        code_closes = html.count("</code>")
+        if code_opens > code_closes:
+            indicators.append(f"unclosed_code_tags ({code_opens} opens, {code_closes} closes)")
+
+        pre_opens = html.count("<pre")
+        pre_closes = html.count("</pre>")
+        if pre_opens > pre_closes:
+            indicators.append(f"unclosed_pre_tags ({pre_opens} opens, {pre_closes} closes)")
+
+        # Check for unclosed lists
+        ul_opens = html.count("<ul")
+        ul_closes = html.count("</ul>")
+        if ul_opens > ul_closes:
+            indicators.append(f"unclosed_ul_tags ({ul_opens} opens, {ul_closes} closes)")
+
+        li_opens = html.count("<li")
+        li_closes = html.count("</li>")
+        if li_opens > li_closes:
+            indicators.append(f"unclosed_li_tags ({li_opens} opens, {li_closes} closes)")
+
+        # Check for truncated SVG (common issue)
+        if "<svg" in html.lower() and "</svg>" not in html.lower():
+            indicators.append("unclosed_svg_tag")
+
+        # Check if response ends in incomplete syntax
+        stripped = html.rstrip()
+        if stripped:
+            # Ends with incomplete HTML tag
+            if stripped.endswith("<") or re.search(r"<[a-z]+[^>]*$", stripped, re.IGNORECASE):
+                indicators.append("ends_with_incomplete_tag")
+
+            # Ends with incomplete attribute
+            if re.search(r'="[^"]*$', stripped):
+                indicators.append("ends_with_incomplete_attribute")
+
+            # Very short response (less than 500 chars) for card generation
+            if len(stripped) < 500:
+                indicators.append(f"very_short_response ({len(stripped)} chars)")
+
+        return indicators
 
     def _generate_manifest(
         self, manifest: Manifest, card_type: str, tags: list[str]
