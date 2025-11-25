@@ -40,6 +40,12 @@ from .slug_utils import generate_agent_slug_base
 
 logger = get_logger(__name__)
 
+# Optional agent memory (requires chromadb)
+try:
+    from .agent_memory import AgentMemoryStore
+except ImportError:
+    AgentMemoryStore = None
+
 
 # ============================================================================
 # State Definition

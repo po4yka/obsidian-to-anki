@@ -50,10 +50,11 @@ class TestModelReuse:
         )
 
         with patch(
-            "obsidian_anki_sync.agents.langgraph_orchestrator.PydanticAIModelFactory.create_from_config"
+            "obsidian_anki_sync.providers.pydantic_ai_models.PydanticAIModelFactory.create_from_config"
         ) as mock_create:
-            mock_model = MagicMock()
-            mock_create.return_value = mock_model
+            # Return a new MagicMock for each call so different orchestrators
+            # get different model instances
+            mock_create.side_effect = lambda *args, **kwargs: MagicMock()
 
             # Create orchestrator
             orchestrator1 = LangGraphOrchestrator(test_config_for_resources)
@@ -67,7 +68,7 @@ class TestModelReuse:
             # Verify models were created again (total 14 calls)
             assert mock_create.call_count == 14
 
-            # Verify models are different instances
+            # Verify models are different instances (each orchestrator has its own)
             assert orchestrator1.pre_validator_model is not None
             assert orchestrator2.pre_validator_model is not None
             assert (
@@ -82,7 +83,7 @@ class TestModelReuse:
         )
 
         with patch(
-            "obsidian_anki_sync.agents.langgraph_orchestrator.PydanticAIModelFactory.create_from_config"
+            "obsidian_anki_sync.providers.pydantic_ai_models.PydanticAIModelFactory.create_from_config"
         ) as mock_create:
             mock_model = MagicMock()
             mock_create.return_value = mock_model

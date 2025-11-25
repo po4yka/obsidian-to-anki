@@ -37,7 +37,7 @@ class TestNoteValidator:
 
         errors = validate_note_structure(sample_metadata, content_with_code)
 
-        assert any("Unbalanced code fences" in err for err in errors)
+        assert any("Unbalanced code fence" in err for err in errors)
 
 
 class TestLintNoteFrontmatter:
