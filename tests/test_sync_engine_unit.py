@@ -109,7 +109,7 @@ class TestSyncEngineInitialization:
             patch(
                 "obsidian_anki_sync.sync.engine.AgentOrchestrator"
             ) as mock_orchestrator_class,
-            patch("obsidian_anki_sync.sync.engine.configure_llm_extraction"),
+            patch("obsidian_anki_sync.sync.engine.create_qa_extractor"),
         ):
             mock_orchestrator = MagicMock()
             mock_orchestrator.provider = MagicMock()

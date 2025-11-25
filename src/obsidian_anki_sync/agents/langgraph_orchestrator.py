@@ -90,6 +90,7 @@ class PipelineState(TypedDict):
 
     # Workflow control
     current_stage: Literal[
+        "note_correction",
         "pre_validation",
         "card_splitting",
         "generation",
@@ -120,6 +121,79 @@ class PipelineState(TypedDict):
 # ============================================================================
 # Node Functions
 # ============================================================================
+
+
+async def note_correction_node(state: PipelineState) -> PipelineState:
+    """Execute optional proactive note correction stage.
+
+    Improves note quality before parsing (grammar, clarity, completeness).
+    Only runs if enable_note_correction is True.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with corrected note content
+    """
+    from ..providers.pydantic_ai_models import create_openrouter_model_from_env
+    from .parser_repair import ParserRepairAgent
+
+    logger.info("langgraph_note_correction_start")
+    start_time = time.time()
+
+    # Check if note correction is enabled
+    config = state["config"]
+    if not getattr(config, "enable_note_correction", False):
+        logger.info("note_correction_skipped", reason="disabled")
+        state["current_stage"] = "pre_validation"
+        return state
+
+    # Get note correction model
+    try:
+        model_name = config.get_model_for_agent("note_correction")
+        if not model_name or model_name == "":
+            # Fallback to parser repair model if note correction model not set
+            model_name = getattr(config, "parser_repair_model", "qwen3:8b")
+
+        # Create provider for note correction (reuse parser repair infrastructure)
+        from ..providers.factory import ProviderFactory
+
+        provider = ProviderFactory.create_from_config(config)
+        correction_model = model_name
+        correction_temp = getattr(config, "note_correction_temperature", 0.0)
+
+        # Create repair agent for correction (reuse existing infrastructure)
+        correction_agent = ParserRepairAgent(
+            ollama_client=provider,
+            model=correction_model,
+            temperature=correction_temp,
+            enable_content_generation=True,
+            repair_missing_sections=True,
+        )
+
+        # For proactive correction, we simulate a "parsing error" to trigger correction
+        # In practice, this would analyze the note for quality issues
+        # For now, we'll skip proactive correction and rely on reactive repair
+        # This is a placeholder for future enhancement
+
+        logger.info(
+            "note_correction_placeholder",
+            note="Proactive note correction node created but not fully implemented. "
+            "Reactive repair (ParserRepairAgent) handles corrections when parsing fails.",
+        )
+
+        # For now, just pass through to pre-validation
+        # Future: Add proactive quality analysis and correction here
+
+    except Exception as e:
+        logger.warning("note_correction_failed", error=str(e))
+        # Continue to pre-validation even if correction fails
+
+    state["stage_times"]["note_correction"] = time.time() - start_time
+    state["current_stage"] = "pre_validation"
+    state["messages"].append("Note correction: passed through")
+
+    return state
 
 
 async def pre_validation_node(state: PipelineState) -> PipelineState:
@@ -169,7 +243,8 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             state["pre_validation"] = pre_result.model_dump()
             state["stage_times"]["pre_validation"] = pre_result.validation_time
             state["current_stage"] = "generation"
-            state["messages"].append(f"Pre-validation: {pre_result.error_type}")
+            state["messages"].append(
+                f"Pre-validation: {pre_result.error_type}")
             return state
 
     # Create pre-validator agent
@@ -185,7 +260,8 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         )
         pre_result.validation_time = time.time() - start_time
     except PreValidationError as e:
-        logger.error("langgraph_pre_validation_error", error=str(e), details=e.details)
+        logger.error("langgraph_pre_validation_error",
+                     error=str(e), details=e.details)
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -207,7 +283,8 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
     except Exception as e:
-        logger.exception("langgraph_pre_validation_unexpected_error", error=str(e))
+        logger.exception(
+            "langgraph_pre_validation_unexpected_error", error=str(e))
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -270,16 +347,25 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("card_splitting")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
-            logger.warning("failed_to_create_card_splitting_model", error=str(e))
+            logger.warning(
+                "failed_to_create_card_splitting_model", error=str(e))
             # Fallback: skip card splitting analysis
             state["card_splitting"] = None
             state["current_stage"] = "generation"
             state["stage_times"]["card_splitting"] = time.time() - start_time
-            state["messages"].append("Card splitting skipped (model unavailable)")
+            state["messages"].append(
+                "Card splitting skipped (model unavailable)")
             return state
 
     # Create card splitting agent
     splitting_agent = CardSplittingAgentAI(model=model, temperature=0.0)
+
+    # Get splitting preferences from config
+    config = state["config"]
+    preferred_size = getattr(config, "card_splitting_preferred_size", "medium")
+    prefer_splitting = getattr(config, "card_splitting_prefer_splitting", True)
+    min_confidence = getattr(config, "card_splitting_min_confidence", 0.7)
+    max_cards = getattr(config, "card_splitting_max_cards_per_note", 10)
 
     # Run splitting analysis
     try:
@@ -289,6 +375,57 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             qa_pairs=qa_pairs,
         )
         splitting_result.decision_time = time.time() - start_time
+
+        # Apply preferences and safety limits
+        # Check confidence threshold
+        if splitting_result.confidence < min_confidence:
+            logger.warning(
+                "card_splitting_below_confidence_threshold",
+                confidence=splitting_result.confidence,
+                threshold=min_confidence,
+                decision=splitting_result.should_split,
+            )
+            # If confidence is too low, use fallback strategy or default to no split
+            if splitting_result.fallback_strategy:
+                logger.info(
+                    "card_splitting_using_fallback",
+                    fallback=splitting_result.fallback_strategy,
+                )
+            elif splitting_result.should_split:
+                # Low confidence on split - default to no split
+                logger.info(
+                    "card_splitting_low_confidence_defaulting_to_no_split",
+                    confidence=splitting_result.confidence,
+                )
+                splitting_result.should_split = False
+                splitting_result.card_count = 1
+                splitting_result.splitting_strategy = "none"
+
+        # Apply max cards safety limit
+        if splitting_result.card_count > max_cards:
+            logger.warning(
+                "card_splitting_exceeds_max_cards",
+                requested=splitting_result.card_count,
+                max_allowed=max_cards,
+            )
+            splitting_result.card_count = max_cards
+            # Truncate split plan if needed
+            if len(splitting_result.split_plan) > max_cards:
+                splitting_result.split_plan = splitting_result.split_plan[:max_cards]
+
+        # Apply preferred size bias
+        if preferred_size == "small" and not splitting_result.should_split:
+            # Prefer smaller cards - encourage splitting
+            logger.debug(
+                "card_splitting_preferred_size_small_encouraging_split")
+        elif preferred_size == "large" and splitting_result.should_split:
+            # Prefer larger cards - might want to discourage splitting
+            # But respect the agent's decision unless confidence is low
+            if splitting_result.confidence < 0.8:
+                logger.debug(
+                    "card_splitting_preferred_size_large_low_confidence",
+                    confidence=splitting_result.confidence,
+                )
     except Exception as e:
         logger.exception("langgraph_card_splitting_error", error=str(e))
         # Fallback: assume no splitting needed
@@ -366,6 +503,23 @@ async def generation_node(state: PipelineState) -> PipelineState:
             state["messages"].append("Generation failed: model unavailable")
             return state
 
+    # Check if we have a split plan from card splitting agent
+    card_splitting = state.get("card_splitting")
+    expected_card_count = None
+    split_plan = None
+    if card_splitting:
+        from .models import CardSplittingResult
+
+        splitting_result = CardSplittingResult(**card_splitting)
+        expected_card_count = splitting_result.card_count
+        split_plan = splitting_result.split_plan
+        logger.info(
+            "langgraph_generation_with_split_plan",
+            expected_cards=expected_card_count,
+            strategy=splitting_result.splitting_strategy,
+            confidence=splitting_result.confidence,
+        )
+
     # Create generator agent
     generator = GeneratorAgentAI(model=model, temperature=0.3)
 
@@ -378,8 +532,40 @@ async def generation_node(state: PipelineState) -> PipelineState:
             slug_base=state["slug_base"],
         )
         gen_result.generation_time = time.time() - start_time
+
+        # Validate against split plan if available
+        if expected_card_count is not None:
+            actual_count = gen_result.total_cards
+            if actual_count != expected_card_count:
+                logger.warning(
+                    "langgraph_generation_card_count_mismatch",
+                    expected=expected_card_count,
+                    actual=actual_count,
+                    strategy=splitting_result.splitting_strategy if card_splitting else None,
+                )
+                # This is a warning, not an error - generation may produce different count
+                # based on actual Q&A pairs vs split plan expectations
+
+        # Log split plan alignment if available
+        if split_plan and gen_result.cards:
+            logger.debug(
+                "langgraph_generation_split_plan_alignment",
+                plan_cards=len(split_plan),
+                generated_cards=len(gen_result.cards),
+            )
+
     except Exception as e:
         logger.exception("langgraph_generation_error", error=str(e))
+
+        # If we have a split plan, log it for debugging
+        if split_plan:
+            logger.error(
+                "langgraph_generation_failed_with_split_plan",
+                expected_cards=expected_card_count,
+                split_plan_count=len(split_plan),
+                error=str(e),
+            )
+
         gen_result = GenerationResult(
             cards=[],
             total_cards=0,
@@ -392,6 +578,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
     logger.info(
         "langgraph_generation_complete",
         cards_count=gen_result.total_cards,
+        expected_count=expected_card_count,
         time=gen_result.generation_time,
     )
 
@@ -421,7 +608,8 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     from ..providers.pydantic_ai_models import create_openrouter_model_from_env
     from .pydantic_ai_agents import PostValidatorAgentAI
 
-    logger.info("langgraph_post_validation_start", retry_count=state["retry_count"])
+    logger.info("langgraph_post_validation_start",
+                retry_count=state["retry_count"])
     start_time = time.time()
 
     # Deserialize data
@@ -443,7 +631,8 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("post_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning("failed_to_create_post_validator_model", error=str(e))
+            logger.warning(
+                "failed_to_create_post_validator_model", error=str(e))
             # Assume valid if validator unavailable
             post_result = PostValidationResult(
                 is_valid=True,
@@ -493,7 +682,8 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
 
     state["post_validation"] = post_result.model_dump()
     state["stage_times"]["post_validation"] = (
-        state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
+        state["stage_times"].get("post_validation", 0.0) +
+        post_result.validation_time
     )
 
     # Determine next stage based on validation result
@@ -572,11 +762,13 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
         model = state.get("context_enrichment_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("context_enrichment")
+            model_name = state["config"].get_model_for_agent(
+                "context_enrichment")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create enrichment agent
-        enrichment_agent = ContextEnrichmentAgentAI(model=model, temperature=0.3)
+        enrichment_agent = ContextEnrichmentAgentAI(
+            model=model, temperature=0.3)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -610,7 +802,8 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
                 enriched_cards.append(card)  # Keep original
 
         # Update generation with enriched cards
-        state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
+        state["generation"]["cards"] = [card.model_dump()
+                                        for card in enriched_cards]
 
         # Create enrichment result summary
         enrichment_result = ContextEnrichmentResult(
@@ -687,11 +880,13 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
         model = state.get("memorization_quality_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("memorization_quality")
+            model_name = state["config"].get_model_for_agent(
+                "memorization_quality")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create memorization quality agent
-        quality_agent = MemorizationQualityAgentAI(model=model, temperature=0.0)
+        quality_agent = MemorizationQualityAgentAI(
+            model=model, temperature=0.0)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -793,11 +988,13 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         model = state.get("duplicate_detection_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("duplicate_detection")
+            model_name = state["config"].get_model_for_agent(
+                "duplicate_detection")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create duplicate detection agent
-        detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
+        detection_agent = DuplicateDetectionAgentAI(
+            model=model, temperature=0.0)
 
         # Deserialize cards
         new_cards = [
@@ -1068,18 +1265,21 @@ class LangGraphOrchestrator:
                 config, model_name=config.get_model_for_agent("post_validator")
             )
             self.context_enrichment_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("context_enrichment")
+                config, model_name=config.get_model_for_agent(
+                    "context_enrichment")
             )
             self.memorization_quality_model = PydanticAIModelFactory.create_from_config(
                 config,
                 model_name=config.get_model_for_agent("memorization_quality"),
             )
             self.duplicate_detection_model = PydanticAIModelFactory.create_from_config(
-                config, model_name=config.get_model_for_agent("duplicate_detection")
+                config, model_name=config.get_model_for_agent(
+                    "duplicate_detection")
             )
             logger.info("pydantic_ai_models_cached", models_created=7)
         except Exception as e:
-            logger.warning("failed_to_cache_models_will_create_on_demand", error=str(e))
+            logger.warning(
+                "failed_to_cache_models_will_create_on_demand", error=str(e))
             # Set to None - nodes will create models on demand as fallback
             self.pre_validator_model = None
             self.card_splitting_model = None
@@ -1096,7 +1296,8 @@ class LangGraphOrchestrator:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(
+                    config, "enable_semantic_search", True)
                 embedding_model = getattr(
                     config, "embedding_model", "text-embedding-3-small"
                 )
@@ -1110,7 +1311,8 @@ class LangGraphOrchestrator:
                     "langgraph_memory_store_initialized", path=str(memory_storage_path)
                 )
             except Exception as e:
-                logger.warning("langgraph_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "langgraph_memory_store_init_failed", error=str(e))
 
         # Build the workflow graph
         self.workflow = self._build_workflow()
@@ -1141,6 +1343,12 @@ class LangGraphOrchestrator:
         # Create workflow graph
         workflow = StateGraph(PipelineState)
 
+        # Add optional note correction node (if enabled)
+        enable_note_correction = getattr(
+            self.config, "enable_note_correction", False)
+        if enable_note_correction:
+            workflow.add_node("note_correction", note_correction_node)
+
         # Add core nodes
         workflow.add_node("pre_validation", pre_validation_node)
         workflow.add_node("card_splitting", card_splitting_node)
@@ -1152,8 +1360,13 @@ class LangGraphOrchestrator:
         workflow.add_node("memorization_quality", memorization_quality_node)
         workflow.add_node("duplicate_detection", duplicate_detection_node)
 
-        # Set entry point
-        workflow.set_entry_point("pre_validation")
+        # Set entry point (note_correction if enabled, otherwise pre_validation)
+        if enable_note_correction:
+            workflow.set_entry_point("note_correction")
+            # Note correction always goes to pre-validation
+            workflow.add_edge("note_correction", "pre_validation")
+        else:
+            workflow.set_entry_point("pre_validation")
 
         # Add conditional edges
         workflow.add_conditional_edges(
@@ -1267,7 +1480,11 @@ class LangGraphOrchestrator:
             "context_enrichment": None,
             "memorization_quality": None,
             "duplicate_detection": None,
-            "current_stage": "pre_validation",
+            "current_stage": (
+                "note_correction"
+                if getattr(config, "enable_note_correction", False)
+                else "pre_validation"
+            ),
             "enable_card_splitting": self.enable_card_splitting,
             "enable_context_enrichment": self.enable_context_enrichment,
             "enable_memorization_quality": self.enable_memorization_quality,
@@ -1300,7 +1517,9 @@ class LangGraphOrchestrator:
             if final_state.get("pre_validation")
             else None
         )
-        (
+        # Card splitting result is available in state but not used in AgentPipelineResult
+        # (kept for future use or logging)
+        _card_splitting = (
             CardSplittingResult(**final_state["card_splitting"])
             if final_state.get("card_splitting")
             else None
@@ -1315,7 +1534,9 @@ class LangGraphOrchestrator:
             if final_state.get("post_validation")
             else None
         )
-        (
+        # Context enrichment result is available in state but not used in AgentPipelineResult
+        # (kept for future use or logging)
+        _context_enrichment = (
             ContextEnrichmentResult(**final_state["context_enrichment"])
             if final_state.get("context_enrichment")
             else None

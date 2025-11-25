@@ -11,38 +11,75 @@ The system now supports intelligent repair and content generation for imperfect 
 By default, the parser operates in tolerant mode, allowing notes with minor issues to proceed through the pipeline. Validation errors are logged as warnings instead of blocking the sync process.
 
 **Configuration:**
+
 ```yaml
-tolerant_parsing: true  # Allow notes with minor issues to proceed
+tolerant_parsing: true # Allow notes with minor issues to proceed
 ```
 
-### 2. Parser Repair Agent
+### 2. Parser Repair Agent (Enhanced)
 
-The ParserRepairAgent automatically repairs notes that fail parsing:
+The ParserRepairAgent automatically repairs notes that fail parsing with enhanced capabilities:
 
-- **YAML frontmatter errors**: Fixes syntax issues, missing required fields
-- **Malformed markdown**: Corrects header levels, fixes unbalanced code fences
-- **Missing language sections**: Generates missing questions/answers by translating from existing content
-- **Incomplete Q&A pairs**: Completes truncated content based on context
+-   **YAML frontmatter errors**: Fixes syntax issues, missing required fields
+-   **Malformed markdown**: Corrects header levels, fixes unbalanced code fences
+-   **Missing language sections**: Generates missing questions/answers by translating from existing content
+-   **Incomplete Q&A pairs**: Completes truncated content based on context
+-   **Structured error diagnosis**: Categorizes errors (syntax/structure/content/quality/frontmatter) with severity scoring
+-   **Quality scoring**: Assesses content quality before and after repair (completeness, structure, bilingual consistency, technical accuracy)
+-   **Grammar and clarity improvements**: Fixes grammatical errors and improves clarity when safe
+-   **Technical accuracy checks**: Verifies technical terms and code examples
 
 **Configuration:**
+
 ```yaml
 parser_repair_enabled: true
-parser_repair_model: "x-ai/grok-4.1-fast"
-parser_repair_generate_content: true  # Enable content generation
+parser_repair_model: "qwen/qwen-2.5-32b-instruct"
+parser_repair_temperature: 0.0
+parser_repair_generate_content: true # Enable content generation
 ```
+
+### 2.1 Enhanced Error Diagnosis
+
+The agent now provides structured error diagnosis:
+
+-   **Error Categories**: syntax, structure, content, quality, frontmatter, unknown
+-   **Severity Levels**: low, medium, high, critical
+-   **Repair Priority**: 1-10 (1 = highest priority)
+-   **Auto-fix Capability**: Indicates if error can be automatically fixed
+
+### 2.2 Quality Scoring
+
+Before and after repair, the agent scores note quality:
+
+-   **Completeness Score**: Are all required sections present? (0.0-1.0)
+-   **Structure Score**: Is markdown structure correct? (0.0-1.0)
+-   **Bilingual Consistency**: Do both languages have equivalent content? (0.0-1.0)
+-   **Technical Accuracy**: Is content technically correct? (0.0-1.0)
+-   **Overall Score**: Weighted average of above scores
+-   **Issues Found**: List of specific quality issues identified
+
+### 2.3 Content Generation Enhancements
+
+Enhanced content generation with improved quality:
+
+-   **Grammar and Clarity**: Fixes grammatical errors, improves clarity
+-   **Technical Accuracy**: Verifies technical terms are used correctly
+-   **Consistency**: Maintains consistent terminology across languages
+-   **Code Validation**: Ensures code examples are syntactically valid
 
 ### 3. Content Generation
 
 When enabled, the system can generate missing content:
 
-- **Translation**: Translates questions/answers from one language to another
-- **Inference**: Infers missing questions from answers (or vice versa)
-- **Completion**: Completes truncated sections based on context
+-   **Translation**: Translates questions/answers from one language to another
+-   **Inference**: Infers missing questions from answers (or vice versa)
+-   **Completion**: Completes truncated sections based on context
 
 **Configuration:**
+
 ```yaml
-enable_content_generation: true  # Allow LLM to generate missing content
-repair_missing_sections: true  # Generate missing language sections
+enable_content_generation: true # Allow LLM to generate missing content
+repair_missing_sections: true # Generate missing language sections
 ```
 
 ## How It Works
@@ -78,15 +115,21 @@ parser_repair_enabled: true
 parser_repair_generate_content: true
 
 # Validation behavior
-enforce_bilingual_validation: false  # Default to false - validation done by LLM repair instead
+enforce_bilingual_validation: false # Default to false - validation done by LLM repair instead
 ```
 
 ### Model Configuration
 
 ```yaml
-# Parser Repair Agent
-parser_repair_model: "x-ai/grok-4.1-fast"
-parser_repair_temperature: null  # Use preset default
+# Parser Repair Agent (reactive - runs when parsing fails)
+parser_repair_enabled: true
+parser_repair_model: "qwen/qwen-2.5-32b-instruct"
+parser_repair_temperature: 0.0
+
+# Note Correction Agent (optional proactive correction before parsing)
+enable_note_correction: false # Default false - reactive repair handles corrections
+note_correction_model: "qwen/qwen-2.5-32b-instruct"
+note_correction_temperature: 0.0
 ```
 
 ## Examples
@@ -94,60 +137,78 @@ parser_repair_temperature: null  # Use preset default
 ### Example 1: Missing English Answer
 
 **Input Note:**
+
 ```markdown
 ---
 language_tags: [en, ru]
 ---
 
 # Question (EN)
+
 What is polymorphism?
 
 # Вопрос (RU)
+
 Что такое полиморфизм?
 
 ## Ответ (RU)
+
 Полиморфизм - это способность объектов принимать различные формы.
 ```
 
 **Repaired Note:**
+
 ```markdown
 ---
 language_tags: [en, ru]
 ---
 
 # Question (EN)
+
 What is polymorphism?
 
 # Вопрос (RU)
+
 Что такое полиморфизм?
 
 ## Answer (EN)
+
 Polymorphism is the ability of objects to take on multiple forms.
 
 ## Ответ (RU)
+
 Полиморфизм - это способность объектов принимать различные формы.
 ```
 
 ### Example 2: Unbalanced Code Fence
 
 **Input Note:**
-```markdown
+
+````markdown
 ## Answer (EN)
+
 Here's some code:
+
 ```kotlin
 fun example() {
     // code here
 ```
+````
 
 **Repaired Note:**
-```markdown
+
+````markdown
 ## Answer (EN)
+
 Here's some code:
+
 ```kotlin
 fun example() {
     // code here
 ```
-```
+````
+
+````
 
 ### Example 3: Malformed YAML
 
@@ -156,12 +217,13 @@ fun example() {
 ---
 language_tags: (en, ru)  # Invalid syntax
 ---
-```
+````
 
 **Repaired Note:**
+
 ```markdown
 ---
-language_tags: [en, ru]  # Fixed syntax
+language_tags: [en, ru] # Fixed syntax
 ---
 ```
 
@@ -169,11 +231,11 @@ language_tags: [en, ru]  # Fixed syntax
 
 The system logs repair and generation activities:
 
-- `parser_repair_attempt`: Repair agent invoked
-- `parser_repair_applied`: Repairs successfully applied
-- `parser_repair_content_generated`: Missing content generated
-- `parser_repair_succeeded`: Note successfully repaired and parsed
-- `parser_repair_failed`: Repair unsuccessful
+-   `parser_repair_attempt`: Repair agent invoked
+-   `parser_repair_applied`: Repairs successfully applied
+-   `parser_repair_content_generated`: Missing content generated
+-   `parser_repair_succeeded`: Note successfully repaired and parsed
+-   `parser_repair_failed`: Repair unsuccessful
 
 ## Limitations
 
@@ -193,20 +255,19 @@ The system logs repair and generation activities:
 
 ### Notes Still Failing After Repair
 
-- Check logs for `parser_repair_failed` messages
-- Verify LLM provider is accessible and configured correctly
-- Ensure `parser_repair_enabled: true` in config
-- Check that model specified in `parser_repair_model` is available
+-   Check logs for `parser_repair_failed` messages
+-   Verify LLM provider is accessible and configured correctly
+-   Ensure `parser_repair_enabled: true` in config
+-   Check that model specified in `parser_repair_model` is available
 
 ### Generated Content Quality Issues
 
-- Use a more powerful model (e.g., `x-ai/grok-4.1-fast`)
-- Ensure source content is complete and accurate
-- Review generated content and manually correct if needed
+-   Use a more powerful model (e.g., `x-ai/grok-4.1-fast`)
+-   Ensure source content is complete and accurate
+-   Review generated content and manually correct if needed
 
 ### Performance Concerns
 
-- Repair adds LLM calls, but only for notes that would otherwise fail
-- Consider using faster models for repair if speed is critical
-- Monitor repair statistics to identify frequently failing notes
-
+-   Repair adds LLM calls, but only for notes that would otherwise fail
+-   Consider using faster models for repair if speed is critical
+-   Monitor repair statistics to identify frequently failing notes

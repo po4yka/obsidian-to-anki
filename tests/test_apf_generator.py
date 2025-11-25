@@ -1,6 +1,6 @@
 """Tests for APF generator helper behaviour."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -53,8 +53,8 @@ def sample_metadata_for_code():
         title="Sample",
         topic="kotlin",
         language_tags=["en"],
-        created=datetime.utcnow(),
-        updated=datetime.utcnow(),
+        created=datetime.now(UTC),
+        updated=datetime.now(UTC),
         tags=["kotlin", "testing"],
     )
 
@@ -66,8 +66,8 @@ def plain_metadata():
         title="Plain",
         topic="general",
         language_tags=["en"],
-        created=datetime.utcnow(),
-        updated=datetime.utcnow(),
+        created=datetime.now(UTC),
+        updated=datetime.now(UTC),
         tags=[],
     )
 
@@ -172,8 +172,8 @@ def test_extract_tags_sanitizes_slashes(dummy_config) -> None:
         title="Tagged",
         topic="Android",
         language_tags=["en"],
-        created=datetime.utcnow(),
-        updated=datetime.utcnow(),
+        created=datetime.now(UTC),
+        updated=datetime.now(UTC),
         subtopics=["ui-compose"],
         tags=["difficulty/easy", "android/ui-compose", "lang/ru"],
     )

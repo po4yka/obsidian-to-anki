@@ -15,7 +15,8 @@ class PreValidationResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     is_valid: bool
-    error_type: Literal["format", "structure", "frontmatter", "content", "none"]
+    error_type: Literal["format", "structure",
+                        "frontmatter", "content", "none"]
     error_details: str = ""
     auto_fix_applied: bool = False
     fixed_content: Optional[str] = None
@@ -34,7 +35,8 @@ class GeneratedCard(BaseModel):
     slug: str = Field(min_length=1, description="Unique card identifier")
     lang: str = Field(pattern="^(en|ru)$", description="Card language")
     apf_html: str = Field(min_length=1, description="APF HTML content")
-    confidence: float = Field(ge=0.0, le=1.0, description="Generation confidence score")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Generation confidence score")
     content_hash: str = Field(
         default="", description="Stable content hash for change detection"
     )
@@ -108,11 +110,73 @@ class CardSplittingResult(BaseModel):
     should_split: bool
     card_count: int = Field(ge=1)
     splitting_strategy: Literal[
-        "none", "concept", "list", "example", "hierarchical", "step"
+        "none",
+        "concept",
+        "list",
+        "example",
+        "hierarchical",
+        "step",
+        "difficulty",
+        "prerequisite",
+        "context_aware",
     ]
     split_plan: list[CardSplitPlan] = Field(default_factory=list)
     reasoning: str = ""
     decision_time: float = 0.0
+    confidence: float = Field(
+        ge=0.0, le=1.0, default=0.5, description="Confidence in splitting decision"
+    )
+    fallback_strategy: Optional[str] = Field(
+        default=None, description="Fallback strategy if primary fails"
+    )
+
+
+class RepairDiagnosis(BaseModel):
+    """Structured error diagnosis for parser repair.
+
+    Categorizes errors with severity and priority for repair.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    error_category: Literal[
+        "syntax", "structure", "content", "quality", "frontmatter", "unknown"
+    ] = Field(description="Category of the error")
+    severity: Literal["low", "medium", "high", "critical"] = Field(
+        description="Severity of the error"
+    )
+    error_description: str = Field(
+        description="Detailed description of the error")
+    repair_priority: int = Field(
+        ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
+    )
+    can_auto_fix: bool = Field(
+        description="Whether this error can be auto-fixed")
+
+
+class RepairQualityScore(BaseModel):
+    """Quality scoring for note content before and after repair."""
+
+    model_config = ConfigDict(frozen=False)
+
+    completeness_score: float = Field(
+        ge=0.0, le=1.0, description="Content completeness (0-1)"
+    )
+    structure_score: float = Field(
+        ge=0.0, le=1.0, description="Structure quality (0-1)"
+    )
+    bilingual_consistency: float = Field(
+        ge=0.0, le=1.0, description="Consistency between languages (0-1)"
+    )
+    technical_accuracy: float = Field(
+        ge=0.0, le=1.0, description="Technical accuracy score (0-1)"
+    )
+    overall_score: float = Field(
+        ge=0.0, le=1.0, description="Overall quality score (0-1)"
+    )
+    issues_found: list[str] = Field(
+        default_factory=list, description="List of quality issues identified"
+    )
 
 
 class ParserRepairResult(BaseModel):
@@ -128,6 +192,9 @@ class ParserRepairResult(BaseModel):
     repairs: list[dict[str, str]] = Field(default_factory=list)
     repaired_content: Optional[str] = None
     repair_time: float = 0.0
+    error_diagnosis: Optional[RepairDiagnosis] = None
+    quality_before: Optional[RepairQualityScore] = None
+    quality_after: Optional[RepairQualityScore] = None
 
 
 class DuplicateMatch(BaseModel):
@@ -135,10 +202,13 @@ class DuplicateMatch(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_slug: str = Field(min_length=1, description="Slug of potential duplicate card")
-    similarity_score: float = Field(ge=0.0, le=1.0, description="Similarity score")
+    card_slug: str = Field(
+        min_length=1, description="Slug of potential duplicate card")
+    similarity_score: float = Field(
+        ge=0.0, le=1.0, description="Similarity score")
     duplicate_type: Literal["exact", "semantic", "partial_overlap", "unique"]
-    reasoning: str = Field(default="", description="Why this is considered a duplicate")
+    reasoning: str = Field(
+        default="", description="Why this is considered a duplicate")
 
 
 class DuplicateDetectionResult(BaseModel):
@@ -166,7 +236,8 @@ class EnrichmentAddition(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    enrichment_type: Literal["example", "mnemonic", "visual", "related", "practical"]
+    enrichment_type: Literal["example", "mnemonic",
+                             "visual", "related", "practical"]
     content: str = Field(min_length=1)
     rationale: str = Field(default="")
 
@@ -201,4 +272,5 @@ class AgentPipelineResult(BaseModel):
     post_validation: Optional[PostValidationResult] = None
     memorization_quality: Optional[MemorizationQualityResult] = None
     total_time: float = Field(ge=0.0)
-    retry_count: int = Field(ge=0, description="Number of post-validation retries")
+    retry_count: int = Field(
+        ge=0, description="Number of post-validation retries")

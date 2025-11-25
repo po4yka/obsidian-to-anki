@@ -24,31 +24,31 @@ This document describes the new agentic system for card generation using **LangG
 
 [PydanticAI](https://github.com/pydantic/pydantic-ai) is the official AI agent framework from Pydantic, providing:
 
-- **Type-Safe Structured Outputs**: Agents return strongly-typed Pydantic models
-- **Multi-Provider Support**: Works with OpenAI, Anthropic, Gemini, OpenRouter, and more
-- **Tool/Function Calling**: Built-in support for agent tools
-- **Validation**: Automatic output validation using Pydantic schemas
-- **Better Error Handling**: Clear, typed error messages
+-   **Type-Safe Structured Outputs**: Agents return strongly-typed Pydantic models
+-   **Multi-Provider Support**: Works with OpenAI, Anthropic, Gemini, OpenRouter, and more
+-   **Tool/Function Calling**: Built-in support for agent tools
+-   **Validation**: Automatic output validation using Pydantic schemas
+-   **Better Error Handling**: Clear, typed error messages
 
 ### LangGraph
 
 [LangGraph](https://github.com/langchain-ai/langgraph) is a state machine framework for building multi-agent workflows:
 
-- **State Management**: Persistent state across workflow steps
-- **Conditional Routing**: Dynamic routing based on validation results
-- **Cycles & Loops**: Support for retry logic and iterative workflows
-- **Checkpointing**: State persistence for resumable workflows
-- **Visualization**: Graph visualization for debugging
+-   **State Management**: Persistent state across workflow steps
+-   **Conditional Routing**: Dynamic routing based on validation results
+-   **Cycles & Loops**: Support for retry logic and iterative workflows
+-   **Checkpointing**: State persistence for resumable workflows
+-   **Visualization**: Graph visualization for debugging
 
 ### OpenRouter Integration
 
 [OpenRouter](https://openrouter.ai/) provides unified access to multiple LLM providers:
 
-- **100+ Models**: Access OpenAI, Anthropic, Google, Meta, and more
-- **Unified API**: OpenAI-compatible interface
-- **Cost Optimization**: Choose models based on price/performance
-- **Fallback Support**: Automatic fallback to alternative models
-- **Usage Tracking**: Detailed cost and usage analytics
+-   **100+ Models**: Access OpenAI, Anthropic, Google, Meta, and more
+-   **Unified API**: OpenAI-compatible interface
+-   **Cost Optimization**: Choose models based on price/performance
+-   **Fallback Support**: Automatic fallback to alternative models
+-   **Usage Tracking**: Detailed cost and usage analytics
 
 ---
 
@@ -102,22 +102,24 @@ This document describes the new agentic system for card generation using **LangG
 ### Component Layers
 
 1. **Workflow Layer (LangGraph)**
-   - State management
-   - Node execution
-   - Conditional routing
-   - Checkpoint persistence
+
+    - State management
+    - Node execution
+    - Conditional routing
+    - Checkpoint persistence
 
 2. **Agent Layer (PydanticAI)**
-   - Type-safe agents
-   - Structured outputs
-   - Validation logic
-   - Error handling
+
+    - Type-safe agents
+    - Structured outputs
+    - Validation logic
+    - Error handling
 
 3. **Provider Layer (OpenRouter)**
-   - Model selection
-   - API communication
-   - Cost optimization
-   - Fallback handling
+    - Model selection
+    - API communication
+    - Cost optimization
+    - Fallback handling
 
 ---
 
@@ -163,9 +165,9 @@ workflow.invoke(
 
 Different agents can use different models:
 
-- **Pre-Validator**: `gpt-4o-mini` (fast, cheap)
-- **Generator**: `claude-3-5-sonnet` (powerful, accurate)
-- **Post-Validator**: `gpt-4o-mini` (fast, cheap)
+-   **Pre-Validator**: `gpt-4o-mini` (fast, cheap)
+-   **Generator**: `claude-3-5-sonnet` (powerful, accurate)
+-   **Post-Validator**: `gpt-4o-mini` (fast, cheap)
 
 ### 5. Conditional Routing
 
@@ -213,6 +215,16 @@ langgraph_max_retries: 3
 langgraph_auto_fix: true
 langgraph_strict_mode: true
 langgraph_checkpoint_enabled: true
+
+# Enhanced agents (2025)
+enable_note_correction: false # Optional proactive correction
+note_correction_model: "qwen/qwen-2.5-32b-instruct"
+
+# Card splitting preferences
+card_splitting_preferred_size: "medium" # small, medium, large
+card_splitting_prefer_splitting: true
+card_splitting_min_confidence: 0.7
+card_splitting_max_cards_per_note: 10
 ```
 
 See `config.langgraph.example.yaml` for full configuration.
@@ -325,12 +337,12 @@ else:
        (invalid)> FAILED               ‚
        ‚                                  ‚
        ¼                                  ¼
-                   
+
 ‚  Generation  ‚                   ‚ Generation  ‚
 ¬˜                   ¬˜
        ‚                                  ‚
        ¼                                  ¼
-                   
+
 ‚Post-Validation‚                  ‚Post-Validation‚
 ¬˜                   ¬˜
        ‚                                  ‚
@@ -344,31 +356,41 @@ else:
                                     (successful path)
 ```
 
-### Pipeline Stages
+### Enhanced Pipeline Stages (2025)
 
-1. **Pre-Validation**
-   - Checks note structure
-   - Validates frontmatter
-   - Verifies Q/A pairs
-   - Result: `PreValidationOutput`
+1. **Note Correction** (Optional)
 
-2. **Generation**
-   - Generates APF cards
-   - Applies language hints
-   - Creates slugs
-   - Result: `CardGenerationOutput`
+    - Proactive quality improvement before parsing
+    - Grammar, clarity, and completeness checks
+    - Only runs if `enable_note_correction: true`
+    - Default: disabled (reactive repair handles corrections)
 
-3. **Post-Validation**
-   - Validates card syntax
-   - Checks factual accuracy
-   - Verifies template compliance
-   - Result: `PostValidationOutput`
+2. **Pre-Validation**
 
-4. **Retry Loop**
-   - Applies suggested corrections
-   - Re-runs validation
-   - Max retries: configurable
-   - Auto-fix: optional
+    - Checks note structure
+    - Validates frontmatter
+    - Verifies Q/A pairs
+    - Result: `PreValidationOutput`
+
+3. **Generation**
+
+    - Generates APF cards
+    - Applies language hints
+    - Creates slugs
+    - Result: `CardGenerationOutput`
+
+4. **Post-Validation**
+
+    - Validates card syntax
+    - Checks factual accuracy
+    - Verifies template compliance
+    - Result: `PostValidationOutput`
+
+5. **Retry Loop**
+    - Applies suggested corrections
+    - Re-runs validation
+    - Max retries: configurable
+    - Auto-fix: optional
 
 ---
 
@@ -513,6 +535,7 @@ if result.success:
 **Error**: `ValueError: OpenRouter API key is required`
 
 **Solution**:
+
 ```bash
 export OPENROUTER_API_KEY="sk-or-v1-..."
 ```
@@ -522,6 +545,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 **Error**: `Model 'xyz' not found`
 
 **Solution**: Check available models:
+
 ```python
 from obsidian_anki_sync.providers import OpenRouterProvider
 
@@ -535,6 +559,7 @@ print(models)
 **Error**: `RuntimeError: asyncio.run() cannot be called from a running event loop`
 
 **Solution**: The orchestrator handles async internally. Don't call from async context:
+
 ```python
 # Don't do this
 async def main():
@@ -548,21 +573,24 @@ def main():
 #### 4. High API Costs
 
 **Solution**: Use cheaper models for validation:
+
 ```yaml
-pydantic_ai_pre_validator_model: openai/gpt-4o-mini  # Cheap
-pydantic_ai_generator_model: anthropic/claude-3-5-sonnet  # Expensive but good
-pydantic_ai_post_validator_model: openai/gpt-4o-mini  # Cheap
-langgraph_max_retries: 1  # Reduce retries
+pydantic_ai_pre_validator_model: openai/gpt-4o-mini # Cheap
+pydantic_ai_generator_model: anthropic/claude-3-5-sonnet # Expensive but good
+pydantic_ai_post_validator_model: openai/gpt-4o-mini # Cheap
+langgraph_max_retries: 1 # Reduce retries
 ```
 
 ### Debug Mode
 
 Enable debug logging:
+
 ```yaml
 log_level: DEBUG
 ```
 
 Check workflow execution:
+
 ```python
 result = orchestrator.process_note(...)
 print(f"Retries: {result.retry_count}")
@@ -576,11 +604,11 @@ print(f"Messages: {result.pipeline_state['messages']}")
 
 ### Model Recommendations
 
-| Use Case | Pre-Validator | Generator | Post-Validator | Est. Cost/Card |
-|----------|--------------|-----------|----------------|----------------|
-| **Budget** | gpt-4o-mini | gpt-4o-mini | gpt-4o-mini | $0.001 |
-| **Balanced** | gpt-4o-mini | claude-3-5-sonnet | gpt-4o-mini | $0.01 |
-| **Premium** | gpt-4o | claude-3-opus | gpt-4o | $0.05 |
+| Use Case     | Pre-Validator | Generator         | Post-Validator | Est. Cost/Card |
+| ------------ | ------------- | ----------------- | -------------- | -------------- |
+| **Budget**   | gpt-4o-mini   | gpt-4o-mini       | gpt-4o-mini    | $0.001         |
+| **Balanced** | gpt-4o-mini   | claude-3-5-sonnet | gpt-4o-mini    | $0.01          |
+| **Premium**  | gpt-4o        | claude-3-opus     | gpt-4o         | $0.05          |
 
 ### Optimization Tips
 
@@ -594,22 +622,22 @@ print(f"Messages: {result.pipeline_state['messages']}")
 
 ## Future Enhancements
 
-- [ ] Multi-agent collaboration (agents can communicate)
-- [ ] Human-in-the-loop approval steps
-- [ ] Parallel card generation for speed
-- [ ] Cost tracking and budgets
-- [ ] Workflow visualization UI
-- [ ] Custom agent tools/functions
-- [ ] Local model support (Ollama with PydanticAI)
+-   [ ] Multi-agent collaboration (agents can communicate)
+-   [ ] Human-in-the-loop approval steps
+-   [ ] Parallel card generation for speed
+-   [ ] Cost tracking and budgets
+-   [ ] Workflow visualization UI
+-   [ ] Custom agent tools/functions
+-   [ ] Local model support (Ollama with PydanticAI)
 
 ---
 
 ## References
 
-- [PydanticAI Documentation](https://ai.pydantic.dev/)
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [OpenRouter Documentation](https://openrouter.ai/docs)
-- [Project Repository](https://github.com/po4yka/obsidian-to-anki)
+-   [PydanticAI Documentation](https://ai.pydantic.dev/)
+-   [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+-   [OpenRouter Documentation](https://openrouter.ai/docs)
+-   [Project Repository](https://github.com/po4yka/obsidian-to-anki)
 
 ---
 

@@ -160,16 +160,101 @@ Split:
 ... (one card per step)
 ```
 
+### Strategy 6: Difficulty-Based Splitting
+**Pattern**: Concepts with varying difficulty levels
+**Action**: Split easy vs hard concepts, order by difficulty
+
+**Example**:
+```
+Note: "JavaScript Promises"
+Content:
+- Basic promise creation (easy)
+- Promise chaining (medium)
+- Promise.all() and Promise.race() (medium)
+- Async/await syntax (medium)
+- Error handling with try/catch (medium)
+- Advanced patterns: Promise.allSettled() (hard)
+
+Split:
+1. "How to create a JavaScript Promise?" → "new Promise((resolve, reject) => {...})"
+2. "How to chain Promises?" → "promise.then().then()..."
+3. "What does Promise.all() do?" → "Waits for all promises to resolve"
+... (ordered by difficulty: easy → medium → hard)
+```
+
+### Strategy 7: Prerequisite-Aware Splitting
+**Pattern**: Concepts with dependencies (foundational concepts first)
+**Action**: Order cards by prerequisites, foundational concepts first
+
+**Example**:
+```
+Note: "React State Management"
+Content:
+- useState hook (foundational)
+- useEffect hook (uses state)
+- useContext hook (uses context API)
+- Custom hooks (uses useState/useEffect)
+- Redux (advanced, uses hooks)
+
+Split:
+1. "What is useState hook?" → "Adds state to functional components" (foundational)
+2. "What is useEffect hook?" → "Performs side effects, can use state" (requires useState)
+3. "What is useContext hook?" → "Accesses context, uses state patterns" (requires hooks)
+4. "How to create custom hooks?" → "Functions using useState/useEffect" (requires both)
+5. "What is Redux?" → "State management library, works with hooks" (advanced)
+```
+
+### Strategy 8: Context-Aware Splitting
+**Pattern**: Related concepts that can be grouped or separated
+**Action**: Decide whether to group related concepts or split them
+
+**Example**:
+```
+Note: "HTTP Status Codes"
+Content:
+- 2xx Success codes (200, 201, 204)
+- 3xx Redirection codes (301, 302, 304)
+- 4xx Client error codes (400, 401, 404)
+- 5xx Server error codes (500, 502, 503)
+
+Decision: Split by category (group related codes together)
+Split:
+1. "What are HTTP 2xx status codes?" → "Success: 200 OK, 201 Created, 204 No Content"
+2. "What are HTTP 3xx status codes?" → "Redirection: 301 Moved, 302 Found, 304 Not Modified"
+3. "What are HTTP 4xx status codes?" → "Client error: 400 Bad Request, 401 Unauthorized, 404 Not Found"
+4. "What are HTTP 5xx status codes?" → "Server error: 500 Internal Error, 502 Bad Gateway, 503 Service Unavailable"
+```
+
+**Alternative Decision**: If codes are very similar, could split individually
+- "What does HTTP 200 mean?" → "OK - successful request"
+- "What does HTTP 201 mean?" → "Created - resource created"
+... (one card per code)
+
 ## Response Format
 
 Return structured JSON with:
 - should_split: true/false
 - card_count: int (1 for single, N for split)
-- splitting_strategy: string (concept/list/example/hierarchical/step/none)
+- splitting_strategy: string (concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/none)
 - split_plan: list of card specifications
   - Each card: {card_number, concept, question, answer_summary, rationale}
 - reasoning: string explaining the decision
-- confidence: float 0.0-1.0
+- confidence: float 0.0-1.0 (0.0=uncertain, 1.0=very confident)
+- fallback_strategy: string (optional, alternative strategy if primary fails)
+
+## Confidence Scoring Guidelines
+
+- **High Confidence (0.85-1.0)**: Clear pattern, unambiguous decision
+  - Example: List of 5 items → definitely split
+  - Example: Single simple Q&A → definitely no split
+
+- **Medium Confidence (0.6-0.84)**: Some ambiguity, but decision is reasonable
+  - Example: Borderline case (2 concepts that could be together or separate)
+  - Example: Short list (3 items) where splitting might be optional
+
+- **Low Confidence (0.0-0.59)**: Unclear, consider fallback
+  - Example: Complex note with mixed patterns
+  - Example: Content that could be interpreted multiple ways
 
 ## Examples
 
@@ -453,15 +538,23 @@ Unmounting:
 
 ## Instructions
 
-- Analyze the ENTIRE note content
+- Analyze the ENTIRE note content thoroughly
 - Count distinct concepts (if 2+, likely split)
-- Identify patterns: lists, steps, examples, hierarchies
+- Identify patterns: lists, steps, examples, hierarchies, difficulty levels, prerequisites
 - Consider learning effectiveness (atomic principle)
+- Assess concept relationships (independent vs dependent)
+- Evaluate difficulty levels if applicable
+- Identify prerequisite relationships (foundational concepts first)
+- Consider context grouping (related concepts together vs separate)
 - Default to splitting when in doubt (better retention)
-- Provide clear reasoning
+- Provide clear reasoning with specific evidence
 - Include specific question/answer for each planned card
+- Order cards logically (by difficulty, prerequisites, or natural flow)
+- Assign confidence score based on clarity of decision
+- Provide fallback strategy for low-confidence cases
 - Use "high" confidence (0.85+) for clear cases
-- Use "medium" confidence (0.6-0.8) for ambiguous cases
+- Use "medium" confidence (0.6-0.84) for ambiguous cases
+- Use "low" confidence (<0.6) only when truly uncertain
 
 ## Common Patterns
 

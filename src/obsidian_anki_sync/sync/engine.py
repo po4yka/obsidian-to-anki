@@ -23,7 +23,7 @@ from ..exceptions import AnkiConnectError
 from ..models import Card, ManifestData, NoteMetadata, QAPair, SyncAction
 from ..obsidian.parser import (
     ParserError,
-    configure_llm_extraction,
+    create_qa_extractor,
     discover_notes,
     parse_note,
     parse_note_with_repair,
@@ -137,12 +137,14 @@ class SyncEngine:
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,
             )
-            configure_llm_extraction(
+            # Create QA extractor agent for LLM-based extraction
+            self.qa_extractor = create_qa_extractor(
                 llm_provider=self.agent_orchestrator.provider,
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,
-                enforce_language_validation=getattr(
+                enable_content_generation=True,
+                repair_missing_sections=getattr(
                     config, "enforce_bilingual_validation", True
                 ),
             )
@@ -150,9 +152,8 @@ class SyncEngine:
             self.apf_gen = APFGenerator(config)
             self.agent_orchestrator: AgentOrchestrator | None = None  # type: ignore
             self.use_agents = False
-
-            # Disable LLM extraction when not using agents
-            configure_llm_extraction(llm_provider=None)
+            # No LLM extraction when not using agents
+            self.qa_extractor = None
 
         self.changes: list[SyncAction] = []
         self.stats = {
@@ -1135,8 +1136,8 @@ class SyncEngine:
         }
 
         try:
-            # Parse note
-            metadata, qa_pairs = parse_note(file_path)
+            # Parse note with optional QA extractor
+            metadata, qa_pairs = parse_note(file_path, qa_extractor=self.qa_extractor)
 
             # Read full note content if using agent system
             note_content = ""
