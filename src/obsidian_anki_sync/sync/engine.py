@@ -240,6 +240,74 @@ class SyncEngine:
             logger.warning("cache_close_error", error=str(e))
             # Non-critical, continue
 
+    def __enter__(self) -> "SyncEngine":
+        """Context manager entry for guaranteed cleanup."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit - ensure caches are closed."""
+        self._close_caches()
+        # Reset cache stats for next sync
+        self._cache_stats = {"hits": 0, "misses": 0, "generation_times": []}
+
+    def _archive_note_safely(
+        self,
+        file_path: Path,
+        relative_path: str,
+        error: Exception,
+        processing_stage: str,
+        note_content: str | None = None,
+        context: dict[str, Any] | None = None,
+        card_index: int | None = None,
+        language: str | None = None,
+    ) -> None:
+        """Safely archive a problematic note with consistent error handling.
+
+        Args:
+            file_path: Absolute path to the note file
+            relative_path: Relative path for logging
+            error: The exception that caused the failure
+            processing_stage: Stage where error occurred (parsing, card_generation, processing)
+            note_content: Optional note content (will be read if not provided)
+            context: Optional additional context for archiving
+            card_index: Optional card index if error occurred during card generation
+            language: Optional language if error occurred during card generation
+        """
+        try:
+            # Read content if not provided
+            if note_content is None:
+                try:
+                    note_content = file_path.read_text(encoding="utf-8")
+                except (UnicodeDecodeError, OSError) as read_err:
+                    logger.debug(
+                        "unable_to_read_note_for_archiving",
+                        file=relative_path,
+                        error=str(read_err),
+                    )
+                    note_content = ""
+
+            # Build context dict
+            archive_context = {"relative_path": relative_path}
+            if context:
+                archive_context.update(context)
+
+            self.archiver.archive_note(
+                note_path=file_path,
+                error=error,
+                error_type=type(error).__name__,
+                processing_stage=processing_stage,
+                card_index=card_index,
+                language=language,
+                note_content=note_content if note_content else None,
+                context=archive_context,
+            )
+        except Exception as archive_error:
+            logger.warning(
+                "failed_to_archive_problematic_note",
+                note_path=str(file_path),
+                archive_error=str(archive_error),
+            )
+
     def __del__(self) -> None:
         """Cleanup caches on destruction."""
         try:
@@ -1014,18 +1082,6 @@ class SyncEngine:
                         f"Processing note {notes_processed}/{len(note_files)}",
                         note_name,
                     )
-                    # Update stats
-                    current_stats = {
-                        **self.stats,
-                        "cards_generated": len(obsidian_cards),
-                        "notes_processed": notes_processed,
-                    }
-                    # Update status panel
-                    if self.progress_display:
-                        self.progress_display.update_operation(
-                            f"Processing note {notes_processed}/{len(note_files)}",
-                            Path(relative_path).stem,
-                        )
 
             # Progress indicator (log every 10 notes or on completion)
             if notes_processed % 10 == 0 or notes_processed == len(note_files):
@@ -1202,34 +1258,24 @@ class SyncEngine:
                         error_type_name = type(e).__name__
                         error_message = str(e)
 
-                        # Archive problematic note
-                        try:
-                            self.archiver.archive_note(
-                                note_path=file_path,
-                                error=e,
-                                error_type=error_type_name,
-                                processing_stage="card_generation",
-                                card_index=qa_pair.card_index,
-                                language=lang,
-                                note_content=note_content if note_content else None,
-                                context={
-                                    "relative_path": relative_path,
-                                    "metadata_id": (
-                                        metadata.id if "metadata" in locals() else None
-                                    ),
-                                    "qa_pairs_count": (
-                                        len(qa_pairs)
-                                        if "qa_pairs" in locals()
-                                        else None
-                                    ),
-                                },
-                            )
-                        except Exception as archive_error:
-                            logger.warning(
-                                "failed_to_archive_problematic_note",
-                                note_path=str(file_path),
-                                archive_error=str(archive_error),
-                            )
+                        # Archive problematic note using helper
+                        self._archive_note_safely(
+                            file_path=file_path,
+                            relative_path=relative_path,
+                            error=e,
+                            processing_stage="card_generation",
+                            note_content=note_content if note_content else None,
+                            card_index=qa_pair.card_index,
+                            language=lang,
+                            context={
+                                "metadata_id": (
+                                    metadata.id if "metadata" in locals() else None
+                                ),
+                                "qa_pairs_count": (
+                                    len(qa_pairs) if "qa_pairs" in locals() else None
+                                ),
+                            },
+                        )
 
                         if self.progress:
                             self.progress.fail_note(
@@ -1249,67 +1295,24 @@ class SyncEngine:
             OSError,
             UnicodeDecodeError,
         ) as e:
-            # Archive problematic note
-            try:
-                note_content = ""
-                try:
-                    note_content = file_path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError) as read_err:
-                    logger.debug(
-                        "unable_to_read_note_for_archiving",
-                        file=relative_path,
-                        error=str(read_err),
-                    )
-
-                self.archiver.archive_note(
-                    note_path=file_path,
-                    error=e,
-                    error_type=type(e).__name__,
-                    processing_stage="parsing",
-                    note_content=note_content,
-                    context={
-                        "relative_path": relative_path,
-                    },
-                )
-            except Exception as archive_error:
-                logger.warning(
-                    "failed_to_archive_problematic_note",
-                    note_path=str(file_path),
-                    archive_error=str(archive_error),
-                )
-
+            # Archive problematic note using helper
+            self._archive_note_safely(
+                file_path=file_path,
+                relative_path=relative_path,
+                error=e,
+                processing_stage="parsing",
+            )
             result_info["error"] = str(e)
             result_info["error_type"] = type(e).__name__
+
         except Exception as e:
-            # Archive problematic note
-            try:
-                note_content = ""
-                try:
-                    note_content = file_path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError) as read_err:
-                    logger.debug(
-                        "unable_to_read_note_for_archiving",
-                        file=relative_path,
-                        error=str(read_err),
-                    )
-
-                self.archiver.archive_note(
-                    note_path=file_path,
-                    error=e,
-                    error_type=type(e).__name__,
-                    processing_stage="processing",
-                    note_content=note_content,
-                    context={
-                        "relative_path": relative_path,
-                    },
-                )
-            except Exception as archive_error:
-                logger.warning(
-                    "failed_to_archive_problematic_note",
-                    note_path=str(file_path),
-                    archive_error=str(archive_error),
-                )
-
+            # Archive problematic note using helper
+            self._archive_note_safely(
+                file_path=file_path,
+                relative_path=relative_path,
+                error=e,
+                processing_stage="processing",
+            )
             result_info["error"] = str(e)
             result_info["error_type"] = type(e).__name__
 
@@ -1349,11 +1352,15 @@ class SyncEngine:
             for slug in existing_slugs:
                 self._slug_counters[slug] = 0
 
-        # Thread-safe slug tracking using a lock
+        # Thread-safe tracking using locks
         import threading
 
+        # Lock for slug and card updates
         slugs_lock = threading.Lock()
         shared_slugs = set(existing_slugs)
+
+        # Lock for stats and error tracking (separate to reduce contention)
+        stats_lock = threading.Lock()
 
         # Process notes in parallel
         notes_processed = 0
@@ -1394,22 +1401,24 @@ class SyncEngine:
                     try:
                         cards, new_slugs, result_info = future.result()
 
-                        # Thread-safe update of shared state
+                        # Thread-safe update of slug/card state
                         with slugs_lock:
                             obsidian_cards.update(cards)
                             shared_slugs.update(new_slugs)
                             existing_slugs.update(new_slugs)
 
-                        if result_info["success"]:
-                            self.stats["processed"] += 1
-                        else:
-                            self.stats["errors"] += 1
-                            if result_info["error_type"]:
-                                error_by_type[result_info["error_type"]] += 1
-                                if len(error_samples[result_info["error_type"]]) < 3:
-                                    error_samples[result_info["error_type"]].append(
-                                        f"{relative_path}: {result_info['error']}"
-                                    )
+                        # Thread-safe update of stats and error tracking
+                        with stats_lock:
+                            if result_info["success"]:
+                                self.stats["processed"] += 1
+                            else:
+                                self.stats["errors"] += 1
+                                if result_info["error_type"]:
+                                    error_by_type[result_info["error_type"]] += 1
+                                    if len(error_samples[result_info["error_type"]]) < 3:
+                                        error_samples[result_info["error_type"]].append(
+                                            f"{relative_path}: {result_info['error']}"
+                                        )
 
                     except Exception as e:
                         logger.exception(
@@ -1417,13 +1426,15 @@ class SyncEngine:
                             file=relative_path,
                             error=str(e),
                         )
-                        self.stats["errors"] += 1
-                        error_type_name = type(e).__name__
-                        error_by_type[error_type_name] += 1
-                        if len(error_samples[error_type_name]) < 3:
-                            error_samples[error_type_name].append(
-                                f"{relative_path}: {str(e)}"
-                            )
+                        # Thread-safe update of stats and error tracking
+                        with stats_lock:
+                            self.stats["errors"] += 1
+                            error_type_name = type(e).__name__
+                            error_by_type[error_type_name] += 1
+                            if len(error_samples[error_type_name]) < 3:
+                                error_samples[error_type_name].append(
+                                    f"{relative_path}: {str(e)}"
+                                )
 
                     # Progress indicator
                     notes_processed += 1
