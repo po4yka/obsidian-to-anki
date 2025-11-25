@@ -374,7 +374,8 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 original_max_tokens = self.llm_provider.max_tokens
                 # Always use the larger of: configured max or estimated needed
                 # This ensures we don't truncate responses
-                if estimated_max_tokens > original_max_tokens:
+                # Handle case where original_max_tokens might be None
+                if original_max_tokens is not None and estimated_max_tokens > original_max_tokens:
                     self.llm_provider.max_tokens = estimated_max_tokens
                     logger.info(
                         "increased_max_tokens_for_extraction",
