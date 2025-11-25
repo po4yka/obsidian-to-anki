@@ -328,6 +328,57 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
     return frontmatter_start + fixed_frontmatter + frontmatter_end + rest_content
 
 
+def _detect_content_corruption(content: str, file_path: Path) -> None:
+    """
+    Detect common content corruption patterns and warn about them.
+
+    This helps identify files that may have been corrupted during editing,
+    copying, or other external processes.
+    """
+    import re
+
+    # Pattern 1: Repeated suspicious characters (like "a1a1a1a1" or "111")
+    # Exclude spaces, punctuation, and common formatting characters
+    repeated_chars = re.findall(
+        r'([^а-яёa-z\s\.,;:!?\-\(\)\[\]{}])\1{4,}', content, re.IGNORECASE)
+    if repeated_chars:
+        unique_repeats = set(repeated_chars)
+        logger.warning(
+            "content_corruption_detected",
+            file=str(file_path),
+            pattern="repeated_characters",
+            repeated_chars=list(unique_repeats),
+            message="File contains repeated non-alphabetic character sequences that may indicate corruption"
+        )
+
+    # Pattern 2: Control characters in content (excluding legitimate whitespace)
+    control_chars = []
+    for char in content:
+        if ord(char) < 32 and char not in '\n\r\t':
+            control_chars.append(f"0x{ord(char):02x}")
+
+    if control_chars:
+        unique_controls = list(set(control_chars))
+        logger.warning(
+            "content_corruption_detected",
+            file=str(file_path),
+            pattern="control_characters",
+            control_chars=unique_controls,
+            message="File contains control characters that may indicate corruption"
+        )
+
+    # Pattern 3: Excessive Unicode replacement characters
+    replacement_char_count = content.count('\ufffd')
+    if replacement_char_count > 5:  # More than 5 replacement chars is suspicious
+        logger.warning(
+            "content_corruption_detected",
+            file=str(file_path),
+            pattern="unicode_replacement_chars",
+            count=replacement_char_count,
+            message="File contains many Unicode replacement characters (\\ufffd) indicating encoding issues"
+        )
+
+
 def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     """
     Extract and parse YAML frontmatter from note content.
@@ -345,6 +396,9 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     Raises:
         ParserError: If frontmatter is missing or invalid
     """
+    # Check for content corruption patterns
+    _detect_content_corruption(content, file_path)
+
     # Preprocess content to fix common YAML syntax errors
     try:
         preprocessed_content = _preprocess_yaml_frontmatter(content)
