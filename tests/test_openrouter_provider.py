@@ -147,7 +147,7 @@ def test_generate_retries_on_rate_limit_and_succeeds(
 
     recorded_sleeps: list[float] = []
     monkeypatch.setattr(
-        "obsidian_anki_sync.providers.openrouter.time.sleep",
+        "obsidian_anki_sync.providers.openrouter.provider.time.sleep",
         lambda seconds: recorded_sleeps.append(seconds),
     )
 
