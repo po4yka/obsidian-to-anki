@@ -10,9 +10,10 @@ class QualityDimension(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    score: float = Field(ge=0.0, le=1.0, description="Dimension quality score")
+    score: float = Field(default=0.5, ge=0.0, le=1.0,
+                         description="Dimension quality score")
     weight: float = Field(
-        ge=0.0, le=1.0, description="Dimension weight in overall score")
+        default=0.5, ge=0.0, le=1.0, description="Dimension weight in overall score")
     issues: list[str] = Field(default_factory=list,
                               description="Specific issues found")
     strengths: list[str] = Field(
@@ -25,15 +26,15 @@ class QualityReport(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     overall_score: float = Field(
-        ge=0.0, le=1.0, description="Overall quality score")
+        default=0.5, ge=0.0, le=1.0, description="Overall quality score")
     dimensions: dict[str, QualityDimension] = Field(
         default_factory=dict, description="Quality scores by dimension")
     suggestions: list[str] = Field(
         default_factory=list, description="Actionable improvement suggestions")
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in assessment")
+        default=0.5, ge=0.0, le=1.0, description="Confidence in assessment")
     assessment_time: float = Field(
-        ge=0.0, description="Time taken for assessment")
+        default=0.0, ge=0.0, description="Time taken for assessment")
 
 
 class PreValidationResult(BaseModel):
@@ -111,7 +112,7 @@ class MemorizationQualityResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     is_memorizable: bool
-    memorization_score: float = Field(ge=0.0, le=1.0)
+    memorization_score: float = Field(default=0.5, ge=0.0, le=1.0)
     issues: list[dict[str, str]] = Field(default_factory=list)
     strengths: list[str] = Field(default_factory=list)
     suggested_improvements: list[str] = Field(default_factory=list)
@@ -123,7 +124,7 @@ class CardSplitPlan(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_number: int = Field(ge=1)
+    card_number: int = Field(default=1, ge=1)
     concept: str = Field(min_length=1)
     question: str = Field(min_length=1)
     answer_summary: str = Field(min_length=1)
@@ -139,7 +140,7 @@ class CardSplittingResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     should_split: bool
-    card_count: int = Field(ge=1)
+    card_count: int = Field(default=1, ge=1)
     splitting_strategy: Literal[
         "none",
         "concept",
@@ -179,7 +180,7 @@ class RepairDiagnosis(BaseModel):
     error_description: str = Field(
         description="Detailed description of the error")
     repair_priority: int = Field(
-        ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
+        default=5, ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
     )
     can_auto_fix: bool = Field(
         description="Whether this error can be auto-fixed")
@@ -191,19 +192,19 @@ class RepairQualityScore(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     completeness_score: float = Field(
-        ge=0.0, le=1.0, description="Content completeness (0-1)"
+        default=0.5, ge=0.0, le=1.0, description="Content completeness (0-1)"
     )
     structure_score: float = Field(
-        ge=0.0, le=1.0, description="Structure quality (0-1)"
+        default=0.5, ge=0.0, le=1.0, description="Structure quality (0-1)"
     )
     bilingual_consistency: float = Field(
-        ge=0.0, le=1.0, description="Consistency between languages (0-1)"
+        default=0.5, ge=0.0, le=1.0, description="Consistency between languages (0-1)"
     )
     technical_accuracy: float = Field(
-        ge=0.0, le=1.0, description="Technical accuracy score (0-1)"
+        default=0.5, ge=0.0, le=1.0, description="Technical accuracy score (0-1)"
     )
     overall_score: float = Field(
-        ge=0.0, le=1.0, description="Overall quality score (0-1)"
+        default=0.5, ge=0.0, le=1.0, description="Overall quality score (0-1)"
     )
     issues_found: list[str] = Field(
         default_factory=list, description="List of quality issues identified"
@@ -236,7 +237,7 @@ class DuplicateMatch(BaseModel):
     card_slug: str = Field(
         min_length=1, description="Slug of potential duplicate card")
     similarity_score: float = Field(
-        ge=0.0, le=1.0, description="Similarity score")
+        default=0.0, ge=0.0, le=1.0, description="Similarity score")
     duplicate_type: Literal["exact", "semantic", "partial_overlap", "unique"]
     reasoning: str = Field(
         default="", description="Why this is considered a duplicate")

@@ -28,6 +28,46 @@ from .slug_utils import generate_agent_slug_base
 logger = get_logger(__name__)
 
 
+def resolve_agent_temperature(
+    config: Config,
+    override_attr: str,
+    task_name: str,
+    default: float,
+) -> float:
+    """Return a safe temperature for agent instantiation."""
+    override_value = getattr(config, override_attr, None)
+    if override_value is not None:
+        try:
+            return float(override_value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "invalid_agent_temperature_override",
+                attribute=override_attr,
+                value=override_value,
+                default=default,
+            )
+            return default
+
+    get_model_config = getattr(config, "get_model_config_for_task", None)
+    if callable(get_model_config):
+        try:
+            task_config = get_model_config(task_name)
+            if isinstance(task_config, dict):
+                task_temp = task_config.get("temperature")
+            else:
+                task_temp = getattr(task_config, "temperature", None)
+            if task_temp is not None:
+                return float(task_temp)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug(
+                "model_config_temperature_lookup_failed",
+                task=task_name,
+                error=str(exc),
+            )
+
+    return default
+
+
 class AgentOrchestrator:
     """Orchestrates the three-agent pipeline for card generation.
 
@@ -77,29 +117,48 @@ class AgentOrchestrator:
 
         # Initialize agents
         pre_val_model = getattr(config, "pre_validator_model", "qwen3:8b")
+        pre_val_temp = resolve_agent_temperature(
+            config,
+            "pre_validator_temperature",
+            "pre_validation",
+            0.0,
+        )
         gen_model = getattr(config, "generator_model", "qwen3:32b")
+        gen_temp = resolve_agent_temperature(
+            config,
+            "generator_temperature",
+            "generation",
+            0.3,
+        )
         post_val_model = getattr(config, "post_validator_model", "qwen3:14b")
+        post_val_temp = resolve_agent_temperature(
+            config,
+            "post_validator_temperature",
+            "post_validation",
+            0.0,
+        )
 
         self.pre_validator = PreValidatorAgent(
             ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=pre_val_model,
-            temperature=getattr(config, "pre_validator_temperature", 0.0),
+            temperature=pre_val_temp,
             enable_content_generation=getattr(
                 config, "enable_content_generation", True
             ),
-            repair_missing_sections=getattr(config, "repair_missing_sections", True),
+            repair_missing_sections=getattr(
+                config, "repair_missing_sections", True),
         )
 
         self.generator = GeneratorAgent(
             ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=gen_model,
-            temperature=getattr(config, "generator_temperature", 0.3),
+            temperature=gen_temp,
         )
 
         self.post_validator = PostValidatorAgent(
             ollama_client=self.provider,  # Provider is compatible with OllamaClient interface
             model=post_val_model,
-            temperature=getattr(config, "post_validator_temperature", 0.0),
+            temperature=post_val_temp,
         )
 
         logger.info(
@@ -108,12 +167,15 @@ class AgentOrchestrator:
             pre_val_model=pre_val_model,
             gen_model=gen_model,
             post_val_model=post_val_model,
-            pre_val_temp=getattr(config, "pre_validator_temperature", 0.0),
-            gen_temp=getattr(config, "generator_temperature", 0.3),
-            post_val_temp=getattr(config, "post_validator_temperature", 0.0),
-            post_val_max_retries=getattr(config, "post_validation_max_retries", 3),
-            post_val_auto_fix=getattr(config, "post_validation_auto_fix", True),
-            post_val_strict=getattr(config, "post_validation_strict_mode", True),
+            pre_val_temp=pre_val_temp,
+            gen_temp=gen_temp,
+            post_val_temp=post_val_temp,
+            post_val_max_retries=getattr(
+                config, "post_validation_max_retries", 3),
+            post_val_auto_fix=getattr(
+                config, "post_validation_auto_fix", True),
+            post_val_strict=getattr(
+                config, "post_validation_strict_mode", True),
         )
 
     def process_note(
@@ -153,7 +215,8 @@ class AgentOrchestrator:
         )
 
         # Stage 1: Pre-validation
-        pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
+        pre_validation_enabled = getattr(
+            self.config, "pre_validation_enabled", True)
         pre_val_start = time.time()
 
         if pre_validation_enabled:
@@ -246,7 +309,8 @@ class AgentOrchestrator:
 
         # Stage 3: Post-validation with retry
         post_val_start = time.time()
-        base_max_retries = getattr(self.config, "post_validation_max_retries", 3)
+        base_max_retries = getattr(
+            self.config, "post_validation_max_retries", 3)
         auto_fix = getattr(self.config, "post_validation_auto_fix", True)
         strict_mode = getattr(self.config, "post_validation_strict_mode", True)
 
@@ -254,12 +318,15 @@ class AgentOrchestrator:
         retry_config = getattr(self.config, "post_validation_retry_config", {})
         # Default: syntax errors get more retries (deterministic), semantic errors get fewer
         default_retries = {
-            "syntax": base_max_retries + 2,  # 5 retries for syntax (more fixable)
+            # 5 retries for syntax (more fixable)
+            "syntax": base_max_retries + 2,
             "template": base_max_retries + 1,  # 4 retries for template
             "html": base_max_retries + 1,  # 4 retries for HTML
             "manifest": base_max_retries,  # 3 retries for manifest
-            "factual": base_max_retries - 1,  # 2 retries for factual (harder to fix)
-            "semantic": base_max_retries - 1,  # 2 retries for semantic (harder to fix)
+            # 2 retries for factual (harder to fix)
+            "factual": base_max_retries - 1,
+            # 2 retries for semantic (harder to fix)
+            "semantic": base_max_retries - 1,
         }
         # Merge with config overrides
         retry_counts = {**default_retries, **retry_config}
@@ -334,7 +401,8 @@ class AgentOrchestrator:
 
             # Exponential backoff before retry (except on first attempt)
             if attempt > 0:
-                backoff_seconds = min(2 ** (attempt - 1), 10)  # Cap at 10 seconds
+                backoff_seconds = min(2 ** (attempt - 1),
+                                      10)  # Cap at 10 seconds
                 logger.debug(
                     "post_validation_backoff",
                     seconds=backoff_seconds,
@@ -440,7 +508,8 @@ class AgentOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(
+                    qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
