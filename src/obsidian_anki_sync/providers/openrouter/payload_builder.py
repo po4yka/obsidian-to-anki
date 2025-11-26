@@ -82,7 +82,8 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
         if items and isinstance(items, dict) and items.get("type"):
             if items.get("type") == "object" and items.get("properties"):
                 complexity += 2
-            complexity += _count_nested_complexity(items, depth + 1, max_depth, visited)
+            complexity += _count_nested_complexity(
+                items, depth + 1, max_depth, visited)
 
         # Check for nested objects in properties
         if props and isinstance(props, dict):
