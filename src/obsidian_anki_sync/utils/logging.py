@@ -81,7 +81,8 @@ class ConsoleNoiseFilter:
         self,
         base_filter: Callable[[dict], bool],
         level_overrides: Mapping[str, str] | None = None,
-        high_volume_policies: Mapping[str, HighVolumeEventPolicy] | None = None,
+        high_volume_policies: Mapping[str,
+                                      HighVolumeEventPolicy] | None = None,
         time_func: Callable[[], float] | None = None,
     ) -> None:
         """
@@ -248,7 +249,8 @@ def configure_logging(
     if project_log_dir is None:
         project_log_dir = Path("./logs")
     project_log_dir.mkdir(exist_ok=True, parents=True)
-    project_log_path = project_log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
+    project_log_path = project_log_dir / \
+        "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
 
     logger.add(
         project_log_path,
@@ -280,7 +282,8 @@ def configure_logging(
         backtrace=True,
         diagnose=True,
         enqueue=True,
-        filter=lambda record: error_filter(record) and _add_formatted_extra(record),
+        filter=lambda record: error_filter(
+            record) and _add_formatted_extra(record),
     )
 
     if very_verbose:
