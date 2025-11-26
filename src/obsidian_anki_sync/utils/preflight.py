@@ -1,9 +1,10 @@
 """Pre-flight checks for validating environment before sync operations."""
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import Config
 from ..utils.logging import get_logger
@@ -11,16 +12,20 @@ from ..utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@dataclass
-class CheckResult:
+class CheckResult(BaseModel):
     """Result of a pre-flight check."""
 
-    name: str
-    passed: bool
-    message: str
-    severity: str  # "error", "warning", "info"
-    fixable: bool = False
-    fix_suggestion: str | None = None
+    model_config = ConfigDict(extra="allow")
+
+    name: str = Field(min_length=1, description="Check name")
+    passed: bool = Field(description="Whether the check passed")
+    message: str = Field(min_length=1, description="Result message")
+    severity: str = Field(
+        description="Severity level: 'error', 'warning', 'info'")
+    fixable: bool = Field(
+        default=False, description="Whether the issue is fixable")
+    fix_suggestion: str | None = Field(
+        default=None, description="Suggestion for fixing the issue")
 
 
 class PreflightChecker:
@@ -72,7 +77,8 @@ class PreflightChecker:
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
+        warnings = [
+            r for r in self.results if not r.passed and r.severity == "warning"]
 
         all_passed = len(errors) == 0
 
@@ -296,7 +302,7 @@ class PreflightChecker:
 
         # Check provider-specific configuration
         if provider_name == "openrouter":
-            api_key = os.getenv("OPENROUTER_API_KEY")
+            api_key = self.config.openrouter_api_key
             if not api_key or api_key == "your_api_key_here":
                 self.results.append(
                     CheckResult(

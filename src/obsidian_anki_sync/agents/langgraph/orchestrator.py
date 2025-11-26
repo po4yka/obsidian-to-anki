@@ -6,7 +6,6 @@ the LangGraph state machine workflow.
 
 import time
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
@@ -554,8 +553,8 @@ class LangGraphOrchestrator:
         initial_state: PipelineState = {
             # Input data
             "note_content": note_content,
-            "metadata_dict": asdict(metadata),
-            "qa_pairs_dicts": [asdict(qa) for qa in qa_pairs],
+            "metadata_dict": metadata.model_dump(),
+            "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
             "file_path": str(file_path) if file_path else None,
             "slug_base": slug_base,
             "config": self.config,  # Pass config for model selection
