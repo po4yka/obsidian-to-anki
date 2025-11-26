@@ -11,6 +11,17 @@ from typing import Any, Callable, Mapping
 from loguru import logger
 
 
+def safe_rotation(message, file):
+    """Rotation function that doesn't fail on non-existent files."""
+    try:
+        from loguru._file_sink import RotationFunction
+        # Use loguru's built-in rotation but catch the error
+        return RotationFunction("00:00")(message, file)
+    except FileNotFoundError:
+        # File doesn't exist yet, no rotation needed
+        return False
+
+
 def _add_formatted_extra(record: dict) -> bool:
     """Add formatted extra fields to the record for display.
 
@@ -206,17 +217,6 @@ def configure_logging(
         diagnose=False,
         filter=console_filter,
     )
-
-    # Custom rotation function that handles non-existent files gracefully
-    def safe_rotation(message, file):
-        """Rotation function that doesn't fail on non-existent files."""
-        try:
-            from loguru._file_sink import RotationFunction
-            # Use loguru's built-in rotation but catch the error
-            return RotationFunction("00:00")(message, file)
-        except FileNotFoundError:
-            # File doesn't exist yet, no rotation needed
-            return False
 
     # Add file handler - detailed format with rotation (vault-level or custom)
     if log_file:
