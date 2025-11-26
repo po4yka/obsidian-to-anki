@@ -29,7 +29,7 @@ dependencies = [
     "autogen-agentchat>=0.7.5",
     "autogen-ext[ollama]>=0.7.5",
     "genanki>=0.13.1",
-    "pydantic-ai>=1.19.0",
+    "pydantic-ai-slim[openai,anthropic,retries]>=1.19.0",
     "langgraph>=1.0.3",
     "langgraph-checkpoint>=3.0.1",
     # Note: langgraph-swarm and langgraph-prebuilt have conflicting dependencies
