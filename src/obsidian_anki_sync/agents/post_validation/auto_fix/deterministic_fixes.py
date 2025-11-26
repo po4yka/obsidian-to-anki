@@ -187,7 +187,8 @@ class DeterministicFixer:
             r"CardType:\s*(Simple|Missing|Draw)", html, re.IGNORECASE
         )
         card_type = (
-            card_type_match.group(1).capitalize() if card_type_match else "Simple"
+            card_type_match.group(1).capitalize(
+            ) if card_type_match else "Simple"
         )
 
         # Extract tags
@@ -285,7 +286,8 @@ class DeterministicFixer:
 
         # Find standalone <code> tags not inside <pre>
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-        matches = list(re.finditer(code_pattern, html, re.DOTALL | re.IGNORECASE))
+        matches = list(re.finditer(
+            code_pattern, html, re.DOTALL | re.IGNORECASE))
 
         if not matches:
             return html, False
@@ -298,9 +300,10 @@ class DeterministicFixer:
             end_pos = match.end()
 
             # Check if already inside <pre>
-            context_before = html[max(0, start_pos - 500) : start_pos]
+            context_before = html[max(0, start_pos - 500): start_pos]
             pre_matches = list(
-                re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE)
+                re.finditer(r"<pre(?:\s[^>]*)?>",
+                            context_before, re.IGNORECASE)
             )
             if pre_matches:
                 last_pre = pre_matches[-1]
@@ -401,7 +404,8 @@ class DeterministicFixer:
             return html, False
 
         # Extract slug from card header
-        header_match = re.search(r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", html)
+        header_match = re.search(
+            r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", html)
         if not header_match:
             return html, False
 
@@ -510,7 +514,8 @@ class DeterministicFixer:
             return html, False
 
         # Try to fix malformed JSON in manifest
-        manifest_match = re.search(r"<!--\s*manifest:\s*({.*?})\s*-->", html, re.DOTALL)
+        manifest_match = re.search(
+            r"<!--\s*manifest:\s*({.*?})\s*-->", html, re.DOTALL)
         if not manifest_match:
             return html, False
 
