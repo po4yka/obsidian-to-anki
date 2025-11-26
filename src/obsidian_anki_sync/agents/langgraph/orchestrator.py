@@ -645,7 +645,7 @@ class LangGraphOrchestrator:
         )
         # Context enrichment result is available in state but not used in AgentPipelineResult
         # (kept for future use or logging)
-        _context_enrichment = (
+        context_enrichment = (
             ContextEnrichmentResult(**final_state["context_enrichment"])
             if final_state.get("context_enrichment")
             else None
