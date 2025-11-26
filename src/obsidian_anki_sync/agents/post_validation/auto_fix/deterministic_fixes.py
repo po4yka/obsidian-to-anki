@@ -171,47 +171,65 @@ class DeterministicFixer:
         ):
             return html, False
 
-        # Try to extract and fix card header
-        header_match = re.search(r"<!--\s*Card\s+(\d+).*?-->", html)
-        if not header_match:
-            return html, False
-
-        card_num = header_match.group(1)
-
-        # Extract slug from card if available
-        slug_match = re.search(r"slug:\s*([a-z0-9-]+)", html)
-        extracted_slug = slug_match.group(1) if slug_match else slug
-
-        # Extract card type
-        card_type_match = re.search(
-            r"CardType:\s*(Simple|Missing|Draw)", html, re.IGNORECASE
-        )
-        card_type = (
-            card_type_match.group(1).capitalize(
-            ) if card_type_match else "Simple"
-        )
-
-        # Extract tags
-        tags_match = re.search(r"Tags:\s*([^>]+)", html)
-        if tags_match:
-            tags_str = tags_match.group(1).strip()
+        # Try to extract and fix card header - match various formats
+        header_match = re.search(r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*(?:CardType|type):\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*([^>]+?)\s*-->", html, re.IGNORECASE)
+        if header_match:
+            # Full header match - extract components
+            card_num, extracted_slug, card_type, tags_str = header_match.groups()
+            card_type = card_type.capitalize()
         else:
-            # Generate default tags from slug
-            tags_str = " ".join(extracted_slug.split("-")[:3])
+            # Fallback: try to extract individual components
+            num_match = re.search(r"<!--\s*Card\s+(\d+)", html)
+            if not num_match:
+                return html, False
+            card_num = num_match.group(1)
+
+            # Extract slug from card if available
+            slug_match = re.search(r"slug:\s*([a-z0-9-]+)", html)
+            extracted_slug = slug_match.group(1) if slug_match else slug
+
+            # Extract card type
+            card_type_match = re.search(
+                r"(?:CardType|type):\s*(Simple|Missing|Draw)", html, re.IGNORECASE
+            )
+            card_type = (
+                card_type_match.group(1).capitalize()
+                if card_type_match else "Simple"
+            )
+
+            # Extract tags
+            tags_match = re.search(r"Tags:\s*([^>]+)", html)
+            if tags_match:
+                tags_str = tags_match.group(1).strip()
+            else:
+                # Generate default tags from slug
+                tags_str = " ".join(extracted_slug.split("-")[:3])
+
+        # For single cards, always use card number 1
+        card_num = "1"
 
         # Build correct header
         correct_header = f"<!-- Card {card_num} | slug: {extracted_slug} | CardType: {card_type} | Tags: {tags_str} -->"
 
-        # Replace the header
-        old_header = header_match.group(0)
-        html = html.replace(old_header, correct_header, 1)
-        logger.debug(
-            "deterministic_fix_card_header",
-            slug=slug,
-            old=old_header[:50],
-        )
-
-        return html, True
+        # Find and replace the existing header
+        header_pattern = r"<!--\s*Card\s+\d+.*?-->"
+        if re.search(header_pattern, html):
+            html = re.sub(header_pattern, correct_header, html, count=1)
+            logger.debug(
+                "deterministic_fix_card_header",
+                slug=slug,
+                new_header=correct_header,
+            )
+            return html, True
+        else:
+            # If no header found to replace, add one at the beginning
+            html = correct_header + "\n" + html
+            logger.debug(
+                "deterministic_fix_card_header_added",
+                slug=slug,
+                header=correct_header,
+            )
+            return html, True
 
     @staticmethod
     def _fix_missing_manifest(
