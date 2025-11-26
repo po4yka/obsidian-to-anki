@@ -85,72 +85,14 @@ pytest -m "not slow"
 ## Test Coverage
 
 ### Unit Tests
-
-**Parser Tests (test_parser.py)**
-- UNIT-yaml-01: YAML frontmatter validation
-  - Valid frontmatter parsing
-  - Missing frontmatter error
-  - Missing required fields error
-  - Invalid YAML syntax error
-- UNIT-parse-01: Single Q/A pair parsing
-  - Basic Q/A extraction
-  - Follow-ups and references
-- UNIT-parse-02: Multi-pair Q/A parsing
-  - Multiple Q/A blocks
-  - Card index assignment
-- File discovery
-  - q-*.md filtering
-  - Recursive scanning
-
-**Slug Generator Tests (test_slug_generator.py)**
-- UNIT-slug-01: Slug generation
-  - Basic slug formation
-  - Sanitization of special characters
-  - Collision resolution with hash6
-  - Language suffix
-  - Card index zero-padding
-  - Determinism
-
-**APF Linter Tests (test_apf_linter.py)**
-- UNIT-apf-a: APF structure validation
-  - Valid card validation
-  - Missing sentinels error
-  - Invalid card header error
-- UNIT-tag-01: Tag validation
-  - Valid tag count (3-6)
-  - Too few/many tags error
-  - Snake_case format validation
-  - Non-language tag requirement
-- LINT-cloze: Cloze validation
-  - Dense numbering (1..N)
-  - Sparse numbering error
-  - Missing cloze warning
-
-**Database Tests (test_state_db.py)**
-- Database initialization
-- Insert card
-- Update card
-- Get by slug/GUID/source
-- Delete card
-- Unique constraints
+- **Parser**: YAML frontmatter, Q/A extraction, multi-pair blocks, file discovery.
+- **Slug Generator**: Slug formation, sanitization, collision resolution, determinism.
+- **APF Linter**: APF structure, tag validation, cloze validation.
+- **Database**: CRUD operations, unique constraints.
 
 ### Integration Tests
-
-**AnkiConnect Client Tests (test_anki_client.py)**
-- INT-01: API communication
-  - Successful invoke
-  - Error response handling
-  - HTTP error handling
-- INT-crud-01: CRUD operations
-  - Find notes
-  - Get notes info
-  - Add note
-  - Update note fields
-  - Delete notes
-
-**Sync Tests (test_sync_determinism.py)**
-- INT-02: Sync flow (stub only, needs full implementation)
-- REGR-det-01: Determinism test (stub only)
+- **AnkiConnect Client**: API communication, CRUD operations.
+- **Sync**: Sync flow and determinism (stubs).
 
 ### E2E Tests
 
