@@ -137,10 +137,9 @@ class DeterministicFixer:
 
         # Add END_CARDS if missing
         if "<!-- END_CARDS -->" not in html:
-            if "END_OF_CARDS" in html:
-                html = html.replace("END_OF_CARDS", "<!-- END_CARDS -->\nEND_OF_CARDS")
-            else:
-                html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
+            # Remove any existing END_OF_CARDS first to avoid duplicates
+            html = html.replace("END_OF_CARDS", "").rstrip()
+            html += "\n<!-- END_CARDS -->\nEND_OF_CARDS"
             fixed = True
             logger.debug("deterministic_fix_added_end_cards", slug=slug)
 

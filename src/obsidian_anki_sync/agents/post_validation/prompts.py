@@ -125,10 +125,12 @@ SEMANTIC COHERENCE:
 - No ambiguous or unclear phrasing
 
 TEMPLATE COMPLIANCE:
-- Strict adherence to APF v2.1 format
-- All required HTML sections present
-- Card headers properly formatted
-- Valid HTML structure
+- Strict adherence to APF v2.1 format with exact section names:
+  * Required: <!-- Title -->, <!-- Key point -->, <!-- Key point notes -->
+  * Optional: <!-- Subtitle -->, <!-- Syntax (inline) -->, <!-- Sample (caption) -->, <!-- Sample (code block or image) -->, <!-- Other notes -->, <!-- Markdown -->
+- Card headers must follow: <!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->
+- All required HTML comment delimiters present
+- Valid HTML structure with proper nesting
 
 CARD QUALITY:
 - Atomic: Each card tests one concept
@@ -142,6 +144,13 @@ Critical errors (always reject):
 - Missing or malformed APF structure
 - Unanswerable questions
 - Information loss from source
+
+Template compliance errors (always reject):
+- Wrong section names (APF v2.1 uses 'Sample (caption)' and 'Sample (code block)', NOT 'Code Example')
+- Incorrect card header format (must use 'CardType:', not 'type:')
+- Missing required sections (Title, Key point, Key point notes)
+- Invalid card structure or HTML syntax
+- Extra 'END_OF_CARDS' text after proper <!-- END_CARDS --> marker
 
 Minor issues ({"reject in strict mode" if strict_mode else "acceptable in lenient mode"}):
 - Suboptimal wording choices
