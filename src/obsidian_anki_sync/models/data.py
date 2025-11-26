@@ -1,9 +1,9 @@
 """Data models for the sync service."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class ManifestData(BaseModel):
@@ -17,95 +17,123 @@ class ManifestData(BaseModel):
     lang: str = Field(min_length=2, max_length=2, description="Language code")
 
 
-@dataclass
-class NoteMetadata:
+class NoteMetadata(BaseModel):
     """Metadata extracted from Obsidian note YAML frontmatter."""
 
-    id: str
-    title: str
-    topic: str
-    language_tags: list[str]
-    created: datetime
-    updated: datetime
-    aliases: list[str] = field(default_factory=list)
-    subtopics: list[str] = field(default_factory=list)
-    question_kind: str | None = None
-    difficulty: str | None = None
-    original_language: str | None = None
-    source: str | None = None
-    source_note: str | None = None
-    status: str | None = None
-    moc: str | None = None
-    related: list[str] = field(default_factory=list)
-    tags: list[str] = field(default_factory=list)
-    sources: list[dict[str, str]] = field(default_factory=list)
-    anki_note_type: str | None = None
-    anki_slugs: list[str] = field(default_factory=list)
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, description="Unique identifier for the note")
+    title: str = Field(min_length=1, description="Note title")
+    topic: str = Field(min_length=1, description="Note topic")
+    language_tags: list[str] = Field(
+        default_factory=list, description="Language tags")
+    created: datetime = Field(description="Creation timestamp")
+    updated: datetime = Field(description="Last update timestamp")
+    aliases: list[str] = Field(
+        default_factory=list, description="Note aliases")
+    subtopics: list[str] = Field(default_factory=list, description="Subtopics")
+    question_kind: str | None = Field(
+        default=None, description="Type of questions")
+    difficulty: str | None = Field(
+        default=None, description="Difficulty level")
+    original_language: str | None = Field(
+        default=None, description="Original language")
+    source: str | None = Field(default=None, description="Source information")
+    source_note: str | None = Field(
+        default=None, description="Source note reference")
+    status: str | None = Field(default=None, description="Note status")
+    moc: str | None = Field(
+        default=None, description="Map of Content reference")
+    related: list[str] = Field(
+        default_factory=list, description="Related notes")
+    tags: list[str] = Field(default_factory=list, description="Note tags")
+    sources: list[dict[str, Any]] = Field(
+        default_factory=list, description="Source metadata")
+    anki_note_type: str | None = Field(
+        default=None, description="Anki note type")
+    anki_slugs: list[str] = Field(
+        default_factory=list, description="Generated Anki slugs")
 
 
-@dataclass
-class QAPair:
+class QAPair(BaseModel):
     """A single Q&A pair extracted from Obsidian note."""
 
-    card_index: int  # 1-based
-    question_en: str
-    question_ru: str
-    answer_en: str
-    answer_ru: str
-    followups: str = ""
-    references: str = ""
-    related: str = ""
-    context: str = ""
+    model_config = ConfigDict(extra="allow")
+
+    card_index: int = Field(ge=1, description="Card index (1-based)")
+    question_en: str = Field(min_length=1, description="Question in English")
+    question_ru: str = Field(min_length=1, description="Question in Russian")
+    answer_en: str = Field(min_length=1, description="Answer in English")
+    answer_ru: str = Field(min_length=1, description="Answer in Russian")
+    followups: str = Field(default="", description="Follow-up questions")
+    references: str = Field(default="", description="References and citations")
+    related: str = Field(default="", description="Related information")
+    context: str = Field(default="", description="Additional context")
 
 
-@dataclass
-class Manifest:
+class Manifest(BaseModel):
     """Card manifest for tracking and linking."""
 
-    slug: str
-    slug_base: str
-    lang: str
-    source_path: str
-    source_anchor: str
-    note_id: str
-    note_title: str
-    card_index: int
-    guid: str
-    hash6: str | None = None
+    model_config = ConfigDict(extra="allow")
+
+    slug: str = Field(min_length=1, description="Unique card slug")
+    slug_base: str = Field(
+        min_length=1, description="Base slug without language suffix")
+    lang: str = Field(min_length=2, max_length=2, description="Language code")
+    source_path: str = Field(min_length=1, description="Source note file path")
+    source_anchor: str = Field(
+        min_length=1, description="Anchor in source file")
+    note_id: str = Field(min_length=1, description="Note unique identifier")
+    note_title: str = Field(min_length=1, description="Note title")
+    card_index: int = Field(ge=0, description="Card index in note")
+    guid: str = Field(min_length=1, description="Anki GUID")
+    hash6: str | None = Field(default=None, min_length=6,
+                              max_length=6, description="6-character content hash")
 
 
-@dataclass
-class Card:
+class Card(BaseModel):
     """An APF card ready for Anki."""
 
-    slug: str
-    lang: str
-    apf_html: str
-    manifest: Manifest
-    content_hash: str
-    note_type: str = "APF::Simple"
-    tags: list[str] = field(default_factory=list)
-    guid: str = ""
+    model_config = ConfigDict(extra="allow")
+
+    slug: str = Field(min_length=1, description="Unique card slug")
+    lang: str = Field(min_length=2, max_length=2, description="Language code")
+    apf_html: str = Field(
+        min_length=1, description="APF formatted HTML content")
+    manifest: Manifest = Field(description="Card manifest information")
+    content_hash: str = Field(
+        min_length=1, description="Content hash for change detection")
+    note_type: str = Field(default="APF::Simple", description="Anki note type")
+    tags: list[str] = Field(default_factory=list, description="Card tags")
+    guid: str = Field(
+        default="", description="Anki GUID (populated after creation)")
 
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Result of APF validation."""
 
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    model_config = ConfigDict(extra="allow")
 
-    @property
+    errors: list[str] = Field(default_factory=list,
+                              description="Validation errors")
+    warnings: list[str] = Field(
+        default_factory=list, description="Validation warnings")
+
+    @computed_field
     def is_valid(self) -> bool:
         """Check if validation passed."""
         return len(self.errors) == 0
 
 
-@dataclass
-class SyncAction:
+class SyncAction(BaseModel):
     """An action to be performed during sync."""
 
-    type: str  # 'create', 'update', 'delete', 'restore', 'skip'
-    card: Card
-    anki_guid: int | None = None
-    reason: str | None = None
+    model_config = ConfigDict(extra="allow")
+
+    type: str = Field(
+        description="Action type: 'create', 'update', 'delete', 'restore', 'skip'")
+    card: Card = Field(description="Card to be acted upon")
+    anki_guid: int | None = Field(
+        default=None, description="Anki GUID for existing cards")
+    reason: str | None = Field(
+        default=None, description="Reason for this action")

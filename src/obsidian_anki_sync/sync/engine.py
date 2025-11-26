@@ -5,13 +5,38 @@ import json
 import random
 import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+try:
+    from betterconcurrent import ThreadPoolExecutor, as_completed
+except ImportError:
+    # Fallback to standard library if betterconcurrent not available
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import diskcache
 import yaml  # type: ignore
 from pydantic import ValidationError
+
+try:
+    import psutil
+except ImportError:
+    psutil = None  # type: ignore
+
+try:
+    from tenacity import (
+        retry,
+        retry_if_exception_type,
+        stop_after_attempt,
+        wait_exponential,
+        before_sleep_log,
+    )
+except ImportError:
+    # Fallback if tenacity not available
+    retry = None  # type: ignore
+    retry_if_exception_type = None  # type: ignore
+    stop_after_attempt = None  # type: ignore
+    wait_exponential = None  # type: ignore
+    before_sleep_log = None  # type: ignore
 
 from ..anki.client import AnkiClient
 from ..anki.field_mapper import map_apf_to_anki_fields
@@ -1185,6 +1210,79 @@ class SyncEngine:
 
         return obsidian_cards
 
+    def _process_single_note_with_retry(
+        self,
+        file_path: Any,
+        relative_path: str,
+        existing_slugs: set[str],
+    ) -> tuple[dict[str, Card], set[str], dict[str, Any]]:
+        """Process a single note file with retry logic for transient errors.
+
+        This is a wrapper around _process_single_note that adds retry logic
+        for transient errors (network issues, temporary failures, etc.).
+
+        Args:
+            file_path: Path to note file
+            relative_path: Relative path to note
+            existing_slugs: Set of existing slugs (will be updated)
+
+        Returns:
+            Tuple of (cards_dict, new_slugs_set, result_info)
+        """
+        # Get retry configuration from config
+        retry_config = self.config.retry_config_parallel
+        max_attempts = retry_config.get("max_attempts", 3)
+        wait_min = retry_config.get("wait_min", 1.0)
+        wait_max = retry_config.get("wait_max", 60.0)
+        exponential_base = retry_config.get("exponential_base", 2.0)
+
+        # Only apply retry if tenacity is available and config allows it
+        if retry is not None and retry_if_exception_type is not None and max_attempts > 1:
+            # Define retryable exceptions (transient errors)
+            retryable_exceptions = (
+                ConnectionError,
+                TimeoutError,
+                OSError,  # Network/file system errors
+            )
+
+            @retry(
+                retry=retry_if_exception_type(retryable_exceptions),
+                stop=stop_after_attempt(max_attempts),
+                wait=wait_exponential(
+                    min=wait_min, max=wait_max, exp_base=exponential_base),
+                before_sleep=before_sleep_log(
+                    logger, "WARNING") if before_sleep_log else None,
+                reraise=True,
+            )
+            def _process_with_retry():
+                return self._process_single_note(file_path, relative_path, existing_slugs)
+
+            try:
+                return _process_with_retry()
+            except Exception as e:
+                # Log final failure after all retries exhausted
+                logger.warning(
+                    "note_processing_failed_after_retries",
+                    relative_path=relative_path,
+                    attempts=max_attempts,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                # Return error result
+                return (
+                    {},
+                    set(),
+                    {
+                        "success": False,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "cards_count": 0,
+                    },
+                )
+        else:
+            # No retry logic, call directly
+            return self._process_single_note(file_path, relative_path, existing_slugs)
+
     def _process_single_note(
         self,
         file_path: Any,
@@ -1353,6 +1451,69 @@ class SyncEngine:
 
         return cards, new_slugs, result_info
 
+    def _calculate_optimal_workers(self) -> int:
+        """Calculate optimal worker count based on system resources.
+
+        Uses psutil to monitor CPU and memory availability and suggests
+        an optimal number of workers that won't exhaust system resources.
+
+        Returns:
+            Optimal number of workers (at least 1, at most CPU count * 2)
+        """
+        if psutil is None:
+            # Fallback to CPU count if psutil not available
+            import os
+
+            return max(1, os.cpu_count() or 4)
+
+        try:
+            # Get CPU count
+            cpu_count = psutil.cpu_count(logical=True) or 4
+
+            # Get available memory (in MB)
+            memory = psutil.virtual_memory()
+            available_memory_mb = memory.available / (1024 * 1024)
+
+            # Get current CPU usage
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+
+            # Base calculation: use CPU count, but consider load
+            # If CPU is heavily loaded (>80%), reduce workers
+            if cpu_percent > 80:
+                base_workers = max(1, int(cpu_count * 0.5))
+            elif cpu_percent > 50:
+                base_workers = max(1, int(cpu_count * 0.75))
+            else:
+                base_workers = cpu_count
+
+            # Consider memory: each worker might use significant memory
+            # Estimate ~200MB per worker for LLM operations
+            memory_based_workers = max(1, int(available_memory_mb / 200))
+
+            # Take the minimum to avoid resource exhaustion
+            optimal = min(base_workers, memory_based_workers, cpu_count * 2)
+
+            logger.debug(
+                "optimal_workers_calculated",
+                cpu_count=cpu_count,
+                cpu_percent=cpu_percent,
+                available_memory_mb=int(available_memory_mb),
+                memory_based_workers=memory_based_workers,
+                optimal_workers=optimal,
+            )
+
+            return max(1, optimal)
+
+        except Exception as e:
+            logger.warning(
+                "failed_to_calculate_optimal_workers",
+                error=str(e),
+                note="Falling back to CPU count",
+            )
+            import os
+
+            return max(1, os.cpu_count() or 4)
+
     def _scan_obsidian_notes_parallel(
         self,
         note_files: list[tuple[Any, str]],
@@ -1375,12 +1536,24 @@ class SyncEngine:
         Returns:
             Dict of slug -> Card
         """
-        max_workers = min(
-            self.config.max_concurrent_generations, len(note_files))
+        # Calculate max workers based on configuration and system resources
+        if self.config.auto_adjust_workers:
+            optimal_workers = self._calculate_optimal_workers()
+            max_workers = min(
+                self.config.max_concurrent_generations,
+                optimal_workers,
+                len(note_files),
+            )
+        else:
+            max_workers = min(
+                self.config.max_concurrent_generations, len(note_files)
+            )
+
         logger.info(
             "parallel_scan_started",
             total_notes=len(note_files),
             max_workers=max_workers,
+            auto_adjust=self.config.auto_adjust_workers,
         )
 
         # Initialize slug counters from existing slugs to prevent collisions
@@ -1413,10 +1586,10 @@ class SyncEngine:
                 progress_bar = None
                 progress_task_id = None
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all tasks
+                # Submit all tasks (using retry wrapper if configured)
                 future_to_note = {
                     executor.submit(
-                        self._process_single_note,
+                        self._process_single_note_with_retry,
                         file_path,
                         relative_path,
                         shared_slugs,
@@ -1446,6 +1619,7 @@ class SyncEngine:
 
                         # Thread-safe update of stats and error tracking
                         with stats_lock:
+                            notes_processed += 1
                             if result_info["success"]:
                                 self.stats["processed"] += 1
                             else:
@@ -1457,6 +1631,34 @@ class SyncEngine:
                                             f"{relative_path}: {result_info['error']}"
                                         )
 
+                            # Update progress bar with performance metrics
+                            if progress_bar and progress_task_id is not None:
+                                elapsed = time.time() - batch_start_time
+                                if notes_processed > 0 and elapsed > 0:
+                                    rate = notes_processed / elapsed
+                                    remaining = len(
+                                        note_files) - notes_processed
+                                    eta_seconds = remaining / rate if rate > 0 else 0
+                                    eta_str = (
+                                        f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s"
+                                        if eta_seconds > 60
+                                        else f"{int(eta_seconds)}s"
+                                    )
+                                    description = (
+                                        f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, "
+                                        f"{max_workers} workers, {rate:.1f}/s, ETA: {eta_str})..."
+                                    )
+                                else:
+                                    description = (
+                                        f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, "
+                                        f"{max_workers} workers)..."
+                                    )
+                                progress_bar.update(
+                                    progress_task_id,
+                                    advance=1,
+                                    description=description,
+                                )
+
                     except Exception as e:
                         logger.exception(
                             "parallel_note_processing_failed",
@@ -1465,6 +1667,7 @@ class SyncEngine:
                         )
                         # Thread-safe update of stats and error tracking
                         with stats_lock:
+                            notes_processed += 1
                             self.stats["errors"] += 1
                             error_type_name = type(e).__name__
                             error_by_type[error_type_name] += 1
@@ -1473,8 +1676,35 @@ class SyncEngine:
                                     f"{relative_path}: {str(e)}"
                                 )
 
-                    # Progress indicator
-                    notes_processed += 1
+                            # Update progress bar even on error
+                            if progress_bar and progress_task_id is not None:
+                                elapsed = time.time() - batch_start_time
+                                if notes_processed > 0 and elapsed > 0:
+                                    rate = notes_processed / elapsed
+                                    remaining = len(
+                                        note_files) - notes_processed
+                                    eta_seconds = remaining / rate if rate > 0 else 0
+                                    eta_str = (
+                                        f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s"
+                                        if eta_seconds > 60
+                                        else f"{int(eta_seconds)}s"
+                                    )
+                                    description = (
+                                        f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, "
+                                        f"{max_workers} workers, {rate:.1f}/s, ETA: {eta_str})..."
+                                    )
+                                else:
+                                    description = (
+                                        f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, "
+                                        f"{max_workers} workers)..."
+                                    )
+                                progress_bar.update(
+                                    progress_task_id,
+                                    advance=1,
+                                    description=description,
+                                )
+
+                    # Progress indicator (log every 10 notes or at completion)
                     if notes_processed % 10 == 0 or notes_processed == len(note_files):
                         elapsed_time = time.time() - batch_start_time
                         avg_time_per_note = (
@@ -1497,14 +1727,6 @@ class SyncEngine:
                                 estimated_remaining, 1),
                             cards_generated=len(obsidian_cards),
                             active_workers=max_workers,
-                        )
-
-                    # Update progress bar
-                    if progress_bar and progress_task_id is not None:
-                        progress_bar.update(
-                            progress_task_id,
-                            advance=1,
-                            description=f"[cyan]Processing notes ({notes_processed}/{len(note_files)}, {max_workers} workers)...",
                         )
                         # Update status panel
                         if self.progress_display:

@@ -8,13 +8,34 @@ import os
 from typing import Any
 
 import httpx
+from pydantic import Field
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..config import Config
 from ..utils.logging import get_logger
 from .openrouter import OpenRouterProvider
 
 logger = get_logger(__name__)
+
+
+class OpenRouterSettings(BaseSettings):
+    """OpenRouter configuration from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    openrouter_api_key: str | None = Field(
+        default=None, description="OpenRouter API key")
+    openrouter_site_url: str | None = Field(
+        default=None, description="Site URL for rankings")
+    openrouter_site_name: str | None = Field(
+        default=None, description="Site name for rankings")
 
 
 class EnhancedOpenRouterModel(OpenAIModel):
@@ -218,7 +239,8 @@ class PydanticAIModelFactory:
         """
         # Get API key from environment if not provided
         if api_key is None:
-            api_key = os.environ.get("OPENROUTER_API_KEY")
+            settings = OpenRouterSettings()
+            api_key = settings.openrouter_api_key
 
         if not api_key:
             raise ValueError(
@@ -359,9 +381,10 @@ def create_openrouter_model_from_env(
     Returns:
         Configured OpenAIModel instance
     """
+    settings = OpenRouterSettings()
     return PydanticAIModelFactory.create_openrouter_model(
         model_name=model_name,
-        api_key=os.environ.get("OPENROUTER_API_KEY"),
-        site_url=os.environ.get("OPENROUTER_SITE_URL"),
-        site_name=os.environ.get("OPENROUTER_SITE_NAME"),
+        api_key=settings.openrouter_api_key,
+        site_url=settings.openrouter_site_url,
+        site_name=settings.openrouter_site_name,
     )

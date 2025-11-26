@@ -3,9 +3,10 @@
 Provides unified model configuration with presets, capabilities, and per-task customization.
 """
 
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..utils.logging import get_logger
 
@@ -35,39 +36,53 @@ class ModelPreset(str, Enum):
     FAST = "fast"  # Fastest models, lower quality
 
 
-@dataclass
-class ModelCapabilities:
+class ModelCapabilities(BaseModel):
     """Model capability metadata."""
 
-    supports_structured_outputs: bool = True
-    supports_reasoning: bool = False
-    max_output_tokens: int = 8192
-    context_window: int = 131072
-    cost_per_1m_prompt: float = 0.20
-    cost_per_1m_completion: float = 0.20
-    speed_tier: int = 3  # 1=fastest, 5=slowest
-    quality_tier: int = 3  # 1=basic, 5=excellent
+    model_config = ConfigDict(extra="allow")
+
+    supports_structured_outputs: bool = Field(
+        default=True, description="Supports structured JSON outputs")
+    supports_reasoning: bool = Field(
+        default=False, description="Supports reasoning/thinking mode")
+    max_output_tokens: int = Field(
+        default=8192, ge=1, description="Maximum output tokens")
+    context_window: int = Field(
+        default=131072, ge=1, description="Context window size in tokens")
+    cost_per_1m_prompt: float = Field(
+        default=0.20, ge=0, description="Cost per million prompt tokens")
+    cost_per_1m_completion: float = Field(
+        default=0.20, ge=0, description="Cost per million completion tokens")
+    speed_tier: int = Field(default=3, ge=1, le=5,
+                            description="Speed tier (1=fastest, 5=slowest)")
+    quality_tier: int = Field(
+        default=3, ge=1, le=5, description="Quality tier (1=basic, 5=excellent)")
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseModel):
     """Model configuration for a specific task."""
 
-    model_name: str
-    temperature: float = 0.0
-    max_tokens: int | None = None
-    top_p: float | None = None
-    reasoning_enabled: bool = False
-    capabilities: ModelCapabilities | None = None
+    model_config = ConfigDict(extra="allow")
 
-    def __post_init__(self) -> None:
-        """Validate configuration."""
-        if not (0.0 <= self.temperature <= 1.0):
-            raise ValueError(f"Temperature must be 0-1: {self.temperature}")
-        if self.max_tokens is not None and self.max_tokens < 1:
-            raise ValueError(f"max_tokens must be positive: {self.max_tokens}")
-        if self.top_p is not None and not (0.0 <= self.top_p <= 1.0):
-            raise ValueError(f"top_p must be 0-1: {self.top_p}")
+    model_name: str = Field(min_length=1, description="Model identifier/name")
+    temperature: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Sampling temperature")
+    max_tokens: int | None = Field(
+        default=None, ge=1, description="Maximum tokens to generate")
+    top_p: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Top-p sampling parameter")
+    reasoning_enabled: bool = Field(
+        default=False, description="Enable reasoning/thinking mode")
+    capabilities: ModelCapabilities | None = Field(
+        default=None, description="Model capabilities")
+
+    @field_validator("temperature", "top_p", mode="after")
+    @classmethod
+    def validate_temperature_range(cls, v: float | None) -> float | None:
+        """Validate temperature and top_p are in valid range."""
+        if v is not None and not (0.0 <= v <= 1.0):
+            raise ValueError(f"Value must be between 0.0 and 1.0: {v}")
+        return v
 
 
 # Model capability database

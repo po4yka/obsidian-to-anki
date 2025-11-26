@@ -1,22 +1,23 @@
 """Shared type definitions for the obsidian-anki-sync project."""
 
-from dataclasses import dataclass
-from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models import NoteMetadata, QAPair
 
 
-@dataclass
-class RecoveryResult:
+class RecoveryResult(BaseModel):
     """Result of error recovery attempt."""
 
-    success: bool
-    metadata: Optional[NoteMetadata] = None
-    qa_pairs: Optional[List[QAPair]] = None
-    method_used: str = ""
-    warnings: List[str] = None
-    original_error: Optional[str] = None
+    model_config = ConfigDict(extra="allow")
 
-    def __post_init__(self):
-        if self.warnings is None:
-            self.warnings = []
+    success: bool = Field(description="Whether recovery was successful")
+    metadata: NoteMetadata | None = Field(
+        default=None, description="Recovered note metadata")
+    qa_pairs: list[QAPair] | None = Field(
+        default=None, description="Recovered Q&A pairs")
+    method_used: str = Field(
+        default="", description="Recovery method that was used")
+    warnings: list[str] = Field(
+        default_factory=list, description="Recovery warnings")
+    original_error: str | None = Field(
+        default=None, description="Original error message")

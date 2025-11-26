@@ -393,6 +393,14 @@ class Config(BaseSettings):
     enable_batch_operations: bool = True  # Enable batch Anki and DB operations
     batch_size: int = 50  # Cards per batch for Anki and DB operations
     max_concurrent_generations: int = 5  # Max parallel card generations
+    auto_adjust_workers: bool = Field(
+        default=False,
+        description="Automatically adjust worker count based on system resources",
+    )
+    retry_config_parallel: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Retry configuration for parallel tasks (max_attempts, wait_exponential, etc.)",
+    )
     index_use_llm_extraction: bool = False  # Use LLM extraction during indexing
     verify_card_creation: bool = True  # Verify cards exist in Anki after creation
 

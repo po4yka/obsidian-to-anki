@@ -7,8 +7,9 @@ on:
       - main
 
 jobs:
-  quality:
-    name: Formatting & Tests
+  # Pre-commit hooks validation
+  pre-commit:
+    name: Pre-commit Hooks
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -19,6 +20,45 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+
+  # Formatting checks
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
       - name: Sync dependencies
         run: uv sync --all-extras
 
@@ -28,21 +68,113 @@ jobs:
       - name: Check imports (isort)
         run: uv run isort --check-only .
 
+  # Linting
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
       - name: Lint (Ruff)
         run: uv run ruff check .
+
+  # Type checking
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
 
       - name: Type check (mypy)
         run: uv run mypy src/ --ignore-missing-imports
 
+  # Tests with Python version matrix
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.12", "3.11"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+            ${{ runner.os }}-uv-
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
       - name: Run tests with coverage
-        run: uv run pytest --cov=src/obsidian_anki_sync --cov-report=term --cov-report=xml
+        run: uv run pytest --cov=src/obsidian_anki_sync --cov-report=term --cov-report=xml --cov-report=html -n auto
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          flags: python-${{ matrix.python-version }}
 
+      - name: Upload coverage HTML report
+        uses: actions/upload-artifact@v5
+        if: matrix.python-version == '3.13'
+        with:
+          name: coverage-report
+          path: htmlcov/
+
+  # Security scanning
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
@@ -55,6 +187,16 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
       - name: Sync dependencies
         run: uv sync --all-extras
 
@@ -62,12 +204,14 @@ jobs:
         run: uv pip install pip-audit
 
       - name: Run pip-audit (security scan)
-        run: uv run pip-audit --desc
-        continue-on-error: true  # Don't fail CI on vulnerabilities initially
+        run: |
+          uv run pip-audit --desc --fail-on critical high || {
+            echo "::error::Critical or high severity vulnerabilities found!"
+            exit 1
+          }
 
       - name: Run pip-audit with JSON output
         run: uv run pip-audit --format json --output pip-audit-report.json
-        continue-on-error: true
 
       - name: Upload pip-audit report
         uses: actions/upload-artifact@v5
