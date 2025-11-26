@@ -218,7 +218,7 @@ def build_payload(
             (json_schema and _should_use_reasoning_with_schema(
                 json_schema))  # Complex schema tasks
         )
-        payload["reasoning"] = {"enabled": should_enable_reasoning}
+        payload["reasoning"] = {"enabled": bool(should_enable_reasoning)}
     elif reasoning_enabled and not json_schema:
         payload["reasoning_enabled"] = True
 
