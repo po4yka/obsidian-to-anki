@@ -438,6 +438,39 @@ class MyCustomProvider(BaseLLMProvider):
 
 ---
 
+## Choosing the Right Provider
+
+### Decision Tree
+
+```
+Do you need the HIGHEST quality?
+ Yes  OpenAI (GPT-4) or Anthropic (Claude 3 Opus)
+ No
+
+Is privacy a top concern?
+ Yes  Ollama (local) or LM Studio
+ No
+
+Do you want to minimize costs?
+ Yes  Ollama (local, free) or OpenRouter (cheap models)
+ No
+
+Do you want access to many models?
+ Yes  OpenRouter
+ No  OpenAI or Anthropic
+```
+
+### Cost Optimization Tips
+
+1. **Use smaller models for validation**: Pre-validator doesn't need GPT-4
+2. **Lower temperature**: Reduces randomness and token usage
+3. **Reduce max_tokens**: Limit response length
+4. **Use Ollama for testing**: Free local testing before production
+5. **Batch processing**: Process multiple cards in one session
+6. **Monitor usage**: Track API costs in provider dashboards
+
+---
+
 ## Support
 
 - **Documentation:** https://github.com/po4yka/obsidian-to-anki

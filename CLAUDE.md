@@ -17,34 +17,12 @@ Quick install:
 
 ## Project Overview
 
-Obsidian to Anki APF Sync Service - Synchronizes Obsidian Q&A notes to Anki flashcards using LLM-powered generation with multi-agent validation. Supports 5 LLM providers (Ollama, OpenAI, Anthropic, OpenRouter, LM Studio) with optional 100% local processing.
+See `README.md` for project overview and setup instructions.
 
 ## Development Commands
 
-### Build and Run
+See `README.md` for common commands.
 
-```bash
-# Install dependencies (uses uv package manager)
-uv sync --all-extras
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Run sync service
-obsidian-anki-sync sync
-
-# Dry run (preview changes)
-obsidian-anki-sync sync --dry-run
-
-# With agent system
-obsidian-anki-sync sync --use-agents
-
-# Test run (5 random notes)
-obsidian-anki-sync test-run --count 5
-
-# Resume interrupted sync
-obsidian-anki-sync sync --resume <session-id>
-```
 
 ### Code Quality
 
