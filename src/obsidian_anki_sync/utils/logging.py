@@ -206,10 +206,23 @@ def configure_logging(
         filter=console_filter,
     )
 
+    # Custom rotation function that handles non-existent files gracefully
+    def safe_rotation(message, file):
+        """Rotation function that doesn't fail on non-existent files."""
+        try:
+            from loguru._file_sink import RotationFunction
+            # Use loguru's built-in rotation but catch the error
+            return RotationFunction("00:00")(message, file)
+        except FileNotFoundError:
+            # File doesn't exist yet, no rotation needed
+            return False
+
     # Add file handler - detailed format with rotation (vault-level or custom)
     if log_file:
         # Use specific log file
         log_path = log_file
+        # Ensure parent directory exists
+        log_file.parent.mkdir(exist_ok=True, parents=True)
     else:
         # Use log directory
         if log_dir is None:
@@ -222,7 +235,7 @@ def configure_logging(
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
         level="DEBUG",  # File gets all logs
         # Rotate at midnight only for auto-named files
-        rotation="00:00" if not log_file else None,
+        rotation=safe_rotation if not log_file else None,
         retention="30 days",  # Keep logs for 30 days
         compression="zip",  # Compress old logs
         backtrace=True,  # Include traceback
@@ -241,7 +254,7 @@ def configure_logging(
         project_log_path,
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
         level="DEBUG",  # Project logs get all levels
-        rotation="00:00",
+        rotation=safe_rotation,
         retention="30 days",
         compression="zip",
         backtrace=True,
@@ -261,7 +274,7 @@ def configure_logging(
         error_log_path,
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}\n{exception}",
         level="ERROR",  # Only ERROR and above
-        rotation="00:00",
+        rotation=safe_rotation,
         retention=f"{error_log_retention_days} days",
         compression="zip",
         backtrace=True,
