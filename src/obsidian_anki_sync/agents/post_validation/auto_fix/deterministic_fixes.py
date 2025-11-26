@@ -172,7 +172,8 @@ class DeterministicFixer:
             return html, False
 
         # Try to extract and fix card header - match various formats
-        header_match = re.search(r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*(?:CardType|type):\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*([^>]+?)\s*-->", html, re.IGNORECASE)
+        header_match = re.search(
+            r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*(?:CardType|type):\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*([^>]+?)\s*-->", html, re.IGNORECASE)
         if header_match:
             # Full header match - extract components
             card_num, extracted_slug, card_type, tags_str = header_match.groups()
