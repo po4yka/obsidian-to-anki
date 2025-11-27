@@ -1,6 +1,8 @@
 """Pre-flight checks for validating environment before sync operations."""
 
 from pathlib import Path
+import shutil
+import psutil
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -72,6 +74,14 @@ class PreflightChecker:
         # Additional checks
         self._check_note_type()
         self._check_deck_name()
+
+        # Extended checks
+        self._check_git_repo()
+        self._check_vault_structure()
+        self._check_disk_space()
+        self._check_memory()
+        if check_anki or check_llm:
+            self._check_network_latency(check_anki, check_llm)
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
@@ -575,6 +585,187 @@ class PreflightChecker:
         except Exception:
             # Anki connectivity already failed, skip this check
             pass
+
+
+    def _check_git_repo(self) -> None:
+        """Check if vault is a git repository."""
+        vault_path = self.config.vault_path
+        if not vault_path:
+            return
+
+        git_dir = Path(vault_path) / ".git"
+        if not git_dir.exists():
+            self.results.append(
+                CheckResult(
+                    name="Git Repository",
+                    passed=False,
+                    message="Vault is not a git repository",
+                    severity="warning",
+                    fixable=True,
+                    fix_suggestion="Initialize git repository: git init",
+                )
+            )
+        else:
+            self.results.append(
+                CheckResult(
+                    name="Git Repository",
+                    passed=True,
+                    message="Vault is a git repository",
+                    severity="info",
+                )
+            )
+
+    def _check_vault_structure(self) -> None:
+        """Check for standard Obsidian vault structure."""
+        vault_path = self.config.vault_path
+        if not vault_path:
+            return
+
+        obsidian_dir = Path(vault_path) / ".obsidian"
+        if not obsidian_dir.exists():
+            self.results.append(
+                CheckResult(
+                    name="Vault Structure",
+                    passed=False,
+                    message=".obsidian directory not found",
+                    severity="warning",
+                    fixable=False,
+                    fix_suggestion="Ensure this is a valid Obsidian vault",
+                )
+            )
+        else:
+            self.results.append(
+                CheckResult(
+                    name="Vault Structure",
+                    passed=True,
+                    message="Valid Obsidian vault structure found",
+                    severity="info",
+                )
+            )
+
+    def _check_disk_space(self) -> None:
+        """Check available disk space."""
+        paths_to_check = [
+            ("Database", self.config.db_path.parent),
+            ("Logs", self.config.project_log_dir),
+        ]
+
+        # Deduplicate paths
+        checked_paths = set()
+
+        for name, path in paths_to_check:
+            if not path.exists():
+                continue
+
+            resolved = path.resolve()
+            if resolved in checked_paths:
+                continue
+            checked_paths.add(resolved)
+
+            try:
+                total, used, free = shutil.disk_usage(path)
+                free_mb = free / (1024 * 1024)
+
+                if free_mb < 100:
+                    self.results.append(
+                        CheckResult(
+                            name=f"Disk Space ({name})",
+                            passed=False,
+                            message=f"Critical low disk space: {free_mb:.1f}MB free",
+                            severity="error",
+                            fixable=True,
+                            fix_suggestion="Free up disk space",
+                        )
+                    )
+                elif free_mb < 500:
+                    self.results.append(
+                        CheckResult(
+                            name=f"Disk Space ({name})",
+                            passed=False,
+                            message=f"Low disk space: {free_mb:.1f}MB free",
+                            severity="warning",
+                            fixable=True,
+                            fix_suggestion="Free up disk space",
+                        )
+                    )
+                else:
+                    self.results.append(
+                        CheckResult(
+                            name=f"Disk Space ({name})",
+                            passed=True,
+                            message=f"Sufficient disk space: {free_mb:.1f}MB free",
+                            severity="info",
+                        )
+                    )
+            except Exception as e:
+                logger.warning("disk_space_check_failed", path=str(path), error=str(e))
+
+    def _check_memory(self) -> None:
+        """Check system memory."""
+        # Only relevant for local LLMs
+        if self.config.llm_provider not in ("ollama", "lm_studio"):
+            return
+
+        try:
+            mem = psutil.virtual_memory()
+            available_gb = mem.available / (1024 * 1024 * 1024)
+
+            if available_gb < 4.0:
+                self.results.append(
+                    CheckResult(
+                        name="System Memory",
+                        passed=False,
+                        message=f"Low available memory for local LLM: {available_gb:.1f}GB",
+                        severity="warning",
+                        fixable=True,
+                        fix_suggestion="Close other applications or use a cloud provider",
+                    )
+                )
+            else:
+                self.results.append(
+                    CheckResult(
+                        name="System Memory",
+                        passed=True,
+                        message=f"Available memory: {available_gb:.1f}GB",
+                        severity="info",
+                    )
+                )
+        except Exception as e:
+            logger.warning("memory_check_failed", error=str(e))
+
+    def _check_network_latency(self, check_anki: bool, check_llm: bool) -> None:
+        """Check network latency to services."""
+        import time
+
+        if check_anki:
+            try:
+                start = time.time()
+                from ..anki.client import AnkiClient
+                with AnkiClient(self.config.anki_connect_url) as anki:
+                    anki.invoke("version")
+                latency = (time.time() - start) * 1000
+
+                if latency > 200:
+                     self.results.append(
+                        CheckResult(
+                            name="Anki Latency",
+                            passed=False,
+                            message=f"High latency to AnkiConnect: {latency:.0f}ms",
+                            severity="warning",
+                            fixable=False,
+                        )
+                    )
+                else:
+                    self.results.append(
+                        CheckResult(
+                            name="Anki Latency",
+                            passed=True,
+                            message=f"AnkiConnect latency: {latency:.0f}ms",
+                            severity="info",
+                        )
+                    )
+            except Exception:
+                pass # Already handled by connectivity check
 
 
 def run_preflight_checks(

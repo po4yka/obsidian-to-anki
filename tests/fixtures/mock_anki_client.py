@@ -72,6 +72,32 @@ class MockAnkiClient(IAnkiClient):
                 })
         return result
 
+    def cards_info(self, card_ids: List[int]) -> List[Dict[str, Any]]:
+        """Get card information."""
+        result = []
+        for card_id in card_ids:
+            if card_id in self._cards:
+                result.append(self._cards[card_id])
+            else:
+                # Create mock card data
+                result.append({
+                    "cardId": card_id,
+                    "noteId": card_id - 1000,
+                    "deckName": "Test Deck",
+                    "modelName": "APF::Simple",
+                    "fields": {
+                        "Question": {"value": f"Question {card_id}"},
+                        "Answer": {"value": f"Answer {card_id}"},
+                    },
+                    "interval": 1,
+                    "due": 1234567890,
+                    "reps": 0,
+                    "lapses": 0,
+                    "queue": 0,
+                    "mod": 1234567890,
+                })
+        return result
+
     def add_note(
         self,
         deck_name: str,
