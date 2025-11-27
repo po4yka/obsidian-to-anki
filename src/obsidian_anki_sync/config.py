@@ -409,6 +409,45 @@ class Config(BaseSettings):
     )
 
     # ============================================================================
+    # Self-Reflection Configuration
+    # ============================================================================
+    enable_self_reflection: bool = Field(
+        default=False,
+        description="Enable self-reflection after action nodes to evaluate and revise outputs",
+    )
+    store_reflection_traces: bool = Field(
+        default=True,
+        description="Store reflection traces in pipeline state for inspection",
+    )
+    log_reflection_traces: bool = Field(
+        default=False,
+        description="Log reflection traces to logger (can be verbose)",
+    )
+    reflection_model: str = Field(
+        default="",
+        description="Model for reflection nodes (uses generator_model if empty)",
+    )
+    reflection_temperature: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Temperature for reflection model",
+    )
+    max_revisions: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Maximum revision passes per stage (0 disables auto-revision)",
+    )
+    reflection_enabled_stages: list[str] = Field(
+        default_factory=lambda: [
+            "generation",
+            "context_enrichment",
+        ],
+        description="Stages where self-reflection is applied (after validation passes)",
+    )
+
+    # ============================================================================
     # Unified Agent Framework Configuration
     # ============================================================================
 
@@ -554,6 +593,7 @@ class Config(BaseSettings):
             "parser_repair": ModelTask.PARSER_REPAIR,
             "note_correction": ModelTask.PARSER_REPAIR,  # Reuse parser repair task
             "reasoning": ModelTask.GENERATION,  # CoT reasoning uses generation task
+            "reflection": ModelTask.POST_VALIDATION,  # Self-reflection uses post-validation task
         }
 
         task = agent_to_task.get(agent_type)
@@ -573,6 +613,7 @@ class Config(BaseSettings):
             "parser_repair": self.parser_repair_model,
             "note_correction": self.note_correction_model or self.parser_repair_model,
             "reasoning": self.reasoning_model or self.generator_model,  # CoT reasoning
+            "reflection": self.reflection_model or self.generator_model,  # Self-reflection
         }
 
         explicit_model = agent_model_map.get(agent_type, "")

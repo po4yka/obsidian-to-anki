@@ -404,6 +404,19 @@ class LangGraphOrchestrator:
             "reasoning_model": self.model_factory.get_model("reasoning"),
             "reasoning_traces": {},
             "current_reasoning": None,
+            # Self-Reflection configuration
+            "enable_self_reflection": getattr(self.config, "enable_self_reflection", False),
+            "store_reflection_traces": getattr(self.config, "store_reflection_traces", True),
+            "log_reflection_traces": getattr(self.config, "log_reflection_traces", False),
+            "reflection_enabled_stages": getattr(self.config, "reflection_enabled_stages", [
+                "generation", "context_enrichment"
+            ]),
+            "reflection_model": self.model_factory.get_model("reflection"),
+            "reflection_traces": {},
+            "current_reflection": None,
+            "revision_count": 0,
+            "max_revisions": getattr(self.config, "max_revisions", 2),
+            "stage_revision_counts": {},
             # Pipeline stage results
             "pre_validation": None,
             "note_correction": None,

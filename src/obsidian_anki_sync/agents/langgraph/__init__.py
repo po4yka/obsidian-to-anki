@@ -9,6 +9,7 @@ Public API:
 - PipelineState: State TypedDict for the workflow
 - Retry policies and error handling utilities
 - Chain of Thought (CoT) reasoning models and nodes
+- Self-Reflection models and nodes for output evaluation and revision
 """
 
 from .orchestrator import LangGraphOrchestrator
@@ -31,6 +32,23 @@ from .reasoning_nodes import (
     think_before_memorization_node,
     think_before_post_validation_node,
     think_before_pre_validation_node,
+)
+from .reflection_models import (
+    EnrichmentReflectionOutput,
+    GenerationReflectionOutput,
+    ReflectionOutput,
+    ReflectionTrace,
+    RevisionInput,
+    RevisionOutput,
+    RevisionSuggestion,
+)
+from .reflection_nodes import (
+    reflect_after_enrichment_node,
+    reflect_after_generation_node,
+    revise_enrichment_node,
+    revise_generation_node,
+    should_revise_enrichment,
+    should_revise_generation,
 )
 from .retry_policies import (
     DEFAULT_RETRY_POLICY,
@@ -82,6 +100,21 @@ __all__ = [
     "think_before_enrichment_node",
     "think_before_memorization_node",
     "think_before_duplicate_node",
+    # Self-Reflection models
+    "ReflectionOutput",
+    "GenerationReflectionOutput",
+    "EnrichmentReflectionOutput",
+    "ReflectionTrace",
+    "RevisionSuggestion",
+    "RevisionInput",
+    "RevisionOutput",
+    # Self-Reflection nodes
+    "reflect_after_generation_node",
+    "reflect_after_enrichment_node",
+    "revise_generation_node",
+    "revise_enrichment_node",
+    "should_revise_generation",
+    "should_revise_enrichment",
 ]
 
 # Only export swarm classes if available
