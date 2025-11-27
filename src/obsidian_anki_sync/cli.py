@@ -46,6 +46,14 @@ def sync(
             help="Skip indexing phase (not recommended)",
         ),
     ] = False,
+    sample: Annotated[
+        int | None,
+        typer.Option(
+            "--sample",
+            help="Sync only N random notes (for testing)",
+            min=1,
+        ),
+    ] = None,
     resume: Annotated[
         str | None,
         typer.Option(
@@ -90,6 +98,7 @@ def sync(
         dry_run=dry_run,
         incremental=incremental,
         no_index=no_index,
+        sample_size=sample,
         resume=resume,
         no_resume=no_resume,
     )

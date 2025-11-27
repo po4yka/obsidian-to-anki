@@ -12,13 +12,26 @@ from loguru import logger
 
 
 def safe_rotation(message, file):
-    """Rotation function that doesn't fail on non-existent files."""
+    """Rotation function that rotates at midnight, handles missing files gracefully."""
     try:
-        from loguru._file_sink import RotationFunction
-        # Use loguru's built-in rotation but catch the error
-        return RotationFunction("00:00")(message, file)
-    except FileNotFoundError:
-        # File doesn't exist yet, no rotation needed
+        # Check if file exists and has content
+        if file is None:
+            return False
+        # Get current time from the message
+        record_time = message.record.get("time")
+        if record_time is None:
+            return False
+        # Rotate at midnight (when hour is 0 and this is the first message of the day)
+        if record_time.hour == 0 and record_time.minute == 0:
+            # Only rotate if file has content
+            try:
+                if file.tell() > 0:
+                    return True
+            except (OSError, ValueError):
+                pass
+        return False
+    except Exception:
+        # Fail safe - don't rotate on errors
         return False
 
 
