@@ -652,7 +652,12 @@ class SyncEngine:
             return result
 
         except Exception as e:
-            logger.error("sync_failed", error=str(e))
+            # Use repr to avoid potential recursion in str(e) if e is broken
+            error_msg = repr(e)
+            if isinstance(e, RecursionError):
+                error_msg = "RecursionError: maximum recursion depth exceeded"
+
+            logger.error("sync_failed", error=error_msg)
             if self.progress:
                 self.progress.complete(success=False)
             raise

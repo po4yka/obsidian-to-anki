@@ -159,7 +159,9 @@ class AnkiStateManager:
         logger.info("determining_actions")
 
         # Get database state
+        logger.debug("getting_db_cards")
         db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
+        logger.debug("got_db_cards", count=len(db_cards))
 
         # Check each Obsidian card
         for slug, obs_card in obsidian_cards.items():
