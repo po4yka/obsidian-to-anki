@@ -44,6 +44,7 @@ class PipelineState(TypedDict):
     duplicate_detection_model: Any | None
 
     # Pipeline stage results
+    note_correction: dict | None  # Serialized NoteCorrectionResult
     pre_validation: dict | None  # Serialized PreValidationResult
     card_splitting: dict | None  # Serialized CardSplittingResult
     generation: dict | None  # Serialized GenerationResult
@@ -81,8 +82,10 @@ class PipelineState(TypedDict):
 
     # Error tracking (best practice: track errors for debugging and routing)
     last_error: str | None  # Last error message
-    last_error_severity: str | None  # Error severity (critical/recoverable/warning)
-    errors: list[dict]  # History of errors: [{stage, error, severity, timestamp}]
+    # Error severity (critical/recoverable/warning)
+    last_error_severity: str | None
+    # History of errors: [{stage, error, severity, timestamp}]
+    errors: list[dict]
 
     # Timing
     start_time: float

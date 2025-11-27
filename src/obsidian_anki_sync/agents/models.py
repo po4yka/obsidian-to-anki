@@ -290,6 +290,96 @@ class ContextEnrichmentResult(BaseModel):
     enrichment_time: float = 0.0
 
 
+class NoteCorrectionResult(BaseModel):
+    """Result from proactive note correction agent.
+
+    Tracks quality analysis and corrections applied before parsing.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    needs_correction: bool = Field(
+        description="Whether the note needs correction"
+    )
+    corrected_content: Optional[str] = Field(
+        default=None, description="Corrected note content if repairs were applied"
+    )
+    quality_score: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Overall quality score before correction"
+    )
+    issues_found: list[str] = Field(
+        default_factory=list, description="Issues detected in the note"
+    )
+    corrections_applied: list[str] = Field(
+        default_factory=list, description="List of corrections applied"
+    )
+    confidence: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Confidence in correction quality"
+    )
+    correction_time: float = Field(
+        default=0.0, ge=0.0, description="Time taken for correction"
+    )
+    quality_after: Optional[RepairQualityScore] = Field(
+        default=None, description="Quality score after correction"
+    )
+
+
+class RepairStrategy(BaseModel):
+    """Repair strategy selection based on error type."""
+
+    model_config = ConfigDict(frozen=False)
+
+    strategy_type: Literal[
+        "deterministic",
+        "rule_based",
+        "llm_based",
+        "multi_stage",
+        "partial",
+        "skip",
+    ] = Field(description="Type of repair strategy to use")
+    priority: int = Field(
+        default=5, ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
+    )
+    stages: list[str] = Field(
+        default_factory=list,
+        description="Ordered list of repair stages (e.g., ['syntax', 'structure', 'content'])",
+    )
+    confidence_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence required to apply this strategy",
+    )
+
+
+class PartialRepairResult(BaseModel):
+    """Result from partial repair operation.
+
+    Supports fixing what can be fixed while flagging what cannot.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    repaired_content: str = Field(
+        description="Partially or fully repaired content")
+    sections_fixed: list[str] = Field(
+        default_factory=list, description="List of sections that were successfully fixed"
+    )
+    sections_failed: list[str] = Field(
+        default_factory=list, description="List of sections that could not be fixed"
+    )
+    section_confidence: dict[str, float] = Field(
+        default_factory=dict,
+        description="Confidence score per section (0.0-1.0)",
+    )
+    is_complete: bool = Field(
+        description="Whether all sections were successfully repaired"
+    )
+    repair_report: str = Field(
+        default="", description="Detailed report of repair status per section"
+    )
+
+
 class AgentPipelineResult(BaseModel):
     """Complete result from the multi-agent pipeline.
 
@@ -303,6 +393,9 @@ class AgentPipelineResult(BaseModel):
     generation: Optional[GenerationResult] = None
     post_validation: Optional[PostValidationResult] = None
     memorization_quality: Optional[MemorizationQualityResult] = None
+    note_correction: Optional[NoteCorrectionResult] = Field(
+        default=None, description="Proactive note correction result"
+    )
     total_time: float = Field(ge=0.0)
     retry_count: int = Field(
         ge=0, description="Number of post-validation retries")
