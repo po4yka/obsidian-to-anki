@@ -357,6 +357,8 @@ class Config(BaseSettings):
     memorization_quality_model: str = ""
     # Card Splitting
     card_splitting_model: str = ""
+    # Split Validation
+    split_validator_model: str = ""
     # Duplicate Detection
     duplicate_detection_model: str = ""
 
@@ -448,6 +450,7 @@ class Config(BaseSettings):
             "context_enrichment": ModelTask.CONTEXT_ENRICHMENT,
             "memorization_quality": ModelTask.MEMORIZATION_QUALITY,
             "card_splitting": ModelTask.CARD_SPLITTING,
+            "split_validator": ModelTask.CARD_SPLITTING,  # Reuse card splitting task
             "duplicate_detection": ModelTask.DUPLICATE_DETECTION,
             "qa_extractor": ModelTask.QA_EXTRACTION,
             "parser_repair": ModelTask.PARSER_REPAIR,
@@ -465,6 +468,7 @@ class Config(BaseSettings):
             "context_enrichment": self.context_enrichment_model,
             "memorization_quality": self.memorization_quality_model,
             "card_splitting": self.card_splitting_model,
+            "split_validator": self.split_validator_model,
             "duplicate_detection": self.duplicate_detection_model,
             "qa_extractor": self.qa_extractor_model,
             "parser_repair": self.parser_repair_model,

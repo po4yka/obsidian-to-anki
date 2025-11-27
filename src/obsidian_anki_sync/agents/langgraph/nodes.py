@@ -28,6 +28,7 @@ from ..models import (
     MemorizationQualityResult,
     PostValidationResult,
     PreValidationResult,
+    SplitValidationResult,
 )
 from ..pydantic import (
     CardSplittingAgentAI,
@@ -37,6 +38,7 @@ from ..pydantic import (
     MemorizationQualityAgentAI,
     PostValidatorAgentAI,
     PreValidatorAgentAI,
+    SplitValidatorAgentAI,
 )
 from .node_helpers import increment_step_count
 from .state import PipelineState
@@ -422,6 +424,93 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
     state["messages"].append(
         f"Card splitting: {'split into ' + str(len(splitting_result.split_plan)) if splitting_result.should_split else 'no split needed'}"
     )
+
+    return state
+
+
+async def split_validation_node(state: PipelineState) -> PipelineState:
+    """Execute split validation stage.
+
+    Validates proposed card splits to prevent over-fragmentation.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with validation results
+    """
+    # Check step limit
+    if not increment_step_count(state, "split_validation"):
+        return state
+
+    logger.info("langgraph_split_validation_start")
+    start_time = time.time()
+
+    # Check if we have a split plan to validate
+    card_splitting = state.get("card_splitting")
+    if not card_splitting or not card_splitting.get("should_split", False):
+        logger.info("split_validation_skipped", reason="no_split_proposed")
+        state["current_stage"] = "generation"
+        return state
+
+    # Deserialize data
+    metadata = NoteMetadata(**state["metadata_dict"])
+    splitting_result = CardSplittingResult(**card_splitting)
+
+    # Use cached model or create on demand
+    model = state.get("split_validator_model")
+    if model is None:
+        try:
+            model_name = state["config"].get_model_for_agent("split_validator")
+            model = create_openrouter_model_from_env(model_name=model_name)
+        except Exception as e:
+            logger.warning("failed_to_create_split_validator_model", error=str(e))
+            # Skip validation if model unavailable
+            state["current_stage"] = "generation"
+            return state
+
+    # Create agent
+    validator = SplitValidatorAgentAI(model=model, temperature=0.0)
+
+    try:
+        validation_result = await validator.validate(
+            note_content=state["note_content"],
+            metadata=metadata,
+            splitting_result=splitting_result,
+        )
+
+        # If validation failed, revert split decision
+        if not validation_result.is_valid:
+            logger.info(
+                "split_validation_rejected_split",
+                feedback=validation_result.feedback,
+            )
+            # Revert to single card
+            splitting_result.should_split = False
+            splitting_result.card_count = 1
+            splitting_result.splitting_strategy = "none"
+            splitting_result.split_plan = []
+            splitting_result.reasoning = (
+                f"Split rejected by validator: {validation_result.feedback}"
+            )
+
+            # Update state with modified splitting result
+            state["card_splitting"] = splitting_result.model_dump()
+            state["messages"].append(
+                f"Split validation: Rejected split ({validation_result.feedback})"
+            )
+        else:
+            state["messages"].append("Split validation: Approved split")
+
+        state["split_validation"] = validation_result.model_dump()
+
+    except Exception as e:
+        logger.exception("split_validation_error", error=str(e))
+        # Continue with original plan on error
+        state["messages"].append(f"Split validation failed: {str(e)}")
+
+    state["stage_times"]["split_validation"] = time.time() - start_time
+    state["current_stage"] = "generation"
 
     return state
 

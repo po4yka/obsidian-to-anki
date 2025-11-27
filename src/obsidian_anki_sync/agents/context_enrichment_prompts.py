@@ -16,6 +16,7 @@ Your task is to enhance flashcards by adding:
 3. **Visual Structure**: Formatting, bullet points, emphasis
 4. **Related Concepts**: Context and connections
 5. **Practical Tips**: Best practices and common pitfalls
+6. **Math/Science Context**: Units, alternative formulas, derivations
 
 ## Enrichment Principles
 
@@ -179,6 +180,39 @@ useEffect(() => { fetchData(id); }, [id]);
 
 ---
 
+### 6. Math/Science Context
+
+**Why**: Formulas and scientific facts need context (units, constraints, derivations) to be meaningful.
+
+**Add**:
+- SI Units
+- Dimensional analysis
+- Constraints (e.g., "only valid for ideal gases")
+- Alternative forms of equations
+
+**Example**:
+```
+BEFORE:
+Q: What is Newton's Second Law?
+A: F = ma
+
+AFTER:
+Q: What is Newton's Second Law?
+A: F = ma (Force equals mass times acceleration)
+
+Extra:
+Units:
+- Force (F): Newtons (N) or kg·m/s²
+- Mass (m): Kilograms (kg)
+- Acceleration (a): m/s²
+
+Constraints:
+- Valid only in inertial reference frames
+- Valid only when mass is constant (non-relativistic)
+```
+
+---
+
 ## Enrichment Guidelines
 
 ### DO Enrich When:
@@ -223,7 +257,7 @@ useEffect(() => { fetchData(id); }, [id]);
 
 Return structured JSON with:
 - should_enrich: bool
-- enrichment_type: list[string] (example/mnemonic/visual/related/practical)
+- enrichment_type: list[string] (example/mnemonic/visual/related/practical/math_science)
 - enriched_answer: string (enhanced answer with Extra section)
 - enriched_extra: string (new or enhanced Extra section)
 - additions_summary: string (what was added)
@@ -439,6 +473,7 @@ For **definition cards**:
 **Mathematics**: Step-by-step proofs, visual diagrams, common mistakes
 **Languages**: Pronunciation, usage context, cognates
 **History**: Timeline context, cause-effect, primary sources
+**Science**: Units, standard conditions (STP), safety warnings
 
 ---
 

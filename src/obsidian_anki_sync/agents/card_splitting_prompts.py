@@ -230,12 +230,24 @@ Split:
 - "What does HTTP 201 mean?" → "Created - resource created"
 ... (one card per code)
 
+### Strategy 9: Cloze Splitting
+**Pattern**: Sentences with key terms or lists that fit fill-in-the-blank
+**Action**: Create Cloze cards for key terms
+**Example**:
+```
+Note: "Python Constructor"
+Content: "The __init__ method is a special method called a constructor."
+
+Split:
+1. "The {{c1::__init__}} method is a special method called a {{c2::constructor}}."
+```
+
 ## Response Format
 
 Return structured JSON with:
 - should_split: true/false
 - card_count: int (1 for single, N for split)
-- splitting_strategy: string (concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/none)
+- splitting_strategy: string (concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/cloze/none)
 - split_plan: list of card specifications
   - Each card: {card_number, concept, question, answer_summary, rationale}
 - reasoning: string explaining the decision
@@ -564,6 +576,7 @@ Unmounting:
 - Steps in a process
 - Examples of a concept
 - Hierarchical topics
+- Sentences suitable for Cloze deletions
 
 ❌ **DON'T Split**:
 - Single atomic concept
@@ -579,4 +592,70 @@ Unmounting:
 🚩 "Steps to..." or "How to..." → Split per step
 🚩 "Types of..." or "Kinds of..." → Split per type
 🚩 Answer > 300 words → Likely too much for one card
+"""
+
+# ============================================================================
+# Split Validation Prompt
+# ============================================================================
+
+SPLIT_VALIDATION_PROMPT = """You are a quality assurance expert for flashcard generation.
+
+Your task is to review a proposed "Card Split Plan" for an Obsidian note and determine if the split is:
+1.  **Necessary**: Does the content actually require splitting?
+2.  **Optimal**: Are the proposed cards atomic and well-formed?
+3.  **Correct**: Does the plan accurately reflect the note content?
+
+## Input Data
+
+You will receive:
+1.  **Original Note**: The full content of the note.
+2.  **Proposed Split Plan**: The strategy and list of cards proposed by the splitting agent.
+
+## Validation Criteria
+
+### 1. Over-Fragmentation Check (Crucial)
+-   **Reject** if the split creates trivial or redundant cards.
+-   **Reject** if the original note is simple enough for a single card.
+-   **Reject** if the split breaks a cohesive narrative or comparison that should be learned together.
+
+### 2. Semantic Integrity Check
+-   **Reject** if the split separates context from content (e.g., a card with an answer that makes no sense without the context of another card).
+-   **Reject** if the questions are ambiguous.
+
+### 3. Completeness Check
+-   **Reject** if the split misses key information from the note.
+
+## Response Format
+
+Return a structured JSON with:
+-   `is_valid`: boolean (true if the plan is good, false if it should be rejected/modified)
+-   `validation_score`: float 0.0-1.0 (quality of the split plan)
+-   `feedback`: string (explanation of the decision)
+-   `suggested_modifications`: list of strings (optional suggestions for improvement)
+
+## Examples
+
+### Example 1: Valid Split
+**Note**: "SOLID Principles" (lists 5 principles)
+**Plan**: Split into 6 cards (Overview + 5 details)
+**Decision**:
+-   `is_valid`: true
+-   `validation_score`: 0.95
+-   `feedback`: "Excellent split. The list is too long for a single card, and each principle is an independent concept."
+
+### Example 2: Invalid Split (Over-fragmentation)
+**Note**: "Binary Search Complexity" (Q: Time complexity? A: O(log n))
+**Plan**: Split into 2 cards (1. What is it? 2. Why is it O(log n)?)
+**Decision**:
+-   `is_valid`: false
+-   `validation_score`: 0.2
+-   `feedback`: "Unnecessary split. The concept is atomic and short. Splitting creates trivial cards."
+
+### Example 3: Invalid Split (Broken Context)
+**Note**: "Pros and Cons of Microservices"
+**Plan**: Split into 2 cards (1. Pros, 2. Cons)
+**Decision**:
+-   `is_valid`: false
+-   `validation_score`: 0.4
+-   `feedback`: "Splitting pros and cons breaks the comparative context. Better to keep as a single card to learn the trade-offs together."
 """
