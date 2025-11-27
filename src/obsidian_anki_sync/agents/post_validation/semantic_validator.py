@@ -14,14 +14,37 @@ logger = get_logger(__name__)
 
 # Known false positive patterns that LLMs hallucinate
 # These are patterns where the LLM inverts or misremembers the correct rules
+# APF v2.1 uses 'CardType:' in headers, NOT 'type:' - LLMs frequently get this wrong
 FALSE_POSITIVE_PATTERNS = [
     # LLM sometimes says CardType should be type, but CardType is correct per APF v2.1
     r"CardType.*should.*be.*'?type'?",
     r"'CardType'.*but.*requires.*'type'",
     r"use.*'CardType:.*but.*APF.*requires.*'type:",
     r"headers.*use.*'CardType.*but.*requires.*'type",
+    # "uses X instead of Y" format - comprehensive patterns
+    r"uses\s+'?CardType:?\s*\w*'?\s+instead\s+of\s+'?type:?",
+    r"'CardType:\s*\w+'\s+instead\s+of\s+'type:\s*\w+'",
+    r"uses\s+CardType:\s*\w+\s+instead\s+of\s+type:\s*\w+",
+    r"CardType:\s*\w+\s+instead\s+of\s+type:\s*\w+\s+to\s+match",
+    r"'CardType:\s+Simple'\s+instead\s+of\s+'type:\s+Simple'",
+    r"uses\s+'CardType:\s+Simple'\s+instead\s+of\s+'type:\s+Simple'\s+to\s+match\s+manifest",
+    # "to match manifest" variations - more comprehensive
+    r"CardType.*instead.*type.*match.*manifest",
+    r"type:\s*\w+.*to\s+match\s+manifest",
+    r"to\s+match\s+manifest.*CardType.*instead.*type",
+    r"match\s+manifest.*should\s+use\s+type.*instead.*CardType",
+    # Generic patterns for the CardType/type confusion
+    r"Incorrect.*card\s+header.*CardType.*type",
+    r"card\s+header.*'CardType.*'type",
+    r"card\s+header.*format.*CardType.*type",
     # Inverse: LLM might say type should be CardType when type is used (also wrong direction)
     r"'type'.*should.*be.*'CardType'",
+    r"uses\s+'?type:?\s*\w*'?\s+instead\s+of\s+'?CardType:?",
+    # END_OF_CARDS hallucination - LLM thinks END_OF_CARDS after <!-- END_CARDS --> is wrong,
+    # but APF v2.1 requires both: <!-- END_CARDS --> followed by END_OF_CARDS on last line
+    r"Extra\s+'?END_OF_CARDS'?\s+text\s+after.*END_CARDS.*marker",
+    r"extra\s+END_OF_CARDS",
+    r"END_OF_CARDS.*after.*<!--\s*END_CARDS\s*-->",
 ]
 
 
@@ -86,7 +109,8 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
         logger.info(
             "false_positives_filtered",
             original_errors=original[:200],
-            filtered_errors=result[:200] if result else "(all errors were false positives)",
+            filtered_errors=result[:
+                                   200] if result else "(all errors were false positives)",
         )
 
     return result, removed_any
@@ -136,7 +160,8 @@ def semantic_validation(
 
     # Filter out known false positive errors (LLM hallucinations)
     if error_details and not is_valid:
-        filtered_errors, had_false_positives = _filter_false_positives(error_details)
+        filtered_errors, had_false_positives = _filter_false_positives(
+            error_details)
 
         if had_false_positives:
             if not filtered_errors:

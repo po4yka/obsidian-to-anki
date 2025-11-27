@@ -148,6 +148,7 @@ Critical errors (always reject):
 Template compliance errors (always reject):
 - Wrong section names (APF v2.1 uses 'Sample (caption)' and 'Sample (code block)', NOT 'Code Example')
 - Incorrect card header format (must use 'CardType:', not 'type:')
+  IMPORTANT: Card headers MUST use 'CardType:' (with capital C and T). The manifest uses '"type"' but card headers use 'CardType:' - this is correct per APF v2.1 specification
 - Missing required sections (Title, Key point, Key point notes)
 - Invalid card structure or HTML syntax
 - Extra 'END_OF_CARDS' text after proper <!-- END_CARDS --> marker
@@ -317,10 +318,9 @@ def build_autofix_prompt(cards: list[GeneratedCard], error_details: str) -> str:
     cards_info = "\n\n".join(card_details)
 
     return f"""<task>
-Fix APF card validation errors and return the corrected cards. Diagnose the specific issues and apply targeted corrections while preserving all original content.
+Fix APF v2.1 card validation errors. Apply minimal, targeted corrections while preserving all original content.
 </task>
 
-<input>
 <validation_errors>
 {error_details}
 </validation_errors>
@@ -328,180 +328,57 @@ Fix APF card validation errors and return the corrected cards. Diagnose the spec
 <cards_to_fix>
 {cards_info}
 </cards_to_fix>
-</input>
 
-<diagnostic_approach>
-Think step by step:
-1. Analyze the validation errors to understand what's wrong
-2. Identify the specific cards and fields that need correction
-3. Determine the appropriate fix for each error
-4. Apply corrections while preserving all original content
-5. Verify the fix resolves the validation error
-</diagnostic_approach>
+<critical_rules>
+CRITICAL: END_OF_CARDS must be the absolute last line with no content after it.
+CRITICAL: Card headers MUST use 'CardType:' (capital C and T) - NOT 'type:'.
+CRITICAL: If one language version has optional section (like Subtitle), all versions must have it.
+CRITICAL: Return FULL corrected HTML for each card - no truncation.
+CRITICAL: Include ALL cards that need fixing in corrected_cards array.
+</critical_rules>
 
-<common_fixes>
-Card Header Format Issues:
-- Required format: "<!-- Card N | slug: name | CardType: Type | Tags: tag1 tag2 tag3 -->"
-- MUST have spaces before and after each pipe character |
-- Card number N must be sequential (1, 2, 3, ...)
-- Slug must be lowercase with only letters, numbers, and hyphens (no underscores)
-- CardType must be exactly one of: Simple, Missing, Draw (case-sensitive, capital C and T)
-- Tags must be space-separated, NOT comma-separated
-
-Slug Format Issues:
-- Convert to lowercase
-- Replace underscores with hyphens
-- Remove invalid characters (keep only a-z, 0-9, hyphen)
-- Remove multiple consecutive hyphens
-- Remove leading/trailing hyphens
-
-Tag Format Issues:
-- Change from comma-separated to space-separated
-- Remove extra whitespace
-- Ensure tags are lowercase with underscores for multi-word tags
-- Must have 3-6 tags
-- First tag should be a language/tool from allowed list
-
-CardType Issues:
-- Ensure exact capitalization: Simple, Missing, or Draw
-- No variations like "simple", "SIMPLE", or "SimplE"
-
-HTML Validation Issues:
-- Inline <code> elements MUST be wrapped in <pre><code>...</code></pre>
-- Standalone <code> tags are invalid - always wrap in <pre>
-- Example fix: <code>text</code> -> <pre><code>text</code></pre>
-- Every <pre> must contain a <code> element
-- Every <code> must have a language- class attribute
-
-Missing Sentinels:
-- PROMPT_VERSION: Must be "<!-- PROMPT_VERSION: apf-v2.1 -->" at the start
-- BEGIN_CARDS: Must be "<!-- BEGIN_CARDS -->" after PROMPT_VERSION
-- END_CARDS: Must be "<!-- END_CARDS -->" before END_OF_CARDS
-- END_OF_CARDS: Must be the last line (no content after)
-
-Missing Manifest:
-- Every card MUST have a manifest comment: <!-- manifest: {{"slug":"...","lang":"...","type":"...","tags":[...]}} -->
-- Manifest must be valid JSON
-- Manifest slug must match header slug exactly
-- Manifest lang must match card language
-- Manifest type must match CardType
-
-Missing Field Headers:
-- Required: <!-- Title -->, <!-- Key point (code block) -->, <!-- Key point notes -->
-- Optional: <!-- Subtitle (optional) -->, <!-- Sample (code block) -->, <!-- Other notes (optional) -->
-- Headers must be in correct order
-
-Tag Count Issues:
-- Must have between 3 and 6 tags
-- If too few, add relevant tags from slug or context
-- If too many, keep the most relevant ones (limit to 6)
-
-Manifest Slug Mismatches:
-- Ensure slug in card header matches manifest slug exactly
-- Check both <!-- Card ... | slug: ... --> and <!-- manifest: ... -->
-- They must match or card will fail validation
-- Fix by updating manifest slug to match header
-</common_fixes>
-
-<examples>
-<example_1_invalid_header>
-Before: <!-- Card 1|slug:android_lifecycle|cardtype:simple|Tags:android, lifecycle -->
-After: <!-- Card 1 | slug: android-lifecycle | CardType: Simple | Tags: android lifecycle -->
-
-Fixes applied:
-- Added spaces around pipe characters
-- Converted slug underscores to hyphens
-- Fixed CardType capitalization
-- Changed tags from comma-separated to space-separated
-</example_1_invalid_header>
-
-<example_2_missing_sentinels>
-Before:
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test example -->
-...
+<targeted_fixes>
+For "Extra 'END_OF_CARDS' text after proper <!-- END_CARDS --> marker":
+BEFORE:
+<!-- END_CARDS -->
 END_OF_CARDS
+some extra text here
 
-After:
-<!-- PROMPT_VERSION: apf-v2.1 -->
-<!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test example -->
-...
+AFTER:
 <!-- END_CARDS -->
 END_OF_CARDS
 
-Fixes applied:
-- Added PROMPT_VERSION at start
-- Added BEGIN_CARDS after PROMPT_VERSION
-- Added END_CARDS before END_OF_CARDS
-</example_2_missing_sentinels>
+For "Incorrect card header format: uses 'CardType: Simple' instead of 'type: Simple'":
+WRONG: CardType should be "type" to match manifest
+CORRECT: CardType MUST be "CardType:" (capital C and T) in headers
+BEFORE: <!-- Card 1 | slug: test | type: Simple | Tags: test -->
+AFTER:  <!-- Card 1 | slug: test | CardType: Simple | Tags: test -->
 
-<example_3_missing_manifest>
-Before:
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test example -->
-...
-<!-- END_CARDS -->
-
-After:
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test example -->
-...
-<!-- manifest: {{"slug":"test-card","lang":"en","type":"Simple","tags":["test","example"]}} -->
-<!-- END_CARDS -->
-
-Fixes applied:
-- Added manifest with correct slug, lang, type, and tags
-- Manifest JSON is valid and matches header
-</example_3_missing_manifest>
-
-<example_4_html_code_issue>
-Before:
-<p>Here's some code: <code>print("hello")</code></p>
-
-After:
-<p>Here's some code: <pre><code class="language-python">print("hello")</code></pre></p>
-
-Fixes applied:
-- Wrapped standalone <code> in <pre> tags
-- Added language class to <code> element
-</example_4_html_code_issue>
-
-<example_5_tag_format_issues>
-Before: Tags: android,lifecycle,architecture (comma-separated, wrong format)
-After: Tags: android lifecycle architecture (space-separated, correct)
-
-Before: Tags: Android Lifecycle (wrong case, spaces)
-After: Tags: android lifecycle (lowercase, spaces converted to single space)
-
-Fixes applied:
-- Changed comma-separated to space-separated
-- Converted to lowercase
-- Normalized spacing
-</example_5_tag_format_issues>
-
-<example_6_valid_complete_card>
-<!-- PROMPT_VERSION: apf-v2.1 -->
-<!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: android-lifecycle | CardType: Simple | Tags: android lifecycle architecture -->
-
+For "Missing <!-- Subtitle (optional) --> section":
+BEFORE (RU version missing Subtitle that EN version has):
 <!-- Title -->
-<p>What is Android Activity Lifecycle?</p>
+<p>Question</p>
+<!-- Key point -->
 
-<!-- Key point (code block) -->
-<pre><code class="language-kotlin">override fun onCreate(savedInstanceState: Bundle?) {{
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_main)
-}}</code></pre>
+AFTER (add consistent Subtitle):
+<!-- Title -->
+<p>Question</p>
+<!-- Subtitle (optional) -->
 
-<!-- Key point notes -->
-<ul>
-<li>onCreate is called when activity is first created</li>
-<li>Must call super.onCreate()</li>
-</ul>
+<!-- Key point -->
+</targeted_fixes>
 
-<!-- manifest: {{"slug":"android-lifecycle","lang":"en","type":"Simple","tags":["android","lifecycle","architecture"]}} -->
-<!-- END_CARDS -->
-END_OF_CARDS
-</example_6_valid_complete_card>
-</examples>
+<validation_checklist>
+Before returning, verify your corrections meet ALL these requirements:
+
+[ ] No text appears after END_OF_CARDS line (it must be the absolute last line)
+[ ] All card headers use 'CardType:' (capital C and T) - NOT 'type:'
+[ ] If any language version has an optional section (like Subtitle), ALL language versions have it
+[ ] All corrected_cards have FULL apf_html content (no truncation)
+[ ] All cards that need fixing are included in the corrected_cards array
+[ ] JSON structure is valid and complete
+[ ] All original semantic content is preserved
+</validation_checklist>
 
 <output_format>
 Return ONLY valid JSON matching this EXACT structure:
