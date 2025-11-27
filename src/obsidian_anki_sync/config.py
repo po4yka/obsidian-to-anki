@@ -79,6 +79,18 @@ class Config(BaseSettings):
     anki_note_type: str = Field(
         default="APF::Simple", description="Anki note type")
 
+    # Anki model name mapping (internal -> actual Anki model name)
+    # Maps internal note type names to actual Anki model names
+    # Can be overridden via environment variables or config.yaml
+    model_names: dict[str, str] = Field(
+        default_factory=lambda: {
+            "APF::Simple": os.getenv("ANKI_MODEL_SIMPLE", "APF: Simple (3.0.0)"),
+            "APF::Missing (Cloze)": os.getenv("ANKI_MODEL_MISSING", "APF: Missing! (3.0.0)"),
+            "APF::Draw": os.getenv("ANKI_MODEL_DRAW", "APF: Draw! (3.0.0)"),
+        },
+        description="Mapping from internal note type to actual Anki model name",
+    )
+
     # Runtime settings
     run_mode: str = Field(
         default="apply", description="Run mode: 'apply' or 'dry-run'")

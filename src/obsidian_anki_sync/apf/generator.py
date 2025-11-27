@@ -21,6 +21,8 @@ logger = get_logger(__name__)
 class APFGenerator:
     """Generate APF cards using OpenRouter LLM."""
 
+    MAX_VALIDATION_RETRIES = 2  # Number of times to ask LLM to fix validation errors
+
     def __init__(self, config: Config):
         """Initialize the generator."""
         self.config = config
@@ -61,6 +63,9 @@ class APFGenerator:
         Returns:
             Generated card
         """
+        from .html_validator import validate_card_html
+        from .linter import validate_apf
+
         # Select language-specific content
         question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
         answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
@@ -70,41 +75,85 @@ class APFGenerator:
             question, answer, qa_pair, metadata, manifest, lang
         )
 
-        # Call LLM
-        logger.debug(
-            "calling_llm",
-            model=self.config.openrouter_model,
-            temp=self.config.llm_temperature,
-            slug=manifest.slug,
-        )
+        # Initial messages for conversation
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.config.openrouter_model,
-                temperature=self.config.llm_temperature,
-                top_p=self.config.llm_top_p,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
+        apf_html = None
+        validation_errors = []
 
-            apf_html = response.choices[0].message.content
-
-            if not apf_html:
-                raise ValueError("LLM returned empty response")
-
+        # Generation loop with validation retries
+        for attempt in range(1 + self.MAX_VALIDATION_RETRIES):
+            # Call LLM
             logger.debug(
-                "llm_response_received", slug=manifest.slug, length=len(apf_html)
+                "calling_llm",
+                model=self.config.openrouter_model,
+                temp=self.config.llm_temperature,
+                slug=manifest.slug,
+                attempt=attempt + 1,
             )
 
-        except Exception as e:
-            logger.error("llm_call_failed", slug=manifest.slug, error=str(e))
-            raise
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.config.openrouter_model,
+                    temperature=self.config.llm_temperature,
+                    top_p=self.config.llm_top_p,
+                    messages=messages,
+                )
 
-        # Normalize Markdown code fences (if any) into HTML blocks
-        default_lang = self._code_language_hint(metadata)
-        apf_html = self._normalize_code_blocks(apf_html, default_lang)
+                apf_html = response.choices[0].message.content
+
+                if not apf_html:
+                    raise ValueError("LLM returned empty response")
+
+                logger.debug(
+                    "llm_response_received", slug=manifest.slug, length=len(apf_html)
+                )
+
+            except Exception as e:
+                logger.error("llm_call_failed", slug=manifest.slug, error=str(e))
+                raise
+
+            # Normalize Markdown code fences (if any) into HTML blocks
+            default_lang = self._code_language_hint(metadata)
+            apf_html = self._normalize_code_blocks(apf_html, default_lang)
+
+            # Validate the generated HTML
+            html_errors = validate_card_html(apf_html)
+            linter_result = validate_apf(apf_html, manifest.slug)
+            validation_errors = html_errors + linter_result.errors
+
+            if not validation_errors:
+                # Validation passed
+                logger.debug("validation_passed", slug=manifest.slug, attempt=attempt + 1)
+                break
+
+            # If this was the last attempt, log warning but continue
+            if attempt >= self.MAX_VALIDATION_RETRIES:
+                logger.warning(
+                    "validation_failed_after_retries",
+                    slug=manifest.slug,
+                    errors=validation_errors,
+                    attempts=attempt + 1,
+                )
+                break
+
+            # Ask LLM to fix the errors
+            logger.info(
+                "validation_retry",
+                slug=manifest.slug,
+                errors=validation_errors,
+                attempt=attempt + 1,
+            )
+
+            # Add the assistant's response and error feedback to messages
+            messages.append({"role": "assistant", "content": apf_html})
+            messages.append({
+                "role": "user",
+                "content": self._build_fix_prompt(validation_errors),
+            })
 
         # Compute content hash
         content_hash = compute_content_hash(qa_pair, metadata, lang)
@@ -400,17 +449,71 @@ Answer:
         prompt += f"""
 Requirements:
 - CardType: Simple (or Missing if {{{{c}}}} detected in answer, or Draw if diagram marker present)
-- Tags: Derive from topic/subtopics, 3-6 snake_case tags, include primary language/tech
+- Tags: EXACTLY 3-6 snake_case tags with underscores (e.g., by_keyword NOT by-keyword), include primary language/tech
 - Primary language tag: {lang}
-- Topic-based tags: {metadata.topic.lower().replace(" ", "_")}
-- Preserve every code block using <pre><code class="language-{self._code_language_hint(metadata)}"> ... </code></pre> with original indentation; do NOT fall back to Markdown fences.
-- Include manifest at end with slug "{manifest.slug}"
+- Topic-based tags: {metadata.topic.lower().replace(' ', '_')}
+- Use EXACT slug "{manifest.slug}" in both card header AND manifest (do not create your own slug)
 - Add "Ref: {ref_link}" in Other notes section
 - Follow APF v2.1 format strictly
 - Output ONLY the card HTML, no explanations
+- End with END_OF_CARDS on its own line
+
+SPACED REPETITION PRINCIPLES (apply strictly):
+- ONE CARD = ONE ATOMIC FACT. If testing multiple things, you're doing it wrong.
+- ACTIVE RECALL: Force retrieval, not recognition. Avoid yes/no questions.
+  BAD: "Is Flow cold?" GOOD: "What is Flow's default emission behavior?"
+- NO SPOILERS: Title must NOT reveal the answer.
+  BAD: "Use Kotlin's by keyword" GOOD: "Implement Class Delegation for Repository"
+- MEANINGFUL CLOZE: Hide the CONCEPT, not trivial syntax.
+  BAD: {{{{c1::fun}}}} getData() GOOD: fun getData(): {{{{c1::Flow}}}}<Data>
+- CONTEXT INDEPENDENCE: Card must be understandable standalone, even after 6 months.
+- CONCRETE EXAMPLES: Show real-world usage, not toy examples.
+- WHY IT MATTERS: Include "You need this when..." motivation.
+
+CARD QUALITY REQUIREMENTS:
+- Code: Keep focused on the concept being tested, remove irrelevant implementation details
+- Key point notes: Include 5-7 detailed bullets covering:
+  * WHY it works (underlying mechanism, how compiler/runtime handles it)
+  * WHEN to use (practical use cases, "You need this when...")
+  * CONSTRAINTS and limitations
+  * COMMON MISTAKES developers make
+  * COMPARISON with alternatives ("Unlike X, this does Y because...")
+  * PERFORMANCE implications (if relevant)
+
+CRITICAL FORMATTING (violations will cause rejection):
+- Output is HTML, NOT Markdown. NEVER use **bold** or *italic* markdown - use <strong> and <em> HTML tags
+- ALL code MUST use <pre><code class="language-{self._code_language_hint(metadata)}">...</code></pre> blocks
+- NEVER use markdown backtick fences (```)
+- NEVER use inline <code> tags outside <pre> - use <strong> for inline tokens instead
+- Code blocks are for ACTUAL CODE ONLY - NEVER use // comments to write explanatory text
+- Explanations go in Key point notes as <ul><li> bullets, NOT as code comments
+- MUST include exact field headers: <!-- Title -->, <!-- Key point (code block / image) -->, <!-- Key point notes -->
+- Field headers must appear EXACTLY as specified in the template
 """
 
         return prompt
+
+    def _build_fix_prompt(self, errors: list[str]) -> str:
+        """Build a prompt asking the LLM to fix validation errors."""
+        error_list = "\n".join(f"- {e}" for e in errors)
+        return f"""Your card has validation errors that must be fixed:
+
+{error_list}
+
+Please regenerate the COMPLETE card with these errors fixed. Output the full corrected card HTML, not just the fixes.
+
+FORMATTING RULES:
+- Use HTML, NOT Markdown (no **bold**, use <strong>)
+- Code blocks use <pre><code class="language-X">, NOT backticks
+- Code blocks contain ONLY actual code, NOT explanatory comments
+- Explanations go in Key point notes as <ul><li> bullets
+- Include all required field headers (<!-- Title -->, <!-- Key point -->, etc.)
+- End with END_OF_CARDS on its own line
+
+QUALITY RULES:
+- Title should NOT reveal the answer (avoid "spoiler effect")
+- Key point notes should have 5-7 detailed bullets covering WHY, WHEN, CONSTRAINTS, COMMON MISTAKES
+- Code should be focused on the concept, not cluttered with unrelated implementation"""
 
     def _determine_note_type(self, metadata: NoteMetadata, apf_html: str) -> str:
         """Determine note type from metadata and content."""

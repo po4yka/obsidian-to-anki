@@ -121,77 +121,69 @@ def _extract_manifest(content: str) -> dict:
 
 
 def _map_simple(parsed: dict) -> dict[str, str]:
-    """Map to APF::Simple fields."""
-    # Combine front-facing content
-    front = parsed["title"]
-    if parsed["syntax"]:
-        front += f"\n\n{parsed['syntax']}"
-    if parsed["sample_caption"]:
-        front += f"\n\n{parsed['sample_caption']}"
-    if parsed["sample_code"]:
-        front += f"\n\n{parsed['sample_code']}"
-
-    # Combine back content
-    back = parsed["key_point"]
-    if parsed["key_point_notes"]:
-        back += f"\n\n{parsed['key_point_notes']}"
-
-    # Additional content
-    additional = ""
-    if parsed["other_notes"]:
-        additional = parsed["other_notes"]
-    if parsed["markdown"]:
-        additional += f"\n\n{parsed['markdown']}"
+    """Map to APF::Simple fields using APF 3.0.0 field names."""
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
 
     return {
-        "Front": front.strip(),
-        "Back": back.strip(),
-        "Additional": additional.strip(),
-        "Manifest": json.dumps(parsed["manifest"]),
+        "★ Title": parsed.get("title", ""),
+        "☆ Subtitle": parsed.get("subtitle", ""),
+        "☆ Syntax (inline code)": parsed.get("syntax", ""),
+        "★ Sample (code block)": sample.strip(),
+        "★ Key point (code block)": parsed.get("key_point", ""),
+        "★ Key point notes": parsed.get("key_point_notes", ""),
+        "✎ Other notes": parsed.get("other_notes", ""),
+        "✎ Markdown": parsed.get("markdown", ""),
     }
 
 
 def _map_missing(parsed: dict) -> dict[str, str]:
-    """Map to APF::Missing (Cloze) fields."""
-    # Text field contains the cloze deletions
-    text = parsed["key_point"]
-
-    # Extra field contains notes and additional info
-    extra = ""
-    if parsed["key_point_notes"]:
-        extra = parsed["key_point_notes"]
-    if parsed["other_notes"]:
-        extra += f"\n\n{parsed['other_notes']}"
-    if parsed["markdown"]:
-        extra += f"\n\n{parsed['markdown']}"
+    """Map to APF::Missing (Cloze) fields using APF 3.0.0 field names."""
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
 
     return {
-        "Text": text.strip(),
-        "Extra": extra.strip(),
-        "Manifest": json.dumps(parsed["manifest"]),
+        "★ Title": parsed.get("title", ""),
+        "☆ Subtitle": parsed.get("subtitle", ""),
+        "☆ Syntax (inline code)": parsed.get("syntax", ""),
+        "★ Sample (code block)": sample.strip(),
+        "★ Key point (code block)": parsed.get("key_point", ""),
+        "★ Key point notes": parsed.get("key_point_notes", ""),
+        "✎ Other notes": parsed.get("other_notes", ""),
+        "✎ Markdown": parsed.get("markdown", ""),
     }
 
 
 def _map_draw(parsed: dict) -> dict[str, str]:
-    """Map to APF::Draw fields."""
-    # Prompt is the question/title
-    prompt = parsed["title"]
-    if parsed["subtitle"]:
-        prompt += f"\n\n{parsed['subtitle']}"
-
-    # Drawing is the diagram/answer
-    drawing = parsed["key_point"]
-
-    # Notes
-    notes = ""
-    if parsed["key_point_notes"]:
-        notes = parsed["key_point_notes"]
-    if parsed["other_notes"]:
-        notes += f"\n\n{parsed['other_notes']}"
+    """Map to APF::Draw fields using APF 3.0.0 field names."""
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
 
     return {
-        "Prompt": prompt.strip(),
-        "Drawing": drawing.strip(),
-        "Notes": notes.strip(),
-        "Manifest": json.dumps(parsed["manifest"]),
+        "★ Title": parsed.get("title", ""),
+        "☆ Subtitle": parsed.get("subtitle", ""),
+        "☆ Syntax (inline code)": parsed.get("syntax", ""),
+        "★ Sample (code block)": sample.strip(),
+        "★ Key point (code block)": parsed.get("key_point", ""),
+        "★ Key point notes": parsed.get("key_point_notes", ""),
+        "✎ Other notes": parsed.get("other_notes", ""),
+        "✎ Markdown": parsed.get("markdown", ""),
     }
