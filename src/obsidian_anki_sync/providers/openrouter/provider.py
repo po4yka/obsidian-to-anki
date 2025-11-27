@@ -366,28 +366,52 @@ class OpenRouterProvider(BaseLLMProvider):
             schema_name=json_schema.get("name") if json_schema else None,
         )
 
-        # Retry logic
+        # Retry logic for HTTP errors
         response = self._execute_with_retry(
             payload=payload,
             model=model,
             request_start_time=request_start_time,
         )
 
-        # Process response
-        return self._process_response(
-            response=response,
-            model=model,
-            prompt=prompt,
-            system=system,
-            temperature=temperature,
-            format=format,
-            json_schema=json_schema,
-            stream=stream,
-            reasoning_enabled=reasoning_enabled,
-            request_start_time=request_start_time,
-            effective_max_tokens=effective_max_tokens,
-            payload=payload,
-        )
+        # Process response with retry for empty completions
+        max_empty_retries = 2
+        for attempt in range(max_empty_retries + 1):
+            try:
+                return self._process_response(
+                    response=response,
+                    model=model,
+                    prompt=prompt,
+                    system=system,
+                    temperature=temperature,
+                    format=format,
+                    json_schema=json_schema,
+                    stream=stream,
+                    reasoning_enabled=reasoning_enabled,
+                    request_start_time=request_start_time,
+                    effective_max_tokens=effective_max_tokens,
+                    payload=payload,
+                )
+            except ValueError as e:
+                if "empty completion" in str(e).lower() and attempt < max_empty_retries:
+                    logger.warning(
+                        "retrying_empty_completion",
+                        model=model,
+                        attempt=attempt + 1,
+                        max_attempts=max_empty_retries + 1,
+                    )
+                    time.sleep(1.0 * (attempt + 1))  # Backoff
+                    # Re-execute the request
+                    request_start_time = time.time()
+                    response = self._execute_with_retry(
+                        payload=payload,
+                        model=model,
+                        request_start_time=request_start_time,
+                    )
+                    continue
+                raise
+
+        # Should not reach here, but satisfy type checker
+        raise RuntimeError("Unexpected retry loop exit")
 
     def _log_token_calculations(
         self,
@@ -641,6 +665,19 @@ class OpenRouterProvider(BaseLLMProvider):
                 stream=stream,
                 reasoning_enabled=reasoning_enabled,
                 request_start_time=request_start_time,
+            )
+            raise
+        except ValueError as e:
+            error_msg = str(e)
+            # Check if this is an empty completion error (retryable)
+            is_empty_completion = "empty completion" in error_msg.lower()
+            log_llm_error(
+                model=model,
+                operation="openrouter_generate",
+                start_time=request_start_time,
+                error=e,
+                error_type=type(e).__name__,
+                retryable=is_empty_completion,
             )
             raise
         except Exception as e:

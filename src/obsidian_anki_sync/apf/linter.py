@@ -116,7 +116,8 @@ def _check_sentinels(lines: list[str], result: ValidationResult) -> None:
 
     # Check PROMPT_VERSION
     if not re.search(REQUIRED_SENTINELS[0], content, re.MULTILINE):
-        result.errors.append("Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
+        result.errors.append(
+            "Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
 
     # Check BEGIN_CARDS
     if not re.search(REQUIRED_SENTINELS[1], content, re.MULTILINE):
@@ -156,13 +157,20 @@ def _validate_card_block(
         result.errors.append(f"Card {card_num}: Empty card block")
         return
 
-    # Validate card header
+    # Validate card header - strict format checking
+    header_line = lines[0].strip()
+
+    # First check for common mistakes before regex matching
+    _validate_header_format_strict(header_line, card_num, result)
+    if result.errors:
+        return
+
     header_pattern = r"<!-- Card (\d+) \| slug: ([a-z0-9-]+) \| CardType: (Simple|Missing|Draw) \| Tags: (.+?) -->"
-    header_match = re.match(header_pattern, lines[0].strip())
+    header_match = re.match(header_pattern, header_line)
 
     if not header_match:
         # Provide detailed error message showing what was found
-        actual_header = lines[0].strip()[:200]  # First 200 chars
+        actual_header = header_line[:200]  # First 200 chars
         logger.warning(
             "invalid_card_header",
             card_num=card_num,
@@ -212,6 +220,40 @@ def _validate_card_block(
             )
 
 
+def _validate_header_format_strict(header_line: str, card_num: int, result: ValidationResult) -> None:
+    """Perform strict validation of card header format to catch common mistakes."""
+    if not header_line.startswith("<!--"):
+        result.errors.append(f"Card {card_num}: Header must start with '<!--'")
+        return
+
+    if not header_line.endswith("-->"):
+        result.errors.append(f"Card {card_num}: Header must end with '-->'")
+        return
+
+    # Check for common capitalization mistakes
+    if "type:" in header_line.lower() and "CardType:" not in header_line:
+        result.errors.append(
+            f"Card {card_num}: Use 'CardType:' not 'type:' (case-sensitive)")
+        return
+
+    if "cardtype:" in header_line.lower() and "CardType:" not in header_line:
+        result.errors.append(
+            f"Card {card_num}: Use 'CardType:' with capital C and T")
+        return
+
+    # Check spacing around pipes
+    if " |" not in header_line or "| " not in header_line:
+        result.errors.append(
+            f"Card {card_num}: Header must have spaces around pipe characters: ' | '")
+        return
+
+    # Check for comma-separated tags instead of space-separated
+    if "Tags:" in header_line and "," in header_line.split("Tags:")[1].split("-->")[0]:
+        result.errors.append(
+            f"Card {card_num}: Tags must be space-separated, not comma-separated")
+        return
+
+
 def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> None:
     """Validate tag count and format."""
     if not (MIN_TAGS <= len(tags) <= MAX_TAGS):
@@ -259,7 +301,8 @@ def _validate_manifest(
     required_fields = ["slug", "lang", "type", "tags"]
     missing = [f for f in required_fields if f not in manifest]
     if missing:
-        result.errors.append(f"Card {card_num}: Manifest missing fields: {missing}")
+        result.errors.append(
+            f"Card {card_num}: Manifest missing fields: {missing}")
 
     # Check slug matches
     if manifest.get("slug") != expected_slug:
@@ -288,7 +331,8 @@ def _validate_cloze_density(
     cloze_matches = re.findall(r"\{\{c(\d+)::", block)
 
     if not cloze_matches:
-        result.warnings.append(f"Card {card_num}: Missing card has no cloze deletions")
+        result.warnings.append(
+            f"Card {card_num}: Missing card has no cloze deletions")
         return
 
     indices = sorted({int(m) for m in cloze_matches})

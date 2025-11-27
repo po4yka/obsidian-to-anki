@@ -212,8 +212,8 @@ def log_llm_success(
     duration = time.time() - start_time
     tokens_per_second = calculate_tokens_per_second(completion_tokens, duration)
 
-    # Track slow requests (>60 seconds)
-    is_slow = duration > 60.0
+    # Track slow requests (>120 seconds)
+    is_slow = duration > 120.0
     if is_slow:
         logger.warning(
             "llm_slow_request",
