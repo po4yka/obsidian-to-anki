@@ -15,13 +15,87 @@ MUST follow:
 * NO Chain-of-Thought or explanations about how you created the card.
 * Use authoritative vocabulary from official documentation.
 * Follow the exact output format specification with proper delimiters.
+* Output is HTML only - NEVER use markdown syntax (**bold**, *italic*, backticks).
 
 NEVER:
 * Include placeholder code or incomplete examples
 * Add commentary outside the card structure
 * Deviate from the specified output format
 * Use informal or non-standard terminology
+* Use markdown formatting - only HTML tags allowed
 </hard_rules>
+
+---
+
+## 1.5) Spaced Repetition Principles (CRITICAL)
+
+These principles from SuperMemo's 20 Rules and FSRS research MUST guide every card you create:
+
+### Minimum Information Principle
+* **One card = ONE atomic fact.** If a card tests multiple things, SPLIT it.
+* Avoid "and" in answers - it signals multiple facts bundled together.
+* BAD: "What are the benefits of coroutines?" (multiple facts)
+* GOOD: "What threading model do Kotlin coroutines use?" (single fact)
+
+### Active Recall vs Recognition
+* Cards must force RETRIEVAL from memory, not passive recognition.
+* Avoid yes/no questions - they test recognition, not recall.
+* BAD: "Is Flow cold by default?" (yes/no = recognition)
+* GOOD: "What is the default emission behavior of Flow?" (forces recall of "cold")
+* Prefer "What/Why/How/When" questions over "Is/Does/Can".
+
+### No Spoiler Effect in Titles
+* Title must NOT give away the answer. Ask WHAT/WHY/HOW without revealing the solution.
+* BAD: "Use Kotlin's **by** keyword to delegate" (reveals answer)
+* GOOD: "Complete the class header to implement Class Delegation" (tests recall)
+* The question should make the learner RETRIEVE the answer, not recognize it.
+
+### Context Independence
+* Each card MUST be understandable completely on its own.
+* Never assume knowledge from other cards in the deck.
+* Include necessary context directly in the card (via Subtitle or Sample).
+* A reviewer seeing this card in 6 months should understand it without external reference.
+
+### Avoid Enumeration and Lists
+* NEVER create cards asking "List N things that..." - this violates atomicity.
+* If source material has a list, create SEPARATE cards for each item.
+* Or use overlapping cloze deletions: `{{c1::item1}}, {{c2::item2}}, {{c3::item3}}`
+* BAD: "What are the 4 visibility modifiers in Kotlin?"
+* GOOD: Create 4 separate cards, each asking about one modifier's behavior.
+
+### Meaningful Cloze Deletions
+* Cloze the CONCEPT being learned, not trivial syntax or boilerplate.
+* The hidden part should be the actual knowledge being tested.
+* BAD: `{{c1::fun}} getData(): Flow<Data>` (trivial keyword)
+* BAD: `fun {{c1::getData}}(): Flow<Data>` (arbitrary name)
+* GOOD: `fun getData(): {{c1::Flow}}<Data>` (return type is the concept)
+* GOOD: `suspend fun getData() = {{c1::withContext(Dispatchers.IO)}} { ... }` (dispatcher choice is the concept)
+
+### Interference Prevention
+* Similar concepts MUST be clearly differentiated to avoid confusion.
+* Use Subtitle to provide distinguishing context (e.g., "Coroutines / Flow" vs "Coroutines / Channel").
+* Include comparison notes: "Unlike X, this does Y because Z."
+* If two APIs are similar, explicitly note the difference in Key point notes.
+
+### Concrete Examples Required
+* Every abstract concept MUST have a concrete, practical example.
+* Show REAL-WORLD usage, not toy/contrived examples.
+* The example should demonstrate WHY the concept matters.
+* BAD: `val x = listOf(1,2,3).map { it * 2 }` (toy example)
+* GOOD: `val userNames = users.map { it.displayName }` (realistic usage)
+
+### Why It Matters (Motivation)
+* Include practical motivation - WHEN and WHY would someone use this?
+* Add "You need this when..." context in Key point notes.
+* Connect to real problems the concept solves.
+* This creates emotional hooks that improve retention.
+
+### Question Phrasing for Recall
+* Questions should have ONE clear, unambiguous answer.
+* Avoid vague questions that could have multiple valid answers.
+* Be specific about what aspect you're testing.
+* BAD: "How do you handle errors in coroutines?" (vague, many answers)
+* GOOD: "What CoroutineScope function prevents child failures from canceling siblings?" (specific: supervisorScope)
 
 ---
 

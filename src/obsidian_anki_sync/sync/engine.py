@@ -258,6 +258,21 @@ class SyncEngine:
                 self.agent_orchestrator.set_progress_display(
                     self.progress_display)
 
+    def _get_anki_model_name(self, internal_note_type: str) -> str:
+        """Get the actual Anki model name from internal note type.
+
+        Maps internal note types (e.g., "APF::Simple") to actual Anki
+        model names (e.g., "APF: Simple (3.0.0)").
+
+        Args:
+            internal_note_type: Internal note type identifier
+
+        Returns:
+            Actual Anki model name from config.model_names mapping,
+            or the internal name if no mapping exists
+        """
+        return self.config.model_names.get(internal_note_type, internal_note_type)
+
     def _close_caches(self) -> None:
         """Close disk caches to ensure data is flushed to disk."""
         try:
@@ -2485,10 +2500,10 @@ class SyncEngine:
 
         try:
             with CardTransaction(self.anki, self.db) as txn:
-                # Step 1: Add to Anki
+                # Step 1: Add to Anki (map internal note type to Anki model name)
                 note_id = self.anki.add_note(
                     deck=self.config.anki_deck_name,
-                    note_type=card.note_type,
+                    note_type=self._get_anki_model_name(card.note_type),
                     fields=fields,
                     tags=card.tags,
                     guid=card.guid,
@@ -2585,13 +2600,14 @@ class SyncEngine:
                     actual_deck=actual_deck,
                 )
 
-            # Verify note type
+            # Verify note type (compare with mapped Anki model name)
             actual_note_type = note_info.get("modelName", "")
-            if actual_note_type != card.note_type:
+            expected_note_type = self._get_anki_model_name(card.note_type)
+            if actual_note_type != expected_note_type:
                 logger.warning(
                     "card_verification_note_type_mismatch",
                     slug=card.slug,
-                    expected_note_type=card.note_type,
+                    expected_note_type=expected_note_type,
                     actual_note_type=actual_note_type,
                 )
 
@@ -2746,7 +2762,7 @@ class SyncEngine:
 
                 note_payload = {
                     "deckName": self.config.anki_deck_name,
-                    "modelName": card.note_type,
+                    "modelName": self._get_anki_model_name(card.note_type),
                     "fields": fields,
                     "tags": card.tags,
                     "options": {"allowDuplicate": False},

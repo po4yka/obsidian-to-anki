@@ -336,6 +336,18 @@ def parse_note(
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
 
+    # Check for topic mismatch (directory name vs frontmatter topic)
+    # Strip numeric prefix from directory name (e.g., "40-Android" -> "Android")
+    dir_name = resolved_path.parent.name
+    expected_topic = re.sub(r"^\d+-", "", dir_name)  # Strip "40-" from "40-Android"
+    if metadata.topic.lower() != expected_topic.lower():
+        logger.warning(
+            "topic_mismatch",
+            file=str(file_path),
+            frontmatter_topic=metadata.topic,
+            directory_topic=expected_topic,
+        )
+
     # Validate note structure
     enforce_validation = _get_enforce_language_validation()
     if enforce_validation or not tolerant_parsing:
