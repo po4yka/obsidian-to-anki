@@ -22,6 +22,7 @@ from typing import Any
 from pydantic_ai import Agent
 
 from ...utils.logging import get_logger
+from .context import get_pipeline_context
 from .node_helpers import increment_step_count
 from .reflection_domains import DOMAIN_REGISTRY
 from .reflection_models import (
@@ -67,7 +68,9 @@ def detect_domain(state: PipelineState) -> str:
             return domain_criteria.name
 
         # Check tags
-        if any(any(keyword in tag for keyword in domain_criteria.keywords) for tag in tags):
+        if any(
+            any(keyword in tag for keyword in domain_criteria.keywords) for tag in tags
+        ):
             state["detected_domain"] = domain_criteria.name
             return domain_criteria.name
 
@@ -81,17 +84,17 @@ REVISION_STRATEGIES = {
     "light_edit": {
         "max_changes": 2,
         "focus": ["typos", "formatting", "minor_clarity"],
-        "description": "Minor fixes only - preserve core content"
+        "description": "Minor fixes only - preserve core content",
     },
     "moderate_revision": {
         "max_changes": 5,
         "focus": ["clarity", "completeness", "structure"],
-        "description": "Targeted improvements to address key issues"
+        "description": "Targeted improvements to address key issues",
     },
     "major_rewrite": {
         "max_changes": 10,
         "focus": ["accuracy", "structure", "completeness", "comprehensiveness"],
-        "description": "Comprehensive revision for significant quality issues"
+        "description": "Comprehensive revision for significant quality issues",
     },
 }
 
@@ -118,14 +121,17 @@ def determine_revision_strategy(reflection: dict, domain: str) -> str:
             score = getattr(suggestion, "severity_score", 0.5)
         severity_scores.append(score)
 
-    avg_severity = sum(severity_scores) / \
-        len(severity_scores) if severity_scores else 0
+    avg_severity = sum(severity_scores) / len(severity_scores) if severity_scores else 0
 
     # Get domain-specific thresholds
     from .reflection_domains import get_domain_criteria
+
     domain_criteria = get_domain_criteria(domain)
-    thresholds = domain_criteria.revision_thresholds if domain_criteria else {
-        "low": 0.4, "medium": 0.7}
+    thresholds = (
+        domain_criteria.revision_thresholds
+        if domain_criteria
+        else {"low": 0.4, "medium": 0.7}
+    )
 
     # Determine strategy based on severity and domain thresholds
     if avg_severity < thresholds.get("low", 0.4):
@@ -136,7 +142,9 @@ def determine_revision_strategy(reflection: dict, domain: str) -> str:
         return "major_rewrite"
 
 
-def prioritize_issues(issues: list[dict], domain: str, max_issues: int = 5) -> list[dict]:
+def prioritize_issues(
+    issues: list[dict], domain: str, max_issues: int = 5
+) -> list[dict]:
     """Prioritize issues based on domain-specific weights and severity scores.
 
     Args:
@@ -148,13 +156,20 @@ def prioritize_issues(issues: list[dict], domain: str, max_issues: int = 5) -> l
         Prioritized list of issues (highest priority first)
     """
     from .reflection_domains import get_domain_criteria
+
     domain_criteria = get_domain_criteria(domain)
 
     if not domain_criteria:
         # Fallback: sort by severity score only
-        scored_issues = [(issue, getattr(issue, "severity_score", 0.5))
-                         for issue in issues]
-        return [issue for issue, _ in sorted(scored_issues, key=lambda x: x[1], reverse=True)[:max_issues]]
+        scored_issues = [
+            (issue, getattr(issue, "severity_score", 0.5)) for issue in issues
+        ]
+        return [
+            issue
+            for issue, _ in sorted(scored_issues, key=lambda x: x[1], reverse=True)[
+                :max_issues
+            ]
+        ]
 
     # Score issues based on domain weights and severity
     scored_issues = []
@@ -199,7 +214,7 @@ def _should_skip_reflection(state: PipelineState, stage: str) -> bool:
         return True
 
     # Smart skipping based on content complexity
-    config = state.get("config")
+    config = get_pipeline_context().config
     if config and _is_simple_content(state, config):
         # Mark reflection as skipped in state for observability
         state["reflection_skipped"] = True
@@ -235,8 +250,7 @@ def _is_simple_content(state: PipelineState, config) -> bool:
         return True
 
     # Check validation confidence threshold
-    confidence_threshold = getattr(
-        config, "reflection_skip_confidence_threshold", 0.9)
+    confidence_threshold = getattr(config, "reflection_skip_confidence_threshold", 0.9)
 
     pre_val = state.get("pre_validation", {})
     post_val = state.get("post_validation", {})
@@ -387,7 +401,7 @@ async def reflect_after_generation_node(state: PipelineState) -> PipelineState:
     logger.info("self_reflection_domain_detected", stage=stage, domain=domain)
 
     # Get reflection model from state
-    model = state.get("reflection_model")
+    model = get_pipeline_context().get_model("reflection_model")
     if model is None:
         logger.warning("self_reflection_model_not_available", stage=stage)
         return state
@@ -419,9 +433,11 @@ async def reflect_after_generation_node(state: PipelineState) -> PipelineState:
             card_summary.append(f"Card {i}:")
             card_summary.append(f"  Type: {card.get('card_type', 'unknown')}")
             card_summary.append(
-                f"  Question preview: {str(card.get('question', ''))[:100]}...")
+                f"  Question preview: {str(card.get('question', ''))[:100]}..."
+            )
             card_summary.append(
-                f"  Answer preview: {str(card.get('answer', ''))[:100]}...")
+                f"  Answer preview: {str(card.get('answer', ''))[:100]}..."
+            )
         card_text = "\n".join(card_summary)
 
         if len(cards) > 5:
@@ -445,10 +461,10 @@ async def reflect_after_generation_node(state: PipelineState) -> PipelineState:
             cot_context = f"""
 
 Original CoT Reasoning Plan:
-- Planned approach: {cot_reasoning.get('planned_approach', 'N/A')}
-- Recommendations: {', '.join(cot_reasoning.get('recommendations', [])[:5])}
-- Potential issues identified: {', '.join(cot_reasoning.get('potential_issues', [])[:3])}
-- Confidence: {cot_reasoning.get('confidence', 0):.2f}
+- Planned approach: {cot_reasoning.get("planned_approach", "N/A")}
+- Recommendations: {", ".join(cot_reasoning.get("recommendations", [])[:5])}
+- Potential issues identified: {", ".join(cot_reasoning.get("potential_issues", [])[:3])}
+- Confidence: {cot_reasoning.get("confidence", 0):.2f}
 """
 
         prompt = f"""Reflect on these generated flashcards:
@@ -489,8 +505,7 @@ Determine if revision is needed and provide specific suggestions."""
             },
         )
 
-        state["stage_times"]["reflect_after_generation"] = time.time() - \
-            start_time
+        state["stage_times"]["reflect_after_generation"] = time.time() - start_time
         state["messages"].append(
             f"Self-reflection generation: revision_needed={output.revision_needed}, "
             f"confidence={output.confidence:.2f}"
@@ -531,7 +546,7 @@ async def reflect_after_enrichment_node(state: PipelineState) -> PipelineState:
     domain = detect_domain(state)
     logger.info("self_reflection_domain_detected", stage=stage, domain=domain)
 
-    model = state.get("reflection_model")
+    model = get_pipeline_context().get_model("reflection_model")
     if model is None:
         logger.warning("self_reflection_model_not_available", stage=stage)
         return state
@@ -560,11 +575,14 @@ async def reflect_after_enrichment_node(state: PipelineState) -> PipelineState:
         for i, enrichment in enumerate(enrichments[:5], 1):
             enrichment_summary.append(f"Enrichment {i}:")
             enrichment_summary.append(
-                f"  Examples: {len(enrichment.get('examples', []))}")
+                f"  Examples: {len(enrichment.get('examples', []))}"
+            )
             enrichment_summary.append(
-                f"  Mnemonics: {len(enrichment.get('mnemonics', []))}")
+                f"  Mnemonics: {len(enrichment.get('mnemonics', []))}"
+            )
             enrichment_summary.append(
-                f"  Context added: {bool(enrichment.get('context'))}")
+                f"  Context added: {bool(enrichment.get('context'))}"
+            )
         enrichment_text = "\n".join(enrichment_summary)
 
         if len(enrichments) > 5:
@@ -576,10 +594,10 @@ async def reflect_after_enrichment_node(state: PipelineState) -> PipelineState:
             cot_context = f"""
 
 Original CoT Reasoning Plan:
-- Enrichment opportunities: {', '.join(cot_reasoning.get('stage_specific_data', {}).get('enrichment_opportunities', [])[:3])}
-- Mnemonic suggestions: {', '.join(cot_reasoning.get('stage_specific_data', {}).get('mnemonic_suggestions', [])[:3])}
-- Example types recommended: {', '.join(cot_reasoning.get('stage_specific_data', {}).get('example_types', [])[:3])}
-- Confidence: {cot_reasoning.get('confidence', 0):.2f}
+- Enrichment opportunities: {", ".join(cot_reasoning.get("stage_specific_data", {}).get("enrichment_opportunities", [])[:3])}
+- Mnemonic suggestions: {", ".join(cot_reasoning.get("stage_specific_data", {}).get("mnemonic_suggestions", [])[:3])}
+- Example types recommended: {", ".join(cot_reasoning.get("stage_specific_data", {}).get("example_types", [])[:3])}
+- Confidence: {cot_reasoning.get("confidence", 0):.2f}
 """
 
         prompt = f"""Reflect on these enriched flashcards:
@@ -587,7 +605,7 @@ Original CoT Reasoning Plan:
 Enrichment Summary:
 {enrichment_text}
 
-Original cards count: {len(generation.get('cards', [])) if generation else 0}
+Original cards count: {len(generation.get("cards", [])) if generation else 0}
 {cot_context}
 
 Evaluate the enrichment quality. Consider:
@@ -617,8 +635,7 @@ Determine if revision is needed and provide specific suggestions."""
             },
         )
 
-        state["stage_times"]["reflect_after_enrichment"] = time.time() - \
-            start_time
+        state["stage_times"]["reflect_after_enrichment"] = time.time() - start_time
         state["messages"].append(
             f"Self-reflection enrichment: revision_needed={output.revision_needed}, "
             f"confidence={output.confidence:.2f}"
@@ -671,10 +688,12 @@ async def revise_generation_node(state: PipelineState) -> PipelineState:
         "revise_generation_strategy_selected",
         domain=domain,
         strategy=revision_strategy,
-        revision_needed=current_reflection.get("revision_needed")
+        revision_needed=current_reflection.get("revision_needed"),
     )
 
-    model = state.get("reflection_model")  # Use same model as reflection
+    model = get_pipeline_context().get_model(
+        "reflection_model"
+    )  # Use same model as reflection
     if model is None:
         logger.warning("revision_model_not_available", stage=stage)
         return state
@@ -698,32 +717,31 @@ async def revise_generation_node(state: PipelineState) -> PipelineState:
         suggestions = current_reflection.get("revision_suggestions", [])
 
         # Prioritize issues based on domain and severity
-        prioritized_suggestions = prioritize_issues(
-            suggestions, domain, max_issues=5)
+        prioritized_suggestions = prioritize_issues(suggestions, domain, max_issues=5)
         strategy_config = REVISION_STRATEGIES.get(revision_strategy, {})
 
         prompt = f"""Revise these generated flashcards based on reflection feedback.
 
-REVISION STRATEGY: {revision_strategy.upper()} - {strategy_config.get('description', '')}
-Focus Areas: {', '.join(strategy_config.get('focus', []))}
-Maximum Changes: {strategy_config.get('max_changes', 5)}
+REVISION STRATEGY: {revision_strategy.upper()} - {strategy_config.get("description", "")}
+Focus Areas: {", ".join(strategy_config.get("focus", []))}
+Maximum Changes: {strategy_config.get("max_changes", 5)}
 
 Domain: {domain}
-Content Quality Assessment: {current_reflection.get('quality_assessment', 'N/A')}
+Content Quality Assessment: {current_reflection.get("quality_assessment", "N/A")}
 
 Original Output:
 {generation}
 
 PRIORITIZED ISSUES TO ADDRESS (highest priority first):
-{chr(10).join(f'- {s.get("suggestion", "")} (severity: {s.get("severity", "medium")})' for s in prioritized_suggestions)}
+{chr(10).join(f"- {s.get('suggestion', '')} (severity: {s.get('severity', 'medium')})" for s in prioritized_suggestions)}
 
 All Issues Found:
-{chr(10).join(f'- {issue}' for issue in issues[:10])}
+{chr(10).join(f"- {issue}" for issue in issues[:10])}
 
 {f"CoT Plan: {cot_reasoning.get('planned_approach', 'N/A')}" if cot_reasoning else ""}
 
-Apply the {revision_strategy} strategy: focus on {', '.join(strategy_config.get('focus', []))}.
-Make at most {strategy_config.get('max_changes', 5)} changes. Prioritize quality over quantity."""
+Apply the {revision_strategy} strategy: focus on {", ".join(strategy_config.get("focus", []))}.
+Make at most {strategy_config.get("max_changes", 5)} changes. Prioritize quality over quantity."""
 
         result = await agent.run(prompt)
         output = result.data
@@ -796,10 +814,10 @@ async def revise_enrichment_node(state: PipelineState) -> PipelineState:
         "revise_enrichment_strategy_selected",
         domain=domain,
         strategy=revision_strategy,
-        revision_needed=current_reflection.get("revision_needed")
+        revision_needed=current_reflection.get("revision_needed"),
     )
 
-    model = state.get("reflection_model")
+    model = get_pipeline_context().get_model("reflection_model")
     if model is None:
         logger.warning("revision_model_not_available", stage=stage)
         return state
@@ -821,20 +839,21 @@ async def revise_enrichment_node(state: PipelineState) -> PipelineState:
         suggestions = current_reflection.get("revision_suggestions", [])
 
         # Prioritize issues based on domain and severity
-        prioritized_suggestions = prioritize_issues(
-            suggestions, domain, max_issues=5)
+        prioritized_suggestions = prioritize_issues(suggestions, domain, max_issues=5)
         strategy_config = REVISION_STRATEGIES.get(revision_strategy, {})
 
-        over_enrichment_risk = current_reflection.get(
-            'stage_specific_data', {}).get('over_enrichment_risk', False)
-        enrichment_impact = current_reflection.get(
-            'stage_specific_data', {}).get('enrichment_impact', 'N/A')
+        over_enrichment_risk = current_reflection.get("stage_specific_data", {}).get(
+            "over_enrichment_risk", False
+        )
+        enrichment_impact = current_reflection.get("stage_specific_data", {}).get(
+            "enrichment_impact", "N/A"
+        )
 
         prompt = f"""Revise these enriched flashcards based on reflection feedback.
 
-REVISION STRATEGY: {revision_strategy.upper()} - {strategy_config.get('description', '')}
-Focus Areas: {', '.join(strategy_config.get('focus', []))}
-Maximum Changes: {strategy_config.get('max_changes', 5)}
+REVISION STRATEGY: {revision_strategy.upper()} - {strategy_config.get("description", "")}
+Focus Areas: {", ".join(strategy_config.get("focus", []))}
+Maximum Changes: {strategy_config.get("max_changes", 5)}
 
 Domain: {domain}
 Over-enrichment Risk: {over_enrichment_risk}
@@ -844,16 +863,16 @@ Current Enrichment Output:
 {context_enrichment}
 
 PRIORITIZED ISSUES TO ADDRESS (highest priority first):
-{chr(10).join(f'- {s.get("suggestion", "")} (severity: {s.get("severity", "medium")})' for s in prioritized_suggestions)}
+{chr(10).join(f"- {s.get('suggestion', '')} (severity: {s.get('severity', 'medium')})" for s in prioritized_suggestions)}
 
 All Issues Found:
-{chr(10).join(f'- {issue}' for issue in issues[:10])}
+{chr(10).join(f"- {issue}" for issue in issues[:10])}
 
 {f"CoT Plan: {cot_reasoning.get('planned_approach', 'N/A')}" if cot_reasoning else ""}
 
-Apply the {revision_strategy} strategy: focus on {', '.join(strategy_config.get('focus', []))}.
-{f"If over-enrichment risk is high, prioritize trimming excessive content." if over_enrichment_risk else ""}
-Make at most {strategy_config.get('max_changes', 5)} changes. Prioritize quality over quantity."""
+Apply the {revision_strategy} strategy: focus on {", ".join(strategy_config.get("focus", []))}.
+{"If over-enrichment risk is high, prioritize trimming excessive content." if over_enrichment_risk else ""}
+Make at most {strategy_config.get("max_changes", 5)} changes. Prioritize quality over quantity."""
 
         result = await agent.run(prompt)
         output = result.data

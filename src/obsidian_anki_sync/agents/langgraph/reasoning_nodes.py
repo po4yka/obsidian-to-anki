@@ -14,6 +14,7 @@ from pydantic_ai import Agent
 
 from ...models import NoteMetadata, QAPair
 from ...utils.logging import get_logger
+from .context import get_pipeline_context
 from .node_helpers import increment_step_count
 from .reasoning_models import (
     CardSplittingReasoningOutput,
@@ -140,7 +141,7 @@ async def think_before_pre_validation_node(state: PipelineState) -> PipelineStat
     start_time = time.time()
 
     # Get reasoning model from state
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -166,8 +167,8 @@ async def think_before_pre_validation_node(state: PipelineState) -> PipelineStat
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
-Language Tags: {', '.join(metadata.language_tags)}
+Tags: {", ".join(metadata.tags)}
+Language Tags: {", ".join(metadata.language_tags)}
 Q&A Pairs Count: {len(qa_pairs)}
 
 Note Content:
@@ -230,7 +231,7 @@ async def think_before_generation_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_generation_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -316,7 +317,7 @@ async def think_before_post_validation_node(state: PipelineState) -> PipelineSta
     logger.info("cot_think_before_post_validation_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -347,9 +348,9 @@ async def think_before_post_validation_node(state: PipelineState) -> PipelineSta
         prompt = f"""Analyze generated cards before post-validation:
 
 {card_summary}
-Retry Count: {state.get('retry_count', 0)}
-Auto-fix Enabled: {state.get('auto_fix_enabled', False)}
-Strict Mode: {state.get('strict_mode', True)}
+Retry Count: {state.get("retry_count", 0)}
+Auto-fix Enabled: {state.get("auto_fix_enabled", False)}
+Strict Mode: {state.get("strict_mode", True)}
 
 Think through: What quality issues might exist? What validation strategy?
 What issues are expected based on linting?"""
@@ -403,7 +404,7 @@ async def think_before_card_splitting_node(state: PipelineState) -> PipelineStat
     logger.info("cot_think_before_card_splitting_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -481,7 +482,7 @@ async def think_before_enrichment_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_enrichment_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -501,7 +502,7 @@ async def think_before_enrichment_node(state: PipelineState) -> PipelineState:
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
+Tags: {", ".join(metadata.tags)}
 Cards Count: {cards_count}
 
 Think through: What enrichment opportunities exist?
@@ -556,7 +557,7 @@ async def think_before_memorization_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_memorization_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -629,7 +630,7 @@ async def think_before_duplicate_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_duplicate_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_pipeline_context().get_model("reasoning_model")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state

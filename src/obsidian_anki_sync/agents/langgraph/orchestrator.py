@@ -7,6 +7,7 @@ the LangGraph state machine workflow.
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -25,14 +26,16 @@ from ..models import (
 )
 from ..slug_utils import generate_agent_slug_base
 from ..unified_agent import UnifiedAgentSelector
+from .context import set_pipeline_context
 from .model_factory import ModelFactory
 from .state import PipelineState
 from .workflow_builder import WorkflowBuilder
 
 # Optional agent memory and observability (requires chromadb, motor, langsmith)
 try:
-    from ..agent_memory import AgentMemoryStore
     from ..advanced_memory import AdvancedMemoryStore  # NEW: Advanced memory system
+    from ..agent_memory import AgentMemoryStore
+
     # NEW: Enhanced observability
     from ..enhanced_observability import EnhancedObservabilitySystem
 except ImportError:
@@ -61,6 +64,7 @@ class LangGraphOrchestrator:
         enable_memorization_quality: bool | None = None,
         enable_duplicate_detection: bool | None = None,
         agent_framework: str | None = None,  # NEW: Agent framework selection
+        checkpointer: Any | None = None,
     ):
         """Initialize LangGraph orchestrator.
 
@@ -112,6 +116,12 @@ class LangGraphOrchestrator:
             )  # Default to False
         )
 
+        # Checkpointing configuration
+        self.langgraph_checkpoint_enabled = getattr(
+            config, "langgraph_checkpoint_enabled", True
+        )
+        self.checkpointer = checkpointer
+
         # NEW: Agent framework selection (can be overridden by memory)
         self.agent_framework = (
             agent_framework
@@ -128,6 +138,27 @@ class LangGraphOrchestrator:
         # Initialize WorkflowBuilder
         self.workflow_builder = WorkflowBuilder(config)
 
+        # Share non-serializable resources with workflow nodes via context
+        shared_resources: dict[str, Any] = {
+            "pre_validator_model": self.model_factory.get_model("pre_validator"),
+            "card_splitting_model": self.model_factory.get_model("card_splitting"),
+            "generator_model": self.model_factory.get_model("generator"),
+            "post_validator_model": self.model_factory.get_model("post_validator"),
+            "context_enrichment_model": self.model_factory.get_model(
+                "context_enrichment"
+            ),
+            "memorization_quality_model": self.model_factory.get_model(
+                "memorization_quality"
+            ),
+            "duplicate_detection_model": self.model_factory.get_model(
+                "duplicate_detection"
+            ),
+            "reasoning_model": self.model_factory.get_model("reasoning"),
+            "reflection_model": self.model_factory.get_model("reflection"),
+            "agent_selector": self.agent_selector,
+        }
+        set_pipeline_context(config=self.config, resources=shared_resources)
+
         # Initialize memory stores if enabled
         self.memory_store = None
         self.advanced_memory_store = None
@@ -138,8 +169,7 @@ class LangGraphOrchestrator:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
                 embedding_model = getattr(
                     config, "embedding_model", "text-embedding-3-small"
                 )
@@ -154,16 +184,17 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning(
-                    "langgraph_memory_store_init_failed", error=str(e))
+                logger.warning("langgraph_memory_store_init_failed", error=str(e))
 
         # NEW: Advanced MongoDB memory store
         if getattr(config, "use_advanced_memory", False) and AdvancedMemoryStore:
             try:
                 mongodb_url = getattr(
-                    config, "mongodb_url", "mongodb://localhost:27017")
+                    config, "mongodb_url", "mongodb://localhost:27017"
+                )
                 memory_db_name = getattr(
-                    config, "memory_db_name", "obsidian_anki_memory")
+                    config, "memory_db_name", "obsidian_anki_memory"
+                )
 
                 self.advanced_memory_store = AdvancedMemoryStore(
                     config=config,
@@ -174,6 +205,7 @@ class LangGraphOrchestrator:
 
                 # Connect to MongoDB (synchronous wrapper for async connect)
                 import asyncio
+
                 try:
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
@@ -195,32 +227,45 @@ class LangGraphOrchestrator:
                                 db_name=memory_db_name,
                             )
                         else:
-                            logger.warning(
-                                "advanced_memory_store_connection_failed")
+                            logger.warning("advanced_memory_store_connection_failed")
                             self.advanced_memory_store = None
                 except RuntimeError:
                     # No event loop available, will connect on first use
                     logger.info("advanced_memory_store_lazy_connection")
 
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_init_failed", error=str(e))
+                logger.warning("advanced_memory_store_init_failed", error=str(e))
 
         # NEW: Enhanced observability system
         self.observability = None
-        if getattr(config, "enable_enhanced_observability", False) and EnhancedObservabilitySystem:
+        if (
+            getattr(config, "enable_enhanced_observability", False)
+            and EnhancedObservabilitySystem
+        ):
             try:
                 self.observability = EnhancedObservabilitySystem(config)
                 logger.info("enhanced_observability_system_initialized")
             except Exception as e:
-                logger.warning(
-                    "enhanced_observability_init_failed", error=str(e))
+                logger.warning("enhanced_observability_init_failed", error=str(e))
 
         # Build the workflow graph
         self.workflow = self.workflow_builder.build_workflow()
 
         # Initialize checkpoint saver for state persistence
-        self.checkpointer = MemorySaver()
+        if not self.langgraph_checkpoint_enabled:
+            if self.checkpointer is not None:
+                logger.info(
+                    "langgraph_checkpointer_disabled_by_config",
+                    provided_type=type(self.checkpointer).__name__,
+                )
+            self.checkpointer = None
+        elif self.checkpointer is None:
+            self.checkpointer = MemorySaver()
+        else:
+            logger.info(
+                "langgraph_checkpointer_custom",
+                checkpointer_type=type(self.checkpointer).__name__,
+            )
 
         # Compile the graph
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
@@ -256,11 +301,13 @@ class LangGraphOrchestrator:
         # If memory is available, use it for routing decisions
         if self.advanced_memory_store and self.advanced_memory_store.connected:
             try:
-                topic = getattr(metadata, 'topic', 'general')
-                user_id = getattr(metadata, 'user_id', 'default')
+                topic = getattr(metadata, "topic", "general")
+                user_id = getattr(metadata, "user_id", "default")
 
                 # Check user preferences for framework
-                user_prefs = await self.advanced_memory_store.get_user_card_preferences(user_id, topic)
+                user_prefs = await self.advanced_memory_store.get_user_card_preferences(
+                    user_id, topic
+                )
                 if user_prefs and user_prefs.confidence > 0.8:
                     # If user strongly prefers memory-enhanced and it's available
                     if self.agent_selector.memory_enhanced_available:
@@ -273,13 +320,18 @@ class LangGraphOrchestrator:
                         )
 
                 # Check topic performance patterns
-                topic_stats = await self.advanced_memory_store.get_topic_feedback_stats(topic)
+                topic_stats = await self.advanced_memory_store.get_topic_feedback_stats(
+                    topic
+                )
                 if topic_stats and topic_stats.get("total_feedback", 0) > 10:
                     avg_quality = topic_stats.get("avg_quality_score", 0.5)
 
                     # If topic has high quality scores and memory-enhanced is available,
                     # prefer it for consistency
-                    if avg_quality > 0.8 and self.agent_selector.memory_enhanced_available:
+                    if (
+                        avg_quality > 0.8
+                        and self.agent_selector.memory_enhanced_available
+                    ):
                         optimal_framework = "memory_enhanced"
                         logger.info(
                             "topic_performance_routing_selected_memory_enhanced",
@@ -318,8 +370,7 @@ class LangGraphOrchestrator:
                         )
 
             except Exception as e:
-                logger.warning(
-                    f"Memory-based routing failed, using default: {e}")
+                logger.warning(f"Memory-based routing failed, using default: {e}")
                 optimal_framework = self.agent_framework
 
         return optimal_framework
@@ -345,6 +396,7 @@ class LangGraphOrchestrator:
             AgentPipelineResult with all pipeline stages
         """
         start_time = time.time()
+        optimal_framework = self.agent_framework
 
         logger.info(
             "langgraph_pipeline_start",
@@ -366,7 +418,9 @@ class LangGraphOrchestrator:
         slug_base = self._generate_slug_base(metadata)
 
         # Determine optimal agent framework based on memory and content
-        optimal_framework = await self._determine_optimal_agent_framework(note_content, metadata)
+        optimal_framework = await self._determine_optimal_agent_framework(
+            note_content, metadata
+        )
 
         # Initialize state
         # Best practice: Initialize all state fields explicitly
@@ -377,7 +431,6 @@ class LangGraphOrchestrator:
             "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
             "file_path": str(file_path) if file_path else None,
             "slug_base": slug_base,
-            "config": self.config,  # Pass config for model selection
             "existing_cards_dicts": (
                 [card.model_dump() for card in existing_cards]
                 if existing_cards
@@ -385,33 +438,34 @@ class LangGraphOrchestrator:
             ),
             # NEW: Agent framework configuration (dynamically determined)
             "agent_framework": optimal_framework,
-            "agent_selector": self.agent_selector,
-            # Pass cached models through state for reuse (legacy support)
-            "pre_validator_model": self.model_factory.get_model("pre_validator"),
-            "card_splitting_model": self.model_factory.get_model("card_splitting"),
-            "generator_model": self.model_factory.get_model("generator"),
-            "post_validator_model": self.model_factory.get_model("post_validator"),
-            "context_enrichment_model": self.model_factory.get_model("context_enrichment"),
-            "memorization_quality_model": self.model_factory.get_model("memorization_quality"),
-            "duplicate_detection_model": self.model_factory.get_model("duplicate_detection"),
             # Chain of Thought (CoT) configuration
             "enable_cot_reasoning": getattr(self.config, "enable_cot_reasoning", False),
-            "store_reasoning_traces": getattr(self.config, "store_reasoning_traces", True),
+            "store_reasoning_traces": getattr(
+                self.config, "store_reasoning_traces", True
+            ),
             "log_reasoning_traces": getattr(self.config, "log_reasoning_traces", False),
-            "cot_enabled_stages": getattr(self.config, "cot_enabled_stages", [
-                "pre_validation", "generation", "post_validation"
-            ]),
-            "reasoning_model": self.model_factory.get_model("reasoning"),
+            "cot_enabled_stages": getattr(
+                self.config,
+                "cot_enabled_stages",
+                ["pre_validation", "generation", "post_validation"],
+            ),
             "reasoning_traces": {},
             "current_reasoning": None,
             # Self-Reflection configuration
-            "enable_self_reflection": getattr(self.config, "enable_self_reflection", False),
-            "store_reflection_traces": getattr(self.config, "store_reflection_traces", True),
-            "log_reflection_traces": getattr(self.config, "log_reflection_traces", False),
-            "reflection_enabled_stages": getattr(self.config, "reflection_enabled_stages", [
-                "generation", "context_enrichment"
-            ]),
-            "reflection_model": self.model_factory.get_model("reflection"),
+            "enable_self_reflection": getattr(
+                self.config, "enable_self_reflection", False
+            ),
+            "store_reflection_traces": getattr(
+                self.config, "store_reflection_traces", True
+            ),
+            "log_reflection_traces": getattr(
+                self.config, "log_reflection_traces", False
+            ),
+            "reflection_enabled_stages": getattr(
+                self.config,
+                "reflection_enabled_stages",
+                ["generation", "context_enrichment"],
+            ),
             "reflection_traces": {},
             "current_reflection": None,
             "revision_count": 0,
@@ -534,13 +588,18 @@ class LangGraphOrchestrator:
         if self.observability:
             try:
                 from ..enhanced_observability import AgentMetrics
+
                 metrics = AgentMetrics(
                     agent_name="langgraph_orchestrator",
                     execution_time=total_time,
                     success=success,
                     retry_count=final_state["retry_count"],
                     step_count=final_state.get("step_count", 0),
-                    quality_score=memorization_quality.memorization_score if memorization_quality else None,
+                    quality_score=(
+                        memorization_quality.memorization_score
+                        if memorization_quality
+                        else None
+                    ),
                     api_cost=None,  # Could be calculated from API usage
                     token_count=None,  # Could be tracked from model usage
                     error_type=final_state.get("last_error_severity"),
@@ -550,8 +609,7 @@ class LangGraphOrchestrator:
                 self.observability.record_metrics(metrics)
                 logger.info("observability_metrics_recorded")
             except Exception as e:
-                logger.warning(
-                    "observability_metrics_recording_failed", error=str(e))
+                logger.warning("observability_metrics_recording_failed", error=str(e))
 
         # NEW: Learn from execution if advanced memory is enabled
         if self.advanced_memory_store and self.advanced_memory_store.connected:
@@ -570,20 +628,32 @@ class LangGraphOrchestrator:
                         "total_time": total_time,
                         "retry_count": final_state["retry_count"],
                         "step_count": final_state.get("step_count", 0),
-                        "quality_score": memorization_quality.memorization_score if memorization_quality else None,
+                        "quality_score": (
+                            memorization_quality.memorization_score
+                            if memorization_quality
+                            else None
+                        ),
                         "context_enrichment": context_enrichment is not None,
-                        "error_type": last_error.get("type") if (last_error := final_state.get("last_error")) else None,
+                        "error_type": (
+                            last_error.get("type")
+                            if (last_error := final_state.get("last_error"))
+                            else None
+                        ),
                     },
                     execution_time=total_time,
                 )
 
                 # Learn user preferences from successful generation
                 if success and generation and generation.success:
-                    await self._learn_user_preferences(metadata, generation, memorization_quality)
+                    await self._learn_user_preferences(
+                        metadata, generation, memorization_quality
+                    )
 
                 # Store memorization feedback for learning
                 if memorization_quality:
-                    await self._store_memorization_feedback(metadata, generation, memorization_quality)
+                    await self._store_memorization_feedback(
+                        metadata, generation, memorization_quality
+                    )
 
                 logger.info("advanced_memory_learning_completed")
             except Exception as e:
@@ -595,7 +665,7 @@ class LangGraphOrchestrator:
         self,
         metadata: NoteMetadata,
         generation: GenerationResult,
-        memorization_quality: MemorizationQualityResult | None
+        memorization_quality: MemorizationQualityResult | None,
     ):
         """Learn user preferences from successful card generation.
 
@@ -608,11 +678,12 @@ class LangGraphOrchestrator:
             return
 
         try:
-            from ..advanced_memory import UserCardPreferences
             import time
 
-            user_id = getattr(metadata, 'user_id', 'default')
-            topic = getattr(metadata, 'topic', 'general')
+            from ..advanced_memory import UserCardPreferences
+
+            user_id = getattr(metadata, "user_id", "default")
+            topic = getattr(metadata, "topic", "general")
 
             # Analyze generated cards for preferences
             if generation.cards:
@@ -629,17 +700,29 @@ class LangGraphOrchestrator:
                         difficulty = "hard"
 
                 # Get existing preferences to update
-                existing_prefs = await self.advanced_memory_store.get_user_card_preferences(user_id, topic)
+                existing_prefs = (
+                    await self.advanced_memory_store.get_user_card_preferences(
+                        user_id, topic
+                    )
+                )
 
                 # Update or create preferences
                 if existing_prefs:
                     # Update existing preferences with new observations
-                    confidence_boost = 0.1 if memorization_quality and memorization_quality.memorization_score > 0.7 else 0.05
+                    confidence_boost = (
+                        0.1
+                        if memorization_quality
+                        and memorization_quality.memorization_score > 0.7
+                        else 0.05
+                    )
                     new_confidence = min(
-                        1.0, existing_prefs.confidence + confidence_boost)
+                        1.0, existing_prefs.confidence + confidence_boost
+                    )
 
                     # Update dominant preferences
-                    if card_types.count(dominant_card_type) > card_types.count(existing_prefs.preferred_card_type):
+                    if card_types.count(dominant_card_type) > card_types.count(
+                        existing_prefs.preferred_card_type
+                    ):
                         preferred_type = dominant_card_type
                     else:
                         preferred_type = existing_prefs.preferred_card_type
@@ -669,7 +752,9 @@ class LangGraphOrchestrator:
                         observation_count=1,
                     )
 
-                await self.advanced_memory_store.store_user_card_preferences(updated_prefs)
+                await self.advanced_memory_store.store_user_card_preferences(
+                    updated_prefs
+                )
 
                 logger.info(
                     "user_preferences_learned",
@@ -686,7 +771,7 @@ class LangGraphOrchestrator:
         self,
         metadata: NoteMetadata,
         generation: GenerationResult,
-        memorization_quality: MemorizationQualityResult
+        memorization_quality: MemorizationQualityResult,
     ):
         """Store memorization quality feedback for learning.
 
@@ -699,8 +784,9 @@ class LangGraphOrchestrator:
             return
 
         try:
-            from ..advanced_memory import MemorizationFeedback
             import time
+
+            from ..advanced_memory import MemorizationFeedback
 
             # Store feedback for each card
             if generation.cards:
@@ -711,25 +797,27 @@ class LangGraphOrchestrator:
                         issues_found=memorization_quality.issues,
                         strengths_identified=memorization_quality.strengths,
                         improvement_suggestions=memorization_quality.suggested_improvements,
-                        topic=getattr(metadata, 'topic', 'general'),
+                        topic=getattr(metadata, "topic", "general"),
                         card_type=card.card_type,
                         timestamp=time.time(),
                         metadata={
-                            "title": getattr(metadata, 'title', ''),
-                            "language": getattr(card, 'lang', 'en'),
-                            "card_index": getattr(card, 'card_index', 0),
-                            "tags": getattr(card, 'tags', []),
+                            "title": getattr(metadata, "title", ""),
+                            "language": getattr(card, "lang", "en"),
+                            "card_index": getattr(card, "card_index", 0),
+                            "tags": getattr(card, "tags", []),
                             "is_memorizable": memorization_quality.is_memorizable,
-                        }
+                        },
                     )
 
-                    await self.advanced_memory_store.store_memorization_feedback(feedback)
+                    await self.advanced_memory_store.store_memorization_feedback(
+                        feedback
+                    )
 
                 logger.info(
                     "memorization_feedback_stored",
                     cards_count=len(generation.cards),
                     quality_score=memorization_quality.quality_score,
-                    topic=getattr(metadata, 'topic', 'general'),
+                    topic=getattr(metadata, "topic", "general"),
                     issues_count=len(memorization_quality.issues),
                 )
 

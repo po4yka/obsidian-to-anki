@@ -4,11 +4,9 @@ This module defines the TypedDict state structure used throughout the
 card generation pipeline workflow.
 """
 
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from langgraph.graph.message import add_messages
-
-from ...config import Config
 
 
 class PipelineState(TypedDict):
@@ -29,19 +27,9 @@ class PipelineState(TypedDict):
     qa_pairs_dicts: list[dict]  # Serialized QAPair list
     file_path: str | None
     slug_base: str
-    config: Config  # Service configuration for model selection
     existing_cards_dicts: (
         list[dict] | None
     )  # Serialized existing cards for duplicate check
-
-    # Cached models (for performance - created once during orchestrator init)
-    pre_validator_model: Any | None  # PydanticAI OpenAIModel instance
-    card_splitting_model: Any | None
-    generator_model: Any | None
-    post_validator_model: Any | None
-    context_enrichment_model: Any | None
-    memorization_quality_model: Any | None
-    duplicate_detection_model: Any | None
 
     # Pipeline stage results
     note_correction: dict | None  # Serialized NoteCorrectionResult
@@ -106,9 +94,6 @@ class PipelineState(TypedDict):
     log_reasoning_traces: bool  # Log traces to logger (can be verbose)
     cot_enabled_stages: list[str]  # Stages where CoT is applied
 
-    # Reasoning Model (cached for performance)
-    reasoning_model: Any | None  # PydanticAI model for reasoning
-
     # Reasoning Traces (per stage)
     # Structure: {stage_name: ReasoningTrace.model_dump()}
     reasoning_traces: dict[str, dict]
@@ -124,9 +109,6 @@ class PipelineState(TypedDict):
     store_reflection_traces: bool  # Store traces in state for inspection
     log_reflection_traces: bool  # Log traces to logger (can be verbose)
     reflection_enabled_stages: list[str]  # Stages where reflection is applied
-
-    # Reflection Model (cached for performance)
-    reflection_model: Any | None  # PydanticAI model for reflection
 
     # Reflection Traces (per stage)
     # Structure: {stage_name: ReflectionTrace.model_dump()}
