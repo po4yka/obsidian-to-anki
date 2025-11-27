@@ -139,48 +139,34 @@ export_deck_description: "Generated from Obsidian notes"
 export_output_path: "interview_questions.apkg"
 
 # =============================================================================
-# LANGCHAIN AGENT SYSTEM (New Multi-Agent Pipeline)
+# UNIFIED AGENT FRAMEWORK CONFIGURATION
 # =============================================================================
 
-# Feature Flag: Use LangChain-based agent system
-# This is a new, more sophisticated agent system with:
-# - Card Mapping Agent (converts notes to cards)
-# - Schema Validation Tool (validates Anki model compatibility)
-# - QA Agent (semantic quality checks)
-# - Style/Hint Agent (optional refinement)
-# - Card Diff Agent (safe updates of existing cards)
-use_langchain_agents: false # Set to true to enable
+# Primary agent framework selection
+# Choose between 'pydantic_ai' (recommended, stable) or 'langchain' (new, advanced)
+agent_framework: "pydantic_ai"
 
-# Supervisor Configuration
-langchain_agents:
-  # Retry and quality thresholds
-  max_mapping_retries: 2 # Retries if schema validation fails
-  min_qa_score: 0.8 # Minimum QA score (0-1) to pass
-  allow_auto_fix: true # Allow automatic fixing based on feedback
-  max_llm_calls_per_card: 8 # Maximum total LLM calls per card
+# LangChain Agent Type Configuration (only used when agent_framework = "langchain")
+# Each agent type has different strengths:
+# - tool_calling: Best for complex operations requiring multiple tools (recommended)
+# - react: Best for reasoning and validation with transparent thought process
+# - structured_chat: Best for multi-input scenarios
+# - json_chat: Best for structured data processing
+langchain_generator_type: "tool_calling" # Card generation with tool access
+langchain_pre_validator_type: "react" # Pre-validation with reasoning
+langchain_post_validator_type: "tool_calling" # Post-validation with tools
+langchain_enrichment_type: "structured_chat" # Context enrichment with multiple inputs
 
-  # Update policies
-  allow_content_updates: true # Allow updates that change card content
-  allow_structural_updates: false # Allow model/deck changes (risky)
+# Agent Framework Fallback Configuration
+# Automatic fallback when primary framework fails
+agent_fallback_on_error: "pydantic_ai" # Fallback to PydanticAI on errors
+agent_fallback_on_timeout: "react" # Fallback to ReAct on timeouts
 
-  # Optional features
-  enable_style_polish: false # Enable style polishing step (slower but better quality)
-  strict_schema_validation: false # Treat schema warnings as errors
+# =============================================================================
+# LEGACY LANGCHAIN AGENT SYSTEM (Deprecated - use unified config above)
+# =============================================================================
 
-  # Model assignment (uses existing LLM config)
-  # mapping_model: Uses generator_model (qwen3:32b)
-  # qa_model: Uses post_validator_model (qwen3:14b)
-  # style_model: Uses pre_validator_model (qwen3:8b)
-
-  # Schema validation settings
-  max_front_length: 500 # Maximum characters for Front field
-  max_back_length: 2000 # Maximum characters for Back field
-  max_field_length: 4000 # Maximum characters for any field
-  max_tags: 20 # Maximum number of tags
-
-  # Deck settings
-  default_deck_prefix: "Interview" # Default prefix for deck names
-
-  # Bilingual settings
-  bilingual_mode: "front_back" # Options: "none", "front_back", "separate_cards"
+# Feature Flag: Use legacy LangChain-based agent system
+# This is the old agent system - consider migrating to the unified framework above
+use_langchain_agents: false # Set to true to enable legacy system
 

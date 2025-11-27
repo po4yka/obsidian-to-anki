@@ -374,6 +374,70 @@ class Config(BaseSettings):
         description="Maximum steps allowed in LangGraph workflow (prevents infinite loops)",
     )
 
+    # ============================================================================
+    # Unified Agent Framework Configuration
+    # ============================================================================
+
+    # Primary agent framework selection
+    agent_framework: str = Field(
+        default="pydantic_ai",
+        description="Primary agent framework: 'pydantic_ai' or 'langchain'"
+    )
+
+    @field_validator("agent_framework")
+    @classmethod
+    def validate_agent_framework(cls, v: str) -> str:
+        """Validate agent framework selection."""
+        valid_frameworks = ["pydantic_ai", "langchain"]
+        if v not in valid_frameworks:
+            raise ValueError(
+                f"agent_framework must be one of {valid_frameworks}, got '{v}'")
+        return v
+
+    # LangChain Agent Type Configuration
+    # Specify which LangChain agent type to use for each task
+    langchain_generator_type: str = Field(
+        default="tool_calling",
+        description="LangChain agent type for card generation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+    )
+    langchain_pre_validator_type: str = Field(
+        default="react",
+        description="LangChain agent type for pre-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+    )
+    langchain_post_validator_type: str = Field(
+        default="tool_calling",
+        description="LangChain agent type for post-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+    )
+    langchain_enrichment_type: str = Field(
+        default="structured_chat",
+        description="LangChain agent type for context enrichment: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+    )
+
+    @field_validator(
+        "langchain_generator_type",
+        "langchain_pre_validator_type",
+        "langchain_post_validator_type",
+        "langchain_enrichment_type"
+    )
+    @classmethod
+    def validate_langchain_agent_type(cls, v: str) -> str:
+        """Validate LangChain agent type selection."""
+        valid_types = ["tool_calling", "react", "structured_chat", "json_chat"]
+        if v not in valid_types:
+            raise ValueError(
+                f"LangChain agent type must be one of {valid_types}, got '{v}'")
+        return v
+
+    # Agent Framework Fallback Configuration
+    agent_fallback_on_error: str = Field(
+        default="pydantic_ai",
+        description="Fallback agent framework when primary framework fails"
+    )
+    agent_fallback_on_timeout: str = Field(
+        default="react",
+        description="Fallback agent type when primary agent times out"
+    )
+
     # Enhancement Agents (optional quality improvements)
     enable_card_splitting: bool = True  # Analyze if note should be split
 
