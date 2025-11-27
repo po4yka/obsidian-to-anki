@@ -21,6 +21,7 @@ def run_sync(
     dry_run: bool = False,
     incremental: bool = False,
     no_index: bool = False,
+    sample_size: int | None = None,
     resume: str | None = None,
     no_resume: bool = False,
 ) -> None:
@@ -32,6 +33,7 @@ def run_sync(
         dry_run: Preview changes without applying
         incremental: Only process new notes
         no_index: Skip indexing phase
+        sample_size: Limit to N random notes (for testing)
         resume: Session ID to resume
         no_resume: Disable automatic resume
 
@@ -42,6 +44,7 @@ def run_sync(
         "sync_started",
         dry_run=dry_run,
         incremental=incremental,
+        sample_size=sample_size,
         vault=str(config.vault_path),
     )
 
@@ -114,8 +117,17 @@ def run_sync(
             engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
             engine.set_progress_display(progress_display)
 
+            # Show sample mode info
+            if sample_size:
+                console.print(
+                    f"\n[cyan]Sample mode: Processing {sample_size} random notes[/cyan]\n"
+                )
+
             stats = engine.sync(
-                dry_run=dry_run, incremental=incremental, build_index=not no_index
+                dry_run=dry_run,
+                incremental=incremental,
+                build_index=not no_index,
+                sample_size=sample_size,
             )
 
             _display_sync_results(stats, no_index)
