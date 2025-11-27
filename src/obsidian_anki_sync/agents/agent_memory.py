@@ -7,7 +7,7 @@ and adaptive routing based on historical performance.
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import chromadb
 from chromadb.config import Settings
@@ -40,7 +40,7 @@ class OpenAIEmbeddings:
                 "Set OPENAI_API_KEY environment variable or disable semantic search."
             ) from e
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Embed a single query text.
 
         Args:
@@ -52,7 +52,7 @@ class OpenAIEmbeddings:
         response = self.client.embeddings.create(model=self.model, input=text)
         return response.data[0].embedding
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed multiple documents.
 
         Args:
@@ -71,7 +71,7 @@ class AgentMemoryStore:
     def __init__(
         self,
         storage_path: Path,
-        embedding_model: Optional[str] = None,
+        embedding_model: str | None = None,
         enable_semantic_search: bool = True,
     ):
         """Initialize agent memory store.
@@ -138,8 +138,8 @@ class AgentMemoryStore:
 
     def store_failure_pattern(
         self,
-        error_context: Dict[str, Any],
-        attempted_agents: List[ProblemDomain],
+        error_context: dict[str, Any],
+        attempted_agents: list[ProblemDomain],
     ) -> str:
         """Store failure pattern with embedding.
 
@@ -194,7 +194,7 @@ class AgentMemoryStore:
 
     def store_success_pattern(
         self,
-        error_context: Dict[str, Any],
+        error_context: dict[str, Any],
         successful_agent: ProblemDomain,
     ) -> str:
         """Store success pattern with embedding.
@@ -250,9 +250,9 @@ class AgentMemoryStore:
 
     def find_similar_failures(
         self,
-        error_context: Dict[str, Any],
+        error_context: dict[str, Any],
         limit: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find similar past failures using semantic search.
 
         Args:
@@ -330,8 +330,8 @@ class AgentMemoryStore:
 
     def get_agent_recommendation(
         self,
-        error_context: Dict[str, Any],
-    ) -> Optional[ProblemDomain]:
+        error_context: dict[str, Any],
+    ) -> ProblemDomain | None:
         """Get agent recommendation based on similar successful patterns.
 
         Args:
@@ -396,7 +396,7 @@ class AgentMemoryStore:
         agent_name: str,
         metric_name: str,
         value: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any | None] = None,
     ) -> str:
         """Store performance metric.
 
@@ -440,7 +440,7 @@ class AgentMemoryStore:
 
     def store_routing_decision(
         self,
-        error_context: Dict[str, Any],
+        error_context: dict[str, Any],
         selected_agent: ProblemDomain,
         success: bool,
         confidence: float,

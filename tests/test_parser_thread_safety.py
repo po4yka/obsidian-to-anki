@@ -62,14 +62,15 @@ class TestThreadSafety:
         assert results[3]["enabled"] is True
         assert results[3]["has_agent"] is True
 
-    def test_configure_llm_extraction_deprecation_warning(self):
-        """Test that configure_llm_extraction emits deprecation warning."""
+    def test_create_qa_extractor_works(self):
+        """Test that create_qa_extractor creates extractor successfully."""
         mock_provider = MagicMock()
 
-        with pytest.warns(
-            DeprecationWarning, match="configure_llm_extraction.*deprecated"
-        ):
-            configure_llm_extraction(mock_provider, model="test-model")
+        extractor = create_qa_extractor(mock_provider, model="test-model")
+        assert extractor is not None
+
+        # Test setting thread-local extractor (should not raise)
+        set_thread_qa_extractor(extractor)
 
     def test_temporarily_disable_llm_extraction_thread_safe(self):
         """Test that temporarily_disable_llm_extraction is thread-safe."""
@@ -85,7 +86,8 @@ class TestThreadSafety:
             from obsidian_anki_sync.obsidian.parser import _thread_local_state
 
             # Check enabled before context
-            enabled_before = getattr(_thread_local_state, "use_llm_extraction", False)
+            enabled_before = getattr(
+                _thread_local_state, "use_llm_extraction", False)
 
             with temporarily_disable_llm_extraction():
                 # Check disabled in context
@@ -94,7 +96,8 @@ class TestThreadSafety:
                 )
 
             # Check restored after context
-            enabled_after = getattr(_thread_local_state, "use_llm_extraction", False)
+            enabled_after = getattr(
+                _thread_local_state, "use_llm_extraction", False)
 
             results[thread_id] = {
                 "before": enabled_before,

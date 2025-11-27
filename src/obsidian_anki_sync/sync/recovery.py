@@ -11,7 +11,7 @@ These inconsistencies can occur due to:
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from ..anki.client import AnkiClient
 from ..exceptions import AnkiConnectError
@@ -38,7 +38,7 @@ class CardRecovery:
         self.anki = anki_client
         self.db = db
 
-    def find_orphaned_cards(self) -> Dict[str, List[Any]]:
+    def find_orphaned_cards(self) -> dict[str, list[Any]]:
         """Find cards in inconsistent states.
 
         Scans both Anki and the database to identify:
@@ -129,7 +129,7 @@ class CardRecovery:
             logger.error("failed_to_verify_card", slug=slug, error=str(e))
             return False
 
-    def get_failed_cards(self) -> List[Dict[str, Any]]:
+    def get_failed_cards(self) -> list[dict[str, Any]]:
         """Get list of cards with failed creation/update status.
 
         Returns:
@@ -141,7 +141,7 @@ class CardRecovery:
         logger.info("found_failed_cards", count=len(failed_cards))
         return failed_cards
 
-    def get_cards_needing_retry(self, max_retries: int = 3) -> List[Dict[str, Any]]:
+    def get_cards_needing_retry(self, max_retries: int = 3) -> list[dict[str, Any]]:
         """Get list of cards that failed but haven't exceeded retry limit.
 
         Args:

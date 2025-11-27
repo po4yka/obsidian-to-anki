@@ -2,7 +2,7 @@
 
 import re
 import time
-from typing import Dict, List, Optional
+
 
 from ..models import NoteMetadata
 from .models import GeneratedCard
@@ -22,7 +22,7 @@ class CardImprover:
 
     def __init__(
         self,
-        llm_provider: Optional[BaseLLMProvider] = None,
+        llm_provider: BaseLLMProvider | None = None,
         model: str = "qwen3:14b",
         temperature: float = 0.0,
     ):
@@ -243,7 +243,7 @@ class CardImprover:
 
         return re.sub(pattern, add_language_class, text, flags=re.DOTALL)
 
-    def _detect_code_language(self, code: str) -> Optional[str]:
+    def _detect_code_language(self, code: str) -> str | None:
         """Simple language detection based on keywords."""
         code_lower = code.lower()
 
@@ -295,7 +295,7 @@ class CardImprover:
 
         return slug
 
-    def _add_missing_tags(self, tags: List[str], question: str) -> List[str]:
+    def _add_missing_tags(self, tags: list[str], question: str) -> list[str]:
         """Add relevant tags if there are fewer than 3."""
         if len(tags) >= 3:
             return tags
@@ -322,7 +322,7 @@ class CardImprover:
 
         return new_tags
 
-    def _remove_duplicate_tags(self, tags: List[str]) -> List[str]:
+    def _remove_duplicate_tags(self, tags: list[str]) -> list[str]:
         """Remove duplicate tags while preserving order."""
         seen = set()
         unique_tags = []
@@ -351,7 +351,7 @@ class CardImprover:
     def _build_improvement_prompt(
         self,
         card: GeneratedCard,
-        issues: List[str],
+        issues: list[str],
         metadata: NoteMetadata,
     ) -> str:
         """Build prompt for LLM-powered card improvements."""
@@ -385,7 +385,7 @@ Return the improved card in this exact JSON format:
 
 Only return the JSON, no other text or explanations."""
 
-    def _parse_improvement_response(self, response: str) -> Optional[Dict[str, str]]:
+    def _parse_improvement_response(self, response: str) -> dict[str, str | None]:
         """Parse LLM improvement response."""
         try:
             import json

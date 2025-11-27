@@ -1,6 +1,6 @@
 """Pydantic models for multi-agent system validation and results."""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,7 +51,7 @@ class PreValidationResult(BaseModel):
                         "frontmatter", "content", "none"]
     error_details: str = ""
     auto_fix_applied: bool = False
-    fixed_content: Optional[str] = None
+    fixed_content: str | None = None
     validation_time: float = 0.0
 
 
@@ -99,7 +99,7 @@ class PostValidationResult(BaseModel):
     is_valid: bool
     error_type: Literal["syntax", "factual", "semantic", "template", "none"]
     error_details: str = ""
-    corrected_cards: Optional[list[GeneratedCard]] = None
+    corrected_cards: list[GeneratedCard | None] = None
     validation_time: float = 0.0
 
 
@@ -158,7 +158,7 @@ class CardSplittingResult(BaseModel):
     confidence: float = Field(
         ge=0.0, le=1.0, default=0.5, description="Confidence in splitting decision"
     )
-    fallback_strategy: Optional[str] = Field(
+    fallback_strategy: str | None = Field(
         default=None, description="Fallback strategy if primary fails"
     )
 
@@ -222,11 +222,11 @@ class ParserRepairResult(BaseModel):
     is_repairable: bool
     diagnosis: str = ""
     repairs: list[dict[str, str]] = Field(default_factory=list)
-    repaired_content: Optional[str] = None
+    repaired_content: str | None = None
     repair_time: float = 0.0
-    error_diagnosis: Optional[RepairDiagnosis] = None
-    quality_before: Optional[RepairQualityScore] = None
-    quality_after: Optional[RepairQualityScore] = None
+    error_diagnosis: RepairDiagnosis | None = None
+    quality_before: RepairQualityScore | None = None
+    quality_after: RepairQualityScore | None = None
 
 
 class DuplicateMatch(BaseModel):
@@ -252,14 +252,14 @@ class DuplicateDetectionResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     is_duplicate: bool
-    best_match: Optional[DuplicateMatch] = None
+    best_match: DuplicateMatch | None = None
     all_matches: list[DuplicateMatch] = Field(default_factory=list)
     recommendation: Literal["delete", "merge", "keep_both", "review_manually"]
-    better_card: Optional[str] = Field(
+    better_card: str | None = Field(
         default=None,
         description="Slug of better card if duplicate ('new' or existing slug)",
     )
-    merge_suggestion: Optional[str] = None
+    merge_suggestion: str | None = None
     detection_time: float = 0.0
 
 
@@ -283,7 +283,7 @@ class ContextEnrichmentResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     should_enrich: bool
-    enriched_card: Optional[GeneratedCard] = None
+    enriched_card: GeneratedCard | None = None
     additions: list[EnrichmentAddition] = Field(default_factory=list)
     additions_summary: str = ""
     enrichment_rationale: str = ""
@@ -301,7 +301,7 @@ class NoteCorrectionResult(BaseModel):
     needs_correction: bool = Field(
         description="Whether the note needs correction"
     )
-    corrected_content: Optional[str] = Field(
+    corrected_content: str | None = Field(
         default=None, description="Corrected note content if repairs were applied"
     )
     quality_score: float = Field(
@@ -319,7 +319,7 @@ class NoteCorrectionResult(BaseModel):
     correction_time: float = Field(
         default=0.0, ge=0.0, description="Time taken for correction"
     )
-    quality_after: Optional[RepairQualityScore] = Field(
+    quality_after: RepairQualityScore | None = Field(
         default=None, description="Quality score after correction"
     )
 
@@ -390,10 +390,10 @@ class AgentPipelineResult(BaseModel):
 
     success: bool
     pre_validation: PreValidationResult
-    generation: Optional[GenerationResult] = None
-    post_validation: Optional[PostValidationResult] = None
-    memorization_quality: Optional[MemorizationQualityResult] = None
-    note_correction: Optional[NoteCorrectionResult] = Field(
+    generation: GenerationResult | None = None
+    post_validation: PostValidationResult | None = None
+    memorization_quality: MemorizationQualityResult | None = None
+    note_correction: NoteCorrectionResult | None = Field(
         default=None, description="Proactive note correction result"
     )
     total_time: float = Field(ge=0.0)

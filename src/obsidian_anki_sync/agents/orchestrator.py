@@ -21,7 +21,7 @@ from ..utils.content_hash import compute_content_hash
 from ..utils.logging import get_logger
 from .generator import GeneratorAgent
 from .models import AgentPipelineResult, GeneratedCard
-from .post_validator import PostValidatorAgent
+from .post_validation import PostValidatorAgent
 from .pre_validator import PreValidatorAgent
 from .slug_utils import generate_agent_slug_base
 

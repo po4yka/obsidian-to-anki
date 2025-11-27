@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -10,11 +10,11 @@ class RepairResult:
     """Result from content repair operation."""
 
     success: bool
-    repaired_content: Optional[str] = None
+    repaired_content: str | None = None
     confidence: float = 0.0
     reasoning: str = ""
-    error_message: Optional[str] = None
-    warnings: List[str] = None
+    error_message: str | None = None
+    warnings: list[str] = None
 
     def __post_init__(self):
         if self.warnings is None:
@@ -38,12 +38,12 @@ class AgentResult:
     """Result from a specialized agent."""
 
     success: bool
-    content: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    qa_pairs: Optional[List[Dict[str, Any]]] = None
+    content: str | None = None
+    metadata: dict[str, Any | None] = None
+    qa_pairs: list[dict[str, Any | None]] = None
     confidence: float = 0.0
     reasoning: str = ""
-    warnings: List[str] = None
+    warnings: list[str] = None
 
     def __post_init__(self):
         if self.warnings is None:

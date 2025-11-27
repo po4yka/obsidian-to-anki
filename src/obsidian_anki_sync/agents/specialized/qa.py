@@ -1,6 +1,6 @@
 """QA extraction agent."""
 
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent
@@ -16,7 +16,7 @@ class QAExtractionAgent(BaseSpecializedAgent):
         super().__init__()
         self.qa_agent = None
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Extract Q/A pairs from content."""
         return AgentResult(
             success=False,

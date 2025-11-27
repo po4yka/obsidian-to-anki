@@ -1,7 +1,7 @@
 """Path validation utilities for security and safety."""
 
 from pathlib import Path
-from typing import Optional
+
 
 from ..exceptions import ConfigurationError
 
@@ -135,7 +135,7 @@ def validate_note_path(vault_path: Path, note_path: Path) -> Path:
     return resolved_note
 
 
-def validate_db_path(db_path: Path, vault_path: Optional[Path] = None) -> Path:
+def validate_db_path(db_path: Path, vault_path: Path | None = None) -> Path:
     """Validate database path.
 
     Args:

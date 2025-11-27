@@ -1,7 +1,7 @@
 """Comprehensive quality validation system for Anki cards."""
 
 import time
-from typing import Dict, List, Optional
+
 
 from ..anki.client import AnkiClient
 from ..models import Card, NoteMetadata
@@ -23,8 +23,8 @@ class QualityValidationResult:
         self,
         original_card: GeneratedCard,
         quality_report: QualityReport,
-        improved_card: Optional[GeneratedCard] = None,
-        performance_data: Optional[Dict] = None,
+        improved_card: GeneratedCard | None = None,
+        performance_data: Dict | None = None,
         validation_time: float = 0.0,
     ):
         """Initialize validation result.
@@ -68,7 +68,7 @@ class QualityValidator:
     def __init__(
         self,
         llm_provider: BaseLLMProvider,
-        anki_client: Optional[AnkiClient] = None,
+        anki_client: AnkiClient | None = None,
         enable_auto_improvement: bool = True,
         enable_performance_tracking: bool = True,
         quality_threshold: float = 0.8,
@@ -106,8 +106,8 @@ class QualityValidator:
         self,
         card: GeneratedCard,
         metadata: NoteMetadata,
-        context_cards: Optional[List[GeneratedCard]] = None,
-        note_id: Optional[int] = None,
+        context_cards: list[GeneratedCard | None] = None,
+        note_id: int | None = None,
     ) -> QualityValidationResult:
         """Perform comprehensive quality validation on a card.
 
@@ -175,10 +175,10 @@ class QualityValidator:
 
     def validate_cards_batch(
         self,
-        cards: List[GeneratedCard],
+        cards: list[GeneratedCard],
         metadata: NoteMetadata,
-        note_ids: Optional[List[int]] = None,
-    ) -> List[QualityValidationResult]:
+        note_ids: list[int | None] = None,
+    ) -> list[QualityValidationResult]:
         """Validate multiple cards in batch for efficiency.
 
         Args:
@@ -225,7 +225,7 @@ class QualityValidator:
 
         return results
 
-    def get_quality_statistics(self, results: List[QualityValidationResult]) -> Dict:
+    def get_quality_statistics(self, results: list[QualityValidationResult]) -> Dict:
         """Generate quality statistics from validation results.
 
         Args:
@@ -248,7 +248,7 @@ class QualityValidator:
 
         return stats
 
-    def _calculate_quality_distribution(self, results: List[QualityValidationResult]) -> Dict[str, int]:
+    def _calculate_quality_distribution(self, results: list[QualityValidationResult]) -> dict[str, int]:
         """Calculate distribution of quality scores."""
         distribution = {
             "excellent": 0,  # 0.9-1.0
@@ -273,7 +273,7 @@ class QualityValidator:
 
         return distribution
 
-    def _identify_common_issues(self, results: List[QualityValidationResult]) -> List[Dict]:
+    def _identify_common_issues(self, results: list[QualityValidationResult]) -> list[Dict]:
         """Identify most common quality issues."""
         issue_counts = {}
 
@@ -314,7 +314,7 @@ class QualityValidator:
         else:
             logger.info("card_quality_acceptable", **log_data)
 
-    def export_quality_report(self, results: List[QualityValidationResult]) -> Dict:
+    def export_quality_report(self, results: list[QualityValidationResult]) -> Dict:
         """Export comprehensive quality report.
 
         Args:
@@ -352,7 +352,7 @@ class QualityValidator:
 
         return report
 
-    def _generate_recommendations(self, stats: Dict) -> List[str]:
+    def _generate_recommendations(self, stats: Dict) -> list[str]:
         """Generate recommendations based on quality statistics.
 
         Args:

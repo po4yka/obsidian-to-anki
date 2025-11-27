@@ -6,7 +6,7 @@ to the persistent ChromaDB memory store.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from ..agents.agent_memory import AgentMemoryStore
 from ..agents.specialized import ProblemDomain
@@ -16,9 +16,9 @@ logger = get_logger(__name__)
 
 
 def migrate_in_memory_patterns(
-    failure_patterns: Dict[str, int],
-    success_patterns: Dict[str, int],
-    pattern_to_agent: Dict[str, ProblemDomain],
+    failure_patterns: dict[str, int],
+    success_patterns: dict[str, int],
+    pattern_to_agent: dict[str, ProblemDomain],
     memory_store: AgentMemoryStore,
 ) -> int:
     """Migrate in-memory patterns to persistent storage.

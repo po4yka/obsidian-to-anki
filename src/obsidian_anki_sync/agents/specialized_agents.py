@@ -10,7 +10,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..utils.logging import get_logger
 from ..utils.resilience import (
@@ -36,11 +36,11 @@ class RepairResult:
     """Result from content repair operation."""
 
     success: bool
-    repaired_content: Optional[str] = None
+    repaired_content: str | None = None
     confidence: float = 0.0
     reasoning: str = ""
-    error_message: Optional[str] = None
-    warnings: List[str] = None
+    error_message: str | None = None
+    warnings: list[str] = None
 
     def __post_init__(self):
         if self.warnings is None:
@@ -84,12 +84,12 @@ class AgentResult:
     """Result from a specialized agent."""
 
     success: bool
-    content: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    qa_pairs: Optional[List[Dict[str, Any]]] = None
+    content: str | None = None
+    metadata: dict[str, Any | None] = None
+    qa_pairs: list[dict[str, Any | None]] = None
     confidence: float = 0.0
     reasoning: str = ""
-    warnings: List[str] = None
+    warnings: list[str] = None
 
     def __post_init__(self):
         if self.warnings is None:
@@ -101,9 +101,9 @@ class ProblemRouter:
 
     def __init__(
         self,
-        circuit_breaker_config: Optional[Dict[str, Dict[str, Any]]] = None,
-        rate_limit_config: Optional[Dict[str, int]] = None,
-        bulkhead_config: Optional[Dict[str, int]] = None,
+        circuit_breaker_config: dict[str, dict[str, Any | None]] = None,
+        rate_limit_config: dict[str, int | None] = None,
+        bulkhead_config: dict[str, int | None] = None,
         confidence_threshold: float = 0.7,
     ):
         """Initialize problem router with resilience patterns.
@@ -115,9 +115,9 @@ class ProblemRouter:
             confidence_threshold: Minimum confidence threshold for validation
         """
         self.agents = {}
-        self.circuit_breakers: Dict[ProblemDomain, CircuitBreaker] = {}
-        self.rate_limiters: Dict[ProblemDomain, RateLimiter] = {}
-        self.bulkheads: Dict[ProblemDomain, Bulkhead] = {}
+        self.circuit_breakers: dict[ProblemDomain, CircuitBreaker] = {}
+        self.rate_limiters: dict[ProblemDomain, RateLimiter] = {}
+        self.bulkheads: dict[ProblemDomain, Bulkhead] = {}
         self.confidence_validator = ConfidenceValidator(
             min_confidence=confidence_threshold
         )
@@ -159,9 +159,9 @@ class ProblemRouter:
 
     def _initialize_resilience_patterns(
         self,
-        circuit_breaker_config: Dict[str, Dict[str, Any]],
-        rate_limit_config: Dict[str, int],
-        bulkhead_config: Dict[str, int],
+        circuit_breaker_config: dict[str, dict[str, Any]],
+        rate_limit_config: dict[str, int],
+        bulkhead_config: dict[str, int],
     ) -> None:
         """Initialize resilience patterns for each agent domain.
 
@@ -201,8 +201,8 @@ class ProblemRouter:
             self.bulkheads[domain] = Bulkhead(max_concurrent=bulkhead_max)
 
     def diagnose_and_route(
-        self, content: str, error_context: Dict[str, Any]
-    ) -> List[Tuple[ProblemDomain, float]]:
+        self, content: str, error_context: dict[str, Any]
+    ) -> list[tuple[ProblemDomain, float]]:
         """
         Diagnose the problem and return prioritized list of agents to try.
 
@@ -278,7 +278,7 @@ class ProblemRouter:
         return False
 
     def solve_problem(
-        self, domain: ProblemDomain, content: str, context: Dict[str, Any]
+        self, domain: ProblemDomain, content: str, context: dict[str, Any]
     ) -> AgentResult:
         """
         Route problem to the appropriate specialized agent with resilience patterns.
@@ -428,7 +428,7 @@ class BaseSpecializedAgent:
                 jitter=True,
             )
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Solve the problem - implemented by subclasses.
 
         This method can be wrapped with retry logic by subclasses if needed.
@@ -436,7 +436,7 @@ class BaseSpecializedAgent:
         raise NotImplementedError
 
     def _solve_with_retry(
-        self, content: str, context: Dict[str, Any], solve_func: Callable
+        self, content: str, context: dict[str, Any], solve_func: Callable
     ) -> AgentResult:
         """Execute solve function with retry and jitter.
 
@@ -458,7 +458,7 @@ class BaseSpecializedAgent:
         else:
             return solve_func(content, context)
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create the prompt for the agent - implemented by subclasses."""
         raise NotImplementedError
 
@@ -470,7 +470,7 @@ class FallbackAgent(BaseSpecializedAgent):
         super().__init__()
         self.reason = reason
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Return failure result with explanation."""
         return AgentResult(
             success=False,
@@ -486,7 +486,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair YAML frontmatter issues."""
         prompt = self._create_prompt(content, context)
 
@@ -525,7 +525,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
                 warnings=["YAML agent execution failed"],
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create YAML repair prompt."""
         error_msg = context.get("error_message", "")
 
@@ -564,7 +564,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content structure issues like missing sections."""
         # First try rule-based repair
         rule_based_result = self._rule_based_repair(content, context)
@@ -601,7 +601,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                 warnings=["Content structure agent execution failed"],
             )
 
-    def _rule_based_repair(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def _rule_based_repair(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Try rule-based repair first."""
         try:
             # Extract languages from frontmatter
@@ -679,7 +679,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                 success=False, reasoning=f"Rule-based repair failed: {e}"
             )
 
-    def _extract_languages_from_frontmatter(self, content: str) -> List[str]:
+    def _extract_languages_from_frontmatter(self, content: str) -> list[str]:
         """Extract language tags from frontmatter."""
         lines = content.splitlines()
         in_frontmatter = False
@@ -701,14 +701,14 @@ class ContentStructureAgent(BaseSpecializedAgent):
 
         return ["en"]  # Default fallback
 
-    def _find_frontmatter_end(self, lines: List[str]) -> int:
+    def _find_frontmatter_end(self, lines: list[str]) -> int:
         """Find the end of frontmatter."""
         for i, line in enumerate(lines):
             if line.strip() == "---" and i > 0:
                 return i
         return 0
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create content structure repair prompt."""
         error_msg = context.get("error_message", "")
 
@@ -736,7 +736,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content corruption like repetitive patterns."""
         # First try rule-based corruption repair
         rule_based_result = self._rule_based_corruption_repair(content)
@@ -810,7 +810,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
                 success=False, reasoning=f"Rule-based corruption repair failed: {e}"
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create content corruption repair prompt."""
         error_msg = context.get("error_message", "")
 
@@ -834,7 +834,7 @@ Return the complete repaired content with corruption removed."""
 class CodeBlockAgent(BaseSpecializedAgent):
     """Agent specialized in repairing code block issues."""
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair code block formatting and fence issues."""
         # This can often be done with simple regex patterns
         repaired_content = self._repair_code_fences(content)
@@ -886,7 +886,7 @@ class CodeBlockAgent(BaseSpecializedAgent):
 class HTMLValidationAgent(BaseSpecializedAgent):
     """Agent specialized in repairing HTML validation issues."""
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair HTML validation issues."""
         # Import here to avoid circular imports
         from ..apf.html_generator import HTMLTemplateGenerator
@@ -924,7 +924,7 @@ class HTMLValidationAgent(BaseSpecializedAgent):
                 warnings=["HTML validation agent execution failed"],
             )
 
-    def _extract_card_data(self, content: str) -> Optional[Dict[str, Any]]:
+    def _extract_card_data(self, content: str) -> dict[str, Any | None]:
         """Extract card data from HTML content for regeneration."""
         # This would need more sophisticated parsing
         # For now, return None to indicate we can't extract
@@ -940,7 +940,7 @@ class QAExtractionAgent(BaseSpecializedAgent):
         # This agent is a placeholder that falls back to the FallbackAgent behavior
         self.qa_agent = None
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Extract Q/A pairs from content."""
         # QA extraction requires full LLM integration with a provider
         # This is not available in the specialized agent context
@@ -958,7 +958,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """General quality assurance and repair."""
         prompt = self._create_prompt(content, context)
 
@@ -989,7 +989,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
                 warnings=["Quality assurance agent execution failed"],
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create general quality assurance prompt."""
         error_msg = context.get("error_message", "")
 
@@ -1014,8 +1014,8 @@ problem_router = ProblemRouter()
 
 
 def diagnose_and_solve_problems(
-    content: str, error_context: Dict[str, Any]
-) -> List[AgentResult]:
+    content: str, error_context: dict[str, Any]
+) -> list[AgentResult]:
     """
     Diagnose problems and attempt solutions using specialized agents.
 

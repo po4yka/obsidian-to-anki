@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 
 import httpx
 
+from ..domain.interfaces.anki_client import IAnkiClient
 from ..exceptions import AnkiConnectError
 from ..utils.logging import get_logger
 from ..utils.retry import retry
@@ -13,7 +14,7 @@ from ..utils.retry import retry
 logger = get_logger(__name__)
 
 
-class AnkiClient:
+class AnkiClient(IAnkiClient):
     """Client for AnkiConnect HTTP API.
 
     Note: This client uses synchronous httpx.Client for compatibility with
@@ -587,6 +588,24 @@ class AnkiClient:
         """Trigger Anki sync."""
         self.invoke("sync")
         logger.info("anki_sync_triggered")
+
+    # IAnkiClient interface implementation
+
+    def check_connection(self) -> bool:
+        """Check if AnkiConnect is accessible and healthy."""
+        return self._check_health()
+
+    def get_note_id_from_card_id(self, card_id: int) -> int:
+        """Get note ID from card ID."""
+        return cast(int, self.invoke("cardsToNotes", {"cards": [card_id]})[0])
+
+    def get_card_ids_from_note_id(self, note_id: int) -> list[int]:
+        """Get card IDs from note ID."""
+        return cast(list[int], self.invoke("notesToCards", {"notes": [note_id]})[0])
+
+    def get_deck_stats(self, deck_name: str) -> dict[str, Any]:
+        """Get statistics for a deck."""
+        return cast(dict[str, Any], self.invoke("getDeckStats", {"decks": [deck_name]}))
 
     def close(self) -> None:
         """Close HTTP session and cleanup resources."""

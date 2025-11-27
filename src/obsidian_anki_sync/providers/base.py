@@ -4,6 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
+from ..domain.interfaces.llm_provider import ILLMProvider
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -217,6 +218,19 @@ class BaseLLMProvider(ABC):
             Provider name (e.g., "Ollama", "LM Studio", "OpenRouter")
         """
         return self.__class__.__name__.replace("Provider", "")
+
+    def get_provider_info(self) -> dict[str, Any]:
+        """Get provider information and capabilities.
+
+        Returns:
+            Dictionary with provider metadata
+        """
+        return {
+            "name": self.get_provider_name(),
+            "class": self.__class__.__name__,
+            "config_keys": list(self.config.keys()),
+            "has_connection": self.check_connection(),
+        }
 
     def __repr__(self) -> str:
         """String representation of the provider."""

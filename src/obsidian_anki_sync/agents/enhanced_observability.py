@@ -9,7 +9,7 @@ NEW in 2025: LangSmith integration, agent trajectory tracking, cost monitoring.
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..config import Config
 from ..utils.logging import get_logger
@@ -36,10 +36,10 @@ class AgentMetrics:
     success: bool
     retry_count: int
     step_count: int
-    quality_score: Optional[float]
-    api_cost: Optional[float]
-    token_count: Optional[int]
-    error_type: Optional[str]
+    quality_score: float | None
+    api_cost: float | None
+    token_count: int | None
+    error_type: str | None
     handoffs: int
     timestamp: float
 
@@ -50,8 +50,8 @@ class TrajectoryStep:
 
     agent: str
     action: str
-    state_before: Dict[str, Any]
-    state_after: Dict[str, Any]
+    state_before: dict[str, Any]
+    state_after: dict[str, Any]
     timestamp: float
     duration: float
     success: bool
@@ -91,8 +91,8 @@ class EnhancedObservabilitySystem:
                 self.langsmith_client = None
 
         # In-memory metrics storage (for when LangSmith is unavailable)
-        self.metrics_buffer: List[AgentMetrics] = []
-        self.trajectory_buffer: List[TrajectoryStep] = []
+        self.metrics_buffer: list[AgentMetrics] = []
+        self.trajectory_buffer: list[TrajectoryStep] = []
 
         # Performance tracking
         self.execution_stats = {
@@ -249,7 +249,7 @@ class EnhancedObservabilitySystem:
             except Exception as e:
                 logger.warning("langsmith_trajectory_log_failed", error=str(e))
 
-    def get_agent_analytics(self, agent_name: str, time_window_hours: int = 24) -> Dict[str, Any]:
+    def get_agent_analytics(self, agent_name: str, time_window_hours: int = 24) -> dict[str, Any]:
         """Get analytics for a specific agent.
 
         Args:
@@ -307,7 +307,7 @@ class EnhancedObservabilitySystem:
             "error_types": list(set(m.error_type for m in agent_metrics if m.error_type)),
         }
 
-    def get_system_analytics(self, time_window_hours: int = 24) -> Dict[str, Any]:
+    def get_system_analytics(self, time_window_hours: int = 24) -> dict[str, Any]:
         """Get system-wide analytics.
 
         Args:
@@ -388,7 +388,7 @@ class EnhancedObservabilitySystem:
             "recent_bottlenecks": recent_bottlenecks[-10:],
         }
 
-    def detect_performance_issues(self) -> List[Dict[str, Any]]:
+    def detect_performance_issues(self) -> list[dict[str, Any]]:
         """Detect potential performance issues and optimization opportunities.
 
         Returns:
@@ -520,7 +520,7 @@ class EnhancedObservabilitySystem:
             logger.error("metrics_export_failed", error=str(e))
             return False
 
-    def get_observability_stats(self) -> Dict[str, Any]:
+    def get_observability_stats(self) -> dict[str, Any]:
         """Get observability system statistics.
 
         Returns:

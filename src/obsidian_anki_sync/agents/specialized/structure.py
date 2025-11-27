@@ -1,7 +1,7 @@
 """Content structure repair agent."""
 
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent, ContentRepairAgent
@@ -17,7 +17,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content structure issues like missing sections."""
         # First try rule-based repair
         rule_based_result = self._rule_based_repair(content, context)
@@ -54,7 +54,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                 warnings=["Content structure agent execution failed"],
             )
 
-    def _rule_based_repair(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def _rule_based_repair(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Try rule-based repair first."""
         try:
             languages = self._extract_languages_from_frontmatter(content)
@@ -128,7 +128,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                 success=False, reasoning=f"Rule-based repair failed: {e}"
             )
 
-    def _extract_languages_from_frontmatter(self, content: str) -> List[str]:
+    def _extract_languages_from_frontmatter(self, content: str) -> list[str]:
         """Extract language tags from frontmatter."""
         lines = content.splitlines()
         in_frontmatter = False
@@ -149,14 +149,14 @@ class ContentStructureAgent(BaseSpecializedAgent):
 
         return ["en"]
 
-    def _find_frontmatter_end(self, lines: List[str]) -> int:
+    def _find_frontmatter_end(self, lines: list[str]) -> int:
         """Find the end of frontmatter."""
         for i, line in enumerate(lines):
             if line.strip() == "---" and i > 0:
                 return i
         return 0
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create content structure repair prompt."""
         error_msg = context.get("error_message", "")
 

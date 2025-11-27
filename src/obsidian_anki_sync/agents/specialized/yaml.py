@@ -1,6 +1,6 @@
 """YAML frontmatter repair agent."""
 
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent, ContentRepairAgent
@@ -16,7 +16,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair YAML frontmatter issues."""
         prompt = self._create_prompt(content, context)
 
@@ -54,7 +54,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
                 warnings=["YAML agent execution failed"],
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create YAML repair prompt."""
         error_msg = context.get("error_message", "")
 

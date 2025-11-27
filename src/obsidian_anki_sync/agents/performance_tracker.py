@@ -2,7 +2,7 @@
 
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+
 
 from ..anki.client import AnkiClient
 from ..models import Card
@@ -30,7 +30,7 @@ class PerformanceTracker:
 
         logger.info("performance_tracker_initialized")
 
-    def get_card_performance(self, note_ids: List[int]) -> Dict[int, Dict[str, float]]:
+    def get_card_performance(self, note_ids: list[int]) -> dict[int, dict[str, float]]:
         """Get performance metrics for specific cards.
 
         Args:
@@ -57,7 +57,7 @@ class PerformanceTracker:
             logger.warning("failed_to_get_card_performance", error=str(e))
             return {}
 
-    def get_review_statistics(self) -> Dict[str, float]:
+    def get_review_statistics(self) -> dict[str, float]:
         """Get overall review statistics from Anki.
 
         Returns:
@@ -82,7 +82,7 @@ class PerformanceTracker:
             logger.warning("failed_to_get_review_statistics", error=str(e))
             return {}
 
-    def analyze_card_patterns(self, cards: List[Card]) -> Dict[str, List[str]]:
+    def analyze_card_patterns(self, cards: list[Card]) -> dict[str, list[str]]:
         """Analyze patterns in card performance to identify quality issues.
 
         Args:
@@ -114,7 +114,7 @@ class PerformanceTracker:
 
         return dict(issues)
 
-    def _calculate_card_metrics(self, card_info: Dict) -> Dict[str, float]:
+    def _calculate_card_metrics(self, card_info: Dict) -> dict[str, float]:
         """Calculate performance metrics for a single card.
 
         Args:
@@ -165,8 +165,8 @@ class PerformanceTracker:
         return metrics
 
     def _analyze_single_card_performance(
-        self, card: Card, performance_data: Dict[str, float]
-    ) -> Dict[str, List[str]]:
+        self, card: Card, performance_data: dict[str, float]
+    ) -> dict[str, list[str]]:
         """Analyze performance of a single card.
 
         Args:
@@ -201,7 +201,7 @@ class PerformanceTracker:
 
         return dict(issues)
 
-    def get_quality_insights(self, performance_data: Dict[int, Dict[str, float]]) -> Dict[str, float]:
+    def get_quality_insights(self, performance_data: dict[int, dict[str, float]]) -> dict[str, float]:
         """Generate quality insights from performance data.
 
         Args:
@@ -275,7 +275,7 @@ class PerformanceTracker:
             logger.error("performance_report_export_failed", error=str(e))
             return {"error": str(e), "timestamp": time.time()}
 
-    def _generate_recommendations(self, stats: Dict[str, float]) -> List[str]:
+    def _generate_recommendations(self, stats: dict[str, float]) -> list[str]:
         """Generate recommendations based on performance statistics.
 
         Args:

@@ -6,7 +6,7 @@ to prevent common parsing and validation errors.
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+
 
 from ..utils.logging import get_logger
 
@@ -18,9 +18,9 @@ class ContentValidationResult:
     """Result of content validation with warnings and suggestions."""
 
     is_valid: bool
-    warnings: List[str]
-    suggestions: List[str]
-    sanitized_content: Optional[str] = None
+    warnings: list[str]
+    suggestions: list[str]
+    sanitized_content: str | None = None
 
 
 @dataclass
@@ -37,10 +37,10 @@ class PreprocessingConfig:
 class ContentPreprocessor:
     """Enhanced content validation and preprocessing."""
 
-    def __init__(self, config: Optional[PreprocessingConfig] = None):
+    def __init__(self, config: PreprocessingConfig | None = None):
         self.config = config or PreprocessingConfig()
 
-    def preprocess_content(self, content: str) -> Tuple[str, List[str]]:
+    def preprocess_content(self, content: str) -> tuple[str, list[str]]:
         """
         Preprocess content with sanitization and validation.
 
@@ -109,7 +109,7 @@ class ContentPreprocessor:
             sanitized_content=None,  # Will be set if preprocessing is applied
         )
 
-    def _normalize_whitespace(self, content: str) -> Tuple[str, List[str]]:
+    def _normalize_whitespace(self, content: str) -> tuple[str, list[str]]:
         """Normalize whitespace issues."""
         warnings = []
         original_lines = content.splitlines()
@@ -141,7 +141,7 @@ class ContentPreprocessor:
 
         return "\n".join(result_lines), warnings
 
-    def _sanitize_code_fences(self, content: str) -> Tuple[str, List[str]]:
+    def _sanitize_code_fences(self, content: str) -> tuple[str, list[str]]:
         """Sanitize code fences to prevent parsing issues."""
         warnings = []
         lines = content.splitlines()
@@ -179,7 +179,7 @@ class ContentPreprocessor:
 
         return "\n".join(sanitized_lines), warnings
 
-    def _add_missing_language_hints(self, content: str) -> Tuple[str, List[str]]:
+    def _add_missing_language_hints(self, content: str) -> tuple[str, list[str]]:
         """Add language hints to code blocks that lack them."""
         warnings = []
 
@@ -208,7 +208,7 @@ class ContentPreprocessor:
 
         return modified_content, warnings
 
-    def _fix_frontmatter(self, content: str) -> Tuple[str, List[str]]:
+    def _fix_frontmatter(self, content: str) -> tuple[str, list[str]]:
         """Fix common frontmatter issues."""
         warnings = []
 
@@ -239,7 +239,7 @@ class ContentPreprocessor:
 
         return "\n".join(lines), warnings
 
-    def _check_code_fence_balance(self, content: str) -> List[str]:
+    def _check_code_fence_balance(self, content: str) -> list[str]:
         """Check for code fence balance issues."""
         warnings = []
         lines = content.splitlines()
@@ -254,7 +254,7 @@ class ContentPreprocessor:
 
         return warnings
 
-    def _check_frontmatter_integrity(self, content: str) -> List[str]:
+    def _check_frontmatter_integrity(self, content: str) -> list[str]:
         """Check frontmatter structure."""
         warnings = []
 
@@ -273,7 +273,7 @@ class ContentPreprocessor:
 
         return warnings
 
-    def _check_content_structure(self, content: str) -> List[str]:
+    def _check_content_structure(self, content: str) -> list[str]:
         """Check overall content structure."""
         warnings = []
 
@@ -310,8 +310,8 @@ class ContentPreprocessor:
         return warnings
 
     def _generate_improvement_suggestions(
-        self, content: str, warnings: List[str]
-    ) -> List[str]:
+        self, content: str, warnings: list[str]
+    ) -> list[str]:
         """Generate improvement suggestions based on warnings."""
         suggestions = []
 
@@ -340,7 +340,7 @@ class ContentPreprocessor:
         # For now, any fence can close any opener (simplified logic)
         return True
 
-    def _detect_code_language(self, code: str) -> Optional[str]:
+    def _detect_code_language(self, code: str) -> str | None:
         """Attempt to detect programming language from code content."""
         # Simple heuristics for common languages
         code_lower = code.lower().strip()

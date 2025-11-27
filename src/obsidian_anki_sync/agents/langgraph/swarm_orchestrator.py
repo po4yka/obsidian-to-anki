@@ -6,16 +6,14 @@ control to other agents based on expertise, improving efficiency and specializat
 NEW in 2025: Dynamic agent handoffs, expertise-based routing, and collaborative workflows.
 """
 
-import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
-from langgraph.graph import END, StateGraph
-from langgraph.prebuilt import create_react_agent
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 from langgraph_swarm import Swarm
+from langchain.agents import create_agent
 
 from ...config import Config
 from ...utils.logging import get_logger
@@ -30,8 +28,8 @@ class AgentExpertise:
     """Defines an agent's expertise areas and handoff capabilities."""
 
     name: str
-    expertise: List[str]
-    handoff_agents: List[str]
+    expertise: list[str]
+    handoff_agents: list[str]
     model: Any
     description: str
 
@@ -41,7 +39,7 @@ class SwarmResult:
     """Result from swarm execution."""
 
     final_agent: str
-    handoffs: List[Dict[str, Any]]
+    handoffs: list[dict[str, Any]]
     total_time: float
     success: bool
     final_state: PipelineState
@@ -90,7 +88,7 @@ class LangGraphSwarmOrchestrator:
             strategy=handoff_strategy,
         )
 
-    def _define_agent_expertise(self) -> Dict[str, AgentExpertise]:
+    def _define_agent_expertise(self) -> dict[str, AgentExpertise]:
         """Define expertise profiles for each agent."""
         from ...providers.pydantic_ai_models import PydanticAIModelFactory
 
@@ -175,11 +173,11 @@ class LangGraphSwarmOrchestrator:
             for handoff_agent in expertise.handoff_agents:
                 handoff_tools.append(self._create_handoff_tool(handoff_agent))
 
-            agent = create_react_agent(
+            # Create agent using modern langchain.agents API
+            agent = create_agent(
                 expertise.model,
                 tools=handoff_tools,
-                name=expertise.name,
-                prompt=self._create_agent_prompt(expertise),
+                system_prompt=self._create_agent_prompt(expertise),
             )
             agents.append(agent)
 
@@ -234,9 +232,9 @@ Always focus on your core competencies and hand off when appropriate.
     async def process_note_with_swarm(
         self,
         note_content: str,
-        metadata: Dict,
-        qa_pairs: List[Dict],
-        file_path: Optional[str] = None,
+        metadata: dict,
+        qa_pairs: list[dict],
+        file_path: str | None = None,
     ) -> SwarmResult:
         """Process a note through the swarm orchestration.
 
@@ -302,9 +300,9 @@ Always focus on your core competencies and hand off when appropriate.
     def _create_swarm_state(
         self,
         note_content: str,
-        metadata: Dict,
-        qa_pairs: List[Dict],
-        file_path: Optional[str],
+        metadata: dict,
+        qa_pairs: list[dict],
+        file_path: str | None,
     ) -> PipelineState:
         """Create initial state for swarm processing."""
         return {
@@ -329,9 +327,9 @@ Always focus on your core competencies and hand off when appropriate.
     async def _fallback_processing(
         self,
         note_content: str,
-        metadata: Dict,
-        qa_pairs: List[Dict],
-        file_path: Optional[str],
+        metadata: dict,
+        qa_pairs: list[dict],
+        file_path: str | None,
         start_time: float,
     ) -> SwarmResult:
         """Fallback to traditional processing when swarm is disabled or fails."""
@@ -365,7 +363,7 @@ Always focus on your core competencies and hand off when appropriate.
             final_state={},  # Not available in traditional result
         )
 
-    def get_swarm_stats(self) -> Dict[str, Any]:
+    def get_swarm_stats(self) -> dict[str, Any]:
         """Get statistics about swarm performance."""
         if not self.swarm:
             return {"enabled": False}
