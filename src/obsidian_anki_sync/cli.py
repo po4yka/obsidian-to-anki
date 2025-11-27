@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .cli_commands.shared import get_config_and_logger
 from .cli_commands.sync_handler import run_sync
+from .cli_commands.rag_commands import rag_app
 from .obsidian.note_validator import validate_note_structure
 from .obsidian.parser import parse_frontmatter
 from .utils.log_analyzer import LogAnalyzer
@@ -22,6 +23,9 @@ app = typer.Typer(
     help="Obsidian to Anki APF sync service.",
     no_args_is_help=True,
 )
+
+# Add RAG subcommand group
+app.add_typer(rag_app, name="rag", help="RAG (Retrieval-Augmented Generation) commands")
 
 console = Console()
 
