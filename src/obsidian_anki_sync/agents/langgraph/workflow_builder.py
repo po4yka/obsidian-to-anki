@@ -8,6 +8,7 @@ from .nodes import (
     context_enrichment_node,
     duplicate_detection_node,
     generation_node,
+    linter_validation_node,
     memorization_quality_node,
     note_correction_node,
     post_validation_node,
@@ -125,6 +126,15 @@ class WorkflowBuilder:
             retry=TRANSIENT_RETRY_POLICY,
         )
 
+        # Linter validation - deterministic APF template compliance check
+        # This runs between generation and post_validation to provide
+        # authoritative template validation (no LLM hallucinations)
+        workflow.add_node(
+            "linter_validation",
+            linter_validation_node,
+            retry=None,  # Deterministic - no retry needed
+        )
+
         workflow.add_node(
             "post_validation",
             post_validation_node,
@@ -172,7 +182,10 @@ class WorkflowBuilder:
         # Split validation goes to generation
         workflow.add_edge("split_validation", "generation")
 
-        workflow.add_edge("generation", "post_validation")
+        # Generation -> Linter validation -> Post-validation
+        # Linter provides deterministic template compliance checking
+        workflow.add_edge("generation", "linter_validation")
+        workflow.add_edge("linter_validation", "post_validation")
 
         workflow.add_conditional_edges(
             "post_validation",

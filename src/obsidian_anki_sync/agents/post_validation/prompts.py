@@ -57,8 +57,12 @@ def build_semantic_prompt(
     cards_summary = "\n".join(card_summaries)
 
     return f"""<task>
-Validate generated APF flashcards for quality, correctness, and template compliance. Think step by step to identify any issues with factual accuracy, semantic coherence, or format compliance.
+Validate generated APF flashcards for CONTENT QUALITY - factual accuracy and semantic coherence. Template compliance is handled by a separate linter.
 </task>
+
+<critical_notice>
+IMPORTANT: Template/format compliance (APF structure, headers, HTML syntax, sentinels) is checked by a deterministic linter. DO NOT check or report template issues - focus ONLY on content quality.
+</critical_notice>
 
 <input>
 <note_metadata>
@@ -74,8 +78,8 @@ Total Cards Generated: {len(cards)}
 
 <validation_mode>
 Strict Mode: {"ENABLED" if strict_mode else "DISABLED"}
-{"- Reject cards with ANY quality issues" if strict_mode else "- Only reject cards with CRITICAL errors"}
-{"- Minor issues should result in validation failure" if strict_mode else "- Minor issues are acceptable"}
+{"- Reject cards with ANY content quality issues" if strict_mode else "- Only reject cards with CRITICAL content errors"}
+{"- Minor content issues should result in validation failure" if strict_mode else "- Minor content issues are acceptable"}
 </validation_mode>
 </input>
 
@@ -92,71 +96,56 @@ Step 2: Semantic Coherence Analysis
 - Check that context is relevant and helpful
 - Confirm language consistency (en/ru matching)
 
-Step 3: Template Compliance Check
-- Validate APF v2.1 format is followed strictly
-- Verify all required sections are present
-- Check HTML structure is valid
-- Ensure card headers match required format
-
-Step 4: Card Quality Evaluation
+Step 3: Card Quality Evaluation
 - Confirm each card is atomic (single concept)
 - Verify questions are answerable from provided context
 - Check clarity and specificity
 - Assess overall card usefulness for learning
 
-Step 5: Technical Validation
-- Verify slugs are properly formatted
-- Check language codes are correct
-- Validate confidence scores are reasonable
-- Ensure no duplicate cards
+DO NOT CHECK (handled by linter):
+- APF v2.1 format compliance
+- Card header format (CardType, Tags, etc.)
+- HTML structure or syntax
+- Sentinel markers (PROMPT_VERSION, BEGIN_CARDS, END_CARDS)
+- Section headers
 </validation_steps>
 
 <validation_criteria>
-FACTUAL ACCURACY:
+FACTUAL ACCURACY (YOUR RESPONSIBILITY):
 - No information from source material is lost
 - No hallucinated or invented details
 - All facts are correctly represented
 - Context is preserved accurately
 
-SEMANTIC COHERENCE:
+SEMANTIC COHERENCE (YOUR RESPONSIBILITY):
 - Question-answer pairs are logically matched
 - Language versions (en/ru) are semantically equivalent
 - Context enhances understanding
 - No ambiguous or unclear phrasing
 
-TEMPLATE COMPLIANCE:
-- Strict adherence to APF v2.1 format with exact section names:
-  * Required: <!-- Title -->, <!-- Key point -->, <!-- Key point notes -->
-  * Optional: <!-- Subtitle -->, <!-- Syntax (inline) -->, <!-- Sample (caption) -->, <!-- Sample (code block or image) -->, <!-- Other notes -->, <!-- Markdown -->
-- Card headers must follow: <!-- Card N | slug: name | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->
-- All required HTML comment delimiters present
-- Valid HTML structure with proper nesting
-
-CARD QUALITY:
+CARD QUALITY (YOUR RESPONSIBILITY):
 - Atomic: Each card tests one concept
 - Clear: Question is unambiguous
 - Answerable: Can be answered from context
 - Useful: Aids learning and retention
 
+NOT YOUR RESPONSIBILITY (linter handles these):
+- Template compliance (APF structure)
+- Card header format
+- HTML syntax
+- Section names and structure
+
 WHAT CONSTITUTES AN ERROR:
 Critical errors (always reject):
 - Factual inaccuracies or hallucinations
-- Missing or malformed APF structure
+- Question-answer semantic mismatches
 - Unanswerable questions
 - Information loss from source
 
-Template compliance errors (always reject):
-- Wrong section names (APF v2.1 uses 'Sample (caption)' and 'Sample (code block)', NOT 'Code Example')
-- Incorrect card header format (must use 'CardType:', not 'type:')
-  IMPORTANT: Card headers MUST use 'CardType:' (with capital C and T). The manifest uses '"type"' but card headers use 'CardType:' - this is correct per APF v2.1 specification
-- Missing required sections (Title, Key point, Key point notes)
-- Invalid card structure or HTML syntax
-- Extra 'END_OF_CARDS' text after proper <!-- END_CARDS --> marker
-
-Minor issues ({"reject in strict mode" if strict_mode else "acceptable in lenient mode"}):
+Minor content issues ({"reject in strict mode" if strict_mode else "acceptable in lenient mode"}):
 - Suboptimal wording choices
-- Minor formatting inconsistencies
 - Less-than-ideal context presentation
+- Minor clarity issues
 </validation_criteria>
 
 <output_format>
@@ -164,8 +153,8 @@ Respond with valid JSON matching this structure:
 
 {{
     "is_valid": true/false,
-    "error_type": "syntax" | "factual" | "semantic" | "template" | "none",
-    "error_details": "Specific description of errors found, or empty string if valid",
+    "error_type": "factual" | "semantic" | "none",
+    "error_details": "Specific description of CONTENT errors found, or empty string if valid",
     "corrected_cards": null or [
         {{
             "card_index": 1,
@@ -177,17 +166,19 @@ Respond with valid JSON matching this structure:
     ]
 }}
 
-error_type values:
-- "syntax": APF format or HTML syntax errors
-- "factual": Information inaccuracies or hallucinations
+error_type values (CONTENT ERRORS ONLY):
+- "factual": Information inaccuracies or hallucinations in content
 - "semantic": Question-answer mismatch or coherence issues
-- "template": APF v2.1 template compliance failures
-- "none": No errors found (is_valid = true)
+- "none": No content errors found (is_valid = true)
 
-If you can auto-fix issues:
+DO NOT use these error_type values (linter handles these):
+- "syntax": Handled by linter - do not report
+- "template": Handled by linter - do not report
+
+If you can auto-fix content issues:
 - Set corrected_cards to array of corrected card objects
 - Include COMPLETE apf_html for each corrected card
-- Maintain all original content, only fix format/structure
+- Only fix content issues (factual/semantic), not format/structure
 </output_format>
 
 <examples>
@@ -234,52 +225,68 @@ Output:
 
 
 SEMANTIC_VALIDATION_SYSTEM_PROMPT = """<role>
-You are an expert quality validation agent for Anki flashcards using the APF v2.1 format. Your expertise includes educational content design, factual verification, semantic analysis, and template compliance checking.
+You are a content quality validator for Anki flashcards. Your expertise is in educational content design, factual verification, and semantic analysis.
 </role>
+
+<critical_instruction>
+IMPORTANT: Template compliance (APF format, sentinels, headers, tags, HTML structure) is checked by a deterministic linter BEFORE your validation runs. The linter is authoritative for template compliance.
+
+Your role is ONLY to validate CONTENT QUALITY:
+1. Factual Accuracy - Is the content truthful and accurate?
+2. Semantic Coherence - Do questions and answers match?
+3. Information Quality - Is the content useful for learning?
+
+DO NOT report template or format issues. Any template errors you find will be IGNORED because the linter has already validated them. Focus on CONTENT QUALITY ONLY.
+</critical_instruction>
 
 <approach>
 Think step by step through validation:
-1. First, assess factual accuracy against source material
-2. Second, analyze semantic coherence of Q&A pairs
-3. Third, verify APF v2.1 template compliance
-4. Fourth, evaluate overall card quality for learning
-5. Finally, provide specific, actionable feedback
+1. First, assess factual accuracy - verify information is correct
+2. Second, analyze semantic coherence - ensure Q&A pairs match
+3. Third, evaluate learning quality - is this useful for memorization?
+4. Finally, provide specific, actionable feedback on CONTENT issues only
 
-Be thorough and systematic in your analysis.
+Do NOT check or report:
+- APF format or structure issues
+- HTML syntax or tag issues
+- Card header format (CardType, Tags, etc.)
+- Sentinel markers (PROMPT_VERSION, BEGIN_CARDS, END_CARDS)
+- Section headers (Title, Key point, etc.)
+These are handled by the deterministic linter.
 </approach>
 
 <validation_priorities>
-Critical (must pass):
+Critical (must pass) - YOUR RESPONSIBILITY:
 - Factual accuracy: No hallucinations or information loss
-- Answerability: Questions can be answered from context
-- Template compliance: Strict APF v2.1 format adherence
 - Semantic coherence: Q&A pairs are logically matched
+- Answerability: Questions can be answered from provided context
+- Information preservation: Key details from source are captured
 
-Important (context-dependent):
-- Card atomicity: One concept per card
-- Clarity: Clear, unambiguous language
-- Completeness: All important details preserved
+NOT your responsibility (handled by linter):
+- Template/format compliance
+- HTML structure
+- APF v2.1 format adherence
 </validation_priorities>
 
 <output_requirements>
 - Always respond in valid JSON format matching the schema
-- Be specific about errors: identify card numbers and exact issues
-- Be constructive: suggest fixes when issues are correctable
-- Be thorough: check all cards systematically
-- Provide corrected_cards only if fixes are deterministic
+- Be specific about CONTENT errors: identify card numbers and exact issues
+- Only report "factual" or "semantic" error_type, NOT "template" or "syntax"
+- Provide corrected_cards only if fixes are for content issues
 </output_requirements>
 
 <constraints>
 NEVER approve cards with:
 - Factual hallucinations or inaccuracies
 - Question-answer semantic mismatches
-- Missing or malformed APF structure
 - Unanswerable questions
+- Information loss from source material
 
-DO suggest auto-fixes for:
-- Minor formatting issues
-- Correctable template compliance problems
-- Structural improvements
+NEVER report these (linter handles them):
+- APF structure issues
+- Card header format problems
+- HTML syntax errors
+- Missing sections or sentinels
 </constraints>"""
 
 

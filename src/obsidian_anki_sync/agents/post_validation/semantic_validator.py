@@ -37,6 +37,10 @@ FALSE_POSITIVE_PATTERNS = [
     r"Incorrect.*card\s+header.*CardType.*type",
     r"card\s+header.*'CardType.*'type",
     r"card\s+header.*format.*CardType.*type",
+    # Confusing CardType complaints that reference the correct format
+    r"CardType:\s*\w+.*but.*APF.*requires.*exact\s+format",
+    r"CardType:\s*\w+.*but.*requires.*exact\s+format",
+    r"uses\s+'CardType:\s*\w+'.*but.*APF.*v2\.1\s+requires",
     # Inverse: LLM might say type should be CardType when type is used (also wrong direction)
     r"'type'.*should.*be.*'CardType'",
     r"uses\s+'?type:?\s*\w*'?\s+instead\s+of\s+'?CardType:?",
@@ -45,6 +49,13 @@ FALSE_POSITIVE_PATTERNS = [
     r"Extra\s+'?END_OF_CARDS'?\s+text\s+after.*END_CARDS.*marker",
     r"extra\s+END_OF_CARDS",
     r"END_OF_CARDS.*after.*<!--\s*END_CARDS\s*-->",
+    # Tag format hallucinations - underscores ARE correct for multi-word tags
+    r"Tags.*use\s+underscores.*instead\s+of\s+spaces",
+    r"Tags.*underscores.*instead.*hyphens",
+    r"tags.*header.*use.*underscores",
+    # Vague "proper spacing" complaints without specific issues
+    r"proper\s+spacing\s+and\s+structure",
+    r"with\s+proper\s+spacing",
 ]
 
 

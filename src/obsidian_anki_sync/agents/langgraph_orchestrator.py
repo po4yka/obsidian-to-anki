@@ -42,6 +42,7 @@ from .langgraph.nodes import (
     context_enrichment_node,
     duplicate_detection_node,
     generation_node,
+    linter_validation_node,
     memorization_quality_node,
     note_correction_node,
     post_validation_node,
@@ -56,7 +57,7 @@ from .langgraph.node_helpers import (
 )
 
 # Re-export routing functions for backward compatibility (though these were private)
-from .langgraph.orchestrator import (
+from .langgraph.workflow_builder import (
     should_continue_after_enrichment,
     should_continue_after_memorization_quality,
     should_continue_after_post_validation,
@@ -81,6 +82,7 @@ __all__ = [
     "pre_validation_node",
     "card_splitting_node",
     "generation_node",
+    "linter_validation_node",
     "post_validation_node",
     "context_enrichment_node",
     "memorization_quality_node",

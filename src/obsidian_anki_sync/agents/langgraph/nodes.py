@@ -16,6 +16,7 @@ import asyncio
 import time
 from pathlib import Path
 
+from ...apf.linter import validate_apf
 from ...models import NoteMetadata, QAPair
 from ...providers.pydantic_ai_models import create_openrouter_model_from_env
 from ...utils.logging import get_logger
@@ -697,9 +698,127 @@ async def generation_node(state: PipelineState) -> PipelineState:
     state["generation"] = gen_result.model_dump()
     state["stage_times"]["generation"] = gen_result.generation_time
     state["current_stage"] = (
-        "post_validation" if gen_result.total_cards > 0 else "failed"
+        "linter_validation" if gen_result.total_cards > 0 else "failed"
     )
     state["messages"].append(f"Generated {gen_result.total_cards} cards")
+
+    return state
+
+
+async def linter_validation_node(state: PipelineState) -> PipelineState:
+    """Execute deterministic APF linting - source of truth for template compliance.
+
+    This node runs the APF linter on all generated cards to validate template
+    compliance (sentinels, headers, tags, structure). The linter is authoritative
+    for template checks - when it passes, any LLM template complaints should be
+    overridden as hallucinations.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with linter results
+    """
+    from .node_helpers import increment_step_count
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "linter_validation"):
+        return state
+
+    logger.info("langgraph_linter_validation_start")
+    start_time = time.time()
+
+    # Get generated cards
+    generation = state.get("generation")
+    if not generation:
+        logger.error("langgraph_linter_validation_no_generation")
+        state["linter_valid"] = False
+        state["linter_results"] = []
+        state["current_stage"] = "failed"
+        return state
+
+    cards = [GeneratedCard(**card_dict) for card_dict in generation["cards"]]
+
+    if not cards:
+        logger.warning("langgraph_linter_validation_no_cards")
+        state["linter_valid"] = True
+        state["linter_results"] = []
+        state["current_stage"] = "post_validation"
+        return state
+
+    # Run deterministic linter on each card
+    linter_results = []
+    all_valid = True
+    total_errors = 0
+    total_warnings = 0
+
+    for card in cards:
+        try:
+            result = validate_apf(card.apf_html, card.slug)
+            card_result = {
+                "slug": card.slug,
+                "is_valid": not result.errors,  # Only errors block, not warnings
+                "errors": result.errors,
+                "warnings": result.warnings,
+            }
+            linter_results.append(card_result)
+
+            if result.errors:
+                all_valid = False
+                total_errors += len(result.errors)
+                logger.warning(
+                    "linter_validation_card_errors",
+                    slug=card.slug,
+                    errors=result.errors,
+                )
+
+            total_warnings += len(result.warnings)
+
+            if result.warnings:
+                logger.debug(
+                    "linter_validation_card_warnings",
+                    slug=card.slug,
+                    warnings=result.warnings,
+                )
+
+        except Exception as e:
+            logger.exception(
+                "linter_validation_card_failed",
+                slug=card.slug,
+                error=str(e),
+            )
+            # On exception, mark as invalid
+            linter_results.append({
+                "slug": card.slug,
+                "is_valid": False,
+                "errors": [f"Linter exception: {str(e)}"],
+                "warnings": [],
+            })
+            all_valid = False
+            total_errors += 1
+
+    # Update state with linter results
+    state["linter_valid"] = all_valid
+    state["linter_results"] = linter_results
+
+    linting_time = time.time() - start_time
+    state["stage_times"]["linter_validation"] = linting_time
+
+    logger.info(
+        "langgraph_linter_validation_complete",
+        cards_count=len(cards),
+        linter_valid=all_valid,
+        total_errors=total_errors,
+        total_warnings=total_warnings,
+        linting_time=linting_time,
+    )
+
+    # Always proceed to post_validation - linter results are used there
+    # to override LLM template hallucinations
+    state["current_stage"] = "post_validation"
+    state["messages"].append(
+        f"Linter validation: {'passed' if all_valid else f'failed ({total_errors} errors)'}"
+    )
 
     return state
 
@@ -785,11 +904,52 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     except BaseException:
         raise
 
+    # Check linter results to override LLM template hallucinations
+    # Two-tier validation: linter is authoritative for template compliance,
+    # LLM is authoritative for content quality (factual/semantic)
+    linter_valid = state.get("linter_valid", False)
+    llm_template_overridden = False
+
+    if not post_result.is_valid and post_result.error_type == "template":
+        if linter_valid:
+            # Template compliance: LINTER is authoritative
+            # LLM is hallucinating - log and override
+            logger.warning(
+                "llm_template_error_overridden_by_linter",
+                error_type=post_result.error_type,
+                error_details=post_result.error_details[:200] if post_result.error_details else "",
+                reason="linter_passed_template_checks",
+                linter_results_summary={
+                    "total_cards": len(state.get("linter_results", [])),
+                    "all_valid": linter_valid,
+                },
+            )
+            # Override: treat as valid for template compliance
+            post_result.is_valid = True
+            post_result.error_type = "none"
+            post_result.error_details = ""
+            llm_template_overridden = True
+        else:
+            # Both linter and LLM found template errors - LLM errors are legitimate
+            logger.info(
+                "llm_template_error_confirmed_by_linter",
+                error_type=post_result.error_type,
+                linter_errors=[
+                    r.get("errors", [])
+                    for r in state.get("linter_results", [])
+                    if r.get("errors")
+                ],
+            )
+
+    # Log validation decision for tracking
     logger.info(
         "langgraph_post_validation_complete",
         is_valid=post_result.is_valid,
         retry_count=state["retry_count"],
         time=post_result.validation_time,
+        linter_valid=linter_valid,
+        llm_error_type=post_result.error_type if not post_result.is_valid else "none",
+        llm_template_overridden=llm_template_overridden,
     )
 
     state["post_validation"] = post_result.model_dump()

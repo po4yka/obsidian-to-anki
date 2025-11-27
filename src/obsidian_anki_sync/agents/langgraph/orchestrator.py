@@ -290,6 +290,8 @@ class LangGraphOrchestrator:
             "pre_validation": None,
             "card_splitting": None,
             "generation": None,
+            "linter_valid": False,  # Will be set by linter_validation_node
+            "linter_results": [],  # Will be populated by linter_validation_node
             "post_validation": None,
             "context_enrichment": None,
             "memorization_quality": None,
