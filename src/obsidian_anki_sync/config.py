@@ -303,6 +303,72 @@ class Config(BaseSettings):
         default=10000, description="Maximum number of memories per type"
     )
 
+    # ============================================================================
+    # RAG (Retrieval-Augmented Generation) Configuration
+    # ============================================================================
+    rag_enabled: bool = Field(
+        default=False,
+        description="Enable RAG for context enrichment, duplicate detection, and few-shot examples"
+    )
+
+    rag_db_path: Path = Field(
+        default=Path(".chroma_db"),
+        description="Path to ChromaDB persistence directory (relative to vault)"
+    )
+
+    rag_embedding_model: str = Field(
+        default="openai/text-embedding-3-small",
+        description="Embedding model for RAG (via OpenRouter or direct provider)"
+    )
+
+    rag_chunk_size: int = Field(
+        default=1000,
+        ge=100,
+        le=10000,
+        description="Maximum characters per chunk for RAG indexing"
+    )
+
+    rag_chunk_overlap: int = Field(
+        default=200,
+        ge=0,
+        le=500,
+        description="Overlap between chunks for RAG indexing"
+    )
+
+    rag_search_k: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Number of results to retrieve in RAG searches"
+    )
+
+    rag_similarity_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Similarity threshold for duplicate detection"
+    )
+
+    rag_index_on_sync: bool = Field(
+        default=True,
+        description="Automatically re-index changed files during sync"
+    )
+
+    rag_context_enrichment: bool = Field(
+        default=True,
+        description="Use RAG to enrich context during card generation"
+    )
+
+    rag_duplicate_detection: bool = Field(
+        default=True,
+        description="Use RAG for semantic duplicate detection"
+    )
+
+    rag_few_shot_examples: bool = Field(
+        default=True,
+        description="Use RAG to retrieve few-shot examples for generation"
+    )
+
     # LLM Performance Monitoring
     llm_slow_request_threshold: float = Field(
         default=60.0, description="Threshold in seconds for logging slow LLM requests"
