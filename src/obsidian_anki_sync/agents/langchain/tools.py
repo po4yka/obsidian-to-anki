@@ -4,17 +4,13 @@ This module defines tools that can be used by LangChain agents to perform
 specific operations in the card generation pipeline.
 """
 
-from typing import Any, Dict, List, Optional
-
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field
 
-from ...apf.generator import APFGenerator
-from ...apf.linter import validate_apf
 from ...apf.html_validator import validate_card_html
+from ...apf.linter import validate_apf
+from ...sync.slug_generator import generate_slug
 from ...utils.content_hash import compute_content_hash
 from ...utils.logging import get_logger
-from ...utils.slug_utils import generate_slug
 
 logger = get_logger(__name__)
 
@@ -40,7 +36,7 @@ class APFValidatorTool(BaseTool):
                 return "APF validation passed: All cards are valid."
             else:
                 errors = [f"- {error}" for error in result.errors]
-                return f"APF validation failed:\n" + "\n".join(errors)
+                return "APF validation failed:\n" + "\n".join(errors)
         except Exception as e:
             logger.error("apf_validation_tool_error", error=str(e))
             return f"APF validation error: {e}"
@@ -50,7 +46,9 @@ class HTMLFormatterTool(BaseTool):
     """Tool for formatting and validating HTML content."""
 
     name: str = "html_formatter"
-    description: str = "Format and validate HTML content. Returns formatted HTML or validation errors."
+    description: str = (
+        "Format and validate HTML content. Returns formatted HTML or validation errors."
+    )
 
     def _run(self, html_content: str) -> str:
         """Format and validate HTML content.
@@ -67,7 +65,7 @@ class HTMLFormatterTool(BaseTool):
                 return f"HTML validation passed. Formatted content:\n{result.formatted_html}"
             else:
                 errors = [f"- {error}" for error in result.errors]
-                return f"HTML validation failed:\n" + "\n".join(errors)
+                return "HTML validation failed:\n" + "\n".join(errors)
         except Exception as e:
             logger.error("html_formatter_tool_error", error=str(e))
             return f"HTML formatting error: {e}"
@@ -79,7 +77,9 @@ class SlugGeneratorTool(BaseTool):
     name: str = "slug_generator"
     description: str = "Generate unique slugs for cards based on title and base slug. Returns generated slug."
 
-    def _run(self, title: str, base_slug: str, existing_slugs: Optional[List[str]] = None) -> str:
+    def _run(
+        self, title: str, base_slug: str, existing_slugs: list[str] | None = None
+    ) -> str:
         """Generate a unique slug.
 
         Args:
@@ -103,7 +103,9 @@ class ContentHashTool(BaseTool):
     """Tool for computing content hashes."""
 
     name: str = "content_hash"
-    description: str = "Compute content hash for change detection. Returns hex hash string."
+    description: str = (
+        "Compute content hash for change detection. Returns hex hash string."
+    )
 
     def _run(self, content: str) -> str:
         """Compute content hash.
@@ -170,7 +172,7 @@ class CardTemplateTool(BaseTool):
         answer: str,
         slug: str,
         language: str = "en",
-        tags: Optional[List[str]] = None
+        tags: list[str] | None = None,
     ) -> str:
         """Generate a card template.
 
@@ -215,9 +217,11 @@ class QAExtractorTool(BaseTool):
     """Tool for extracting Q&A pairs from note content."""
 
     name: str = "qa_extractor"
-    description: str = "Extract Q&A pairs from note content. Returns structured Q&A data."
+    description: str = (
+        "Extract Q&A pairs from note content. Returns structured Q&A data."
+    )
 
-    def _run(self, note_content: str, language_tags: Optional[List[str]] = None) -> str:
+    def _run(self, note_content: str, language_tags: list[str] | None = None) -> str:
         """Extract Q&A pairs from note content.
 
         Args:
@@ -274,13 +278,14 @@ def get_tool(tool_name: str, **kwargs) -> BaseTool:
     if tool_name not in TOOL_REGISTRY:
         available_tools = list(TOOL_REGISTRY.keys())
         raise ValueError(
-            f"Unknown tool '{tool_name}'. Available tools: {available_tools}")
+            f"Unknown tool '{tool_name}'. Available tools: {available_tools}"
+        )
 
     tool_class = TOOL_REGISTRY[tool_name]
     return tool_class(**kwargs)
 
 
-def get_tools_for_agent(agent_type: str) -> List[BaseTool]:
+def get_tools_for_agent(agent_type: str) -> list[BaseTool]:
     """Get recommended tools for a specific agent type.
 
     Args:

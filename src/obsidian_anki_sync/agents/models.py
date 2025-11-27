@@ -5,19 +5,36 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class NoteMetadata(BaseModel):
+    """Lightweight metadata model used by agent components."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str | None = Field(default=None, description="Optional note identifier")
+    title: str = Field(default="", description="Note title")
+    topic: str = Field(default="", description="Primary note topic")
+    tags: list[str] = Field(default_factory=list, description="Associated tags")
+    file_path: str | None = Field(default=None, description="Source file path")
+    language_tags: list[str] = Field(
+        default_factory=list, description="Language tags for the note"
+    )
+
+
 class QualityDimension(BaseModel):
     """Quality assessment for a specific dimension."""
 
     model_config = ConfigDict(frozen=False)
 
-    score: float = Field(default=0.5, ge=0.0, le=1.0,
-                         description="Dimension quality score")
+    score: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Dimension quality score"
+    )
     weight: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Dimension weight in overall score")
-    issues: list[str] = Field(default_factory=list,
-                              description="Specific issues found")
+        default=0.5, ge=0.0, le=1.0, description="Dimension weight in overall score"
+    )
+    issues: list[str] = Field(default_factory=list, description="Specific issues found")
     strengths: list[str] = Field(
-        default_factory=list, description="Positive aspects identified")
+        default_factory=list, description="Positive aspects identified"
+    )
 
 
 class QualityReport(BaseModel):
@@ -26,15 +43,20 @@ class QualityReport(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     overall_score: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Overall quality score")
+        default=0.5, ge=0.0, le=1.0, description="Overall quality score"
+    )
     dimensions: dict[str, QualityDimension] = Field(
-        default_factory=dict, description="Quality scores by dimension")
+        default_factory=dict, description="Quality scores by dimension"
+    )
     suggestions: list[str] = Field(
-        default_factory=list, description="Actionable improvement suggestions")
+        default_factory=list, description="Actionable improvement suggestions"
+    )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Confidence in assessment")
+        default=0.5, ge=0.0, le=1.0, description="Confidence in assessment"
+    )
     assessment_time: float = Field(
-        default=0.0, ge=0.0, description="Time taken for assessment")
+        default=0.0, ge=0.0, description="Time taken for assessment"
+    )
 
 
 class PreValidationResult(BaseModel):
@@ -47,8 +69,7 @@ class PreValidationResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     is_valid: bool
-    error_type: Literal["format", "structure",
-                        "frontmatter", "content", "none"]
+    error_type: Literal["format", "structure", "frontmatter", "content", "none"]
     error_details: str = ""
     auto_fix_applied: bool = False
     fixed_content: str | None = None
@@ -67,8 +88,7 @@ class GeneratedCard(BaseModel):
     slug: str = Field(min_length=1, description="Unique card identifier")
     lang: str = Field(pattern="^(en|ru)$", description="Card language")
     apf_html: str = Field(min_length=1, description="APF HTML content")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Generation confidence score")
+    confidence: float = Field(ge=0.0, le=1.0, description="Generation confidence score")
     content_hash: str = Field(
         default="", description="Stable content hash for change detection"
     )
@@ -177,13 +197,11 @@ class RepairDiagnosis(BaseModel):
     severity: Literal["low", "medium", "high", "critical"] = Field(
         description="Severity of the error"
     )
-    error_description: str = Field(
-        description="Detailed description of the error")
+    error_description: str = Field(description="Detailed description of the error")
     repair_priority: int = Field(
         default=5, ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
     )
-    can_auto_fix: bool = Field(
-        description="Whether this error can be auto-fixed")
+    can_auto_fix: bool = Field(description="Whether this error can be auto-fixed")
 
 
 class RepairQualityScore(BaseModel):
@@ -234,13 +252,12 @@ class DuplicateMatch(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_slug: str = Field(
-        min_length=1, description="Slug of potential duplicate card")
+    card_slug: str = Field(min_length=1, description="Slug of potential duplicate card")
     similarity_score: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Similarity score")
+        default=0.0, ge=0.0, le=1.0, description="Similarity score"
+    )
     duplicate_type: Literal["exact", "semantic", "partial_overlap", "unique"]
-    reasoning: str = Field(
-        default="", description="Why this is considered a duplicate")
+    reasoning: str = Field(default="", description="Why this is considered a duplicate")
 
 
 class DuplicateDetectionResult(BaseModel):
@@ -268,8 +285,7 @@ class EnrichmentAddition(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    enrichment_type: Literal["example", "mnemonic",
-                             "visual", "related", "practical"]
+    enrichment_type: Literal["example", "mnemonic", "visual", "related", "practical"]
     content: str = Field(min_length=1)
     rationale: str = Field(default="")
 
@@ -298,14 +314,15 @@ class NoteCorrectionResult(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    needs_correction: bool = Field(
-        description="Whether the note needs correction"
-    )
+    needs_correction: bool = Field(description="Whether the note needs correction")
     corrected_content: str | None = Field(
         default=None, description="Corrected note content if repairs were applied"
     )
     quality_score: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Overall quality score before correction"
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Overall quality score before correction",
     )
     issues_found: list[str] = Field(
         default_factory=list, description="Issues detected in the note"
@@ -360,10 +377,10 @@ class PartialRepairResult(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    repaired_content: str = Field(
-        description="Partially or fully repaired content")
+    repaired_content: str = Field(description="Partially or fully repaired content")
     sections_fixed: list[str] = Field(
-        default_factory=list, description="List of sections that were successfully fixed"
+        default_factory=list,
+        description="List of sections that were successfully fixed",
     )
     sections_failed: list[str] = Field(
         default_factory=list, description="List of sections that could not be fixed"
@@ -397,8 +414,7 @@ class AgentPipelineResult(BaseModel):
         default=None, description="Proactive note correction result"
     )
     total_time: float = Field(ge=0.0)
-    retry_count: int = Field(
-        ge=0, description="Number of post-validation retries")
+    retry_count: int = Field(ge=0, description="Number of post-validation retries")
 
 
 class SplitValidationResult(BaseModel):
@@ -414,4 +430,3 @@ class SplitValidationResult(BaseModel):
     feedback: str = ""
     suggested_modifications: list[str] = Field(default_factory=list)
     validation_time: float = 0.0
-
