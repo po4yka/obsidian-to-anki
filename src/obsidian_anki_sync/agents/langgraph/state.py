@@ -48,6 +48,8 @@ class PipelineState(TypedDict):
     pre_validation: dict | None  # Serialized PreValidationResult
     card_splitting: dict | None  # Serialized CardSplittingResult
     generation: dict | None  # Serialized GenerationResult
+    linter_valid: bool  # Did cards pass deterministic APF linting?
+    linter_results: list[dict]  # Per-card linter results: [{slug, is_valid, errors, warnings}]
     post_validation: dict | None  # Serialized PostValidationResult
     context_enrichment: dict | None  # Serialized ContextEnrichmentResult
     memorization_quality: dict | None  # Serialized MemorizationQualityResult
@@ -60,6 +62,7 @@ class PipelineState(TypedDict):
         "pre_validation",
         "card_splitting",
         "generation",
+        "linter_validation",
         "post_validation",
         "context_enrichment",
         "memorization_quality",
