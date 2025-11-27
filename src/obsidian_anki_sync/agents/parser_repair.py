@@ -15,7 +15,15 @@ from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .json_schemas import get_parser_repair_schema
-from .models import RepairDiagnosis, RepairQualityScore
+from .models import (
+    NoteCorrectionResult,
+    PartialRepairResult,
+    RepairDiagnosis,
+    RepairQualityScore,
+)
+from .repair_metrics import get_repair_metrics_collector
+from .repair_learning import get_repair_learning_system
+from .langgraph.retry_policies import classify_error_category, select_repair_strategy
 
 logger = get_logger(__name__)
 
@@ -393,10 +401,47 @@ DO NOT repair (mark as unrepairable):
         Raises:
             ParserError: If repair also fails
         """
+        import time
+
+        start_time = time.time()
+        metrics_collector = get_repair_metrics_collector()
+
+        # Classify error for metrics
+        error_category = classify_error_category(original_error)
+
+        # Try to get suggested strategy from learning system
+        learning_system = get_repair_learning_system()
+        suggested_strategy = learning_system.suggest_strategy(
+            error_category=error_category,
+            error_type=type(original_error).__name__,
+            error_message=str(original_error),
+        )
+
+        # Use suggested strategy if available, otherwise use default selection
+        if suggested_strategy:
+            from .models import RepairStrategy
+            repair_strategy = RepairStrategy(
+                strategy_type=suggested_strategy,
+                priority=1,  # Learned strategies get high priority
+                stages=[suggested_strategy],
+                confidence_threshold=0.7,
+            )
+            logger.info(
+                "repair_strategy_from_learning",
+                category=error_category,
+                strategy=suggested_strategy,
+            )
+        else:
+            repair_strategy = select_repair_strategy(original_error)
+
+        strategy_type = repair_strategy.strategy_type
+
         logger.info(
             "parser_repair_attempt",
             file=str(file_path),
             error=str(original_error),
+            category=error_category,
+            strategy=strategy_type,
         )
 
         # Read original content
@@ -484,10 +529,20 @@ ALWAYS:
 
         # Check if repairable
         if not repair_result.get("is_repairable", False):
+            repair_time = time.time() - start_time
             logger.warning(
                 "parser_repair_unrepairable",
                 file=str(file_path),
                 diagnosis=repair_result.get("diagnosis", "Unknown"),
+            )
+            # Record failed attempt
+            metrics_collector.record_attempt(
+                error_category=error_category,
+                error_type=type(original_error).__name__,
+                strategy_used=strategy_type,
+                success=False,
+                repair_time=repair_time,
+                error_message=str(original_error),
             )
             return None
 
@@ -575,48 +630,636 @@ ALWAYS:
                 description=gen_section.get("description", ""),
             )
 
-        # Try parsing repaired content
-        # Import here to avoid circular dependency
-        from ..obsidian.parser import parse_frontmatter, parse_qa_pairs
-
-        try:
-            # Write to temporary path for parsing
-            temp_content_for_parse = repaired_content
-
-            # Parse frontmatter from repaired content
-            metadata = parse_frontmatter(temp_content_for_parse, file_path)
-
-            # Parse Q/A pairs from repaired content
-            qa_pairs = parse_qa_pairs(
-                temp_content_for_parse, metadata, file_path)
-
-            if not qa_pairs:
+            # Validate repaired content against APF/Obsidian requirements
+            validation_errors = self._validate_repaired_content(
+                repaired_content, file_path
+            )
+            if validation_errors:
                 logger.warning(
-                    "parser_repair_no_qa_pairs",
+                    "parser_repair_validation_warnings",
                     file=str(file_path),
+                    errors=validation_errors,
                 )
-                return None
+
+            # Try parsing repaired content
+            # Import here to avoid circular dependency
+            from ..obsidian.parser import parse_frontmatter, parse_qa_pairs
+
+            try:
+                # Write to temporary path for parsing
+                temp_content_for_parse = repaired_content
+
+                # Parse frontmatter from repaired content
+                metadata = parse_frontmatter(temp_content_for_parse, file_path)
+
+                # Parse Q/A pairs from repaired content
+                qa_pairs = parse_qa_pairs(
+                    temp_content_for_parse, metadata, file_path)
+
+                if not qa_pairs:
+                    logger.warning(
+                        "parser_repair_no_qa_pairs",
+                        file=str(file_path),
+                    )
+                    return None
+
+            repair_time = time.time() - start_time
+            quality_improvement = (
+                quality_after.overall_score - quality_before.overall_score
+                if quality_before and quality_after
+                else None
+            )
 
             logger.info(
                 "parser_repair_success",
                 file=str(file_path),
                 qa_pairs_count=len(qa_pairs),
-                quality_improvement=(
-                    quality_after.overall_score - quality_before.overall_score
-                    if quality_before and quality_after
-                    else None
-                ),
+                quality_improvement=quality_improvement,
+            )
+
+            # Record successful repair
+            metrics_collector.record_attempt(
+                error_category=error_category,
+                error_type=type(original_error).__name__,
+                strategy_used=strategy_type,
+                success=True,
+                quality_before=quality_before.overall_score if quality_before else None,
+                quality_after=quality_after.overall_score if quality_after else None,
+                repair_time=repair_time,
+            )
+
+            # Learn from successful repair
+            quality_improvement = (
+                quality_after.overall_score - quality_before.overall_score
+                if quality_before and quality_after
+                else None
+            )
+            learning_system.learn_from_success(
+                error_category=error_category,
+                error_type=type(original_error).__name__,
+                error_message=str(original_error),
+                strategy_used=strategy_type,
+                quality_improvement=quality_improvement,
+                repair_steps=[repair.get("type", "") for repair in repairs],
             )
 
             return metadata, qa_pairs
 
         except ParserError as e:
+            repair_time = time.time() - start_time
             logger.error(
                 "parser_repair_reparse_failed",
                 file=str(file_path),
                 error=str(e),
             )
+            # Record failed attempt
+            metrics_collector.record_attempt(
+                error_category=error_category,
+                error_type=type(original_error).__name__,
+                strategy_used=strategy_type,
+                success=False,
+                repair_time=repair_time,
+                error_message=str(e),
+            )
             return None
+
+    def analyze_and_correct_proactively(
+        self, content: str, file_path: Path | None = None
+    ) -> NoteCorrectionResult:
+        """Proactively analyze note quality and apply corrections before parsing.
+
+        This method analyzes notes for common issues before they cause parsing failures,
+        enabling early correction and better quality.
+
+        Args:
+            content: Note content to analyze
+            file_path: Optional file path for context
+
+        Returns:
+            NoteCorrectionResult with analysis and corrections
+        """
+        import time
+
+        start_time = time.time()
+        logger.info(
+            "proactive_note_analysis_start",
+            file=str(file_path) if file_path else "unknown",
+        )
+
+        # Build proactive analysis prompt
+        analysis_prompt = f"""<task>
+Analyze this Obsidian note for quality issues and potential parsing problems BEFORE parsing occurs.
+Identify issues proactively to prevent parse failures.
+
+Think step by step:
+1. Check frontmatter structure and required fields
+2. Verify markdown structure (headers, sections, formatting)
+3. Check for missing language sections (EN/RU)
+4. Identify grammar and clarity issues
+5. Detect incomplete or truncated content
+6. Assess bilingual consistency
+7. Score overall quality
+</task>
+
+<note_content>
+{content[:3000]}
+</note_content>
+
+<analysis_requirements>
+Provide a comprehensive quality analysis:
+- Overall quality score (0.0-1.0)
+- List of issues found (be specific)
+- Whether correction is needed
+- Suggested corrections
+- Confidence in analysis (0.0-1.0)
+</analysis_requirements>
+
+<output_format>
+Respond with valid JSON:
+{{
+    "quality_score": 0.0-1.0,
+    "issues_found": ["issue1", "issue2", ...],
+    "needs_correction": true/false,
+    "suggested_corrections": ["correction1", "correction2", ...],
+    "confidence": 0.0-1.0
+}}
+</output_format>"""
+
+        system_prompt = """<role>
+You are a proactive quality analysis agent for Obsidian educational notes. Your goal is to identify and fix issues BEFORE they cause parsing failures.
+</role>
+
+<approach>
+1. Analyze note structure and content comprehensively
+2. Identify potential parsing issues early
+3. Suggest specific, actionable corrections
+4. Score quality objectively
+5. Be conservative: only flag real issues
+</approach>
+
+<quality_dimensions>
+- Completeness: Are all required sections present?
+- Structure: Is markdown structure correct?
+- Bilingual consistency: Do both languages have equivalent content?
+- Technical accuracy: Is content technically correct?
+- Grammar and clarity: Is content well-written?
+</quality_dimensions>"""
+
+        try:
+            # Get JSON schema for structured output
+            json_schema = {
+                "type": "object",
+                "properties": {
+                    "quality_score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                    "issues_found": {"type": "array", "items": {"type": "string"}},
+                    "needs_correction": {"type": "boolean"},
+                    "suggested_corrections": {"type": "array", "items": {"type": "string"}},
+                    "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                },
+                "required": ["quality_score", "issues_found", "needs_correction", "confidence"],
+            }
+
+            analysis_result = self.ollama_client.generate_json(
+                model=self.model,
+                prompt=analysis_prompt,
+                system=system_prompt,
+                temperature=self.temperature,
+                json_schema=json_schema,
+            )
+
+            quality_score = analysis_result.get("quality_score", 0.5)
+            issues_found = analysis_result.get("issues_found", [])
+            needs_correction = analysis_result.get("needs_correction", False)
+            suggested_corrections = analysis_result.get(
+                "suggested_corrections", [])
+            confidence = analysis_result.get("confidence", 0.5)
+
+            corrected_content = None
+            corrections_applied = []
+            quality_after = None
+
+            # If correction is needed and we have suggestions, attempt repair
+            if needs_correction and suggested_corrections:
+                logger.info(
+                    "proactive_correction_needed",
+                    issues_count=len(issues_found),
+                    suggestions_count=len(suggested_corrections),
+                )
+
+                # Create a synthetic error for repair
+                synthetic_error = f"Proactive correction needed. Issues: {', '.join(issues_found[:3])}"
+
+                # Attempt repair using existing repair logic
+                repair_prompt = self._build_repair_prompt(
+                    content, synthetic_error, enable_content_gen=self.enable_content_generation
+                )
+
+                repair_system_prompt = """<role>
+You are a proactive correction agent. Fix quality issues in this note before parsing.
+Apply corrections conservatively - only fix real issues, preserve all valid content.
+</role>"""
+
+                try:
+                    repair_json_schema = get_parser_repair_schema()
+                    repair_result = self.ollama_client.generate_json(
+                        model=self.model,
+                        prompt=repair_prompt,
+                        system=repair_system_prompt,
+                        temperature=self.temperature,
+                        json_schema=repair_json_schema,
+                    )
+
+                    if repair_result.get("is_repairable", False):
+                        corrected_content = repair_result.get(
+                            "repaired_content")
+                        repairs = repair_result.get("repairs", [])
+                        corrections_applied = [
+                            repair.get("description", "") for repair in repairs
+                        ]
+
+                        # Extract quality after if available
+                        quality_after_data = repair_result.get("quality_after")
+                        if quality_after_data:
+                            try:
+                                quality_after = RepairQualityScore(
+                                    **quality_after_data)
+                            except Exception:
+                                pass
+
+                        logger.info(
+                            "proactive_correction_applied",
+                            corrections_count=len(corrections_applied),
+                        )
+                    else:
+                        logger.info("proactive_correction_not_repairable")
+                except Exception as e:
+                    logger.warning("proactive_repair_failed", error=str(e))
+
+            correction_time = time.time() - start_time
+
+            result = NoteCorrectionResult(
+                needs_correction=needs_correction,
+                corrected_content=corrected_content,
+                quality_score=quality_score,
+                issues_found=issues_found,
+                corrections_applied=corrections_applied,
+                confidence=confidence,
+                correction_time=correction_time,
+                quality_after=quality_after,
+            )
+
+            logger.info(
+                "proactive_note_analysis_complete",
+                needs_correction=needs_correction,
+                quality_score=quality_score,
+                issues_count=len(issues_found),
+                corrections_applied=len(corrections_applied),
+                time=correction_time,
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error("proactive_analysis_failed", error=str(e))
+            # Return permissive result on error
+            return NoteCorrectionResult(
+                needs_correction=False,
+                quality_score=0.5,
+                issues_found=[f"Analysis failed: {str(e)}"],
+                corrections_applied=[],
+                confidence=0.0,
+                correction_time=time.time() - start_time,
+            )
+
+    def _validate_repaired_content(
+        self, content: str, file_path: Path | None = None
+    ) -> list[str]:
+        """Validate repaired content against APF and Obsidian requirements.
+
+        Args:
+            content: Repaired content to validate
+            file_path: Optional file path for context
+
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+
+        # Check Obsidian markdown conventions
+        obsidian_errors = self._validate_obsidian_markdown(content)
+        errors.extend(obsidian_errors)
+
+        # Check bilingual consistency if applicable
+        bilingual_errors = self._validate_bilingual_consistency(content)
+        errors.extend(bilingual_errors)
+
+        # Check frontmatter structure
+        frontmatter_errors = self._validate_frontmatter_structure(content)
+        errors.extend(frontmatter_errors)
+
+        return errors
+
+    def _validate_obsidian_markdown(self, content: str) -> list[str]:
+        """Validate Obsidian markdown conventions.
+
+        Args:
+            content: Content to validate
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        # Check for proper YAML frontmatter delimiters
+        if not content.strip().startswith("---"):
+            errors.append("Missing YAML frontmatter start delimiter (---)")
+
+        # Count frontmatter delimiters
+        delimiter_count = content.count("---")
+        if delimiter_count < 2:
+            errors.append("Missing YAML frontmatter end delimiter (---)")
+
+        # Check for proper header levels (should use # for questions, ## for answers)
+        lines = content.split("\n")
+        has_question_header = False
+        has_answer_header = False
+
+        for line in lines:
+            if line.strip().startswith("# Question") or line.strip().startswith(
+                "# Вопрос"
+            ):
+                has_question_header = True
+            if line.strip().startswith("## Answer") or line.strip().startswith(
+                "## Ответ"
+            ):
+                has_answer_header = True
+
+        if not has_question_header and not has_answer_header:
+            # Only warn if content seems to be a note (has frontmatter)
+            if "---" in content:
+                errors.append("Missing question/answer headers")
+
+        return errors
+
+    def _validate_bilingual_consistency(self, content: str) -> list[str]:
+        """Validate bilingual consistency (EN/RU).
+
+        Args:
+            content: Content to validate
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        # Check if both languages are present
+        has_en_question = "# Question (EN)" in content or "# Question" in content
+        has_ru_question = "# Вопрос (RU)" in content or "# Вопрос" in content
+        has_en_answer = "## Answer (EN)" in content or "## Answer" in content
+        has_ru_answer = "## Ответ (RU)" in content or "## Ответ" in content
+
+        # Extract language tags from frontmatter
+        import re
+
+        lang_tags_match = re.search(r"language_tags:\s*\[(.*?)\]", content)
+        if lang_tags_match:
+            lang_tags_str = lang_tags_match.group(1)
+            lang_tags = [tag.strip().strip('"').strip("'")
+                         for tag in lang_tags_str.split(",")]
+
+            # Check consistency
+            if "en" in lang_tags and not (has_en_question and has_en_answer):
+                errors.append(
+                    "Language tag 'en' present but EN content missing")
+
+            if "ru" in lang_tags and not (has_ru_question and has_ru_answer):
+                errors.append(
+                    "Language tag 'ru' present but RU content missing")
+
+        return errors
+
+    def _validate_frontmatter_structure(self, content: str) -> list[str]:
+        """Validate frontmatter structure.
+
+        Args:
+            content: Content to validate
+
+        Returns:
+            List of validation errors
+        """
+        errors = []
+
+        # Extract frontmatter
+        import re
+
+        frontmatter_match = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
+        if not frontmatter_match:
+            errors.append("Invalid or missing YAML frontmatter")
+            return errors
+
+        frontmatter = frontmatter_match.group(1)
+
+        # Check required fields
+        required_fields = ["id", "title", "topic",
+                           "language_tags", "created", "updated"]
+        for field in required_fields:
+            if f"{field}:" not in frontmatter:
+                errors.append(f"Missing required frontmatter field: {field}")
+
+        # Validate language_tags format
+        lang_tags_match = re.search(r"language_tags:\s*\[(.*?)\]", frontmatter)
+        if lang_tags_match:
+            lang_tags_str = lang_tags_match.group(1)
+            lang_tags = [tag.strip().strip('"').strip("'")
+                         for tag in lang_tags_str.split(",")]
+            valid_langs = {"en", "ru"}
+            for tag in lang_tags:
+                if tag not in valid_langs:
+                    errors.append(
+                        f"Invalid language tag: {tag} (must be 'en' or 'ru')")
+
+        return errors
+
+    def attempt_partial_repair(
+        self, file_path: Path, original_error: Exception
+    ) -> PartialRepairResult | None:
+        """Attempt partial repair - fix what can be fixed, flag what cannot.
+
+        Args:
+            file_path: Path to the note file
+            original_error: Original parsing error
+
+        Returns:
+            PartialRepairResult with repair status per section, or None if completely unrepairable
+        """
+        import time
+
+        start_time = time.time()
+        logger.info(
+            "parser_partial_repair_attempt",
+            file=str(file_path),
+            error=str(original_error),
+        )
+
+        # Read original content
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.error("parser_partial_repair_read_failed",
+                         file=str(file_path), error=str(e))
+            return None
+
+        # Identify sections
+        sections = self._identify_sections(content)
+        repaired_content = content
+        sections_fixed = []
+        sections_failed = []
+        section_confidence: dict[str, float] = {}
+        repair_report_parts = []
+
+        # Try to repair each section
+        for section_name, section_content in sections.items():
+            try:
+                # Attempt repair for this section
+                section_error = f"{original_error} (section: {section_name})"
+                repair_prompt = self._build_repair_prompt(
+                    section_content,
+                    str(section_error),
+                    enable_content_gen=self.enable_content_generation,
+                )
+
+                repair_json_schema = get_parser_repair_schema()
+                repair_result = self.ollama_client.generate_json(
+                    model=self.model,
+                    prompt=repair_prompt,
+                    system="""<role>
+You are a partial repair agent. Fix only the section you're given.
+If the section cannot be fixed, mark it as unrepairable.
+</role>""",
+                    temperature=self.temperature,
+                    json_schema=repair_json_schema,
+                )
+
+                if repair_result.get("is_repairable", False):
+                    repaired_section = repair_result.get("repaired_content")
+                    if repaired_section:
+                        # Replace section in content
+                        repaired_content = repaired_content.replace(
+                            section_content, repaired_section, 1
+                        )
+                        sections_fixed.append(section_name)
+                        confidence = repair_result.get("quality_after", {}).get(
+                            "overall_score", 0.7
+                        )
+                        section_confidence[section_name] = confidence
+                        repair_report_parts.append(
+                            f"Section '{section_name}': Fixed (confidence: {confidence:.2f})"
+                        )
+                    else:
+                        sections_failed.append(section_name)
+                        section_confidence[section_name] = 0.0
+                        repair_report_parts.append(
+                            f"Section '{section_name}': Failed (no repaired content)"
+                        )
+                else:
+                    sections_failed.append(section_name)
+                    section_confidence[section_name] = 0.0
+                    repair_report_parts.append(
+                        f"Section '{section_name}': Unrepairable"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    "partial_repair_section_failed",
+                    section=section_name,
+                    error=str(e),
+                )
+                sections_failed.append(section_name)
+                section_confidence[section_name] = 0.0
+                repair_report_parts.append(
+                    f"Section '{section_name}': Error - {str(e)}")
+
+        is_complete = len(sections_failed) == 0
+        repair_report = "\n".join(repair_report_parts)
+
+        result = PartialRepairResult(
+            repaired_content=repaired_content,
+            sections_fixed=sections_fixed,
+            sections_failed=sections_failed,
+            section_confidence=section_confidence,
+            is_complete=is_complete,
+            repair_report=repair_report,
+        )
+
+        logger.info(
+            "partial_repair_complete",
+            file=str(file_path),
+            sections_fixed=len(sections_fixed),
+            sections_failed=len(sections_failed),
+            is_complete=is_complete,
+            time=time.time() - start_time,
+        )
+
+        return result
+
+    def _identify_sections(self, content: str) -> dict[str, str]:
+        """Identify sections in note content.
+
+        Args:
+            content: Note content
+
+        Returns:
+            Dictionary mapping section names to content
+        """
+        sections: dict[str, str] = {}
+        lines = content.split("\n")
+
+        # Extract frontmatter
+        frontmatter_start = None
+        frontmatter_end = None
+        for i, line in enumerate(lines):
+            if line.strip() == "---":
+                if frontmatter_start is None:
+                    frontmatter_start = i
+                else:
+                    frontmatter_end = i
+                    break
+
+        if frontmatter_start is not None and frontmatter_end is not None:
+            sections["frontmatter"] = "\n".join(
+                lines[frontmatter_start: frontmatter_end + 1])
+
+        # Extract question/answer sections
+        current_section = None
+        current_section_lines = []
+
+        for i, line in enumerate(lines):
+            if line.strip().startswith("# Question") or line.strip().startswith("# Вопрос"):
+                if current_section:
+                    sections[current_section] = "\n".join(
+                        current_section_lines)
+                current_section = "question_" + \
+                    str(len([k for k in sections.keys()
+                        if k.startswith("question")]))
+                current_section_lines = [line]
+            elif line.strip().startswith("## Answer") or line.strip().startswith("## Ответ"):
+                if current_section:
+                    sections[current_section] = "\n".join(
+                        current_section_lines)
+                current_section = "answer_" + \
+                    str(len([k for k in sections.keys() if k.startswith("answer")]))
+                current_section_lines = [line]
+            elif current_section:
+                current_section_lines.append(line)
+
+        if current_section:
+            sections[current_section] = "\n".join(current_section_lines)
+
+        # If no sections found, treat entire content as one section
+        if not sections:
+            sections["content"] = content
+
+        return sections
 
 
 def attempt_repair(

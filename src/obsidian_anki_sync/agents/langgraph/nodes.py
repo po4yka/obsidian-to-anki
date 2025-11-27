@@ -61,6 +61,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     Returns:
         Updated state with corrected note content
     """
+    from ..models import NoteCorrectionResult
     from ..parser_repair import ParserRepairAgent
 
     # Check step limit (best practice: cycle protection)
@@ -91,37 +92,75 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         correction_model = model_name
         correction_temp = getattr(config, "note_correction_temperature", 0.0)
 
-        # Create repair agent for correction (reuse existing infrastructure)
-        # Note: This is a placeholder - actual correction logic would go here
-        _correction_agent = ParserRepairAgent(
+        # Create repair agent for proactive correction
+        correction_agent = ParserRepairAgent(
             ollama_client=provider,
             model=correction_model,
             temperature=correction_temp,
-            enable_content_generation=True,
-            repair_missing_sections=True,
+            enable_content_generation=getattr(
+                config, "parser_repair_generate_content", True
+            ),
+            repair_missing_sections=getattr(
+                config, "repair_missing_sections", True),
         )
 
-        # For proactive correction, we simulate a "parsing error" to trigger correction
-        # In practice, this would analyze the note for quality issues
-        # For now, we'll skip proactive correction and rely on reactive repair
-        # This is a placeholder for future enhancement
+        # Perform proactive analysis and correction
+        note_content = state.get("note_content", "")
+        file_path = Path(state["file_path"]) if state.get(
+            "file_path") else None
 
-        logger.info(
-            "note_correction_placeholder",
-            note="Proactive note correction node created but not fully implemented. "
-            "Reactive repair (ParserRepairAgent) handles corrections when parsing fails.",
+        correction_result = correction_agent.analyze_and_correct_proactively(
+            content=note_content, file_path=file_path
         )
 
-        # For now, just pass through to pre-validation
-        # Future: Add proactive quality analysis and correction here
+        # Update state with correction result
+        state["note_correction"] = correction_result.model_dump()
+
+        # If correction was applied, update note content
+        if (
+            correction_result.needs_correction
+            and correction_result.corrected_content
+        ):
+            state["note_content"] = correction_result.corrected_content
+            logger.info(
+                "note_correction_applied",
+                issues_found=len(correction_result.issues_found),
+                corrections_applied=len(correction_result.corrections_applied),
+                quality_before=correction_result.quality_score,
+                quality_after=(
+                    correction_result.quality_after.overall_score
+                    if correction_result.quality_after
+                    else None
+                ),
+            )
+            state["messages"].append(
+                f"Note correction: {len(correction_result.corrections_applied)} corrections applied"
+            )
+        else:
+            logger.info(
+                "note_correction_no_action_needed",
+                quality_score=correction_result.quality_score,
+            )
+            state["messages"].append(
+                f"Note correction: quality score {correction_result.quality_score:.2f}, no corrections needed"
+            )
 
     except Exception as e:
         logger.warning("note_correction_failed", error=str(e))
-        # Continue to pre-validation even if correction fails
+        # Create fallback result
+        fallback_result = NoteCorrectionResult(
+            needs_correction=False,
+            quality_score=0.5,
+            issues_found=[f"Correction failed: {str(e)}"],
+            corrections_applied=[],
+            confidence=0.0,
+            correction_time=time.time() - start_time,
+        )
+        state["note_correction"] = fallback_result.model_dump()
+        state["messages"].append("Note correction: failed, continuing")
 
     state["stage_times"]["note_correction"] = time.time() - start_time
     state["current_stage"] = "pre_validation"
-    state["messages"].append("Note correction: passed through")
 
     return state
 

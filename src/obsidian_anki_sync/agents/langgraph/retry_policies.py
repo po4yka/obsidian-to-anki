@@ -6,6 +6,8 @@ classification logic for routing decisions.
 
 from langgraph.types import RetryPolicy
 
+from ..models import RepairStrategy
+
 # ============================================================================
 # Retry Policy Configuration
 # ============================================================================
@@ -152,3 +154,347 @@ def classify_error_severity(error: Exception) -> str:
 
     # Default to recoverable for unknown errors
     return ErrorSeverity.RECOVERABLE
+
+
+def classify_error_category(error: Exception) -> str:
+    """Classify error into specific categories for repair routing.
+
+    Expanded categories:
+    - syntax: YAML/JSON syntax errors, malformed structure
+    - structure: Missing sections, incorrect hierarchy
+    - content: Missing or invalid content, quality issues
+    - quality: Grammar, clarity, completeness issues
+    - frontmatter: YAML frontmatter specific issues
+    - unknown: Unclassified errors
+
+    Args:
+        error: Exception to classify
+
+    Returns:
+        Error category string
+    """
+    error_msg = str(error).lower()
+    error_type = type(error).__name__.lower()
+
+    # Syntax errors
+    if any(
+        term in error_msg
+        for term in [
+            "syntax",
+            "parse",
+            "json",
+            "yaml",
+            "malformed",
+            "invalid format",
+            "unexpected token",
+            "invalid character",
+        ]
+    ):
+        return "syntax"
+
+    # Structure errors
+    if any(
+        term in error_msg
+        for term in [
+            "missing section",
+            "missing field",
+            "required field",
+            "structure",
+            "hierarchy",
+            "incorrect level",
+            "missing header",
+        ]
+    ):
+        return "structure"
+
+    # Frontmatter errors
+    if any(
+        term in error_msg
+        for term in [
+            "frontmatter",
+            "metadata",
+            "yaml frontmatter",
+            "header",
+            "language_tags",
+            "missing id",
+            "missing title",
+        ]
+    ):
+        return "frontmatter"
+
+    # Content errors
+    if any(
+        term in error_msg
+        for term in [
+            "missing content",
+            "empty",
+            "no content",
+            "invalid content",
+            "content error",
+        ]
+    ):
+        return "content"
+
+    # Quality errors
+    if any(
+        term in error_msg
+        for term in [
+            "grammar",
+            "clarity",
+            "quality",
+            "incomplete",
+            "truncated",
+            "bilingual",
+            "consistency",
+        ]
+    ):
+        return "quality"
+
+    # Default to unknown
+    return "unknown"
+
+
+def select_repair_strategy(error: Exception) -> RepairStrategy:
+    """Select repair strategy based on error classification.
+
+    Strategies:
+    - deterministic: Fast rule-based fixes (syntax errors)
+    - rule_based: Pattern matching fixes (structure errors)
+    - llm_based: LLM-powered fixes (content/quality errors)
+    - multi_stage: Multiple repair stages (complex errors)
+    - partial: Partial fixes with flagging (uncertain errors)
+    - skip: Skip repair (critical/unrecoverable errors)
+
+    Args:
+        error: Exception to analyze
+
+    Returns:
+        RepairStrategy with selected approach
+    """
+    severity = classify_error_severity(error)
+    category = classify_error_category(error)
+
+    # Critical errors: skip repair
+    if severity == ErrorSeverity.CRITICAL:
+        return RepairStrategy(
+            strategy_type="skip",
+            priority=10,
+            stages=[],
+            confidence_threshold=0.0,
+        )
+
+    # Syntax errors: deterministic fixes
+    if category == "syntax":
+        return RepairStrategy(
+            strategy_type="deterministic",
+            priority=1,
+            stages=["syntax"],
+            confidence_threshold=0.9,
+        )
+
+    # Structure errors: rule-based fixes
+    if category == "structure":
+        return RepairStrategy(
+            strategy_type="rule_based",
+            priority=2,
+            stages=["structure"],
+            confidence_threshold=0.8,
+        )
+
+    # Frontmatter errors: rule-based with LLM fallback
+    if category == "frontmatter":
+        return RepairStrategy(
+            strategy_type="multi_stage",
+            priority=2,
+            stages=["deterministic", "rule_based", "llm_based"],
+            confidence_threshold=0.7,
+        )
+
+    # Content/quality errors: LLM-based fixes
+    if category in ["content", "quality"]:
+        return RepairStrategy(
+            strategy_type="llm_based",
+            priority=3,
+            stages=["llm_based"],
+            confidence_threshold=0.7,
+        )
+
+    # Unknown errors: multi-stage with lower confidence
+    return RepairStrategy(
+        strategy_type="multi_stage",
+        priority=5,
+        stages=["deterministic", "rule_based", "llm_based"],
+        confidence_threshold=0.6,
+    )
+
+
+def get_repair_priority(error: Exception) -> int:
+    """Get repair priority ranking (1=highest, 10=lowest).
+
+    Args:
+        error: Exception to rank
+
+    Returns:
+        Priority integer (1-10)
+    """
+    strategy = select_repair_strategy(error)
+    return strategy.priority
+
+
+# ============================================================================
+# Repair-Specific Retry Policies
+# ============================================================================
+
+
+# Repair retry policy with exponential backoff
+REPAIR_RETRY_POLICY = RetryPolicy(
+    max_attempts=3,
+    initial_interval=0.5,  # Start with 0.5 seconds
+    backoff_factor=2.0,  # Double each retry
+    max_interval=10.0,  # Cap at 10 seconds
+    jitter=True,
+)
+
+
+def calculate_repair_backoff(attempt: int, base_interval: float = 0.5) -> float:
+    """Calculate exponential backoff delay for repair attempts.
+
+    Args:
+        attempt: Current attempt number (0-indexed)
+        base_interval: Base interval in seconds
+
+    Returns:
+        Backoff delay in seconds
+    """
+    import random
+
+    delay = base_interval * (2.0 ** attempt)
+    # Add jitter (randomization) to prevent thundering herd
+    jitter = random.uniform(0.0, delay * 0.1)
+    return min(delay + jitter, 10.0)  # Cap at 10 seconds
+
+
+class CircuitBreaker:
+    """Circuit breaker pattern for repair operations.
+
+    Prevents repeated failures from overwhelming the system by temporarily
+    disabling repair attempts after a threshold of failures.
+    """
+
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 60.0,
+        half_open_max_attempts: int = 2,
+    ):
+        """Initialize circuit breaker.
+
+        Args:
+            failure_threshold: Number of failures before opening circuit
+            recovery_timeout: Seconds before attempting recovery (half-open)
+            half_open_max_attempts: Max attempts in half-open state
+        """
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.half_open_max_attempts = half_open_max_attempts
+
+        self.failure_count = 0
+        self.last_failure_time: float | None = None
+        self.state = "closed"  # closed, open, half_open
+        self.half_open_attempts = 0
+
+    def record_success(self) -> None:
+        """Record a successful operation."""
+        if self.state == "half_open":
+            # Success in half-open: close the circuit
+            self.state = "closed"
+            self.failure_count = 0
+            self.half_open_attempts = 0
+        elif self.state == "closed":
+            # Reset failure count on success
+            self.failure_count = 0
+
+    def record_failure(self) -> None:
+        """Record a failed operation."""
+        import time
+
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+
+        if self.state == "half_open":
+            self.half_open_attempts += 1
+            if self.half_open_attempts >= self.half_open_max_attempts:
+                # Too many failures in half-open: open again
+                self.state = "open"
+                self.half_open_attempts = 0
+        elif self.state == "closed":
+            if self.failure_count >= self.failure_threshold:
+                # Threshold reached: open the circuit
+                self.state = "open"
+
+    def can_attempt(self) -> bool:
+        """Check if repair attempt is allowed.
+
+        Returns:
+            True if attempt is allowed, False if circuit is open
+        """
+        import time
+
+        if self.state == "closed":
+            return True
+
+        if self.state == "open":
+            # Check if recovery timeout has passed
+            if (
+                self.last_failure_time is not None
+                and time.time() - self.last_failure_time >= self.recovery_timeout
+            ):
+                # Move to half-open state
+                self.state = "half_open"
+                self.half_open_attempts = 0
+                return True
+            return False
+
+        if self.state == "half_open":
+            return True
+
+        return False
+
+    def get_state(self) -> str:
+        """Get current circuit breaker state.
+
+        Returns:
+            State string (closed/open/half_open)
+        """
+        return self.state
+
+
+def get_adaptive_retry_count(error: Exception, base_max_retries: int = 3) -> int:
+    """Get adaptive retry count based on error type.
+
+    More recoverable errors get more retries.
+
+    Args:
+        error: Exception to analyze
+        base_max_retries: Base maximum retries
+
+    Returns:
+        Adaptive retry count
+    """
+    severity = classify_error_severity(error)
+    category = classify_error_category(error)
+
+    # Critical errors: no retries
+    if severity == ErrorSeverity.CRITICAL:
+        return 0
+
+    # Syntax/structure errors: more retries (easier to fix)
+    if category in ["syntax", "structure"]:
+        return base_max_retries + 1
+
+    # Content/quality errors: standard retries
+    if category in ["content", "quality"]:
+        return base_max_retries
+
+    # Unknown errors: fewer retries (less likely to succeed)
+    return max(1, base_max_retries - 1)
