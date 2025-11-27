@@ -1355,10 +1355,7 @@ class StateDB(IStateRepository):
         """Retrieve all notes."""
         return []
 
-    def get_all_cards(self) -> list[DomainCard]:
-        """Retrieve all cards."""
-        cards_data = self.get_all_cards()
-        return []
+    # get_all_cards is defined above at line 405 - removed duplicate that caused recursion
 
     def get_sync_stats(self) -> dict[str, Any]:
         """Get synchronization statistics."""
