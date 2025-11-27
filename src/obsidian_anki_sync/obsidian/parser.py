@@ -8,7 +8,7 @@ import warnings
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import frontmatter
 from ruamel.yaml import YAML
@@ -289,6 +289,7 @@ def parse_note(
     file_path: Path,
     qa_extractor: QAExtractorAgent | None = None,
     tolerant_parsing: bool = False,
+    content: str | None = None,
 ) -> tuple[NoteMetadata, list[QAPair]]:
     """
     Parse an Obsidian note and extract metadata and Q/A pairs.
@@ -327,13 +328,14 @@ def parse_note(
     except (OSError, RuntimeError) as e:
         raise ParserError(f"Cannot resolve path {file_path}: {e}")
 
-    try:
-        content = resolved_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as e:
-        raise ParserError(f"Failed to read file {resolved_path}: {e}")
-    except Exception as e:
-        logger.exception("unexpected_file_read_error", file=str(resolved_path))
-        raise ParserError(f"Unexpected error reading {resolved_path}: {e}")
+    if content is None:
+        try:
+            content = resolved_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            raise ParserError(f"Failed to read file {resolved_path}: {e}")
+        except Exception as e:
+            logger.exception("unexpected_file_read_error", file=str(resolved_path))
+            raise ParserError(f"Unexpected error reading {resolved_path}: {e}")
 
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
@@ -439,8 +441,7 @@ def parse_note_with_repair(
                 file=str(file_path),
                 original_error=str(e),
             )
-            raise ParserError(
-                f"Parse failed and repair unsuccessful: {e}") from e
+            raise ParserError(f"Parse failed and repair unsuccessful: {e}") from e
 
         # Repair succeeded
         metadata, qa_pairs = result
@@ -468,15 +469,14 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
         Preprocessed content with fixed YAML syntax
     """
     # Extract frontmatter section
-    frontmatter_match = re.match(
-        r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
+    frontmatter_match = re.match(r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
     if not frontmatter_match:
         return content
 
     frontmatter_start = frontmatter_match.group(1)
     frontmatter_body = frontmatter_match.group(2)
     frontmatter_end = frontmatter_match.group(3)
-    rest_content = content[frontmatter_match.end():]
+    rest_content = content[frontmatter_match.end() :]
 
     # Fix backticks in YAML arrays/strings
     # Pattern: matches backticks around words in arrays or after colons
@@ -516,9 +516,7 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
             line = lines[i]
 
             # Check if this line is a field with an inline array
-            inline_array_match = re.match(
-                r"^(\w[\w\-]*)\s*:\s*\[(.*)\]\s*$", line
-            )
+            inline_array_match = re.match(r"^(\w[\w\-]*)\s*:\s*\[(.*)\]\s*$", line)
 
             if inline_array_match:
                 field_name = inline_array_match.group(1)
@@ -708,8 +706,7 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         raise ParserError(f"No frontmatter found in {file_path}")
 
     # Validate required fields
-    required_fields = ["id", "title", "topic",
-                       "language_tags", "created", "updated"]
+    required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ParserError(f"Missing required fields in {file_path}: {missing}")
@@ -850,8 +847,7 @@ def parse_qa_pairs(
     )
 
     # Strip frontmatter
-    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "",
-                     content, count=1, flags=re.DOTALL)
+    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
 
     # Normalize line endings and strip BOM
     content = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -905,8 +901,7 @@ def parse_qa_pairs(
 
         # Try to parse this block as a Q/A pair
         try:
-            qa_pair = _parse_single_qa_block(
-                block, card_index, metadata, file_path)
+            qa_pair = _parse_single_qa_block(block, card_index, metadata, file_path)
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
@@ -933,8 +928,7 @@ def parse_qa_pairs(
                             qa_pairs.extend(extracted_pairs)
                             logger.info(
                                 "llm_extraction_recovered_incomplete_block",
-                                file=str(
-                                    file_path) if file_path else "unknown",
+                                file=str(file_path) if file_path else "unknown",
                                 card_index=card_index,
                                 recovered_pairs=len(extracted_pairs),
                             )
@@ -950,8 +944,7 @@ def parse_qa_pairs(
                         # Fall through to add to failed_blocks
 
                 # Block was skipped (incomplete or invalid)
-                failed_blocks.append(
-                    (card_index, "Incomplete or invalid Q/A block"))
+                failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
             logger.error(
                 "qa_parse_error",
@@ -1371,8 +1364,7 @@ def _normalize_sources(value: Any) -> list[dict[str, str]]:
         if item is None:
             continue
         if isinstance(item, dict):
-            normalized.append({k: str(v)
-                              for k, v in item.items() if v is not None})
+            normalized.append({k: str(v) for k, v in item.items() if v is not None})
         else:
             text = str(item).strip()
             if text:
