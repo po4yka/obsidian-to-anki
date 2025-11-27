@@ -41,7 +41,7 @@ Your task is to validate note structure, formatting, and frontmatter before card
 
 5. **Special Features**: Check for Cloze and MathJax
    - Cloze: Valid syntax `{{c1::answer}}` (if used)
-   - MathJax: Valid syntax `\(...\)` or `\[...\]` (if used)
+   - MathJax: Valid syntax `\\(...\\)` or `\\[...\\]` (if used)
 
 6. **Language Consistency**: Language tags match content
    - If 'en' in language_tags, English content exists
@@ -192,9 +192,9 @@ Each card must include:
 - **Important**: If generating a Cloze card, set `CardType: Cloze` in the metadata comment.
 
 ### MathJax
-- Use `\( ... \)` for inline math
-- Use `\[ ... \]` for display math
-- Example: `The area of a circle is \( A = \pi r^2 \)`
+- Use `\\( ... \\)` for inline math
+- Use `\\[ ... \\]` for display math
+- Example: `The area of a circle is \\( A = \\pi r^2 \\)`
 
 ## Card Generation Principles
 
@@ -332,7 +332,7 @@ Output:
 ✓ **Do**: Create separate cards for each language
 
 ❌ **Don't**: Use `$` for MathJax
-✓ **Do**: Use `\( ... \)` and `\[ ... \]`
+✓ **Do**: Use `\\( ... \\)` and `\\[ ... \\]`
 
 ❌ **Don't**: Forget `CardType: Cloze` for cloze cards
 ✓ **Do**: Update metadata when using `{{c1::...}}`
@@ -366,7 +366,7 @@ Your task is to validate generated cards for quality, syntax correctness, and ad
    - Valid Front/Back/Extra sections
    - Proper HTML escaping
    - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Cloze
-   - **MathJax**: Valid `\(...\)` or `\[...\]` syntax
+   - **MathJax**: Valid `\\(...\\)` or `\\[...\\]` syntax
 
 2. **Factual Accuracy**
    - Answer matches the question

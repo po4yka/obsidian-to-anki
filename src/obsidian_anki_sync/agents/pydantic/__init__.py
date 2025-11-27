@@ -27,6 +27,7 @@ from .models import (
 )
 from .post_validator import PostValidatorAgentAI
 from .pre_validator import PreValidatorAgentAI
+from .split_validator import SplitValidatorAgentAI
 
 __all__ = [
     # Agents
@@ -37,6 +38,7 @@ __all__ = [
     "CardSplittingAgentAI",
     "DuplicateDetectionAgentAI",
     "ContextEnrichmentAgentAI",
+    "SplitValidatorAgentAI",
     # Models
     "PreValidationOutput",
     "PreValidationDeps",
