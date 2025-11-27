@@ -37,11 +37,12 @@ class DeterministicFixer:
         fixed_cards = []
         any_fixes = False
 
+        # First pass: Apply individual card fixes
         for card in cards:
             fixed_html = card.apf_html
             card_fixed = False
 
-            # Apply all fix methods
+            # Apply all individual fix methods
             fixed_html, sentinel_fixed = DeterministicFixer._fix_missing_sentinels(
                 fixed_html, error_details, card.slug
             )
@@ -87,19 +88,22 @@ class DeterministicFixer:
             )
             card_fixed = card_fixed or dup_fixed
 
-            if card_fixed:
-                fixed_card = GeneratedCard(
-                    card_index=card.card_index,
-                    slug=card.slug,
-                    lang=card.lang,
-                    apf_html=fixed_html,
-                    confidence=card.confidence,
-                    content_hash=card.content_hash,
-                )
-                fixed_cards.append(fixed_card)
-                any_fixes = True
-            else:
-                fixed_cards.append(card)
+            fixed_card = GeneratedCard(
+                card_index=card.card_index,
+                slug=card.slug,
+                lang=card.lang,
+                apf_html=fixed_html,
+                confidence=card.confidence,
+                content_hash=card.content_hash,
+            )
+            fixed_cards.append(fixed_card)
+            any_fixes = any_fixes or card_fixed
+
+        # Second pass: Apply cross-card consistency fixes
+        fixed_cards, consistency_fixed = DeterministicFixer._fix_missing_optional_sections(
+            fixed_cards, error_details
+        )
+        any_fixes = any_fixes or consistency_fixed
 
         return fixed_cards if any_fixes else None
 
@@ -170,10 +174,17 @@ class DeterministicFixer:
         Returns:
             Tuple of (fixed_html, was_fixed)
         """
-        if (
-            "Invalid card header" not in error_details
-            and "card header format" not in error_details.lower()
+        # Check for various header format issues, but exclude false positives about CardType vs type
+        # (CardType in header is correct per APF v2.1 spec, even if manifest uses "type")
+        if not (
+            "Invalid card header" in error_details
+            or "card header format" in error_details.lower()
+            or ("CardType:" in error_details and "type:" in error_details)
         ):
+            return html, False
+
+        # Skip if this is the false positive about CardType vs type (CardType is correct)
+        if "CardType:" in error_details and "instead of" in error_details and "type:" in error_details:
             return html, False
 
         # Try to extract and fix card header - match various formats
@@ -587,6 +598,120 @@ class DeterministicFixer:
         return html, True
 
     @staticmethod
+    def _fix_missing_optional_sections(
+        cards: list[GeneratedCard], error_details: str
+    ) -> tuple[list[GeneratedCard], bool]:
+        """Fix missing optional sections for consistency across language versions.
+
+        Args:
+            cards: List of cards to check for consistency
+            error_details: Error description
+
+        Returns:
+            Tuple of (fixed_cards, was_fixed)
+        """
+        if not (
+            "optional" in error_details.lower()
+            and ("missing" in error_details.lower() or "absent" in error_details.lower())
+        ):
+            return cards, False
+
+        # Group cards by base slug (remove language suffix)
+        card_groups: dict[str, list[GeneratedCard]] = {}
+        for card in cards:
+            # Extract base slug by removing language suffix (e.g., "card-slug-en" -> "card-slug")
+            base_slug = card.slug
+            if base_slug.endswith("-en") or base_slug.endswith("-ru"):
+                base_slug = base_slug[:-3]
+            elif base_slug.endswith("_en") or base_slug.endswith("_ru"):
+                base_slug = base_slug[:-3]
+
+            if base_slug not in card_groups:
+                card_groups[base_slug] = []
+            card_groups[base_slug].append(card)
+
+        fixed_cards = []
+        any_fixes = False
+
+        # Define optional section patterns to check
+        optional_sections = [
+            ("<!-- Subtitle (optional) -->", "<!-- Subtitle (optional) -->\n\n"),
+            ("<!-- Syntax (inline) (optional) -->",
+             "<!-- Syntax (inline) (optional) -->\n<code>placeholder</code>\n\n"),
+            ("<!-- Sample (caption) (optional) -->", "<!-- Sample (caption) (optional) -->\nSample caption\n\n<!-- Sample (code block or image) (optional) -->\n<pre><code class=\"language-placeholder\">// placeholder code</code></pre>\n\n"),
+            ("<!-- Other notes (optional) -->",
+             "<!-- Other notes (optional) -->\n<ul>\n  <li>Placeholder note</li>\n</ul>\n\n"),
+            ("<!-- Markdown (optional) -->", "<!-- Markdown (optional) -->\n\n"),
+        ]
+
+        for base_slug, group_cards in card_groups.items():
+            if len(group_cards) < 2:
+                # Only one language version, nothing to compare
+                fixed_cards.extend(group_cards)
+                continue
+
+            # Find all optional sections present in any language version
+            present_sections = set()
+            for card in group_cards:
+                for section_name, _ in optional_sections:
+                    if section_name in card.apf_html:
+                        present_sections.add(section_name)
+
+            # For each card, add missing optional sections
+            for card in group_cards:
+                card_html = card.apf_html
+                card_fixed = False
+
+                for section_name, section_template in optional_sections:
+                    if section_name in present_sections and section_name not in card_html:
+                        # This section exists in other language versions but not this one
+                        # Insert it before Key point notes or at end before manifest
+                        if "<!-- Key point notes -->" in card_html:
+                            card_html = card_html.replace(
+                                "<!-- Key point notes -->",
+                                section_template + "<!-- Key point notes -->",
+                                1  # Only replace first occurrence
+                            )
+                        elif "<!-- manifest:" in card_html:
+                            card_html = card_html.replace(
+                                "<!-- manifest:",
+                                section_template + "<!-- manifest:",
+                                1
+                            )
+                        else:
+                            # Fallback: add at end before END_CARDS
+                            if "<!-- END_CARDS -->" in card_html:
+                                card_html = card_html.replace(
+                                    "<!-- END_CARDS -->",
+                                    section_template + "<!-- END_CARDS -->",
+                                    1
+                                )
+
+                        logger.debug(
+                            "deterministic_fix_added_optional_section",
+                            slug=card.slug,
+                            section=section_name,
+                            base_slug=base_slug,
+                        )
+                        card_fixed = True
+
+                if card_fixed:
+                    fixed_card = GeneratedCard(
+                        card_index=card.card_index,
+                        slug=card.slug,
+                        lang=card.lang,
+                        apf_html=card_html,
+                        confidence=card.confidence,
+                        content_hash=card.content_hash,
+                    )
+                    fixed_cards.append(fixed_card)
+                    any_fixes = True
+                else:
+                    fixed_cards.append(card)
+
+        return fixed_cards, any_fixes
+
+    @staticmethod
     def _fix_duplicate_end_markers(
         html: str, error_details: str, slug: str
     ) -> tuple[str, bool]:
@@ -609,7 +734,9 @@ class DeterministicFixer:
         ):
             return html, False
 
-        # Check for the common case: <!-- END_CARDS --> followed by multiple END_OF_CARDS
+        fixed = False
+
+        # Check for the common case: <!-- END_CARDS --> followed by content issues
         if "<!-- END_CARDS -->" in html:
             # Split at END_CARDS marker to isolate the ending section
             parts = html.split("<!-- END_CARDS -->")
@@ -617,21 +744,40 @@ class DeterministicFixer:
                 before_end = parts[0]
                 after_end = "".join(parts[1:])
 
-                # Count END_OF_CARDS occurrences in the after_end section
-                end_count = after_end.count("END_OF_CARDS")
-                if end_count > 1:
-                    # Remove all END_OF_CARDS and add just one
-                    after_end_clean = after_end.replace(
-                        "END_OF_CARDS", "").strip()
-                    html = before_end + "<!-- END_CARDS -->\n" + after_end_clean
-                    if after_end_clean:
-                        html += "\n"
-                    html += "END_OF_CARDS"
-                    logger.debug(
-                        "deterministic_fix_duplicate_end_markers",
-                        slug=slug,
-                        removed_count=end_count - 1,
-                    )
-                    return html, True
+                # Find the position of the first END_OF_CARDS
+                end_of_cards_pos = after_end.find("END_OF_CARDS")
+                if end_of_cards_pos != -1:
+                    # Extract everything up to and including END_OF_CARDS
+                    end_of_cards_end = end_of_cards_pos + len("END_OF_CARDS")
+                    correct_ending = after_end[:end_of_cards_end]
 
-        return html, False
+                    # Check if there's any non-whitespace content after END_OF_CARDS
+                    remaining_content = after_end[end_of_cards_end:].strip()
+                    if remaining_content:
+                        # There is extra content after END_OF_CARDS - remove it
+                        html = before_end + "<!-- END_CARDS -->\n" + correct_ending
+                        logger.debug(
+                            "deterministic_fix_extra_content_after_end_of_cards",
+                            slug=slug,
+                            removed_content_length=len(remaining_content),
+                        )
+                        fixed = True
+                    else:
+                        # Check for multiple END_OF_CARDS occurrences
+                        end_count = after_end.count("END_OF_CARDS")
+                        if end_count > 1:
+                            # Remove all END_OF_CARDS and add just one
+                            after_end_clean = after_end.replace(
+                                "END_OF_CARDS", "").strip()
+                            html = before_end + "<!-- END_CARDS -->\n" + after_end_clean
+                            if after_end_clean:
+                                html += "\n"
+                            html += "END_OF_CARDS"
+                            logger.debug(
+                                "deterministic_fix_duplicate_end_markers",
+                                slug=slug,
+                                removed_count=end_count - 1,
+                            )
+                            fixed = True
+
+        return html, fixed
