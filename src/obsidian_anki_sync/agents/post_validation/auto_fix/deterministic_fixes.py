@@ -82,6 +82,11 @@ class DeterministicFixer:
             )
             card_fixed = card_fixed or json_fixed
 
+            fixed_html, dup_fixed = DeterministicFixer._fix_duplicate_end_markers(
+                fixed_html, error_details, card.slug
+            )
+            card_fixed = card_fixed or dup_fixed
+
             if card_fixed:
                 fixed_card = GeneratedCard(
                     card_index=card.card_index,
@@ -578,3 +583,52 @@ class DeterministicFixer:
         logger.debug("deterministic_fix_manifest_json", slug=slug)
 
         return html, True
+
+    @staticmethod
+    def _fix_duplicate_end_markers(
+        html: str, error_details: str, slug: str
+    ) -> tuple[str, bool]:
+        """Fix duplicate END_OF_CARDS markers and malformed end structure.
+
+        Args:
+            html: Card HTML
+            error_details: Error description
+            slug: Card slug
+
+        Returns:
+            Tuple of (fixed_html, was_fixed)
+        """
+        # Check if this is relevant (triggered by various end marker issues)
+        if not (
+            "END_OF_CARDS" in error_details
+            or "END_CARDS" in error_details
+            or "end marker" in error_details.lower()
+            or "extra" in error_details.lower()
+        ):
+            return html, False
+
+        # Check for the common case: <!-- END_CARDS --> followed by multiple END_OF_CARDS
+        if "<!-- END_CARDS -->" in html:
+            # Split at END_CARDS marker to isolate the ending section
+            parts = html.split("<!-- END_CARDS -->")
+            if len(parts) >= 2:
+                before_end = parts[0]
+                after_end = "".join(parts[1:])
+
+                # Count END_OF_CARDS occurrences in the after_end section
+                end_count = after_end.count("END_OF_CARDS")
+                if end_count > 1:
+                    # Remove all END_OF_CARDS and add just one
+                    after_end_clean = after_end.replace("END_OF_CARDS", "").strip()
+                    html = before_end + "<!-- END_CARDS -->\n" + after_end_clean
+                    if after_end_clean:
+                        html += "\n"
+                    html += "END_OF_CARDS"
+                    logger.debug(
+                        "deterministic_fix_duplicate_end_markers",
+                        slug=slug,
+                        removed_count=end_count - 1,
+                    )
+                    return html, True
+
+        return html, False
