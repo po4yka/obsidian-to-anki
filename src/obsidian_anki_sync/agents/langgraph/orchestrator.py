@@ -394,8 +394,19 @@ class LangGraphOrchestrator:
             "context_enrichment_model": self.model_factory.get_model("context_enrichment"),
             "memorization_quality_model": self.model_factory.get_model("memorization_quality"),
             "duplicate_detection_model": self.model_factory.get_model("duplicate_detection"),
+            # Chain of Thought (CoT) configuration
+            "enable_cot_reasoning": getattr(self.config, "enable_cot_reasoning", False),
+            "store_reasoning_traces": getattr(self.config, "store_reasoning_traces", True),
+            "log_reasoning_traces": getattr(self.config, "log_reasoning_traces", False),
+            "cot_enabled_stages": getattr(self.config, "cot_enabled_stages", [
+                "pre_validation", "generation", "post_validation"
+            ]),
+            "reasoning_model": self.model_factory.get_model("reasoning"),
+            "reasoning_traces": {},
+            "current_reasoning": None,
             # Pipeline stage results
             "pre_validation": None,
+            "note_correction": None,
             "card_splitting": None,
             "generation": None,
             "linter_valid": False,  # Will be set by linter_validation_node

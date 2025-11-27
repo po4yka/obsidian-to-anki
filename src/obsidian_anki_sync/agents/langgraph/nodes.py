@@ -47,6 +47,32 @@ from .state import PipelineState
 logger = get_logger(__name__)
 
 
+def _get_reasoning_recommendations(state: PipelineState) -> list[str]:
+    """Get recommendations from the current reasoning trace if available.
+
+    This helper allows action nodes to consume recommendations from the
+    preceding reasoning node (if CoT is enabled).
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        List of recommendations from reasoning, empty if none available
+    """
+    current_reasoning = state.get("current_reasoning")
+    if not current_reasoning:
+        return []
+
+    recommendations = current_reasoning.get("recommendations", [])
+    if recommendations:
+        logger.debug(
+            "cot_recommendations_available",
+            count=len(recommendations),
+            stage=current_reasoning.get("stage", "unknown"),
+        )
+    return recommendations
+
+
 # ============================================================================
 # Node Functions
 # ============================================================================
@@ -523,6 +549,9 @@ async def generation_node(state: PipelineState) -> PipelineState:
     Generates APF cards from Q/A pairs using the configured LLM.
     Supports parallel generation for better performance with many Q/A pairs.
 
+    If Chain of Thought (CoT) reasoning is enabled, this node will consume
+    recommendations from the preceding think_before_generation_node.
+
     Args:
         state: Current pipeline state
 
@@ -535,6 +564,17 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
     logger.info("langgraph_generation_start")
     start_time = time.time()
+
+    # Get CoT reasoning recommendations if available
+    reasoning_recommendations = _get_reasoning_recommendations(state)
+    if reasoning_recommendations:
+        logger.info(
+            "cot_generation_using_recommendations",
+            recommendations_count=len(reasoning_recommendations),
+        )
+        # Log a summary of the recommendations
+        for i, rec in enumerate(reasoning_recommendations[:3], 1):  # Log first 3
+            logger.debug(f"cot_recommendation_{i}", recommendation=rec[:100])
 
     # Deserialize data
     metadata = NoteMetadata(**state["metadata_dict"])
