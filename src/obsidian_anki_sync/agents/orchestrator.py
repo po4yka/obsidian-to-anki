@@ -480,6 +480,7 @@ class AgentOrchestrator:
         generated_cards: list[GeneratedCard],
         metadata: NoteMetadata,
         qa_pairs: list[QAPair],
+        file_path: Path | None = None,
     ) -> list[Card]:
         """Convert GeneratedCard instances to Card instances."""
 
@@ -496,10 +497,10 @@ class AgentOrchestrator:
                 slug=gen_card.slug,
                 slug_base=slug_base,
                 lang=gen_card.lang,
-                source_path="",  # Will be set by sync engine
+                source_path=str(file_path) if file_path else "unknown",
                 source_anchor=f"qa-{gen_card.card_index}",
-                note_id="",  # Will be set by sync engine
-                note_title="",  # Will be set by sync engine
+                note_id=metadata.id,
+                note_title=metadata.title,
                 card_index=gen_card.card_index,
                 guid=gen_card.slug,  # Use slug as GUID for now
                 hash6=None,

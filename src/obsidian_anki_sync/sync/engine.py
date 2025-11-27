@@ -685,9 +685,6 @@ class SyncEngine:
         obsidian_cards: dict[str, Card] = {}
         existing_slugs: set[str] = set()
 
-        # Collect topic mismatches for aggregated logging
-        topic_mismatches: defaultdict[str, int] = defaultdict(int)
-
         # Collect errors for aggregated logging
         error_by_type: defaultdict[str, int] = defaultdict(int)
         error_samples: defaultdict[str, list[str]] = defaultdict(list)
@@ -706,7 +703,6 @@ class SyncEngine:
                 note_files,
                 obsidian_cards,
                 existing_slugs,
-                topic_mismatches,
                 error_by_type,
                 error_samples,
             )
@@ -776,12 +772,6 @@ class SyncEngine:
                         enable_content_generation=enable_content_generation,
                         repair_missing_sections=repair_missing_sections,
                     )
-
-                    # Check for topic mismatch and collect for summary
-                    expected_topic = file_path.parent.name
-                    if metadata.topic != expected_topic:
-                        key = f"{expected_topic} -> {metadata.topic}"
-                        topic_mismatches[key] += 1
 
                     # Read full note content if using agent system
                     note_content = ""
@@ -1187,15 +1177,6 @@ class SyncEngine:
                         error=sample,
                     )
 
-        # Log aggregated topic mismatch summary
-        if topic_mismatches:
-            total_mismatches = sum(topic_mismatches.values())
-            logger.info(
-                "topic_mismatches_summary",
-                total=total_mismatches,
-                patterns=topic_mismatches,
-            )
-
         # Log cache statistics
         if self._cache_hits > 0 or self._cache_misses > 0:
             total_cache_requests = self._cache_hits + self._cache_misses
@@ -1534,7 +1515,6 @@ class SyncEngine:
         note_files: list[tuple[Any, str]],
         obsidian_cards: dict[str, Card],
         existing_slugs: set[str],
-        topic_mismatches: defaultdict[str, int],
         error_by_type: defaultdict[str, int],
         error_samples: defaultdict[str, list[str]],
     ) -> dict[str, Card]:
@@ -1544,7 +1524,6 @@ class SyncEngine:
             note_files: List of (file_path, relative_path) tuples
             obsidian_cards: Dict to populate with cards
             existing_slugs: Set of existing slugs (thread-safe updates)
-            topic_mismatches: Dict to collect topic mismatches
             error_by_type: Dict to aggregate errors by type
             error_samples: Dict to store sample errors
 
@@ -1896,7 +1875,7 @@ class SyncEngine:
 
         # Convert GeneratedCard to Card instances
         cards = self.agent_orchestrator.convert_to_cards(
-            result.generation.cards, metadata, qa_pairs
+            result.generation.cards, metadata, qa_pairs, Path(file_path) if file_path.exists() else None
         )
 
         # Update card metadata with proper paths and GUIDs

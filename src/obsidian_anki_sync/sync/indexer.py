@@ -82,9 +82,6 @@ class VaultIndexer:
             "errors": 0,
         }
 
-        # Collect topic mismatches for aggregated logging
-        topic_mismatches: dict[str, int] = {}
-
         # Collect errors for aggregated logging
         error_by_type: defaultdict[str, int] = defaultdict(int)
         error_samples: defaultdict[str, list[str]] = defaultdict(
@@ -171,12 +168,6 @@ class VaultIndexer:
                     else:
                         # Parse without repair
                         metadata, qa_pairs = parse_note(file_path)
-
-                    # Check for topic mismatch and collect for summary
-                    expected_topic = file_path.parent.name
-                    if metadata.topic != expected_topic:
-                        key = f"{expected_topic} -> {metadata.topic}"
-                        topic_mismatches[key] = topic_mismatches.get(key, 0) + 1
 
                     # Get file modification time
                     file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -289,15 +280,6 @@ class VaultIndexer:
                         sample_num=i + 1,
                         error=sample,
                     )
-
-        # Log aggregated topic mismatch summary
-        if topic_mismatches:
-            total_mismatches = sum(topic_mismatches.values())
-            logger.info(
-                "topic_mismatches_summary",
-                total=total_mismatches,
-                patterns=topic_mismatches,
-            )
 
         logger.info("indexing_vault_completed", stats=stats)
         return stats
