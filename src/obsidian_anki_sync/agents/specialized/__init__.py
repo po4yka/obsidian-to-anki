@@ -1,6 +1,6 @@
 """Specialized LLM agents for handling different types of note processing problems."""
 
-from typing import Any, Dict, List
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent, ContentRepairAgent, FallbackAgent
@@ -21,8 +21,8 @@ problem_router = ProblemRouter()
 
 
 def diagnose_and_solve_problems(
-    content: str, error_context: Dict[str, Any]
-) -> List[AgentResult]:
+    content: str, error_context: dict[str, Any]
+) -> list[AgentResult]:
     """Diagnose problems and attempt solutions using specialized agents.
 
     Args:

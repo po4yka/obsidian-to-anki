@@ -9,7 +9,7 @@ All agents use structured outputs and proper type validation.
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
@@ -169,7 +169,7 @@ class CardSplittingOutput(BaseModel):
     confidence: float = Field(
         ge=0.0, le=1.0, default=0.5, description="Decision confidence (0.0-1.0)"
     )
-    fallback_strategy: Optional[str] = Field(
+    fallback_strategy: str | None = Field(
         default=None, description="Fallback strategy if primary fails"
     )
 

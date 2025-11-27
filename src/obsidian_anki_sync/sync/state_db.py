@@ -22,13 +22,16 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .progress import SyncProgress
 
+from ..domain.entities.card import Card as DomainCard
+from ..domain.entities.note import Note as DomainNote
+from ..domain.interfaces.state_repository import IStateRepository
 from ..models import Card
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class StateDB:
+class StateDB(IStateRepository):
     """SQLite database for tracking card state.
 
     Thread Safety:
@@ -318,7 +321,8 @@ class StateDB:
         # Add missing columns
         for col_name, col_type in columns_to_add.items():
             if col_name not in existing_columns:
-                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                cursor.execute(
+                    f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
@@ -394,7 +398,8 @@ class StateDB:
         """Get all cards from a source note."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM cards WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM cards WHERE source_path = ?", (source_path,))
         return [dict(row) for row in cursor.fetchall()]
 
     def get_all_cards(self) -> list[dict]:
@@ -882,7 +887,8 @@ class StateDB:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
+        cursor.execute(
+            "DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
         conn.commit()
 
     # Note Index Methods
@@ -976,7 +982,8 @@ class StateDB:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM note_index WHERE source_path = ?", (source_path,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
@@ -1142,7 +1149,8 @@ class StateDB:
         cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_database = 1")
         cards_in_database = cursor.fetchone()[0]
 
-        cursor.execute("SELECT status, COUNT(*) FROM card_index GROUP BY status")
+        cursor.execute(
+            "SELECT status, COUNT(*) FROM card_index GROUP BY status")
         card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
@@ -1259,7 +1267,8 @@ class StateDB:
 
         if row["checkpoint_data"]:
             try:
-                checkpoint["additional_data"] = json.loads(row["checkpoint_data"])
+                checkpoint["additional_data"] = json.loads(
+                    row["checkpoint_data"])
             except json.JSONDecodeError:
                 checkpoint["additional_data"] = {}
 
@@ -1300,6 +1309,104 @@ class StateDB:
             session_id=session_id,
             older_than_days=older_than_days,
         )
+
+    # IStateRepository interface implementation
+
+    def get_note_by_id(self, note_id: str) -> DomainNote | None:
+        """Retrieve a note by its ID."""
+        # This is a simplified implementation - would need proper conversion
+        # from database model to domain entity
+        return None  # Placeholder
+
+    def get_notes_by_path(self, file_path: str) -> list[DomainNote]:
+        """Retrieve notes by file path."""
+        # Placeholder implementation
+        return []
+
+    def save_note(self, note: DomainNote) -> None:
+        """Save a note to the repository."""
+        # Placeholder implementation
+        pass
+
+    def delete_note(self, note_id: str) -> None:
+        """Delete a note from the repository."""
+        # Placeholder implementation
+        pass
+
+    def get_card_by_slug(self, slug: str) -> DomainCard | None:
+        """Retrieve a card by its slug."""
+        card_data = self.get_by_slug(slug)
+        if card_data:
+            # Convert to domain entity - simplified
+            return None  # Would need proper conversion
+        return None
+
+    def get_cards_by_note_id(self, note_id: str) -> list[DomainCard]:
+        """Retrieve all cards for a note."""
+        # Placeholder implementation
+        return []
+
+    def save_card(self, card: DomainCard) -> None:
+        """Save a card to the repository."""
+        # Convert domain card to data model and save
+        # Placeholder implementation
+        pass
+
+    def delete_card(self, slug: str) -> None:
+        """Delete a card from the repository."""
+        # Call the existing StateDB delete_card method
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
+        conn.commit()
+
+    def get_all_notes(self) -> list[DomainNote]:
+        """Retrieve all notes."""
+        # Placeholder implementation
+        return []
+
+    def get_all_cards(self) -> list[DomainCard]:
+        """Retrieve all cards."""
+        cards_data = self.get_all_cards()
+        # Convert to domain entities - simplified
+        return []
+
+    def get_sync_stats(self) -> dict[str, Any]:
+        """Get synchronization statistics."""
+        # Use existing method or create stats
+        return {}
+
+    def save_sync_session(self, session_data: dict[str, Any]) -> str:
+        """Save sync session data."""
+        # Placeholder - would integrate with existing progress tracking
+        return "session_id"
+
+    def get_sync_session(self, session_id: str) -> dict[str, Any] | None:
+        """Retrieve sync session data."""
+        progress = self.get_progress(session_id)
+        if progress:
+            return {}  # Convert to dict
+        return None
+
+    def update_sync_progress(self, session_id: str, progress_data: dict[str, Any]) -> None:
+        """Update sync progress for a session."""
+        # Would need to integrate with existing progress system
+        pass
+
+    def get_content_hash(self, resource_id: str) -> str | None:
+        """Get stored content hash for a resource."""
+        # Placeholder - would need to implement hash storage
+        return None
+
+    def save_content_hash(self, resource_id: str, hash_value: str) -> None:
+        """Save content hash for a resource."""
+        # Placeholder implementation
+        pass
+
+    def clear_expired_data(self, max_age_days: int) -> int:
+        """Clear expired data from repository."""
+        # Placeholder implementation
+        return 0
 
     def close(self) -> None:
         """Close all thread-local database connections.

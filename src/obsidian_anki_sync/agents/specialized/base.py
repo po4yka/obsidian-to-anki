@@ -1,7 +1,7 @@
 """Base classes for specialized agents."""
 
 from collections.abc import Callable
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .models import AgentResult, RepairResult
@@ -59,7 +59,7 @@ class BaseSpecializedAgent:
                 jitter=True,
             )
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Solve the problem - implemented by subclasses.
 
         This method can be wrapped with retry logic by subclasses if needed.
@@ -67,7 +67,7 @@ class BaseSpecializedAgent:
         raise NotImplementedError
 
     def _solve_with_retry(
-        self, content: str, context: Dict[str, Any], solve_func: Callable
+        self, content: str, context: dict[str, Any], solve_func: Callable
     ) -> AgentResult:
         """Execute solve function with retry and jitter.
 
@@ -89,7 +89,7 @@ class BaseSpecializedAgent:
         else:
             return solve_func(content, context)
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create the prompt for the agent - implemented by subclasses."""
         raise NotImplementedError
 
@@ -101,7 +101,7 @@ class FallbackAgent(BaseSpecializedAgent):
         super().__init__()
         self.reason = reason
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Return failure result with explanation."""
         from .models import AgentResult
 

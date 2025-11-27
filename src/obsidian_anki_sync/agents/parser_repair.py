@@ -663,65 +663,66 @@ ALWAYS:
                     )
                     return None
 
-            repair_time = time.time() - start_time
-            quality_improvement = (
-                quality_after.overall_score - quality_before.overall_score
-                if quality_before and quality_after
-                else None
-            )
+                repair_time = time.time() - start_time
+                quality_improvement = (
+                    quality_after.overall_score - quality_before.overall_score
+                    if quality_before and quality_after
+                    else None
+                )
 
-            logger.info(
-                "parser_repair_success",
-                file=str(file_path),
-                qa_pairs_count=len(qa_pairs),
-                quality_improvement=quality_improvement,
-            )
+                logger.info(
+                    "parser_repair_success",
+                    file=str(file_path),
+                    qa_pairs_count=len(qa_pairs),
+                    quality_improvement=quality_improvement,
+                )
 
-            # Record successful repair
-            metrics_collector.record_attempt(
-                error_category=error_category,
-                error_type=type(original_error).__name__,
-                strategy_used=strategy_type,
-                success=True,
-                quality_before=quality_before.overall_score if quality_before else None,
-                quality_after=quality_after.overall_score if quality_after else None,
-                repair_time=repair_time,
-            )
+                # Record successful repair
+                metrics_collector.record_attempt(
+                    error_category=error_category,
+                    error_type=type(original_error).__name__,
+                    strategy_used=strategy_type,
+                    success=True,
+                    quality_before=quality_before.overall_score if quality_before else None,
+                    quality_after=quality_after.overall_score if quality_after else None,
+                    repair_time=repair_time,
+                )
 
-            # Learn from successful repair
-            quality_improvement = (
-                quality_after.overall_score - quality_before.overall_score
-                if quality_before and quality_after
-                else None
-            )
-            learning_system.learn_from_success(
-                error_category=error_category,
-                error_type=type(original_error).__name__,
-                error_message=str(original_error),
-                strategy_used=strategy_type,
-                quality_improvement=quality_improvement,
-                repair_steps=[repair.get("type", "") for repair in repairs],
-            )
+                # Learn from successful repair
+                quality_improvement = (
+                    quality_after.overall_score - quality_before.overall_score
+                    if quality_before and quality_after
+                    else None
+                )
+                learning_system.learn_from_success(
+                    error_category=error_category,
+                    error_type=type(original_error).__name__,
+                    error_message=str(original_error),
+                    strategy_used=strategy_type,
+                    quality_improvement=quality_improvement,
+                    repair_steps=[repair.get("type", "")
+                                  for repair in repairs],
+                )
 
-            return metadata, qa_pairs
+                return metadata, qa_pairs
 
-        except ParserError as e:
-            repair_time = time.time() - start_time
-            logger.error(
-                "parser_repair_reparse_failed",
-                file=str(file_path),
-                error=str(e),
-            )
-            # Record failed attempt
-            metrics_collector.record_attempt(
-                error_category=error_category,
-                error_type=type(original_error).__name__,
-                strategy_used=strategy_type,
-                success=False,
-                repair_time=repair_time,
-                error_message=str(e),
-            )
-            return None
+            except ParserError as e:
+                repair_time = time.time() - start_time
+                logger.error(
+                    "parser_repair_reparse_failed",
+                    file=str(file_path),
+                    error=str(e),
+                )
+                # Record failed attempt
+                metrics_collector.record_attempt(
+                    error_category=error_category,
+                    error_type=type(original_error).__name__,
+                    strategy_used=strategy_type,
+                    success=False,
+                    repair_time=repair_time,
+                    error_message=str(e),
+                )
+                return None
 
     def analyze_and_correct_proactively(
         self, content: str, file_path: Path | None = None

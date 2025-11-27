@@ -3,7 +3,7 @@
 Routes problems to appropriate specialized agents with resilience patterns.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ...utils.logging import get_logger
 from ...utils.resilience import (
@@ -28,9 +28,9 @@ class ProblemRouter:
 
     def __init__(
         self,
-        circuit_breaker_config: Optional[Dict[str, Dict[str, Any]]] = None,
-        rate_limit_config: Optional[Dict[str, int]] = None,
-        bulkhead_config: Optional[Dict[str, int]] = None,
+        circuit_breaker_config: dict[str, dict[str, Any | None]] = None,
+        rate_limit_config: dict[str, int | None] = None,
+        bulkhead_config: dict[str, int | None] = None,
         confidence_threshold: float = 0.7,
     ):
         """Initialize problem router with resilience patterns.
@@ -42,9 +42,9 @@ class ProblemRouter:
             confidence_threshold: Minimum confidence threshold for validation
         """
         self.agents = {}
-        self.circuit_breakers: Dict[ProblemDomain, CircuitBreaker] = {}
-        self.rate_limiters: Dict[ProblemDomain, RateLimiter] = {}
-        self.bulkheads: Dict[ProblemDomain, Bulkhead] = {}
+        self.circuit_breakers: dict[ProblemDomain, CircuitBreaker] = {}
+        self.rate_limiters: dict[ProblemDomain, RateLimiter] = {}
+        self.bulkheads: dict[ProblemDomain, Bulkhead] = {}
         self.confidence_validator = ConfidenceValidator(
             min_confidence=confidence_threshold
         )
@@ -93,9 +93,9 @@ class ProblemRouter:
 
     def _initialize_resilience_patterns(
         self,
-        circuit_breaker_config: Dict[str, Dict[str, Any]],
-        rate_limit_config: Dict[str, int],
-        bulkhead_config: Dict[str, int],
+        circuit_breaker_config: dict[str, dict[str, Any]],
+        rate_limit_config: dict[str, int],
+        bulkhead_config: dict[str, int],
     ) -> None:
         """Initialize resilience patterns for each agent domain.
 
@@ -137,8 +137,8 @@ class ProblemRouter:
             self.bulkheads[domain] = Bulkhead(max_concurrent=bulkhead_max)
 
     def diagnose_and_route(
-        self, content: str, error_context: Dict[str, Any]
-    ) -> List[Tuple[ProblemDomain, float]]:
+        self, content: str, error_context: dict[str, Any]
+    ) -> list[tuple[ProblemDomain, float]]:
         """Diagnose the problem and return prioritized list of agents to try.
 
         Args:
@@ -210,7 +210,7 @@ class ProblemRouter:
         return False
 
     def solve_problem(
-        self, domain: ProblemDomain, content: str, context: Dict[str, Any]
+        self, domain: ProblemDomain, content: str, context: dict[str, Any]
     ) -> AgentResult:
         """Route problem to the appropriate specialized agent with resilience patterns.
 

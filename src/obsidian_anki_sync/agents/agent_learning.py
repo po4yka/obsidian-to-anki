@@ -8,7 +8,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..utils.logging import get_logger
 from .agent_monitoring import PerformanceTracker
@@ -28,15 +28,15 @@ class PatternSignature:
     """Signature for error pattern matching."""
 
     error_type: str
-    keywords: List[str]
-    attempted_agents: List[str]
+    keywords: list[str]
+    attempted_agents: list[str]
 
 
 @dataclass
 class LearningResult:
     """Result from learning system."""
 
-    recommended_agent: Optional[ProblemDomain]
+    recommended_agent: ProblemDomain | None
     confidence: float
     reasoning: str
 
@@ -44,7 +44,7 @@ class LearningResult:
 class FailureAnalyzer:
     """Analyze failures to extract patterns for learning."""
 
-    def __init__(self, memory_store: Optional[Any] = None):
+    def __init__(self, memory_store: Any | None = None):
         """Initialize failure analyzer.
 
         Args:
@@ -52,14 +52,14 @@ class FailureAnalyzer:
         """
         self.memory_store = memory_store
         # Keep in-memory fallback for backward compatibility
-        self.failure_patterns: Dict[str, int] = defaultdict(int)
-        self.success_patterns: Dict[str, int] = defaultdict(int)
-        self.pattern_to_agent: Dict[str, ProblemDomain] = {}
+        self.failure_patterns: dict[str, int] = defaultdict(int)
+        self.success_patterns: dict[str, int] = defaultdict(int)
+        self.pattern_to_agent: dict[str, ProblemDomain] = {}
 
     def analyze_failure(
         self,
-        error_context: Dict[str, Any],
-        attempted_agents: List[ProblemDomain],
+        error_context: dict[str, Any],
+        attempted_agents: list[ProblemDomain],
     ) -> None:
         """Analyze failure to extract patterns.
 
@@ -88,7 +88,7 @@ class FailureAnalyzer:
 
     def analyze_success(
         self,
-        error_context: Dict[str, Any],
+        error_context: dict[str, Any],
         successful_agent: ProblemDomain,
     ) -> None:
         """Analyze successful repair to extract patterns.
@@ -119,8 +119,8 @@ class FailureAnalyzer:
         )
 
     def get_recommendation(
-        self, error_context: Dict[str, Any]
-    ) -> Optional[ProblemDomain]:
+        self, error_context: dict[str, Any]
+    ) -> ProblemDomain | None:
         """Get agent recommendation based on learned patterns.
 
         Args:
@@ -162,7 +162,7 @@ class FailureAnalyzer:
         return None
 
     def _create_pattern_signature(
-        self, error_context: Dict[str, Any], agents: List[ProblemDomain]
+        self, error_context: dict[str, Any], agents: list[ProblemDomain]
     ) -> str:
         """Create a pattern signature from error and agents.
 
@@ -182,7 +182,7 @@ class FailureAnalyzer:
 
         return f"{error_type}:{':'.join(keywords[:3])}:{':'.join(agent_names)}"
 
-    def _extract_keywords(self, error_msg: str) -> List[str]:
+    def _extract_keywords(self, error_msg: str) -> list[str]:
         """Extract key words from error message.
 
         Args:
@@ -242,7 +242,7 @@ class FailureAnalyzer:
 
         return [word for word, _ in Counter(keywords).most_common(5)]
 
-    def _pattern_matches(self, pattern: str, error_context: Dict[str, Any]) -> bool:
+    def _pattern_matches(self, pattern: str, error_context: dict[str, Any]) -> bool:
         """Check if pattern matches error context.
 
         Args:
@@ -280,11 +280,11 @@ class AdaptiveRouter(ProblemRouter):
 
     def __init__(
         self,
-        performance_tracker: Optional[PerformanceTracker] = None,
-        memory_store: Optional[Any] = None,
-        circuit_breaker_config: Optional[Dict[str, Dict[str, Any]]] = None,
-        rate_limit_config: Optional[Dict[str, int]] = None,
-        bulkhead_config: Optional[Dict[str, int]] = None,
+        performance_tracker: PerformanceTracker | None = None,
+        memory_store: Any | None = None,
+        circuit_breaker_config: dict[str, dict[str, Any | None]] = None,
+        rate_limit_config: dict[str, int | None] = None,
+        bulkhead_config: dict[str, int | None] = None,
         confidence_threshold: float = 0.7,
     ):
         """Initialize adaptive router.
@@ -309,8 +309,8 @@ class AdaptiveRouter(ProblemRouter):
         self.learning_enabled = True
 
     def diagnose_and_route(
-        self, content: str, error_context: Dict[str, Any]
-    ) -> List[Tuple[ProblemDomain, float]]:
+        self, content: str, error_context: dict[str, Any]
+    ) -> list[tuple[ProblemDomain, float]]:
         """Route with adaptive confidence based on historical performance.
 
         Args:
@@ -373,7 +373,7 @@ class AdaptiveRouter(ProblemRouter):
         return sorted(base_diagnoses, key=lambda x: x[1], reverse=True)
 
     def solve_problem(
-        self, domain: ProblemDomain, content: str, context: Dict[str, Any]
+        self, domain: ProblemDomain, content: str, context: dict[str, Any]
     ) -> Any:
         """Solve problem and record result for learning.
 
@@ -489,9 +489,9 @@ class PerformanceLearner:
 
     def get_optimal_agent(
         self,
-        available_agents: List[ProblemDomain],
-        error_context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[ProblemDomain]:
+        available_agents: list[ProblemDomain],
+        error_context: dict[str, Any | None] = None,
+    ) -> ProblemDomain | None:
         """Get optimal agent based on performance history.
 
         Args:
@@ -505,7 +505,7 @@ class PerformanceLearner:
             return None
 
         # Score each agent based on performance metrics
-        agent_scores: List[Tuple[ProblemDomain, float]] = []
+        agent_scores: list[tuple[ProblemDomain, float]] = []
 
         for agent in available_agents:
             metrics = self.performance_tracker.get_agent_metrics(agent.value)

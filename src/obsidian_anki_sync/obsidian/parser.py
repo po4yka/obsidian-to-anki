@@ -1,12 +1,14 @@
 """Obsidian note parser for YAML frontmatter and Q/A pairs."""
 
+from __future__ import annotations
+
 import re
 import threading
 import warnings
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, TYPE_CHECKING
 
 import frontmatter
 from ruamel.yaml import YAML
@@ -37,7 +39,7 @@ class _ParserState(threading.local):
     def __init__(self) -> None:
         """Initialize thread-local parser state."""
         self.use_llm_extraction: bool = False
-        self.qa_extractor_agent: Optional["QAExtractorAgent"] = None
+        self.qa_extractor_agent: "QAExtractorAgent" | None = None
         self.enforce_language_validation: bool = False
 
 
@@ -46,7 +48,7 @@ _thread_local_state = _ParserState()
 
 # Backward compatibility - global state (deprecated, kept for legacy code)
 _USE_LLM_EXTRACTION = False
-_QA_EXTRACTOR_AGENT: Optional["QAExtractorAgent"] = None
+_QA_EXTRACTOR_AGENT: "QAExtractorAgent" | None = None
 _ENFORCE_LANGUAGE_VALIDATION = False
 _GLOBAL_STATE_LOCK = threading.RLock()
 
@@ -83,7 +85,7 @@ def temporarily_disable_llm_extraction() -> Any:
 
 
 def configure_llm_extraction(
-    llm_provider: Optional[BaseLLMProvider],
+    llm_provider: BaseLLMProvider | None,
     model: str = "qwen3:8b",
     temperature: float = 0.0,
     reasoning_enabled: bool = False,
@@ -195,8 +197,8 @@ def create_qa_extractor(
 
 
 def _get_qa_extractor(
-    explicit_extractor: Optional["QAExtractorAgent"],
-) -> Optional["QAExtractorAgent"]:
+    explicit_extractor: "QAExtractorAgent" | None,
+) -> "QAExtractorAgent" | None:
     """Get QA extractor from explicit parameter, thread-local, or global state.
 
     Priority order:
@@ -246,7 +248,7 @@ def _get_enforce_language_validation() -> bool:
 
 
 def set_thread_qa_extractor(
-    qa_extractor: Optional["QAExtractorAgent"],
+    qa_extractor: "QAExtractorAgent" | None,
     enforce_language_validation: bool = False,
 ) -> None:
     """Set QA extractor for the current thread (thread-safe).
@@ -285,7 +287,7 @@ def set_thread_qa_extractor(
 
 def parse_note(
     file_path: Path,
-    qa_extractor: Optional["QAExtractorAgent"] = None,
+    qa_extractor: "QAExtractorAgent" | None = None,
     tolerant_parsing: bool = False,
 ) -> tuple[NoteMetadata, list[QAPair]]:
     """
@@ -375,7 +377,7 @@ def parse_note(
 
 def parse_note_with_repair(
     file_path: Path,
-    ollama_client: Optional[BaseLLMProvider] = None,
+    ollama_client: BaseLLMProvider | None = None,
     repair_model: str = "qwen3:8b",
     enable_repair: bool = True,
     tolerant_parsing: bool = True,
@@ -654,7 +656,6 @@ def _detect_content_corruption(content: str, file_path: Path) -> None:
         )
 
 
-
 def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
     """
     Extract and parse YAML frontmatter from note content.
@@ -772,7 +773,7 @@ def parse_qa_pairs(
     content: str,
     metadata: NoteMetadata,
     file_path: Path | None = None,
-    qa_extractor: Optional["QAExtractorAgent"] = None,
+    qa_extractor: "QAExtractorAgent" | None = None,
     tolerant_parsing: bool = False,
 ) -> list[QAPair]:
     """

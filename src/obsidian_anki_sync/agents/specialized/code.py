@@ -1,6 +1,6 @@
 """Code block repair agent."""
 
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent
@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class CodeBlockAgent(BaseSpecializedAgent):
     """Agent specialized in repairing code block issues."""
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair code block formatting and fence issues."""
         repaired_content = self._repair_code_fences(content)
 

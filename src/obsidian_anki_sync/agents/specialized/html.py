@@ -1,6 +1,6 @@
 """HTML validation repair agent."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent
@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class HTMLValidationAgent(BaseSpecializedAgent):
     """Agent specialized in repairing HTML validation issues."""
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair HTML validation issues."""
         from ...apf.html_generator import HTMLTemplateGenerator
 
@@ -46,6 +46,6 @@ class HTMLValidationAgent(BaseSpecializedAgent):
                 warnings=["HTML validation agent execution failed"],
             )
 
-    def _extract_card_data(self, content: str) -> Optional[Dict[str, Any]]:
+    def _extract_card_data(self, content: str) -> dict[str, Any | None]:
         """Extract card data from HTML content for regeneration."""
         return None

@@ -1,6 +1,6 @@
 """Quality assurance agent."""
 
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent, ContentRepairAgent
@@ -16,7 +16,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """General quality assurance and repair."""
         prompt = self._create_prompt(content, context)
 
@@ -47,7 +47,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
                 warnings=["Quality assurance agent execution failed"],
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create general quality assurance prompt."""
         error_msg = context.get("error_message", "")
 

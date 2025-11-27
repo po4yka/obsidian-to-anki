@@ -1,7 +1,7 @@
 """Content corruption repair agent."""
 
 import re
-from typing import Any, Dict
+from typing import Any
 
 from ...utils.logging import get_logger
 from .base import BaseSpecializedAgent, ContentRepairAgent
@@ -17,7 +17,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
         super().__init__()
         self.agent = ContentRepairAgent(model=self.model)
 
-    def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
+    def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content corruption like repetitive patterns."""
         # First try rule-based corruption repair
         rule_based_result = self._rule_based_corruption_repair(content)
@@ -87,7 +87,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
                 success=False, reasoning=f"Rule-based corruption repair failed: {e}"
             )
 
-    def _create_prompt(self, content: str, context: Dict[str, Any]) -> str:
+    def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create content corruption repair prompt."""
         error_msg = context.get("error_message", "")
 

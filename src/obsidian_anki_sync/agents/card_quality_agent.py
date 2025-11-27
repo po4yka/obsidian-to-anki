@@ -2,7 +2,7 @@
 
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..models import Card, NoteMetadata
 from .models import GeneratedCard
@@ -44,7 +44,7 @@ class CardQualityAgent:
         self,
         card: GeneratedCard,
         metadata: NoteMetadata,
-        context_cards: Optional[List[GeneratedCard]] = None,
+        context_cards: list[GeneratedCard | None] = None,
     ) -> QualityReport:
         """Perform comprehensive quality assessment of a card.
 
@@ -97,8 +97,8 @@ class CardQualityAgent:
         self,
         card: GeneratedCard,
         metadata: NoteMetadata,
-        context_cards: Optional[List[GeneratedCard]] = None,
-    ) -> Dict[str, QualityDimension]:
+        context_cards: list[GeneratedCard | None] = None,
+    ) -> dict[str, QualityDimension]:
         """Assess card across all quality dimensions."""
         dimensions = {}
 
@@ -307,7 +307,7 @@ class CardQualityAgent:
             strengths=self._identify_accessibility_strengths(card),
         )
 
-    def _calculate_overall_score(self, dimensions: Dict[str, QualityDimension]) -> float:
+    def _calculate_overall_score(self, dimensions: dict[str, QualityDimension]) -> float:
         """Calculate weighted overall quality score."""
         total_weighted_score = 0.0
         total_weight = 0.0
@@ -319,8 +319,8 @@ class CardQualityAgent:
         return total_weighted_score / total_weight if total_weight > 0 else 0.0
 
     def _generate_improvements(
-        self, card: GeneratedCard, dimensions: Dict[str, QualityDimension]
-    ) -> List[str]:
+        self, card: GeneratedCard, dimensions: dict[str, QualityDimension]
+    ) -> list[str]:
         """Generate actionable improvement suggestions."""
         suggestions = []
 
@@ -339,7 +339,7 @@ class CardQualityAgent:
 
         return unique_suggestions
 
-    def _get_dimension_improvements(self, dimension: str, issues: List[str]) -> List[str]:
+    def _get_dimension_improvements(self, dimension: str, issues: list[str]) -> list[str]:
         """Get improvement suggestions for a specific dimension."""
         suggestions = []
 
@@ -395,7 +395,7 @@ class CardQualityAgent:
         return suggestions
 
     def _calculate_confidence(
-        self, card: GeneratedCard, dimensions: Dict[str, QualityDimension]
+        self, card: GeneratedCard, dimensions: dict[str, QualityDimension]
     ) -> float:
         """Calculate confidence in the quality assessment."""
         # Base confidence on assessment consistency and card complexity
@@ -413,7 +413,7 @@ class CardQualityAgent:
 
         return min(1.0, max(0.5, base_confidence))
 
-    def _identify_content_strengths(self, card: GeneratedCard) -> List[str]:
+    def _identify_content_strengths(self, card: GeneratedCard) -> list[str]:
         """Identify content-related strengths."""
         strengths = []
 
@@ -429,7 +429,7 @@ class CardQualityAgent:
 
         return strengths
 
-    def _identify_learning_strengths(self, card: GeneratedCard) -> List[str]:
+    def _identify_learning_strengths(self, card: GeneratedCard) -> list[str]:
         """Identify learning science-related strengths."""
         strengths = []
 
@@ -451,7 +451,7 @@ class CardQualityAgent:
 
         return strengths
 
-    def _identify_technical_strengths(self, card: GeneratedCard) -> List[str]:
+    def _identify_technical_strengths(self, card: GeneratedCard) -> list[str]:
         """Identify technical quality strengths."""
         strengths = []
 
@@ -469,7 +469,7 @@ class CardQualityAgent:
 
         return strengths
 
-    def _identify_accessibility_strengths(self, card: GeneratedCard) -> List[str]:
+    def _identify_accessibility_strengths(self, card: GeneratedCard) -> list[str]:
         """Identify accessibility-related strengths."""
         strengths = []
 

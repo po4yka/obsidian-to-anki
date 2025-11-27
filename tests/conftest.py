@@ -1,157 +1,168 @@
-"""Pytest configuration and fixtures."""
-
-import tempfile
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock
+"""Pytest configuration and fixtures for the test suite."""
 
 import pytest
+from pathlib import Path
 
-from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.models import NoteMetadata, QAPair
-
-
-@pytest.fixture
-def temp_dir():
-    """Create a temporary directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir)
-
-
-@pytest.fixture
-def test_config(temp_dir):
-    """Create a test configuration."""
-    vault_path = temp_dir / "vault"
-    vault_path.mkdir()
-    source_dir = vault_path / "interview_questions" / "InterviewQuestions"
-    source_dir.mkdir(parents=True)
-
-    return Config(
-        vault_path=vault_path,
-        source_dir=Path("interview_questions/InterviewQuestions"),
-        anki_connect_url="http://localhost:8765",
-        anki_deck_name="Test Deck",
-        anki_note_type="APF::Simple",
-        openrouter_api_key="test-key",
-        openrouter_model="openai/gpt-4",
-        llm_temperature=0.2,
-        llm_top_p=0.3,
-        run_mode="apply",
-        delete_mode="delete",
-        db_path=temp_dir / "test.db",
-        log_level="DEBUG",
-    )
+from obsidian_anki_sync.domain.entities.card import Card, CardManifest
+from obsidian_anki_sync.domain.entities.note import Note, NoteMetadata, QAPair
+from tests.fixtures import (
+    MockAnkiClient,
+    MockCardGenerator,
+    MockLLMProvider,
+    MockNoteParser,
+    MockStateRepository,
+)
 
 
 @pytest.fixture
-def sample_metadata():
-    """Create sample note metadata."""
+def mock_anki_client():
+    """Provide a mock Anki client for testing."""
+    return MockAnkiClient()
+
+
+@pytest.fixture
+def mock_llm_provider():
+    """Provide a mock LLM provider for testing."""
+    return MockLLMProvider()
+
+
+@pytest.fixture
+def mock_state_repository():
+    """Provide a mock state repository for testing."""
+    return MockStateRepository()
+
+
+@pytest.fixture
+def mock_card_generator():
+    """Provide a mock card generator for testing."""
+    return MockCardGenerator()
+
+
+@pytest.fixture
+def mock_note_parser():
+    """Provide a mock note parser for testing."""
+    return MockNoteParser()
+
+
+@pytest.fixture
+def sample_note_metadata():
+    """Provide sample note metadata for testing."""
     return NoteMetadata(
-        id="test-001",
-        title="Test Question",
-        topic="Testing",
+        topic="Test Topic",
         language_tags=["en", "ru"],
-        created=datetime(2024, 1, 1),
-        updated=datetime(2024, 1, 2),
-        aliases=["test"],
-        subtopics=["unit_testing"],
-        question_kind="technical",
         difficulty="medium",
-        original_language="en",
-        tags=["python", "testing"],
+        question_kind="concept",
+        tags=["test", "sample"],
+        status="published",
     )
 
 
 @pytest.fixture
 def sample_qa_pair():
-    """Create sample Q/A pair."""
+    """Provide a sample Q&A pair for testing."""
     return QAPair(
         card_index=1,
-        question_en="What is unit testing?",
-        question_ru="Что такое юнит-тестирование?",
-        answer_en="Unit testing is testing individual components.",
-        answer_ru="Юнит-тестирование - это тестирование отдельных компонентов.",
-        followups="How to write good tests?",
-        references="pytest.org",
-        related="Integration testing",
-        context="Testing fundamentals",
+        question_en="What is dependency injection?",
+        question_ru="Что такое внедрение зависимостей?",
+        answer_en="Dependency injection is a design pattern where dependencies are provided to a class rather than created internally.",
+        answer_ru="Внедрение зависимостей - это паттерн проектирования, при котором зависимости предоставляются классу извне, а не создаются внутри.",
+        followups="How does DI relate to SOLID principles?",
+        references="Martin Fowler - Inversion of Control Containers",
     )
 
 
 @pytest.fixture
-def mock_ollama_provider():
-    """Create a mock Ollama provider for testing."""
-    mock_provider = MagicMock()
-    mock_provider.generate.return_value = {
-        "response": "<!-- Card 1 | slug: test | CardType: Simple | Tags: python testing -->\n<!-- Title -->\nTest card\n<!-- manifest: {} -->"
-    }
-    return mock_provider
+def sample_note(sample_note_metadata, tmp_path):
+    """Provide a sample note entity for testing."""
+    file_path = tmp_path / "sample_note.md"
+    file_path.write_text("# Sample Note\n\nThis is a test note.")
+
+    return Note(
+        id="test-note-123",
+        title="Sample Note",
+        content="# Sample Note\n\nThis is a test note.",
+        file_path=file_path,
+        metadata=sample_note_metadata,
+        created_at=sample_note_metadata.created,
+        updated_at=sample_note_metadata.updated,
+    )
 
 
 @pytest.fixture
-def sample_note_content():
-    """Create sample Obsidian note content."""
-    return """---
-id: test-001
-title: Test Question
+def sample_card(sample_note):
+    """Provide a sample card entity for testing."""
+    manifest = CardManifest(
+        slug="test-note-123-en",
+        slug_base="test-note-123",
+        lang="en",
+        source_path=str(sample_note.file_path),
+        source_anchor="p1",
+        note_id=sample_note.id,
+        note_title=sample_note.title,
+        card_index=1,
+    )
+
+    return Card(
+        slug="test-note-123-en",
+        language="en",
+        apf_html='<!-- PROMPT_VERSION: apf-v2.1 -->\n<!-- BEGIN_CARDS -->\n# Question\nTest?\n# Answer\nAnswer\n<!-- END_CARDS -->',
+        manifest=manifest,
+        note_type="APF::Simple",
+        tags=["test"],
+    )
+
+
+@pytest.fixture
+def temp_vault_dir(tmp_path):
+    """Provide a temporary directory structure mimicking an Obsidian vault."""
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    # Create some sample note files
+    note1 = vault_dir / "note1.md"
+    note1.write_text("""---
+id: note1
+title: Note 1
 topic: Testing
 language_tags: [en, ru]
-created: 2024-01-01
-updated: 2024-01-02
-subtopics: [unit_testing]
-difficulty: medium
-moc: [[moc-testing]]
-related:
-  - [[c-testing-concept]]
-  - external-resource
-sources:
-  - url: https://example.com/unit-tests
-    note: Example overview
-  - https://docs.pytest.org
-tags: [python, testing]
 ---
-
-# Introduction
-
-This is a test note.
 
 # Question (EN)
+What is testing?
 
-> What is unit testing?
+# Answer (EN)
+Testing is verifying code behavior.
 
-# Вопрос (RU)
+# Question (RU)
+Что такое тестирование?
 
-> Что такое юнит-тестирование?
+# Answer (RU)
+Тестирование - это проверка поведения кода.
+""")
 
+    note2 = vault_dir / "note2.md"
+    note2.write_text("""---
+id: note2
+title: Note 2
+topic: Development
+language_tags: [en]
 ---
 
-## Answer (EN)
+# Question (EN)
+What is development?
 
-Unit testing is testing individual components.
+# Answer (EN)
+Development is writing code.
+""")
 
-- Tests small units of code
-- Runs in isolation
-- Fast and reliable
+    return vault_dir
 
-## Ответ (RU)
 
-Юнит-тестирование - это тестирование отдельных компонентов.
-
-- Тестирует небольшие блоки кода
-- Выполняется изолированно
-- Быстро и надежно
-
-## Follow-ups
-
-- How to write good tests?
-- What is TDD?
-
-## References
-
-- https://pytest.org
-
-## Related Questions
-
-- Integration testing
-- End-to-end testing
-"""
+@pytest.fixture(autouse=True)
+def reset_mocks(mock_anki_client, mock_llm_provider, mock_state_repository, mock_card_generator, mock_note_parser):
+    """Automatically reset all mocks before each test."""
+    mock_anki_client.reset()
+    mock_llm_provider.reset()
+    mock_state_repository.reset()
+    mock_card_generator.reset()
+    mock_note_parser.reset()

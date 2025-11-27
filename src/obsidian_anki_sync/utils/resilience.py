@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 from ..utils.logging import get_logger
 
@@ -74,7 +74,7 @@ class CircuitBreaker:
     Prevents cascading failures by stopping requests to failing services.
     """
 
-    def __init__(self, name: str, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, name: str, config: CircuitBreakerConfig | None = None):
         """Initialize circuit breaker.
 
         Args:
@@ -85,7 +85,7 @@ class CircuitBreaker:
         self.config = config or CircuitBreakerConfig()
         self.state = CircuitBreakerState.CLOSED
         self.failure_count = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
         self.half_open_calls = 0
         self.lock = threading.Lock()
 
@@ -411,7 +411,7 @@ class ConfidenceValidator:
         """
         self.min_confidence = min_confidence
         self.validate_patterns = validate_patterns
-        self.validation_history: list[Dict[str, Any]] = []
+        self.validation_history: list[dict[str, Any]] = []
 
     def validate(self, result: Any) -> ConfidenceValidationResult:
         """Validate agent result based on confidence and patterns.
@@ -511,7 +511,7 @@ class ConfidenceValidator:
         confidence: float,
         reason: str,
         is_valid: bool,
-        patterns: Optional[list[str]] = None,
+        patterns: list[str | None] = None,
     ) -> None:
         """Record validation decision for audit trail."""
         self.validation_history.append(

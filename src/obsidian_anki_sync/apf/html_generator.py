@@ -8,7 +8,7 @@ import html
 import re
 from dataclasses import dataclass
 from html import escape
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..utils.logging import get_logger
 from .html_validator import validate_card_html
@@ -21,9 +21,9 @@ class CardTemplate:
     """Template for generating APF card HTML."""
 
     card_type: str
-    sections: Dict[str, str]
+    sections: dict[str, str]
 
-    def render(self, data: Dict[str, Any]) -> str:
+    def render(self, data: dict[str, Any]) -> str:
         """Render the template with provided data."""
         html_parts = []
 
@@ -36,7 +36,7 @@ class CardTemplate:
 
         return "\n".join(html_parts)
 
-    def _render_section(self, template: str, data: Dict[str, Any]) -> str:
+    def _render_section(self, template: str, data: dict[str, Any]) -> str:
         """Render a single section template."""
         # Simple template substitution
         result = template
@@ -54,8 +54,8 @@ class GenerationResult:
 
     html: str
     is_valid: bool
-    validation_errors: List[str]
-    warnings: List[str]
+    validation_errors: list[str]
+    warnings: list[str]
 
 
 class HTMLTemplateGenerator:
@@ -64,7 +64,7 @@ class HTMLTemplateGenerator:
     def __init__(self):
         self.templates = self._initialize_templates()
 
-    def _initialize_templates(self) -> Dict[str, CardTemplate]:
+    def _initialize_templates(self) -> dict[str, CardTemplate]:
         """Initialize available card templates."""
         return {
             "simple": CardTemplate(
@@ -110,7 +110,7 @@ class HTMLTemplateGenerator:
         }
 
     def generate_card_html(
-        self, card_data: Dict[str, Any], template_name: str = "simple"
+        self, card_data: dict[str, Any], template_name: str = "simple"
     ) -> GenerationResult:
         """
         Generate APF HTML for a card using templates.
@@ -154,7 +154,7 @@ class HTMLTemplateGenerator:
             warnings=warnings,
         )
 
-    def _preprocess_card_data(self, card_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _preprocess_card_data(self, card_data: dict[str, Any]) -> dict[str, Any]:
         """Preprocess card data for template rendering."""
         processed = card_data.copy()
 
@@ -236,8 +236,8 @@ class HTMLTemplateGenerator:
         return escaped
 
     def _auto_fix_html_issues(
-        self, html: str, errors: List[str]
-    ) -> Tuple[str, List[str]]:
+        self, html: str, errors: list[str]
+    ) -> tuple[str, list[str]]:
         """Attempt to auto-fix common HTML validation issues."""
         fixed_html = html
         warnings = []
@@ -265,7 +265,7 @@ class HTMLTemplateGenerator:
 
         return fixed_html, warnings
 
-    def _add_missing_language_classes(self, html: str) -> Tuple[str, List[str]]:
+    def _add_missing_language_classes(self, html: str) -> tuple[str, list[str]]:
         """Add default language classes to code elements missing them."""
         warnings = []
 
@@ -283,7 +283,7 @@ class HTMLTemplateGenerator:
 
         return fixed_html, warnings
 
-    def _wrap_standalone_code(self, html: str) -> Tuple[str, List[str]]:
+    def _wrap_standalone_code(self, html: str) -> tuple[str, list[str]]:
         """Wrap standalone code elements in pre tags."""
         warnings = []
 
@@ -302,7 +302,7 @@ class HTMLTemplateGenerator:
         return fixed_html, warnings
 
     def generate_full_apf_html(
-        self, cards_data: List[Dict[str, Any]], manifest_data: Dict[str, Any]
+        self, cards_data: list[dict[str, Any]], manifest_data: dict[str, Any]
     ) -> str:
         """
         Generate complete APF HTML document with all cards.
@@ -342,7 +342,7 @@ class HTMLTemplateGenerator:
 
 
 def generate_card_html_with_validation(
-    card_data: Dict[str, Any], template_name: str = "simple"
+    card_data: dict[str, Any], template_name: str = "simple"
 ) -> GenerationResult:
     """
     Convenience function to generate card HTML with validation.

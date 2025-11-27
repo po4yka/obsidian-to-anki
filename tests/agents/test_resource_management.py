@@ -45,7 +45,7 @@ class TestModelReuse:
 
     def test_models_created_once_per_orchestrator(self, test_config_for_resources):
         """Test that models are created once per orchestrator instance."""
-        from obsidian_anki_sync.agents.langgraph_orchestrator import (
+        from obsidian_anki_sync.agents.langgraph import (
             LangGraphOrchestrator,
         )
 
@@ -78,7 +78,7 @@ class TestModelReuse:
 
     def test_same_model_instance_reused_in_state(self, test_config_for_resources):
         """Test that the same model instance is reused across node executions."""
-        from obsidian_anki_sync.agents.langgraph_orchestrator import (
+        from obsidian_anki_sync.agents.langgraph import (
             LangGraphOrchestrator,
         )
 
@@ -132,7 +132,7 @@ class TestHTTPClientPooling:
         """Test that HTTP clients are reused across requests."""
         # This is tested implicitly through model reuse
         # If models are reused, their HTTP clients are also reused
-        from obsidian_anki_sync.agents.langgraph_orchestrator import (
+        from obsidian_anki_sync.agents.langgraph import (
             LangGraphOrchestrator,
         )
 

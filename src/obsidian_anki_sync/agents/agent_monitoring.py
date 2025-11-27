@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..utils.logging import get_logger
 
@@ -43,9 +43,9 @@ class AgentMetrics:
     total_calls: int = 0
     avg_confidence: float = 0.0
     avg_response_time: float = 0.0
-    last_success_time: Optional[float] = None
-    last_failure_time: Optional[float] = None
-    error_types: Dict[str, int] = field(default_factory=dict)
+    last_success_time: float | None = None
+    last_failure_time: float | None = None
+    error_types: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,7 +54,7 @@ class HealthCheckResult:
 
     status: HealthStatus
     response_time: float
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -66,18 +66,18 @@ class MetricsStorage:
         agent_name: str,
         metric: str,
         value: float,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> None:
         """Record a metric."""
         raise NotImplementedError
 
     def get_metrics(
-        self, agent_name: Optional[str] = None, start_time: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, agent_name: str | None = None, start_time: float | None = None
+    ) -> list[dict[str, Any]]:
         """Get metrics."""
         raise NotImplementedError
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary."""
         raise NotImplementedError
 
@@ -86,7 +86,7 @@ class InMemoryMetricsStorage(MetricsStorage):
     """In-memory metrics storage."""
 
     def __init__(self):
-        self.metrics: List[Dict[str, Any]] = []
+        self.metrics: list[dict[str, Any]] = []
         self.lock = threading.Lock()
 
     def record_metric(
@@ -94,7 +94,7 @@ class InMemoryMetricsStorage(MetricsStorage):
         agent_name: str,
         metric: str,
         value: float,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> None:
         """Record a metric."""
         with self.lock:
@@ -112,24 +112,26 @@ class InMemoryMetricsStorage(MetricsStorage):
                 self.metrics = self.metrics[-10000:]
 
     def get_metrics(
-        self, agent_name: Optional[str] = None, start_time: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, agent_name: str | None = None, start_time: float | None = None
+    ) -> list[dict[str, Any]]:
         """Get metrics."""
         with self.lock:
             filtered = self.metrics
 
             if agent_name:
-                filtered = [m for m in filtered if m["agent_name"] == agent_name]
+                filtered = [
+                    m for m in filtered if m["agent_name"] == agent_name]
 
             if start_time:
-                filtered = [m for m in filtered if m["timestamp"] >= start_time]
+                filtered = [
+                    m for m in filtered if m["timestamp"] >= start_time]
 
             return filtered
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary."""
         with self.lock:
-            summary: Dict[str, Dict[str, Any]] = {}
+            summary: dict[str, dict[str, Any]] = {}
 
             for metric in self.metrics:
                 key = f"{metric['agent_name']}.{metric['metric']}"
@@ -197,7 +199,7 @@ class DatabaseMetricsStorage(MetricsStorage):
         agent_name: str,
         metric: str,
         value: float,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> None:
         """Record a metric."""
         with self.lock:
@@ -212,8 +214,8 @@ class DatabaseMetricsStorage(MetricsStorage):
                 conn.commit()
 
     def get_metrics(
-        self, agent_name: Optional[str] = None, start_time: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, agent_name: str | None = None, start_time: float | None = None
+    ) -> list[dict[str, Any]]:
         """Get metrics."""
         query = (
             "SELECT agent_name, metric, value, timestamp FROM agent_metrics WHERE 1=1"
@@ -244,7 +246,7 @@ class DatabaseMetricsStorage(MetricsStorage):
                     for row in cursor.fetchall()
                 ]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary."""
         query = """
             SELECT agent_name, metric,
@@ -281,13 +283,13 @@ class AgentHealthMonitor:
 
     def __init__(self):
         """Initialize health monitor."""
-        self.health_status: Dict[str, HealthStatus] = {}
-        self.last_check_time: Dict[str, float] = {}
+        self.health_status: dict[str, HealthStatus] = {}
+        self.last_check_time: dict[str, float] = {}
         self.check_interval = 300  # 5 minutes
         self.lock = threading.Lock()
 
     def check_health(
-        self, agent_name: str, test_func: Optional[Callable[[], None]] = None
+        self, agent_name: str, test_func: Callable[[Any, ...], None] | None = None
     ) -> HealthCheckResult:
         """Check health of an agent.
 
@@ -356,7 +358,7 @@ class MetricsCollector:
         agent_name: str,
         metric: str,
         value: float,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> None:
         """Record a metric.
 
@@ -398,13 +400,13 @@ class MetricsCollector:
         )  # Store hash for privacy
         self.record_metric(agent_name, "response_time", response_time)
 
-    def get_metrics_summary(self) -> Dict[str, Any]:
+    def get_metrics_summary(self) -> dict[str, Any]:
         """Get summary of all metrics."""
         return self.storage.get_summary()
 
     def get_agent_metrics(
-        self, agent_name: str, start_time: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, agent_name: str, start_time: float | None = None
+    ) -> list[dict[str, Any]]:
         """Get metrics for a specific agent."""
         return self.storage.get_metrics(agent_name=agent_name, start_time=start_time)
 
@@ -413,7 +415,7 @@ class PerformanceTracker:
     """Track performance metrics for agents."""
 
     def __init__(
-        self, metrics_collector: MetricsCollector, memory_store: Optional[Any] = None
+        self, metrics_collector: MetricsCollector, memory_store: Any | None = None
     ):
         """Initialize performance tracker.
 
@@ -423,7 +425,7 @@ class PerformanceTracker:
         """
         self.metrics_collector = metrics_collector
         self.memory_store = memory_store
-        self.agent_metrics: Dict[str, AgentMetrics] = defaultdict(AgentMetrics)
+        self.agent_metrics: dict[str, AgentMetrics] = defaultdict(AgentMetrics)
 
     def record_call(
         self,
@@ -431,7 +433,7 @@ class PerformanceTracker:
         success: bool,
         confidence: float = 0.0,
         response_time: float = 0.0,
-        error_type: Optional[str] = None,
+        error_type: str | None = None,
     ) -> None:
         """Record an agent call.
 
@@ -454,10 +456,12 @@ class PerformanceTracker:
                 metrics.avg_confidence = confidence
             else:
                 metrics.avg_confidence = (
-                    metrics.avg_confidence * (metrics.total_calls - 1) + confidence
+                    metrics.avg_confidence *
+                    (metrics.total_calls - 1) + confidence
                 ) / metrics.total_calls
 
-            self.metrics_collector.record_success(agent_name, confidence, response_time)
+            self.metrics_collector.record_success(
+                agent_name, confidence, response_time)
 
             # Store in persistent memory if available
             if self.memory_store:
@@ -472,7 +476,8 @@ class PerformanceTracker:
                         },
                     )
                 except Exception as e:
-                    logger.warning("performance_metric_store_failed", error=str(e))
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
         else:
             metrics.failure_count += 1
             metrics.last_failure_time = time.time()
@@ -499,14 +504,16 @@ class PerformanceTracker:
                         },
                     )
                 except Exception as e:
-                    logger.warning("performance_metric_store_failed", error=str(e))
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
 
         # Update running average response time
         if metrics.total_calls == 1:
             metrics.avg_response_time = response_time
         else:
             metrics.avg_response_time = (
-                metrics.avg_response_time * (metrics.total_calls - 1) + response_time
+                metrics.avg_response_time *
+                (metrics.total_calls - 1) + response_time
             ) / metrics.total_calls
 
         # Store response time metric
@@ -531,6 +538,6 @@ class PerformanceTracker:
             return 0.0
         return metrics.success_count / metrics.total_calls
 
-    def get_all_metrics(self) -> Dict[str, AgentMetrics]:
+    def get_all_metrics(self) -> dict[str, AgentMetrics]:
         """Get all agent metrics."""
         return dict(self.agent_metrics)

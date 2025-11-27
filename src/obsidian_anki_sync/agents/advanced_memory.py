@@ -12,7 +12,7 @@ NEW in 2025: MongoDB Store integration, structured memory, agent learning patter
 import json
 import time
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -32,11 +32,11 @@ class AgentExperience:
     input_hash: str
     success: bool
     execution_time: float
-    quality_score: Optional[float]
-    error_type: Optional[str]
-    learned_patterns: Dict[str, Any]
+    quality_score: float | None
+    error_type: str | None
+    learned_patterns: dict[str, Any]
     timestamp: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 @dataclass
@@ -45,8 +45,8 @@ class AgentKnowledge:
 
     topic: str
     confidence: float
-    source_experiences: List[str]  # Experience IDs
-    learned_rules: Dict[str, Any]
+    source_experiences: list[str]  # Experience IDs
+    learned_rules: dict[str, Any]
     last_updated: float
     usage_count: int
 
@@ -57,7 +57,7 @@ class UserPattern:
 
     user_id: str
     preference_type: str
-    pattern_data: Dict[str, Any]
+    pattern_data: dict[str, Any]
     confidence: float
     last_observed: float
     observation_count: int
@@ -78,7 +78,7 @@ class AdvancedMemoryStore:
         config: Config,
         mongodb_url: str = "mongodb://localhost:27017",
         db_name: str = "obsidian_anki_memory",
-        embedding_store: Optional[AgentMemoryStore] = None,
+        embedding_store: AgentMemoryStore | None = None,
     ):
         """Initialize advanced memory store.
 
@@ -93,7 +93,7 @@ class AdvancedMemoryStore:
         self.db_name = db_name
 
         # MongoDB client (async)
-        self.client: Optional[AsyncIOMotorClient] = None
+        self.client: AsyncIOMotorClient | None = None
         self.db = None
 
         # Collections
@@ -220,7 +220,7 @@ class AdvancedMemoryStore:
         agent_name: str,
         task_type: str,
         limit: int = 5
-    ) -> List[AgentExperience]:
+    ) -> list[AgentExperience]:
         """Retrieve similar past experiences for an agent.
 
         Args:
@@ -303,7 +303,7 @@ class AdvancedMemoryStore:
             logger.error("failed_to_store_knowledge", error=str(e))
             return False
 
-    async def retrieve_knowledge(self, topic: str) -> Optional[AgentKnowledge]:
+    async def retrieve_knowledge(self, topic: str) -> AgentKnowledge | None:
         """Retrieve stored knowledge by topic.
 
         Args:
@@ -373,7 +373,7 @@ class AdvancedMemoryStore:
             logger.error("failed_to_store_user_pattern", error=str(e))
             return False
 
-    async def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
+    async def get_user_preferences(self, user_id: str) -> dict[str, Any]:
         """Get all learned preferences for a user.
 
         Args:
@@ -414,8 +414,8 @@ class AdvancedMemoryStore:
         self,
         agent_name: str,
         task_type: str,
-        input_data: Dict[str, Any],
-        pipeline_result: Dict[str, Any],
+        input_data: dict[str, Any],
+        pipeline_result: dict[str, Any],
         execution_time: float,
     ) -> bool:
         """Learn from a pipeline execution result.
@@ -479,7 +479,7 @@ class AdvancedMemoryStore:
             logger.error("failed_to_learn_from_result", error=str(e))
             return False
 
-    def _extract_patterns(self, pipeline_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_patterns(self, pipeline_result: dict[str, Any]) -> dict[str, Any]:
         """Extract learning patterns from pipeline result."""
         patterns = {}
 
@@ -505,8 +505,8 @@ class AdvancedMemoryStore:
     def _extract_knowledge(
         self,
         experience: AgentExperience,
-        pipeline_result: Dict[str, Any]
-    ) -> Optional[AgentKnowledge]:
+        pipeline_result: dict[str, Any]
+    ) -> AgentKnowledge | None:
         """Extract structured knowledge from experience."""
         if not experience.success:
             return None
@@ -528,7 +528,7 @@ class AdvancedMemoryStore:
             usage_count=1,
         )
 
-    def _extract_user_patterns(self, pipeline_result: Dict[str, Any]) -> List[UserPattern]:
+    def _extract_user_patterns(self, pipeline_result: dict[str, Any]) -> list[UserPattern]:
         """Extract user behavior patterns from pipeline result."""
         patterns = []
 
@@ -557,7 +557,7 @@ class AdvancedMemoryStore:
 
         return patterns
 
-    async def get_memory_stats(self) -> Dict[str, Any]:
+    async def get_memory_stats(self) -> dict[str, Any]:
         """Get statistics about stored memory."""
         if not self.connected:
             return {"connected": False}

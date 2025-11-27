@@ -24,7 +24,7 @@ except ModuleNotFoundError:
     _PYDANTIC_AGENTS_AVAILABLE = False
 
 try:
-    from .langgraph_orchestrator import LangGraphOrchestrator
+    from .langgraph import LangGraphOrchestrator
 
     _LANGGRAPH_AVAILABLE = True
 except ModuleNotFoundError:

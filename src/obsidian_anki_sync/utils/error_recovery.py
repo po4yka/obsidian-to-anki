@@ -6,7 +6,7 @@ to ensure processing continues even with problematic content.
 
 import re
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from ..agents.agent_learning import AdaptiveRouter
 from ..agents.agent_monitoring import (
@@ -279,7 +279,7 @@ class ErrorRecoveryManager:
             original_error=original_error,
         )
 
-    def _preprocess_file(self, file_path: Path) -> Tuple[Optional[str], List[str]]:
+    def _preprocess_file(self, file_path: Path) -> tuple[str | None, list[str]]:
         """Preprocess file content to fix common issues."""
         try:
             content = file_path.read_text(encoding="utf-8")
@@ -290,7 +290,7 @@ class ErrorRecoveryManager:
             logger.error("preprocessing_failed", error=str(e))
             return None, [f"Preprocessing failed: {e}"]
 
-    def _auto_repair_file(self, file_path: Path) -> Optional[str]:
+    def _auto_repair_file(self, file_path: Path) -> str | None:
         """Apply targeted auto-repair to file content."""
         try:
             content = file_path.read_text(encoding="utf-8")
@@ -405,7 +405,7 @@ class ErrorRecoveryManager:
 
     def _create_minimal_structure(
         self, file_path: Path
-    ) -> Tuple[NoteMetadata, List[QAPair]]:
+    ) -> tuple[NoteMetadata, list[QAPair]]:
         """Create a minimal valid note structure when all else fails."""
         from ..models import NoteMetadata, QAPair
 
@@ -454,7 +454,7 @@ class ErrorRecoveryManager:
         temp_file.write_text(content, encoding="utf-8")
         return temp_file
 
-    def _extract_languages_from_frontmatter(self, content: str) -> List[str]:
+    def _extract_languages_from_frontmatter(self, content: str) -> list[str]:
         """Extract language tags from frontmatter."""
         languages = []
         lines = content.splitlines()
@@ -480,7 +480,7 @@ class ErrorRecoveryManager:
 
     def _try_specialized_agents(
         self, file_path: Path, original_error: str
-    ) -> Optional[Tuple[NoteMetadata, List[QAPair]]]:
+    ) -> tuple[NoteMetadata, list[QAPair | None]]:
         """Try specialized agents to repair the content."""
         import time
 
@@ -638,7 +638,7 @@ class ErrorRecoveryManager:
             logger.error("specialized_agents_failed", error=str(e))
             return None
 
-    def _find_frontmatter_end(self, lines: List[str]) -> int:
+    def _find_frontmatter_end(self, lines: list[str]) -> int:
         """Find the end of frontmatter."""
         for i, line in enumerate(lines):
             if line.strip() == "---" and i > 0:

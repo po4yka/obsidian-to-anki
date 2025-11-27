@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import threading
-from typing import Dict, Tuple
+
 
 from ..models import NoteMetadata, QAPair
 
 # Thread-safe LRU cache for content hashes
-_hash_cache: Dict[Tuple[str, ...], str] = {}
+_hash_cache: dict[tuple[str, ...], str] = {}
 _cache_lock = threading.Lock()
 _MAX_CACHE_SIZE = 2048
 
