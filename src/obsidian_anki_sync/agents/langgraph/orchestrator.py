@@ -24,6 +24,7 @@ from ..models import (
     PreValidationResult,
 )
 from ..slug_utils import generate_agent_slug_base
+from ..unified_agent import UnifiedAgentSelector
 from .model_factory import ModelFactory
 from .state import PipelineState
 from .workflow_builder import WorkflowBuilder
@@ -59,6 +60,7 @@ class LangGraphOrchestrator:
         enable_context_enrichment: bool | None = None,
         enable_memorization_quality: bool | None = None,
         enable_duplicate_detection: bool | None = None,
+        agent_framework: str | None = None,  # NEW: Agent framework selection
     ):
         """Initialize LangGraph orchestrator.
 
@@ -71,6 +73,7 @@ class LangGraphOrchestrator:
             enable_context_enrichment: Enable context enrichment agent (uses config if None)
             enable_memorization_quality: Enable memorization quality agent (uses config if None)
             enable_duplicate_detection: Enable duplicate detection agent (uses config if None)
+            agent_framework: Agent framework to use ("pydantic_ai" or "langchain", uses config if None)
         """
         self.config = config
         # Use config values as defaults if not explicitly provided
@@ -109,7 +112,17 @@ class LangGraphOrchestrator:
             )  # Default to False
         )
 
-        # Initialize ModelFactory
+        # NEW: Agent framework selection (can be overridden by memory)
+        self.agent_framework = (
+            agent_framework
+            if agent_framework is not None
+            else getattr(config, "agent_framework", "pydantic_ai")
+        )
+
+        # NEW: Initialize unified agent selector for framework switching
+        self.agent_selector = UnifiedAgentSelector(config)
+
+        # Initialize ModelFactory (still needed for some legacy functionality)
         self.model_factory = ModelFactory(config)
 
         # Initialize WorkflowBuilder
@@ -223,6 +236,94 @@ class LangGraphOrchestrator:
             duplicate_detection=self.enable_duplicate_detection,
         )
 
+    async def _determine_optimal_agent_framework(
+        self,
+        note_content: str,
+        metadata: NoteMetadata,
+    ) -> str:
+        """Determine the optimal agent framework based on memory and content analysis.
+
+        Args:
+            note_content: Full note content
+            metadata: Note metadata
+
+        Returns:
+            Optimal agent framework: "pydantic_ai", "langchain", or "memory_enhanced"
+        """
+        # Start with configured default
+        optimal_framework = self.agent_framework
+
+        # If memory is available, use it for routing decisions
+        if self.advanced_memory_store and self.advanced_memory_store.connected:
+            try:
+                topic = getattr(metadata, 'topic', 'general')
+                user_id = getattr(metadata, 'user_id', 'default')
+
+                # Check user preferences for framework
+                user_prefs = await self.advanced_memory_store.get_user_card_preferences(user_id, topic)
+                if user_prefs and user_prefs.confidence > 0.8:
+                    # If user strongly prefers memory-enhanced and it's available
+                    if self.agent_selector.memory_enhanced_available:
+                        optimal_framework = "memory_enhanced"
+                        logger.info(
+                            "memory_based_routing_selected_memory_enhanced",
+                            topic=topic,
+                            user_id=user_id,
+                            confidence=user_prefs.confidence,
+                        )
+
+                # Check topic performance patterns
+                topic_stats = await self.advanced_memory_store.get_topic_feedback_stats(topic)
+                if topic_stats and topic_stats.get("total_feedback", 0) > 10:
+                    avg_quality = topic_stats.get("avg_quality_score", 0.5)
+
+                    # If topic has high quality scores and memory-enhanced is available,
+                    # prefer it for consistency
+                    if avg_quality > 0.8 and self.agent_selector.memory_enhanced_available:
+                        optimal_framework = "memory_enhanced"
+                        logger.info(
+                            "topic_performance_routing_selected_memory_enhanced",
+                            topic=topic,
+                            avg_quality=avg_quality,
+                            total_feedback=topic_stats.get("total_feedback"),
+                        )
+                    # If topic has poor quality scores, try langchain for different approach
+                    elif avg_quality < 0.6:
+                        optimal_framework = "langchain"
+                        logger.info(
+                            "topic_performance_routing_selected_langchain",
+                            topic=topic,
+                            avg_quality=avg_quality,
+                            reason="poor_historical_performance",
+                        )
+
+                # Content complexity routing
+                content_length = len(note_content)
+                if content_length > 5000:  # Very complex content
+                    # Use langchain for complex multi-step reasoning
+                    optimal_framework = "langchain"
+                    logger.info(
+                        "content_complexity_routing_selected_langchain",
+                        content_length=content_length,
+                        reason="high_complexity_content",
+                    )
+                elif content_length < 500:  # Simple content
+                    # Use memory-enhanced for simple, consistent generation
+                    if self.agent_selector.memory_enhanced_available:
+                        optimal_framework = "memory_enhanced"
+                        logger.info(
+                            "content_complexity_routing_selected_memory_enhanced",
+                            content_length=content_length,
+                            reason="simple_content",
+                        )
+
+            except Exception as e:
+                logger.warning(
+                    f"Memory-based routing failed, using default: {e}")
+                optimal_framework = self.agent_framework
+
+        return optimal_framework
+
     async def process_note(
         self,
         note_content: str,
@@ -249,6 +350,7 @@ class LangGraphOrchestrator:
             "langgraph_pipeline_start",
             title=metadata.title,
             qa_pairs_count=len(qa_pairs),
+            agent_framework=optimal_framework,
         )
 
         # NEW: Start observability tracking
@@ -262,6 +364,9 @@ class LangGraphOrchestrator:
 
         # Generate slug base
         slug_base = self._generate_slug_base(metadata)
+
+        # Determine optimal agent framework based on memory and content
+        optimal_framework = await self._determine_optimal_agent_framework(note_content, metadata)
 
         # Initialize state
         # Best practice: Initialize all state fields explicitly
@@ -278,7 +383,10 @@ class LangGraphOrchestrator:
                 if existing_cards
                 else None
             ),
-            # Pass cached models through state for reuse
+            # NEW: Agent framework configuration (dynamically determined)
+            "agent_framework": optimal_framework,
+            "agent_selector": self.agent_selector,
+            # Pass cached models through state for reuse (legacy support)
             "pre_validator_model": self.model_factory.get_model("pre_validator"),
             "card_splitting_model": self.model_factory.get_model("card_splitting"),
             "generator_model": self.model_factory.get_model("generator"),
@@ -439,11 +547,165 @@ class LangGraphOrchestrator:
                     },
                     execution_time=total_time,
                 )
+
+                # Learn user preferences from successful generation
+                if success and generation and generation.success:
+                    await self._learn_user_preferences(metadata, generation, memorization_quality)
+
+                # Store memorization feedback for learning
+                if memorization_quality:
+                    await self._store_memorization_feedback(metadata, generation, memorization_quality)
+
                 logger.info("advanced_memory_learning_completed")
             except Exception as e:
                 logger.warning("advanced_memory_learning_failed", error=str(e))
 
         return result
+
+    async def _learn_user_preferences(
+        self,
+        metadata: NoteMetadata,
+        generation: GenerationResult,
+        memorization_quality: MemorizationQualityResult | None
+    ):
+        """Learn user preferences from successful card generation.
+
+        Args:
+            metadata: Note metadata
+            generation: Generation results
+            memorization_quality: Memorization quality assessment
+        """
+        if not self.advanced_memory_store:
+            return
+
+        try:
+            from ..advanced_memory import UserCardPreferences
+            import time
+
+            user_id = getattr(metadata, 'user_id', 'default')
+            topic = getattr(metadata, 'topic', 'general')
+
+            # Analyze generated cards for preferences
+            if generation.cards:
+                card_types = [card.card_type for card in generation.cards]
+                dominant_card_type = max(set(card_types), key=card_types.count)
+
+                # Determine difficulty based on content and quality
+                difficulty = "medium"  # default
+                if memorization_quality and memorization_quality.memorization_score:
+                    score = memorization_quality.memorization_score
+                    if score > 0.8:
+                        difficulty = "easy"
+                    elif score < 0.6:
+                        difficulty = "hard"
+
+                # Get existing preferences to update
+                existing_prefs = await self.advanced_memory_store.get_user_card_preferences(user_id, topic)
+
+                # Update or create preferences
+                if existing_prefs:
+                    # Update existing preferences with new observations
+                    confidence_boost = 0.1 if memorization_quality and memorization_quality.memorization_score > 0.7 else 0.05
+                    new_confidence = min(
+                        1.0, existing_prefs.confidence + confidence_boost)
+
+                    # Update dominant preferences
+                    if card_types.count(dominant_card_type) > card_types.count(existing_prefs.preferred_card_type):
+                        preferred_type = dominant_card_type
+                    else:
+                        preferred_type = existing_prefs.preferred_card_type
+
+                    updated_prefs = UserCardPreferences(
+                        user_id=user_id,
+                        topic=topic,
+                        preferred_card_type=preferred_type,
+                        preferred_difficulty=difficulty,
+                        formatting_preferences=existing_prefs.formatting_preferences,
+                        rejection_patterns=existing_prefs.rejection_patterns,
+                        confidence=new_confidence,
+                        last_updated=time.time(),
+                        observation_count=existing_prefs.observation_count + 1,
+                    )
+                else:
+                    # Create new preferences
+                    updated_prefs = UserCardPreferences(
+                        user_id=user_id,
+                        topic=topic,
+                        preferred_card_type=dominant_card_type,
+                        preferred_difficulty=difficulty,
+                        formatting_preferences={},
+                        rejection_patterns=[],
+                        confidence=0.6,  # Initial confidence
+                        last_updated=time.time(),
+                        observation_count=1,
+                    )
+
+                await self.advanced_memory_store.store_user_card_preferences(updated_prefs)
+
+                logger.info(
+                    "user_preferences_learned",
+                    user_id=user_id,
+                    topic=topic,
+                    preferred_type=updated_prefs.preferred_card_type,
+                    confidence=updated_prefs.confidence,
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to learn user preferences: {e}")
+
+    async def _store_memorization_feedback(
+        self,
+        metadata: NoteMetadata,
+        generation: GenerationResult,
+        memorization_quality: MemorizationQualityResult
+    ):
+        """Store memorization quality feedback for learning.
+
+        Args:
+            metadata: Note metadata
+            generation: Generation results
+            memorization_quality: Memorization quality assessment
+        """
+        if not self.advanced_memory_store:
+            return
+
+        try:
+            from ..advanced_memory import MemorizationFeedback
+            import time
+
+            # Store feedback for each card
+            if generation.cards:
+                for card in generation.cards:
+                    feedback = MemorizationFeedback(
+                        card_id=card.slug,  # Use slug as unique identifier
+                        quality_score=memorization_quality.memorization_score,
+                        issues_found=memorization_quality.issues,
+                        strengths_identified=memorization_quality.strengths,
+                        improvement_suggestions=memorization_quality.suggested_improvements,
+                        topic=getattr(metadata, 'topic', 'general'),
+                        card_type=card.card_type,
+                        timestamp=time.time(),
+                        metadata={
+                            "title": getattr(metadata, 'title', ''),
+                            "language": getattr(card, 'lang', 'en'),
+                            "card_index": getattr(card, 'card_index', 0),
+                            "tags": getattr(card, 'tags', []),
+                            "is_memorizable": memorization_quality.is_memorizable,
+                        }
+                    )
+
+                    await self.advanced_memory_store.store_memorization_feedback(feedback)
+
+                logger.info(
+                    "memorization_feedback_stored",
+                    cards_count=len(generation.cards),
+                    quality_score=memorization_quality.quality_score,
+                    topic=getattr(metadata, 'topic', 'general'),
+                    issues_count=len(memorization_quality.issues),
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to store memorization feedback: {e}")
 
     def _generate_slug_base(self, metadata: NoteMetadata) -> str:
         """Generate base slug from note metadata using collision-safe helper."""

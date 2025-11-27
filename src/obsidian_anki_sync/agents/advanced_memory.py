@@ -63,6 +63,51 @@ class UserPattern:
     observation_count: int
 
 
+@dataclass
+class CardGenerationPattern:
+    """Successful card generation patterns for learning."""
+
+    topic: str
+    complexity: str  # simple, medium, complex
+    card_type: str  # simple, missing, draw
+    question_structure: str  # template or pattern for questions
+    answer_format: str  # template or pattern for answers
+    quality_score: float
+    success_count: int
+    last_used: float
+    metadata: dict[str, Any]  # additional context like tags, language, etc.
+
+
+@dataclass
+class UserCardPreferences:
+    """Learned user preferences for card generation."""
+
+    user_id: str
+    topic: str
+    preferred_card_type: str  # simple, missing, draw
+    preferred_difficulty: str  # easy, medium, hard
+    formatting_preferences: dict[str, Any]  # font, layout, etc.
+    rejection_patterns: list[str]  # patterns in cards that user rejects
+    confidence: float
+    last_updated: float
+    observation_count: int
+
+
+@dataclass
+class MemorizationFeedback:
+    """Feedback from memorization quality assessments."""
+
+    card_id: str
+    quality_score: float
+    issues_found: list[str]
+    strengths_identified: list[str]
+    improvement_suggestions: list[str]
+    topic: str
+    card_type: str
+    timestamp: float
+    metadata: dict[str, Any]
+
+
 class AdvancedMemoryStore:
     """Advanced memory store combining MongoDB persistence with ChromaDB embeddings.
 
@@ -100,6 +145,9 @@ class AdvancedMemoryStore:
         self.experiences_collection = None
         self.knowledge_collection = None
         self.patterns_collection = None
+        self.card_patterns_collection = None
+        self.user_preferences_collection = None
+        self.feedback_collection = None
 
         # Embedding store (ChromaDB)
         self.embedding_store = embedding_store
@@ -128,6 +176,9 @@ class AdvancedMemoryStore:
             self.experiences_collection = self.db.experiences
             self.knowledge_collection = self.db.knowledge
             self.patterns_collection = self.db.patterns
+            self.card_patterns_collection = self.db.card_patterns
+            self.user_preferences_collection = self.db.user_preferences
+            self.feedback_collection = self.db.memorization_feedback
 
             # Test connection
             await self.client.admin.command('ping')
@@ -178,6 +229,27 @@ class AdvancedMemoryStore:
         await self.patterns_collection.create_index([
             ("user_id", 1),
             ("preference_type", 1)
+        ])
+
+        # Index for card pattern queries
+        await self.card_patterns_collection.create_index([
+            ("topic", 1),
+            ("quality_score", -1),
+            ("success_count", -1)
+        ])
+
+        # Index for user preference queries
+        await self.user_preferences_collection.create_index([
+            ("user_id", 1),
+            ("topic", 1),
+            ("confidence", -1)
+        ])
+
+        # Index for feedback queries
+        await self.feedback_collection.create_index([
+            ("topic", 1),
+            ("quality_score", -1),
+            ("timestamp", -1)
         ])
 
         logger.info("mongodb_indexes_created")
@@ -557,6 +629,297 @@ class AdvancedMemoryStore:
 
         return patterns
 
+    async def store_card_generation_pattern(self, pattern: CardGenerationPattern) -> bool:
+        """Store a successful card generation pattern for learning.
+
+        Args:
+            pattern: The card generation pattern to store
+
+        Returns:
+            True if stored successfully
+        """
+        if not self.connected or not self.card_patterns_collection:
+            return False
+
+        try:
+            # Check if pattern already exists for this topic/complexity/card_type
+            existing = await self.card_patterns_collection.find_one({
+                "topic": pattern.topic,
+                "complexity": pattern.complexity,
+                "card_type": pattern.card_type
+            })
+
+            if existing:
+                # Update existing pattern
+                update_data = {
+                    "question_structure": pattern.question_structure,
+                    "answer_format": pattern.answer_format,
+                    "quality_score": pattern.quality_score,
+                    "success_count": existing.get("success_count", 0) + pattern.success_count,
+                    "last_used": pattern.last_used,
+                    "metadata": pattern.metadata,
+                }
+                await self.card_patterns_collection.update_one(
+                    {
+                        "topic": pattern.topic,
+                        "complexity": pattern.complexity,
+                        "card_type": pattern.card_type
+                    },
+                    {"$set": update_data}
+                )
+            else:
+                # Insert new pattern
+                await self.card_patterns_collection.insert_one(asdict(pattern))
+
+            logger.info(
+                "card_generation_pattern_stored",
+                topic=pattern.topic,
+                complexity=pattern.complexity,
+                card_type=pattern.card_type,
+                quality_score=pattern.quality_score,
+            )
+            return True
+
+        except Exception as e:
+            logger.error("failed_to_store_card_pattern", error=str(e))
+            return False
+
+    async def get_card_generation_patterns(
+        self,
+        topic: str,
+        complexity: str | None = None,
+        min_quality_score: float = 0.7,
+        limit: int = 5
+    ) -> list[CardGenerationPattern]:
+        """Retrieve successful card generation patterns for a topic.
+
+        Args:
+            topic: Topic to get patterns for
+            complexity: Optional complexity filter
+            min_quality_score: Minimum quality score threshold
+            limit: Maximum number of patterns to return
+
+        Returns:
+            List of matching card generation patterns
+        """
+        if not self.connected or not self.card_patterns_collection:
+            return []
+
+        try:
+            # Build query
+            query = {
+                "topic": topic,
+                "quality_score": {"$gte": min_quality_score}
+            }
+            if complexity:
+                query["complexity"] = complexity
+
+            # Get patterns sorted by quality score and success count
+            cursor = self.card_patterns_collection.find(query).sort([
+                ("quality_score", -1),
+                ("success_count", -1)
+            ]).limit(limit)
+
+            patterns = []
+            async for doc in cursor:
+                doc.pop("_id", None)
+                patterns.append(CardGenerationPattern(**doc))
+
+            logger.info(
+                "retrieved_card_generation_patterns",
+                topic=topic,
+                complexity=complexity,
+                count=len(patterns),
+                min_quality=min_quality_score,
+            )
+
+            return patterns
+
+        except Exception as e:
+            logger.error("failed_to_retrieve_card_patterns", error=str(e))
+            return []
+
+    async def store_user_card_preferences(self, preferences: UserCardPreferences) -> bool:
+        """Store learned user card generation preferences.
+
+        Args:
+            preferences: User preferences to store
+
+        Returns:
+            True if stored successfully
+        """
+        if not self.connected or not self.user_preferences_collection:
+            return False
+
+        try:
+            # Check if preferences exist for this user/topic
+            existing = await self.user_preferences_collection.find_one({
+                "user_id": preferences.user_id,
+                "topic": preferences.topic
+            })
+
+            if existing:
+                # Update existing preferences
+                update_data = {
+                    "preferred_card_type": preferences.preferred_card_type,
+                    "preferred_difficulty": preferences.preferred_difficulty,
+                    "formatting_preferences": preferences.formatting_preferences,
+                    "rejection_patterns": preferences.rejection_patterns,
+                    "confidence": preferences.confidence,
+                    "last_updated": preferences.last_updated,
+                    "observation_count": existing.get("observation_count", 0) + preferences.observation_count,
+                }
+                await self.user_preferences_collection.update_one(
+                    {
+                        "user_id": preferences.user_id,
+                        "topic": preferences.topic
+                    },
+                    {"$set": update_data}
+                )
+            else:
+                # Insert new preferences
+                await self.user_preferences_collection.insert_one(asdict(preferences))
+
+            logger.info(
+                "user_card_preferences_stored",
+                user_id=preferences.user_id,
+                topic=preferences.topic,
+                confidence=preferences.confidence,
+            )
+            return True
+
+        except Exception as e:
+            logger.error("failed_to_store_user_preferences", error=str(e))
+            return False
+
+    async def get_user_card_preferences(self, user_id: str, topic: str) -> UserCardPreferences | None:
+        """Retrieve user card generation preferences.
+
+        Args:
+            user_id: User identifier
+            topic: Topic to get preferences for
+
+        Returns:
+            User preferences if found, None otherwise
+        """
+        if not self.connected or not self.user_preferences_collection:
+            return None
+
+        try:
+            doc = await self.user_preferences_collection.find_one({
+                "user_id": user_id,
+                "topic": topic
+            })
+
+            if doc:
+                doc.pop("_id", None)
+                return UserCardPreferences(**doc)
+
+            return None
+
+        except Exception as e:
+            logger.error("failed_to_retrieve_user_preferences", error=str(e))
+            return None
+
+    async def store_memorization_feedback(self, feedback: MemorizationFeedback) -> bool:
+        """Store memorization quality feedback for learning.
+
+        Args:
+            feedback: Memorization feedback to store
+
+        Returns:
+            True if stored successfully
+        """
+        if not self.connected or not self.feedback_collection:
+            return False
+
+        try:
+            # Store feedback with unique ID
+            feedback_dict = asdict(feedback)
+            feedback_dict["_id"] = f"{feedback.card_id}_{int(feedback.timestamp)}"
+
+            await self.feedback_collection.insert_one(feedback_dict)
+
+            logger.info(
+                "memorization_feedback_stored",
+                card_id=feedback.card_id,
+                quality_score=feedback.quality_score,
+                topic=feedback.topic,
+                issues_count=len(feedback.issues_found),
+            )
+            return True
+
+        except Exception as e:
+            logger.error("failed_to_store_memorization_feedback", error=str(e))
+            return False
+
+    async def get_topic_feedback_stats(self, topic: str, days: int = 30) -> dict[str, Any]:
+        """Get memorization feedback statistics for a topic.
+
+        Args:
+            topic: Topic to get statistics for
+            days: Number of days to look back
+
+        Returns:
+            Statistics dictionary
+        """
+        if not self.connected or not self.feedback_collection:
+            return {"error": "not_connected"}
+
+        try:
+            cutoff_time = time.time() - (days * 24 * 60 * 60)
+
+            # Aggregate statistics
+            pipeline = [
+                {
+                    "$match": {
+                        "topic": topic,
+                        "timestamp": {"$gte": cutoff_time}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "avg_quality_score": {"$avg": "$quality_score"},
+                        "total_feedback": {"$sum": 1},
+                        "high_quality_count": {
+                            "$sum": {"$cond": [{"$gte": ["$quality_score", 0.8]}, 1, 0]}
+                        },
+                        "low_quality_count": {
+                            "$sum": {"$cond": [{"$lt": ["$quality_score", 0.6]}, 1, 0]}
+                        }
+                    }
+                }
+            ]
+
+            result = await self.feedback_collection.aggregate(pipeline).to_list(1)
+
+            if result:
+                stats = result[0]
+                stats.pop("_id", None)
+
+                # Calculate percentages
+                total = stats["total_feedback"]
+                if total > 0:
+                    stats["high_quality_percentage"] = stats["high_quality_count"] / total
+                    stats["low_quality_percentage"] = stats["low_quality_count"] / total
+
+                logger.info(
+                    "retrieved_topic_feedback_stats",
+                    topic=topic,
+                    days=days,
+                    total_feedback=total,
+                    avg_quality=stats.get("avg_quality_score"),
+                )
+
+                return stats
+            else:
+                return {"total_feedback": 0, "avg_quality_score": 0.0}
+
+        except Exception as e:
+            logger.error("failed_to_get_topic_feedback_stats", error=str(e))
+            return {"error": str(e)}
+
     async def get_memory_stats(self) -> dict[str, Any]:
         """Get statistics about stored memory."""
         if not self.connected:
@@ -568,6 +931,9 @@ class AdvancedMemoryStore:
                 "experiences_count": await self.experiences_collection.count_documents({}),
                 "knowledge_count": await self.knowledge_collection.count_documents({}),
                 "patterns_count": await self.patterns_collection.count_documents({}),
+                "card_patterns_count": await self.card_patterns_collection.count_documents({}),
+                "user_preferences_count": await self.user_preferences_collection.count_documents({}),
+                "feedback_count": await self.feedback_collection.count_documents({}),
             }
 
             # Get database stats
@@ -606,7 +972,30 @@ class AdvancedMemoryStore:
                 "confidence": {"$lt": 0.3}
             })
 
-            total_cleaned = exp_result.deleted_count + pattern_result.deleted_count
+            # Remove old card patterns with low quality scores
+            card_pattern_result = await self.card_patterns_collection.delete_many({
+                "last_used": {"$lt": cutoff_time},
+                "quality_score": {"$lt": 0.5}
+            })
+
+            # Remove old user preferences with low confidence
+            user_pref_result = await self.user_preferences_collection.delete_many({
+                "last_updated": {"$lt": cutoff_time},
+                "confidence": {"$lt": 0.3}
+            })
+
+            # Remove old feedback (keep only last 90 days)
+            feedback_result = await self.feedback_collection.delete_many({
+                "timestamp": {"$lt": cutoff_time}
+            })
+
+            total_cleaned = (
+                exp_result.deleted_count +
+                pattern_result.deleted_count +
+                card_pattern_result.deleted_count +
+                user_pref_result.deleted_count +
+                feedback_result.deleted_count
+            )
 
             logger.info(
                 "memory_cleanup_completed",
