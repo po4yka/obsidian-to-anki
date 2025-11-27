@@ -99,7 +99,7 @@ class PostValidationResult(BaseModel):
     is_valid: bool
     error_type: Literal["syntax", "factual", "semantic", "template", "none"]
     error_details: str = ""
-    corrected_cards: list[GeneratedCard | None] | None = None
+    corrected_cards: list[GeneratedCard] | None = None
     validation_time: float = 0.0
 
 
