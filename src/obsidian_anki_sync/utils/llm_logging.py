@@ -5,7 +5,10 @@ including token usage, timing, cost estimation, and performance metrics.
 """
 
 import time
+import uuid
 from collections import defaultdict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from .logging import get_logger
@@ -31,6 +34,9 @@ _session_metrics: dict[str, dict[str, Any]] = defaultdict(
         ),
     }
 )
+
+# Track the current session in a context-friendly way for thread safety
+_session_id_var: ContextVar[str | None] = ContextVar("llm_session_id", default=None)
 
 # OpenRouter pricing (per 1M tokens) - update as needed
 # Source: https://openrouter.ai/models (approximate pricing)
@@ -175,9 +181,36 @@ def log_llm_request(
 
 
 def _get_session_id() -> str:
-    """Get current session ID for metrics tracking."""
-    # Use a simple session identifier - could be enhanced with thread-local storage
-    return "default"
+    """Get or create the current session ID for metrics tracking."""
+
+    session_id = _session_id_var.get()
+    if session_id:
+        return session_id
+
+    # Lazily create a unique default session for this context
+    new_session_id = str(uuid.uuid4())
+    _session_id_var.set(new_session_id)
+    return new_session_id
+
+
+def set_session_id(session_id: str) -> None:
+    """Set the active session ID for subsequent logging calls."""
+
+    if not session_id:
+        raise ValueError("session_id cannot be empty")
+
+    _session_id_var.set(session_id)
+
+
+@contextmanager
+def session_context(session_id: str):
+    """Temporarily set the active session ID for logging operations."""
+
+    token = _session_id_var.set(session_id)
+    try:
+        yield
+    finally:
+        _session_id_var.reset(token)
 
 
 def log_llm_success(

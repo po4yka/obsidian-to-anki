@@ -1,5 +1,6 @@
 """Sync command implementation logic."""
 
+from contextlib import nullcontext
 from typing import Any
 
 import typer
@@ -10,6 +11,7 @@ from ..config import Config
 from ..sync.engine import SyncEngine
 from ..sync.progress import ProgressTracker
 from ..sync.state_db import StateDB
+from ..utils.llm_logging import session_context
 from ..utils.preflight import run_preflight_checks
 from ..utils.progress_display import ProgressDisplay
 from .shared import console
@@ -103,35 +105,44 @@ def run_sync(
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
             progress_tracker = _handle_progress_tracking(db, resume, no_resume, logger)
 
-            # Show incremental mode info
-            if incremental:
-                processed_count = len(db.get_processed_note_paths())
-                console.print(
-                    f"\n[cyan]Incremental mode: Skipping {processed_count} already processed notes[/cyan]\n"
-                )
-
-            # Create progress display
-            progress_display = ProgressDisplay(show_reflections=True)
-
-            # Pass progress display to engine
-            engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
-            engine.set_progress_display(progress_display)
-
-            # Show sample mode info
-            if sample_size:
-                console.print(
-                    f"\n[cyan]Sample mode: Processing {sample_size} random notes[/cyan]\n"
-                )
-
-            stats = engine.sync(
-                dry_run=dry_run,
-                incremental=incremental,
-                build_index=not no_index,
-                sample_size=sample_size,
+            session_scope = (
+                session_context(progress_tracker.progress.session_id)
+                if progress_tracker
+                else nullcontext()
             )
 
-            _display_sync_results(stats, no_index)
-            logger.info("sync_completed", stats=stats)
+            with session_scope:
+                # Show incremental mode info
+                if incremental:
+                    processed_count = len(db.get_processed_note_paths())
+                    console.print(
+                        f"\n[cyan]Incremental mode: Skipping {processed_count} already processed notes[/cyan]\n"
+                    )
+
+                # Create progress display
+                progress_display = ProgressDisplay(show_reflections=True)
+
+                # Pass progress display to engine
+                engine = SyncEngine(
+                    config, db, anki, progress_tracker=progress_tracker
+                )
+                engine.set_progress_display(progress_display)
+
+                # Show sample mode info
+                if sample_size:
+                    console.print(
+                        f"\n[cyan]Sample mode: Processing {sample_size} random notes[/cyan]\n"
+                    )
+
+                stats = engine.sync(
+                    dry_run=dry_run,
+                    incremental=incremental,
+                    build_index=not no_index,
+                    sample_size=sample_size,
+                )
+
+                _display_sync_results(stats, no_index)
+                logger.info("sync_completed", stats=stats)
 
     except Exception as e:
         logger.error("sync_failed", error=str(e))
