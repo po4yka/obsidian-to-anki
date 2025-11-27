@@ -623,7 +623,7 @@ class SyncEngine:
             from ..utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(session_id=self.progress.session_id)
+                log_session_summary(session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:

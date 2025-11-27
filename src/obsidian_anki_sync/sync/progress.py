@@ -2,6 +2,7 @@
 
 import signal
 import sys
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -95,7 +96,7 @@ class ProgressTracker:
         """
         self.db = progress_db
         self.on_interrupt_callback = on_interrupt
-        self._interrupted = False
+        self._interrupt_event = threading.Event()  # Thread-safe interrupt flag
         self._signal_handlers_installed = False
 
         # Load existing progress or create new session
@@ -138,7 +139,7 @@ class ProgressTracker:
                 signal=signal_name,
                 session_id=self.progress.session_id,
             )
-            self._interrupted = True
+            self._interrupt_event.set()
             self.progress.phase = SyncPhase.INTERRUPTED
             self.progress.updated_at = datetime.now()
             self.db.save_progress(self.progress)
@@ -160,8 +161,8 @@ class ProgressTracker:
         logger.debug("signal_handlers_installed")
 
     def is_interrupted(self) -> bool:
-        """Check if sync was interrupted."""
-        return self._interrupted
+        """Check if sync was interrupted (thread-safe)."""
+        return self._interrupt_event.is_set()
 
     def set_phase(self, phase: SyncPhase) -> None:
         """Update current sync phase."""
@@ -235,6 +236,14 @@ class ProgressTracker:
         if key in self.progress.note_progress:
             status: str = self.progress.note_progress[key].status
             return status == "completed"
+        return False
+
+    def is_note_failed(self, source_path: str, card_index: int, lang: str) -> bool:
+        """Check if a note previously failed (skip on resume)."""
+        key = f"{source_path}:{card_index}:{lang}"
+        if key in self.progress.note_progress:
+            status: str = self.progress.note_progress[key].status
+            return status == "failed"
         return False
 
     def increment_stat(self, stat: str, count: int = 1) -> None:

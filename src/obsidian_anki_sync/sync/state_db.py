@@ -162,6 +162,17 @@ class StateDB(IStateRepository):
             CREATE INDEX IF NOT EXISTS idx_card_guid ON cards(card_guid)
         """
         )
+        # Additional indexes for performance (non-extended columns only)
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_source_lang ON cards(source_path, lang)
+        """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_card_index ON cards(card_index)
+        """
+        )
 
         # Progress tracking table
         cursor.execute(
@@ -324,6 +335,13 @@ class StateDB(IStateRepository):
                 cursor.execute(
                     f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
+
+        # Add index for creation_status (after column is created)
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_creation_status ON cards(creation_status)
+        """
+        )
 
     def insert_card(self, card: Card, anki_guid: int) -> None:
         """Insert a new card record."""
@@ -858,7 +876,7 @@ class StateDB(IStateRepository):
             SELECT session_id, phase, started_at, updated_at,
                    total_notes, notes_processed, errors
             FROM sync_progress
-            WHERE phase IN ('scanning', 'generating', 'determining_actions', 'applying_changes', 'interrupted')
+            WHERE phase IN ('initializing', 'indexing', 'scanning', 'generating', 'determining_actions', 'applying_changes', 'interrupted')
             ORDER BY updated_at DESC
         """
         )
@@ -1171,144 +1189,8 @@ class StateDB(IStateRepository):
         cursor.execute("DELETE FROM card_index")
         conn.commit()
 
-    # Checkpoint Methods
-
-    def save_checkpoint(self, checkpoint_data: dict[str, Any]) -> None:
-        """Save a sync checkpoint for resumable operations.
-
-        Args:
-            checkpoint_data: Dictionary containing checkpoint information
-                Expected keys: session_id, checkpoint_type, stage, notes_processed,
-                cards_generated, additional_data (optional)
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        session_id = checkpoint_data.get("session_id", "default")
-        checkpoint_type = checkpoint_data.get("checkpoint_type", "periodic")
-        stage = checkpoint_data.get("stage", "unknown")
-        notes_processed = checkpoint_data.get("notes_processed", 0)
-        cards_generated = checkpoint_data.get("cards_generated", 0)
-        additional_data = checkpoint_data.get("additional_data", {})
-
-        cursor.execute(
-            """
-            INSERT INTO sync_checkpoints (
-                session_id, checkpoint_type, stage, notes_processed,
-                cards_generated, checkpoint_data
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                session_id,
-                checkpoint_type,
-                stage,
-                notes_processed,
-                cards_generated,
-                json.dumps(additional_data),
-            ),
-        )
-        conn.commit()
-
-        logger.info(
-            "checkpoint_saved",
-            session_id=session_id,
-            stage=stage,
-            notes_processed=notes_processed,
-            cards_generated=cards_generated,
-        )
-
-    def get_last_checkpoint(
-        self, session_id: str | None = None
-    ) -> dict[str, Any] | None:
-        """Get the most recent checkpoint for resuming sync.
-
-        Args:
-            session_id: Optional session ID to filter checkpoints
-
-        Returns:
-            Dictionary with checkpoint data or None if no checkpoint exists
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        if session_id:
-            cursor.execute(
-                """
-                SELECT * FROM sync_checkpoints
-                WHERE session_id = ?
-                ORDER BY timestamp DESC
-                LIMIT 1
-                """,
-                (session_id,),
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM sync_checkpoints
-                ORDER BY timestamp DESC
-                LIMIT 1
-                """
-            )
-
-        row = cursor.fetchone()
-
-        if not row:
-            return None
-
-        checkpoint = {
-            "id": row["id"],
-            "session_id": row["session_id"],
-            "checkpoint_type": row["checkpoint_type"],
-            "stage": row["stage"],
-            "notes_processed": row["notes_processed"],
-            "cards_generated": row["cards_generated"],
-            "timestamp": row["timestamp"],
-        }
-
-        if row["checkpoint_data"]:
-            try:
-                checkpoint["additional_data"] = json.loads(
-                    row["checkpoint_data"])
-            except json.JSONDecodeError:
-                checkpoint["additional_data"] = {}
-
-        return checkpoint
-
-    def delete_checkpoints(
-        self, session_id: str | None = None, older_than_days: int | None = None
-    ) -> None:
-        """Delete checkpoints by session or age.
-
-        Args:
-            session_id: Optional session ID to delete checkpoints for
-            older_than_days: Optional age threshold in days
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        if session_id:
-            cursor.execute(
-                "DELETE FROM sync_checkpoints WHERE session_id = ?",
-                (session_id,),
-            )
-        elif older_than_days:
-            cursor.execute(
-                """
-                DELETE FROM sync_checkpoints
-                WHERE timestamp < datetime('now', ? || ' days')
-                """,
-                (f"-{older_than_days}",),
-            )
-        else:
-            logger.warning("delete_checkpoints_called_without_filter")
-            return
-
-        conn.commit()
-        logger.info(
-            "checkpoints_deleted",
-            session_id=session_id,
-            older_than_days=older_than_days,
-        )
+    # Checkpoint methods removed (were unused dead code)
+    # Table sync_checkpoints kept for backward compatibility
 
     # IStateRepository interface implementation
 
@@ -1343,13 +1225,7 @@ class StateDB(IStateRepository):
         """Save a card to the repository."""
         pass
 
-    def delete_card(self, slug: str) -> None:
-        """Delete a card from the repository."""
-        # Call the existing StateDB delete_card method
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
-        conn.commit()
+    # delete_card is defined above at line 423 - removed duplicate
 
     def get_all_notes(self) -> list[DomainNote]:
         """Retrieve all notes."""

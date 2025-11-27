@@ -211,6 +211,18 @@ class NoteScanner:
                         ):
                             continue
 
+                        # Skip previously failed notes on resume
+                        if self.progress and self.progress.is_note_failed(
+                            relative_path, qa_pair.card_index, lang
+                        ):
+                            logger.info(
+                                "skipping_failed_note",
+                                path=relative_path,
+                                card_index=qa_pair.card_index,
+                                lang=lang,
+                            )
+                            continue
+
                         # Track progress
                         if self.progress:
                             self.progress.start_note(

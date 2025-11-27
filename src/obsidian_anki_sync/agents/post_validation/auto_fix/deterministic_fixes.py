@@ -213,7 +213,8 @@ class DeterministicFixer:
         correct_header = f"<!-- Card {card_num} | slug: {extracted_slug} | CardType: {card_type} | Tags: {tags_str} -->"
 
         # Find and replace the existing header
-        header_pattern = r"<!--\s*Card\s+\d+.*?-->"
+        # Match headers that may be missing the closing -- before >
+        header_pattern = r"<!--\s*Card\s+\d+.*?(?:-->|->|>)"
         if re.search(header_pattern, html):
             html = re.sub(header_pattern, correct_header, html, count=1)
             logger.debug(
@@ -358,8 +359,8 @@ class DeterministicFixer:
         ):
             return html, False
 
-        # Extract tags from header
-        tags_match = re.search(r"Tags:\s*([^>]+)", html)
+        # Extract tags from header (stop before -->)
+        tags_match = re.search(r"Tags:\s*(.+?)\s*-->", html)
         if not tags_match:
             return html, False
 
@@ -389,9 +390,9 @@ class DeterministicFixer:
         if fixed_tags == tags:
             return html, False
 
-        # Replace tags in header
+        # Replace tags in header (preserve -->)
         new_tags_str = " ".join(fixed_tags)
-        html = re.sub(r"(Tags:\s*)([^>]+)", rf"\1{new_tags_str}", html)
+        html = re.sub(r"(Tags:\s*)(.+?)(\s*-->)", rf"\1{new_tags_str}\3", html)
         logger.debug(
             "deterministic_fix_tags",
             slug=slug,
