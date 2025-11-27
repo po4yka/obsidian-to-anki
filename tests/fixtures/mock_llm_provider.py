@@ -75,14 +75,50 @@ class MockLLMProvider(ILLMProvider):
         try:
             import json
             parsed = json.loads(mock_json)
-        except:
+        except Exception:
             parsed = {"mock": "response", "status": "success"}
 
         return parsed
 
+    async def generate_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        format: str = "",
+        json_schema: Optional[Dict[str, Any]] = None,
+        stream: bool = False,
+        reasoning_enabled: bool = False,
+    ) -> Dict[str, Any]:
+        """Generate a completion asynchronously."""
+        # Reuse synchronous implementation for mock
+        return self.generate(
+            model=model,
+            prompt=prompt,
+            system=system,
+            temperature=temperature,
+            format=format,
+            json_schema=json_schema,
+            stream=stream,
+            reasoning_enabled=reasoning_enabled,
+        )
+
     def check_connection(self) -> bool:
         """Check connection."""
         return not self.should_fail
+
+    def get_connection_status(self) -> Dict[str, Any]:
+        """Get connection status."""
+        return {
+            "connected": self.check_connection(),
+            "latency": 0.0,
+            "error": self.fail_message if self.should_fail else None,
+        }
+
+    def validate_credentials(self) -> bool:
+        """Validate credentials."""
+        return True
 
     def list_models(self) -> List[str]:
         """List available models."""
@@ -100,6 +136,27 @@ class MockLLMProvider(ILLMProvider):
             "models": self.list_models(),
             "connected": self.check_connection(),
         }
+
+    def get_model_info(self, model: str) -> Dict[str, Any] | None:
+        """Get model info."""
+        if model in self.list_models():
+            return {"id": model, "name": model, "context_length": 4096}
+        return None
+
+    def list_models_with_info(self) -> List[Dict[str, Any]]:
+        """List models with info."""
+        return [
+            {"id": m, "name": m, "context_length": 4096}
+            for m in self.list_models()
+        ]
+
+    def supports_model(self, model: str) -> bool:
+        """Check if model is supported."""
+        return model in self.list_models()
+
+    def get_default_model(self) -> str:
+        """Get default model."""
+        return "gpt-3.5-turbo"
 
     # Test helper methods
 
