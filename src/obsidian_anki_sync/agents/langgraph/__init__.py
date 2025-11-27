@@ -8,9 +8,30 @@ Public API:
 - LangGraphOrchestrator: Main orchestrator class
 - PipelineState: State TypedDict for the workflow
 - Retry policies and error handling utilities
+- Chain of Thought (CoT) reasoning models and nodes
 """
 
 from .orchestrator import LangGraphOrchestrator
+from .reasoning_models import (
+    CardSplittingReasoningOutput,
+    DuplicateReasoningOutput,
+    EnrichmentReasoningOutput,
+    GenerationReasoningOutput,
+    MemorizationReasoningOutput,
+    PostValidationReasoningOutput,
+    PreValidationReasoningOutput,
+    ReasoningTrace,
+    ReasoningTraceOutput,
+)
+from .reasoning_nodes import (
+    think_before_card_splitting_node,
+    think_before_duplicate_node,
+    think_before_enrichment_node,
+    think_before_generation_node,
+    think_before_memorization_node,
+    think_before_post_validation_node,
+    think_before_pre_validation_node,
+)
 from .retry_policies import (
     DEFAULT_RETRY_POLICY,
     TRANSIENT_RETRY_POLICY,
@@ -43,6 +64,24 @@ __all__ = [
     # Error handling
     "ErrorSeverity",
     "classify_error_severity",
+    # Chain of Thought (CoT) reasoning models
+    "ReasoningTraceOutput",
+    "ReasoningTrace",
+    "PreValidationReasoningOutput",
+    "GenerationReasoningOutput",
+    "PostValidationReasoningOutput",
+    "CardSplittingReasoningOutput",
+    "EnrichmentReasoningOutput",
+    "MemorizationReasoningOutput",
+    "DuplicateReasoningOutput",
+    # CoT reasoning nodes
+    "think_before_pre_validation_node",
+    "think_before_card_splitting_node",
+    "think_before_generation_node",
+    "think_before_post_validation_node",
+    "think_before_enrichment_node",
+    "think_before_memorization_node",
+    "think_before_duplicate_node",
 ]
 
 # Only export swarm classes if available

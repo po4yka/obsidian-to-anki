@@ -9,8 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from ...config import Config
-from ...utils.logging import get_logger
+from ..config import Config
+from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 

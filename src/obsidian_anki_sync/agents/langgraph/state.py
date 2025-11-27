@@ -96,3 +96,22 @@ class PipelineState(TypedDict):
 
     # Messages (for debugging/logging)
     messages: Annotated[list[str], add_messages]
+
+    # ============================================================================
+    # Chain of Thought (CoT) Configuration
+    # ============================================================================
+    enable_cot_reasoning: bool  # Master toggle for CoT reasoning
+    store_reasoning_traces: bool  # Store traces in state for inspection
+    log_reasoning_traces: bool  # Log traces to logger (can be verbose)
+    cot_enabled_stages: list[str]  # Stages where CoT is applied
+
+    # Reasoning Model (cached for performance)
+    reasoning_model: Any | None  # PydanticAI model for reasoning
+
+    # Reasoning Traces (per stage)
+    # Structure: {stage_name: ReasoningTrace.model_dump()}
+    reasoning_traces: dict[str, dict]
+
+    # Current reasoning context (passed to action nodes)
+    # Contains the latest reasoning output for the current stage
+    current_reasoning: dict | None

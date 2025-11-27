@@ -375,6 +375,40 @@ class Config(BaseSettings):
     )
 
     # ============================================================================
+    # Chain of Thought (CoT) Reasoning Configuration
+    # ============================================================================
+    enable_cot_reasoning: bool = Field(
+        default=False,
+        description="Enable Chain of Thought reasoning nodes before action nodes",
+    )
+    store_reasoning_traces: bool = Field(
+        default=True,
+        description="Store reasoning traces in pipeline state for inspection",
+    )
+    log_reasoning_traces: bool = Field(
+        default=False,
+        description="Log reasoning traces to logger (can be verbose)",
+    )
+    reasoning_model: str = Field(
+        default="",
+        description="Model for reasoning nodes (uses generator_model if empty)",
+    )
+    reasoning_temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Temperature for reasoning model (lower = more deterministic)",
+    )
+    cot_enabled_stages: list[str] = Field(
+        default_factory=lambda: [
+            "pre_validation",
+            "generation",
+            "post_validation",
+        ],
+        description="Stages where CoT reasoning is applied",
+    )
+
+    # ============================================================================
     # Unified Agent Framework Configuration
     # ============================================================================
 
@@ -519,6 +553,7 @@ class Config(BaseSettings):
             "qa_extractor": ModelTask.QA_EXTRACTION,
             "parser_repair": ModelTask.PARSER_REPAIR,
             "note_correction": ModelTask.PARSER_REPAIR,  # Reuse parser repair task
+            "reasoning": ModelTask.GENERATION,  # CoT reasoning uses generation task
         }
 
         task = agent_to_task.get(agent_type)
@@ -537,6 +572,7 @@ class Config(BaseSettings):
             "qa_extractor": self.qa_extractor_model,
             "parser_repair": self.parser_repair_model,
             "note_correction": self.note_correction_model or self.parser_repair_model,
+            "reasoning": self.reasoning_model or self.generator_model,  # CoT reasoning
         }
 
         explicit_model = agent_model_map.get(agent_type, "")
