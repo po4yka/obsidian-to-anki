@@ -7,37 +7,42 @@
 ## Overview
 
 The Duplicate Detection Agent analyzes flashcards to find:
-- **Exact Duplicates** (≥95% similar): Nearly identical cards
-- **Semantic Duplicates** (80-94% similar): Same concept, different wording
-- **Partial Overlap** (50-79% similar): Related but distinct
-- **Unique** (<50% similar): No significant overlap
+
+-   **Exact Duplicates** (≥95% similar): Nearly identical cards
+-   **Semantic Duplicates** (80-94% similar): Same concept, different wording
+-   **Partial Overlap** (50-79% similar): Related but distinct
+-   **Unique** (<50% similar): No significant overlap
 
 This solves a critical problem: **Duplicate cards waste review time and interfere with learning**.
 
 ### The Problem
 
 Without duplicate detection:
-- ❌ **Wasted Time**: Reviewing the same concept multiple times
-- ❌ **Confusion**: Slightly different answers for same question
-- ❌ **Deck Bloat**: Growing collection with redundant content
-- ❌ **Inconsistency**: Multiple versions with conflicting information
+
+-   ❌ **Wasted Time**: Reviewing the same concept multiple times
+-   ❌ **Confusion**: Slightly different answers for same question
+-   ❌ **Deck Bloat**: Growing collection with redundant content
+-   ❌ **Inconsistency**: Multiple versions with conflicting information
 
 With duplicate detection:
-- ✅ **Clean Deck**: Only unique cards remain
-- ✅ **Efficient Reviews**: No redundant repetitions
-- ✅ **Consistent Knowledge**: Single source of truth per concept
-- ✅ **Better Organization**: Clear card relationships
+
+-   ✅ **Clean Deck**: Only unique cards remain
+-   ✅ **Efficient Reviews**: No redundant repetitions
+-   ✅ **Consistent Knowledge**: Single source of truth per concept
+-   ✅ **Better Organization**: Clear card relationships
 
 ## Detection Criteria
 
 ### Exact Duplicate (similarity ≥ 0.95)
 
 **Indicators**:
-- Questions are essentially identical
-- Answers convey the same information
-- Both cards test identical knowledge
+
+-   Questions are essentially identical
+-   Answers convey the same information
+-   Both cards test identical knowledge
 
 **Example**:
+
 ```
 Card A: "What is REST?"
 Card B: "What does REST stand for?"
@@ -51,11 +56,13 @@ Card B: "What does REST stand for?"
 ### Semantic Duplicate (similarity 0.80-0.94)
 
 **Indicators**:
-- Same core concept, different phrasing
-- Answers are equivalent but worded differently
-- Testing identical knowledge
+
+-   Same core concept, different phrasing
+-   Answers are equivalent but worded differently
+-   Testing identical knowledge
 
 **Example**:
+
 ```
 Card A: "What is the time complexity of binary search?"
 Card B: "How efficient is binary search?"
@@ -69,11 +76,13 @@ Card B: "How efficient is binary search?"
 ### Partial Overlap (similarity 0.50-0.79)
 
 **Indicators**:
-- Related concepts but different aspects
-- Questions test different facets of same topic
-- Cards complement each other
+
+-   Related concepts but different aspects
+-   Questions test different facets of same topic
+-   Cards complement each other
 
 **Example**:
+
 ```
 Card A: "What does binary search return?"
 Card B: "What is the time complexity of binary search?"
@@ -87,11 +96,13 @@ Card B: "What is the time complexity of binary search?"
 ### Unique (similarity < 0.50)
 
 **Indicators**:
-- Different concepts
-- No meaningful overlap
-- Independent knowledge
+
+-   Different concepts
+-   No meaningful overlap
+-   Independent knowledge
 
 **Example**:
+
 ```
 Card A: "What is binary search?"
 Card B: "What is bubble sort?"
@@ -133,23 +144,25 @@ Card B: "What is bubble sort?"
 The agent uses **LLM-based semantic comparison** rather than simple string matching:
 
 **Why LLM over embeddings?**
-- Understands paraphrasing and synonyms
-- Recognizes conceptual equivalence
-- Handles code examples and formatting differences
-- Provides explanations for similarity scores
+
+-   Understands paraphrasing and synonyms
+-   Recognizes conceptual equivalence
+-   Handles code examples and formatting differences
+-   Provides explanations for similarity scores
 
 **Similarity Scoring**:
-- 0.95-1.00: Trivial differences (punctuation, minor wording)
-- 0.80-0.94: Same concept, rephrased
-- 0.50-0.79: Related topics, different focus
-- 0.00-0.49: Unrelated content
+
+-   0.95-1.00: Trivial differences (punctuation, minor wording)
+-   0.80-0.94: Same concept, rephrased
+-   0.50-0.79: Related topics, different focus
+-   0.00-0.49: Unrelated content
 
 ## Usage
 
 ### Programmatic Usage
 
 ```python
-from obsidian_anki_sync.agents.pydantic_ai_agents import DuplicateDetectionAgentAI
+from obsidian_anki_sync.agents.pydantic import DuplicateDetectionAgentAI
 from obsidian_anki_sync.providers.pydantic_ai_models import create_openrouter_model_from_env
 
 # Create model (cheap, fast model for comparison)
@@ -188,24 +201,24 @@ if result.is_duplicate:
 
 ```json
 {
-  "is_duplicate": true,
-  "best_match": {
-    "card_slug": "rest-api-definition-en-001",
-    "similarity_score": 0.96,
-    "duplicate_type": "exact",
-    "reasoning": "Both cards ask for REST definition. Questions nearly identical, answers convey same information."
-  },
-  "all_matches": [
-    {
-      "card_slug": "rest-api-definition-en-001",
-      "similarity_score": 0.96,
-      "duplicate_type": "exact"
-    }
-  ],
-  "recommendation": "delete",
-  "better_card": "existing",
-  "merge_suggestion": "Keep existing card. New card adds no new information.",
-  "detection_time": 0.8
+    "is_duplicate": true,
+    "best_match": {
+        "card_slug": "rest-api-definition-en-001",
+        "similarity_score": 0.96,
+        "duplicate_type": "exact",
+        "reasoning": "Both cards ask for REST definition. Questions nearly identical, answers convey same information."
+    },
+    "all_matches": [
+        {
+            "card_slug": "rest-api-definition-en-001",
+            "similarity_score": 0.96,
+            "duplicate_type": "exact"
+        }
+    ],
+    "recommendation": "delete",
+    "better_card": "existing",
+    "merge_suggestion": "Keep existing card. New card adds no new information.",
+    "detection_time": 0.8
 }
 ```
 
@@ -213,24 +226,24 @@ if result.is_duplicate:
 
 ```json
 {
-  "is_duplicate": false,
-  "best_match": {
-    "card_slug": "binary-search-complexity-en-001",
-    "similarity_score": 0.68,
-    "duplicate_type": "partial_overlap",
-    "reasoning": "Both about binary search, but test different aspects: return value vs complexity."
-  },
-  "all_matches": [
-    {
-      "card_slug": "binary-search-complexity-en-001",
-      "similarity_score": 0.68,
-      "duplicate_type": "partial_overlap"
-    }
-  ],
-  "recommendation": "keep_both",
-  "better_card": null,
-  "merge_suggestion": "Keep both. Consider adding relationship note.",
-  "detection_time": 0.7
+    "is_duplicate": false,
+    "best_match": {
+        "card_slug": "binary-search-complexity-en-001",
+        "similarity_score": 0.68,
+        "duplicate_type": "partial_overlap",
+        "reasoning": "Both about binary search, but test different aspects: return value vs complexity."
+    },
+    "all_matches": [
+        {
+            "card_slug": "binary-search-complexity-en-001",
+            "similarity_score": 0.68,
+            "duplicate_type": "partial_overlap"
+        }
+    ],
+    "recommendation": "keep_both",
+    "better_card": null,
+    "merge_suggestion": "Keep both. Consider adding relationship note.",
+    "detection_time": 0.7
 }
 ```
 
@@ -244,7 +257,7 @@ Recommended model: **gpt-4o-mini** (fast, cheap, sufficient for comparison)
 # config.yaml (future integration)
 duplicate_detection_enabled: true
 duplicate_detection_model: "openai/gpt-4o-mini"
-duplicate_threshold: 0.80  # Minimum similarity for duplicate
+duplicate_threshold: 0.80 # Minimum similarity for duplicate
 similarity_threshold_exact: 0.95
 similarity_threshold_semantic: 0.80
 similarity_threshold_partial: 0.50
@@ -252,11 +265,12 @@ similarity_threshold_partial: 0.50
 
 ### Cost
 
-- **Model**: gpt-4o-mini (~$0.15/1M tokens)
-- **Per comparison**: ~$0.0001
-- **100 cards vs 1000 cards**: ~$10 (100,000 comparisons)
+-   **Model**: gpt-4o-mini (~$0.15/1M tokens)
+-   **Per comparison**: ~$0.0001
+-   **100 cards vs 1000 cards**: ~$10 (100,000 comparisons)
 
 **Optimization**: Use embedding-based pre-filtering to reduce LLM calls:
+
 1. Compute embeddings for all cards (cheap)
 2. Filter to top 10 most similar by cosine similarity
 3. Use LLM only for detailed comparison of top matches
@@ -345,6 +359,7 @@ def duplicate_detection_node(state: PipelineState) -> PipelineState:
 ### Language Mixing
 
 Cards in different languages are NOT duplicates:
+
 ```
 Card A (English): "What is recursion?"
 Card B (Russian): "Что такое рекурсия?"
@@ -354,6 +369,7 @@ Card B (Russian): "Что такое рекурсия?"
 ### Example vs Concept
 
 Concept + example cards are complementary:
+
 ```
 Card A: "What is polymorphism?"
 Card B: "Give an example of polymorphism in Python"
@@ -363,6 +379,7 @@ Card B: "Give an example of polymorphism in Python"
 ### Different Difficulty Levels
 
 Same concept at different depths:
+
 ```
 Card A (Basic): "What is a linked list?"
 Card B (Advanced): "Cache performance: linked lists vs arrays?"
@@ -372,6 +389,7 @@ Card B (Advanced): "Cache performance: linked lists vs arrays?"
 ### Improved Versions
 
 Better card replaces worse one:
+
 ```
 Old: "What is REST?" → "An architectural style"
 New: "What is REST?" → "Representational State Transfer - uses HTTP..."
@@ -410,12 +428,12 @@ New: "What is REST?" → "Representational State Transfer - uses HTTP..."
 
 ## Future Enhancements
 
-- [ ] Embedding-based pre-filtering for efficiency
-- [ ] Card versioning (track improvements over time)
-- [ ] Cluster analysis (find groups of related cards)
-- [ ] User feedback loop (learn from merge decisions)
-- [ ] Integration with Anki's built-in duplicate detection
-- [ ] Fuzzy matching for typos and formatting differences
+-   [ ] Embedding-based pre-filtering for efficiency
+-   [ ] Card versioning (track improvements over time)
+-   [ ] Cluster analysis (find groups of related cards)
+-   [ ] User feedback loop (learn from merge decisions)
+-   [ ] Integration with Anki's built-in duplicate detection
+-   [ ] Fuzzy matching for typos and formatting differences
 
 ## Research Background
 
@@ -428,9 +446,9 @@ Duplicate detection is based on:
 
 ## Support
 
-- **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
-- **Documentation**: This file
-- **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (DuplicateDetectionAgentAI)
+-   **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
+-   **Documentation**: This file
+-   **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (DuplicateDetectionAgentAI)
 
 ---
 

@@ -40,12 +40,13 @@ def test_update_card_updates_fields_and_tags(test_config) -> None:
     )
 
     with patch(
-        "obsidian_anki_sync.sync.engine.map_apf_to_anki_fields",
+        "obsidian_anki_sync.sync.change_applier.map_apf_to_anki_fields",
         return_value={"Front": "Q", "Back": "A"},
     ):
-        engine._update_card(card, anki_guid=12345)
+        engine.change_applier.update_card(card, anki_guid=12345)
 
-    anki.update_note_fields.assert_called_once_with(12345, {"Front": "Q", "Back": "A"})
+    anki.update_note_fields.assert_called_once_with(
+        12345, {"Front": "Q", "Back": "A"})
     anki.update_note_tags.assert_called_once_with(12345, card.tags)
     # Updated to match new db.update_card_extended signature
     db.update_card_extended.assert_called_once_with(

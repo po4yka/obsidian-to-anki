@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ..agents.agent_memory import AgentMemoryStore
-from ..agents.specialized_agents import ProblemDomain
+from ..agents.specialized import ProblemDomain
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -54,7 +54,8 @@ def migrate_in_memory_patterns(
                 if agent_names:
                     try:
                         agent = ProblemDomain(agent_names[0])
-                        memory_store.store_success_pattern(error_context, agent)
+                        memory_store.store_success_pattern(
+                            error_context, agent)
                         migrated_count += 1
                     except ValueError:
                         logger.warning(
@@ -64,7 +65,8 @@ def migrate_in_memory_patterns(
                         )
 
         except Exception as e:
-            logger.warning("pattern_migration_failed", pattern=pattern, error=str(e))
+            logger.warning("pattern_migration_failed",
+                           pattern=pattern, error=str(e))
 
     logger.info(
         "memory_migration_complete",
@@ -107,5 +109,6 @@ def migrate_from_file(
         )
 
     except Exception as e:
-        logger.error("file_migration_failed", file=str(patterns_file), error=str(e))
+        logger.error("file_migration_failed",
+                     file=str(patterns_file), error=str(e))
         return 0

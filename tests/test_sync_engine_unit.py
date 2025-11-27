@@ -39,7 +39,14 @@ def mock_config():
     config.problematic_notes_dir = Path("/tmp/problematic_notes")
     config.enable_problematic_notes_archival = False
     config.get_model_for_agent = MagicMock(return_value="test-model")
-    config.get_model_config_for_task = MagicMock(return_value={"temperature": 0.0})
+    config.get_model_config_for_task = MagicMock(
+        return_value={"temperature": 0.0})
+    config.model_names = {"APF::Simple": "APF: Simple (3.0.0)"}
+    config.enable_memory_cleanup = False
+    config.max_note_content_size_mb = 10.0
+    config.retry_config_parallel = {"max_retries": 2, "retry_delay": 1.0}
+    config.auto_adjust_workers = False
+    config.verify_card_creation = True
     return config
 
 
@@ -138,7 +145,7 @@ class TestSyncEngineInitialization:
 class TestNoteDiscovery:
     """Tests for note discovery functionality."""
 
-    @patch("obsidian_anki_sync.sync.engine.discover_notes")
+    @patch("obsidian_anki_sync.sync.note_scanner.discover_notes")
     def test_scan_obsidian_notes_discovers_files(
         self, mock_discover, sync_engine, temp_cache_dir
     ):
@@ -147,14 +154,14 @@ class TestNoteDiscovery:
         test_file.touch()
         mock_discover.return_value = [(test_file, "test.md")]
 
-        with patch.object(sync_engine, "_generate_card") as mock_gen:
+        with patch.object(sync_engine.note_scanner.card_generator, "generate_card") as mock_gen:
             mock_gen.side_effect = Exception("Skip generation for this test")
-            result = sync_engine._scan_obsidian_notes()
+            result = sync_engine.note_scanner.scan_notes()
 
         mock_discover.assert_called_once()
         assert isinstance(result, dict)
 
-    @patch("obsidian_anki_sync.sync.engine.discover_notes")
+    @patch("obsidian_anki_sync.sync.note_scanner.discover_notes")
     def test_scan_obsidian_notes_respects_source_dir(
         self,
         mock_discover,
@@ -171,25 +178,25 @@ class TestNoteDiscovery:
 
         mock_discover.return_value = []
 
-        engine._scan_obsidian_notes()
+        engine.note_scanner.scan_notes()
 
         mock_discover.assert_called_once_with(
             mock_config.vault_path, mock_config.source_dir
         )
 
-    @patch("obsidian_anki_sync.sync.engine.discover_notes")
+    @patch("obsidian_anki_sync.sync.note_scanner.discover_notes")
     def test_scan_obsidian_notes_handles_empty_directory(
         self, mock_discover, sync_engine
     ):
         """scan_obsidian_notes should handle empty directories gracefully."""
         mock_discover.return_value = []
 
-        result = sync_engine._scan_obsidian_notes()
+        result = sync_engine.note_scanner.scan_notes()
 
         assert result == {}
         assert sync_engine.stats["processed"] == 0
 
-    @patch("obsidian_anki_sync.sync.engine.discover_notes")
+    @patch("obsidian_anki_sync.sync.note_scanner.discover_notes")
     def test_scan_obsidian_notes_incremental_mode(
         self, mock_discover, sync_engine, temp_cache_dir
     ):
@@ -205,7 +212,7 @@ class TestNoteDiscovery:
         ]
         sync_engine.db.get_processed_note_paths.return_value = {"test1.md"}
 
-        result = sync_engine._scan_obsidian_notes(incremental=True)
+        result = sync_engine.note_scanner.scan_notes(incremental=True)
 
         # test1.md should be filtered out
         assert sync_engine.db.get_processed_note_paths.called
@@ -242,15 +249,15 @@ class TestCardGeneration:
             mock_gen.return_value = mock_card
 
             with (
-                patch("obsidian_anki_sync.sync.engine.validate_apf") as mock_validate,
+                patch("obsidian_anki_sync.apf.linter.validate_apf") as mock_validate,
                 patch(
-                    "obsidian_anki_sync.sync.engine.validate_card_html"
+                    "obsidian_anki_sync.apf.html_validator.validate_card_html"
                 ) as mock_html_validate,
             ):
                 mock_validate.return_value = MagicMock(errors=[], warnings=[])
                 mock_html_validate.return_value = []  # No HTML errors
 
-                result = sync_engine._generate_card(
+                result = sync_engine.card_generator.generate_card(
                     qa_pair=sample_qa_pair,
                     metadata=sample_metadata,
                     relative_path="test.md",
@@ -288,12 +295,12 @@ class TestCardGeneration:
         )
 
         # Pre-populate cache
-        with patch("obsidian_anki_sync.sync.engine.compute_content_hash") as mock_hash:
+        with patch("obsidian_anki_sync.utils.content_hash.compute_content_hash") as mock_hash:
             mock_hash.return_value = "test-hash"
             cache_key = "test.md:1:en:test-hash"
             sync_engine._apf_card_cache.set(cache_key, cached_card)
 
-            result = sync_engine._generate_card(
+            result = sync_engine.card_generator.generate_card(
                 qa_pair=sample_qa_pair,
                 metadata=sample_metadata,
                 relative_path="test.md",
@@ -332,13 +339,13 @@ class TestCardGeneration:
             )
             mock_gen.return_value = mock_card
 
-            with patch("obsidian_anki_sync.sync.engine.validate_apf") as mock_validate:
+            with patch("obsidian_anki_sync.apf.linter.validate_apf") as mock_validate:
                 mock_validate.return_value = MagicMock(
                     errors=["Missing required field"], warnings=[]
                 )
 
                 with pytest.raises(ValueError, match="APF validation failed"):
-                    sync_engine._generate_card(
+                    sync_engine.card_generator.generate_card(
                         qa_pair=sample_qa_pair,
                         metadata=sample_metadata,
                         relative_path="test.md",
@@ -380,11 +387,13 @@ class TestAnkiStateManagement:
         }
 
         sync_engine.anki.notes_info.return_value = [
-            {"noteId": 100, "fields": {"Manifest": {"value": json.dumps(manifest1)}}},
-            {"noteId": 200, "fields": {"Manifest": {"value": json.dumps(manifest2)}}},
+            {"noteId": 100, "fields": {"Manifest": {
+                "value": json.dumps(manifest1)}}},
+            {"noteId": 200, "fields": {"Manifest": {
+                "value": json.dumps(manifest2)}}},
         ]
 
-        result = sync_engine._fetch_anki_state()
+        result = sync_engine.anki_state_manager.fetch_state()
 
         assert len(result) == 2
         assert result["card-1-en"] == 100
@@ -396,15 +405,16 @@ class TestAnkiStateManagement:
         """fetch_anki_state should handle empty deck gracefully."""
         sync_engine.anki.find_notes.return_value = []
 
-        result = sync_engine._fetch_anki_state()
+        result = sync_engine.anki_state_manager.fetch_state()
 
         assert result == {}
 
     def test_fetch_anki_state_connection_error(self, sync_engine):
         """fetch_anki_state should handle AnkiConnect errors gracefully."""
-        sync_engine.anki.find_notes.side_effect = AnkiConnectError("Connection failed")
+        sync_engine.anki.find_notes.side_effect = AnkiConnectError(
+            "Connection failed")
 
-        result = sync_engine._fetch_anki_state()
+        result = sync_engine.anki_state_manager.fetch_state()
 
         assert result == {}
 
@@ -432,7 +442,7 @@ class TestAnkiStateManagement:
             {"noteId": 200, "fields": {"Manifest": {"value": "invalid json"}}},
         ]
 
-        result = sync_engine._fetch_anki_state()
+        result = sync_engine.anki_state_manager.fetch_state()
 
         # Only valid card should be returned
         assert len(result) == 1
@@ -465,8 +475,11 @@ class TestSyncActionDetermination:
             guid="new-guid",
         )
 
-        sync_engine._determine_actions(
-            obsidian_cards={"new-card-en": obsidian_card}, anki_cards={}
+        sync_engine.changes = []
+        sync_engine.anki_state_manager.determine_actions(
+            obsidian_cards={"new-card-en": obsidian_card},
+            anki_cards={},
+            changes=sync_engine.changes,
         )
 
         assert len(sync_engine.changes) == 1
@@ -512,9 +525,11 @@ class TestSyncActionDetermination:
             }
         ]
 
-        sync_engine._determine_actions(
+        sync_engine.changes = []
+        sync_engine.anki_state_manager.determine_actions(
             obsidian_cards={"updated-card-en": obsidian_card},
             anki_cards={"updated-card-en": 12345},
+            changes=sync_engine.changes,
         )
 
         assert len(sync_engine.changes) == 1
@@ -561,9 +576,11 @@ class TestSyncActionDetermination:
             }
         ]
 
-        sync_engine._determine_actions(
+        sync_engine.changes = []
+        sync_engine.anki_state_manager.determine_actions(
             obsidian_cards={"same-card-en": obsidian_card},
             anki_cards={"same-card-en": 12345},
+            changes=sync_engine.changes,
         )
 
         assert len(sync_engine.changes) == 1
@@ -587,8 +604,11 @@ class TestSyncActionDetermination:
             }
         ]
 
-        sync_engine._determine_actions(
-            obsidian_cards={}, anki_cards={"deleted-card-en": 12345}
+        sync_engine.changes = []
+        sync_engine.anki_state_manager.determine_actions(
+            obsidian_cards={},
+            anki_cards={"deleted-card-en": 12345},
+            changes=sync_engine.changes,
         )
 
         assert len(sync_engine.changes) == 1
@@ -611,16 +631,16 @@ class TestStatisticsTracking:
         self, sync_engine, sample_qa_pair, sample_metadata
     ):
         """Stats should be incremented during note processing."""
-        with patch("obsidian_anki_sync.sync.engine.discover_notes") as mock_discover:
+        with patch("obsidian_anki_sync.sync.note_scanner.discover_notes") as mock_discover:
             test_file = Path("/tmp/test.md")
             mock_discover.return_value = [(test_file, "test.md")]
 
             with patch(
-                "obsidian_anki_sync.sync.engine.parse_note_with_repair"
+                "obsidian_anki_sync.obsidian.parser.parse_note"
             ) as mock_parse:
                 mock_parse.return_value = (sample_metadata, [sample_qa_pair])
 
-                with patch.object(sync_engine, "_generate_card") as mock_gen:
+                with patch.object(sync_engine.card_generator, "generate_card") as mock_gen:
                     mock_card = Card(
                         slug="test-en",
                         lang="en",
@@ -643,7 +663,7 @@ class TestStatisticsTracking:
                     )
                     mock_gen.return_value = mock_card
 
-                    sync_engine._scan_obsidian_notes()
+                    sync_engine.note_scanner.scan_notes()
 
         assert sync_engine.stats["processed"] >= 1
 
@@ -653,27 +673,28 @@ class TestErrorHandling:
 
     def test_parser_error_handling(self, sync_engine):
         """Engine should handle parser errors gracefully."""
-        with patch("obsidian_anki_sync.sync.engine.discover_notes") as mock_discover:
+        with patch("obsidian_anki_sync.sync.note_scanner.discover_notes") as mock_discover:
             test_file = Path("/tmp/test.md")
             mock_discover.return_value = [(test_file, "test.md")]
 
             with patch(
-                "obsidian_anki_sync.sync.engine.parse_note_with_repair"
+                "obsidian_anki_sync.obsidian.parser.parse_note"
             ) as mock_parse:
                 from obsidian_anki_sync.obsidian.parser import ParserError
 
                 mock_parse.side_effect = ParserError("Failed to parse note")
 
-                result = sync_engine._scan_obsidian_notes()
+                result = sync_engine.note_scanner.scan_notes()
 
         assert sync_engine.stats["errors"] >= 1
         assert isinstance(result, dict)
 
     def test_anki_connection_error_handling(self, sync_engine):
         """Engine should handle Anki connection errors gracefully."""
-        sync_engine.anki.find_notes.side_effect = AnkiConnectError("Connection refused")
+        sync_engine.anki.find_notes.side_effect = AnkiConnectError(
+            "Connection refused")
 
-        result = sync_engine._fetch_anki_state()
+        result = sync_engine.anki_state_manager.fetch_state()
 
         assert result == {}
 
@@ -681,19 +702,19 @@ class TestErrorHandling:
         self, sync_engine, sample_qa_pair, sample_metadata
     ):
         """Failed card generation should increment error statistics."""
-        with patch("obsidian_anki_sync.sync.engine.discover_notes") as mock_discover:
+        with patch("obsidian_anki_sync.sync.note_scanner.discover_notes") as mock_discover:
             test_file = Path("/tmp/test.md")
             mock_discover.return_value = [(test_file, "test.md")]
 
             with patch(
-                "obsidian_anki_sync.sync.engine.parse_note_with_repair"
+                "obsidian_anki_sync.obsidian.parser.parse_note"
             ) as mock_parse:
                 mock_parse.return_value = (sample_metadata, [sample_qa_pair])
 
-                with patch.object(sync_engine, "_generate_card") as mock_gen:
+                with patch.object(sync_engine.card_generator, "generate_card") as mock_gen:
                     mock_gen.side_effect = Exception("Generation failed")
 
-                    sync_engine._scan_obsidian_notes()
+                    sync_engine.note_scanner.scan_notes()
 
         assert sync_engine.stats["errors"] >= 1
 
@@ -717,7 +738,8 @@ class TestManifestParsing:
             }
         )
 
-        result = sync_engine._parse_manifest_field(manifest_json)
+        result = sync_engine.anki_state_manager._parse_manifest_field(
+            manifest_json)
 
         assert result is not None
         assert isinstance(result, ManifestData)
@@ -726,7 +748,8 @@ class TestManifestParsing:
 
     def test_parse_manifest_field_invalid_json(self, sync_engine):
         """parse_manifest_field should return None for invalid JSON."""
-        result = sync_engine._parse_manifest_field("not valid json")
+        result = sync_engine.anki_state_manager._parse_manifest_field(
+            "not valid json")
 
         assert result is None
 
@@ -734,7 +757,8 @@ class TestManifestParsing:
         """parse_manifest_field should return None when required fields missing."""
         manifest_json = json.dumps({"slug": "test-card-en"})
 
-        result = sync_engine._parse_manifest_field(manifest_json)
+        result = sync_engine.anki_state_manager._parse_manifest_field(
+            manifest_json)
 
         assert result is None
 
@@ -742,7 +766,8 @@ class TestManifestParsing:
         """parse_manifest_field should return None for non-dict JSON."""
         manifest_json = json.dumps(["not", "a", "dict"])
 
-        result = sync_engine._parse_manifest_field(manifest_json)
+        result = sync_engine.anki_state_manager._parse_manifest_field(
+            manifest_json)
 
         assert result is None
 
