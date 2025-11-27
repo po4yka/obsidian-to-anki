@@ -430,6 +430,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
     """Execute card generation stage.
 
     Generates APF cards from Q/A pairs using the configured LLM.
+    Supports parallel generation for better performance with many Q/A pairs.
 
     Args:
         state: Current pipeline state
@@ -490,13 +491,68 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
     # Run generation
     try:
-        gen_result = await generator.generate_cards(
-            note_content=state["note_content"],
-            metadata=metadata,
-            qa_pairs=qa_pairs,
-            slug_base=state["slug_base"],
-        )
-        gen_result.generation_time = time.time() - start_time
+        # Determine if we should parallelize
+        # Default batch size for parallel generation
+        BATCH_SIZE = getattr(state["config"], "generation_batch_size", 5)
+
+        if len(qa_pairs) > BATCH_SIZE:
+            # Parallel generation
+            logger.info(
+                "langgraph_generation_parallel",
+                total_pairs=len(qa_pairs),
+                batch_size=BATCH_SIZE
+            )
+
+            # Split Q&A pairs into chunks
+            chunks = [qa_pairs[i:i + BATCH_SIZE] for i in range(0, len(qa_pairs), BATCH_SIZE)]
+
+            # Create tasks for each chunk
+            tasks = []
+            for chunk in chunks:
+                tasks.append(generator.generate_cards(
+                    note_content=state["note_content"],
+                    metadata=metadata,
+                    qa_pairs=chunk,
+                    slug_base=state["slug_base"],
+                ))
+
+            # Run tasks in parallel
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Merge results
+            all_cards = []
+            total_gen_time = 0.0
+
+            for i, res in enumerate(results):
+                if isinstance(res, Exception):
+                    logger.error(
+                        "langgraph_generation_chunk_failed",
+                        chunk_index=i,
+                        error=str(res)
+                    )
+                    # We continue with partial results if some chunks fail
+                else:
+                    all_cards.extend(res.cards)
+                    # Use max time as approximation for parallel execution
+                    total_gen_time = max(total_gen_time, res.generation_time)
+
+            # Create merged result
+            gen_result = GenerationResult(
+                cards=all_cards,
+                total_cards=len(all_cards),
+                generation_time=time.time() - start_time, # Total wall time
+                model_used=str(model),
+            )
+
+        else:
+            # Sequential generation (single batch)
+            gen_result = await generator.generate_cards(
+                note_content=state["note_content"],
+                metadata=metadata,
+                qa_pairs=qa_pairs,
+                slug_base=state["slug_base"],
+            )
+            gen_result.generation_time = time.time() - start_time
 
         # Validate against split plan if available
         if expected_card_count is not None:
