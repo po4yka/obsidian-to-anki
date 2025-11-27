@@ -174,7 +174,6 @@ def classify_error_category(error: Exception) -> str:
         Error category string
     """
     error_msg = str(error).lower()
-    error_type = type(error).__name__.lower()
 
     # Syntax errors
     if any(

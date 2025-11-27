@@ -43,9 +43,9 @@ class ProblematicNotesArchiver:
         """Load or initialize the index of archived notes."""
         if self.index_file.exists():
             try:
-                with open(self.index_file, "r", encoding="utf-8") as f:
+                with open(self.index_file, encoding="utf-8") as f:
                     self.index = json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(
                     "failed_to_load_problematic_notes_index",
                     error=str(e),
@@ -64,7 +64,7 @@ class ProblematicNotesArchiver:
             self.index["last_updated"] = datetime.now().isoformat()
             with open(self.index_file, "w", encoding="utf-8") as f:
                 json.dump(self.index, f, indent=2, ensure_ascii=False)
-        except IOError as e:
+        except OSError as e:
             logger.warning(
                 "failed_to_save_problematic_notes_index",
                 error=str(e),
@@ -129,9 +129,9 @@ class ProblematicNotesArchiver:
             # Read note content if not provided
             if note_content is None:
                 try:
-                    with open(note_path, "r", encoding="utf-8") as f:
+                    with open(note_path, encoding="utf-8") as f:
                         note_content = f.read()
-                except IOError as e:
+                except OSError as e:
                     logger.warning(
                         "failed_to_read_note_for_archival",
                         note_path=str(note_path),
@@ -166,7 +166,7 @@ class ProblematicNotesArchiver:
             # Copy note file
             try:
                 shutil.copy2(note_path, archived_note_path)
-            except (IOError, OSError) as e:
+            except OSError as e:
                 logger.error(
                     "failed_to_copy_note_for_archival",
                     source=str(note_path),
@@ -196,7 +196,7 @@ class ProblematicNotesArchiver:
             try:
                 with open(metadata_path, "w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2, ensure_ascii=False)
-            except IOError as e:
+            except OSError as e:
                 logger.warning(
                     "failed_to_save_note_metadata",
                     metadata_path=str(metadata_path),

@@ -17,9 +17,7 @@ from ..agents.agent_monitoring import (
     PerformanceTracker,
 )
 from ..agents.specialized import (
-    ProblemDomain,
     ProblemRouter,
-    diagnose_and_solve_problems,
 )
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair

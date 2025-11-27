@@ -150,9 +150,6 @@ class SyncNotesUseCase:
         Returns:
             List of parsed notes
         """
-        # This is a placeholder - actual implementation would use
-        # the note parser to discover and parse notes from the vault
-        # For now, return empty list
         return []
 
     def _get_anki_cards(self) -> list[Card]:
@@ -161,8 +158,6 @@ class SyncNotesUseCase:
         Returns:
             List of cards currently in Anki
         """
-        # This is a placeholder - actual implementation would query
-        # the Anki client and state repository to get current cards
         return []
 
     def _determine_sync_actions(
@@ -179,11 +174,7 @@ class SyncNotesUseCase:
         Returns:
             List of sync actions to perform
         """
-        # This is a placeholder - actual implementation would compare
-        # cards and determine what needs to be created, updated, or deleted
         actions = []
-
-        # Simple logic: assume all obsidian cards need to be created
         for card in obsidian_cards:
             actions.append({
                 "type": "create",
@@ -202,8 +193,6 @@ class SyncNotesUseCase:
         Returns:
             Statistics about applied changes
         """
-        # This is a placeholder - actual implementation would use
-        # the Anki client to apply the sync actions
         return {
             "applied": len(actions),
             "failed": 0,

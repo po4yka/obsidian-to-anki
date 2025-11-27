@@ -4,7 +4,7 @@ import time
 
 
 from ..anki.client import AnkiClient
-from ..models import Card, NoteMetadata
+from ..models import NoteMetadata
 from .models import GeneratedCard
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
@@ -24,7 +24,7 @@ class QualityValidationResult:
         original_card: GeneratedCard,
         quality_report: QualityReport,
         improved_card: GeneratedCard | None = None,
-        performance_data: Dict | None = None,
+        performance_data: dict | None = None,
         validation_time: float = 0.0,
     ):
         """Initialize validation result.
@@ -225,7 +225,7 @@ class QualityValidator:
 
         return results
 
-    def get_quality_statistics(self, results: list[QualityValidationResult]) -> Dict:
+    def get_quality_statistics(self, results: list[QualityValidationResult]) -> dict:
         """Generate quality statistics from validation results.
 
         Args:
@@ -273,7 +273,7 @@ class QualityValidator:
 
         return distribution
 
-    def _identify_common_issues(self, results: list[QualityValidationResult]) -> list[Dict]:
+    def _identify_common_issues(self, results: list[QualityValidationResult]) -> list[dict]:
         """Identify most common quality issues."""
         issue_counts = {}
 
@@ -314,7 +314,7 @@ class QualityValidator:
         else:
             logger.info("card_quality_acceptable", **log_data)
 
-    def export_quality_report(self, results: list[QualityValidationResult]) -> Dict:
+    def export_quality_report(self, results: list[QualityValidationResult]) -> dict:
         """Export comprehensive quality report.
 
         Args:
@@ -352,7 +352,7 @@ class QualityValidator:
 
         return report
 
-    def _generate_recommendations(self, stats: Dict) -> list[str]:
+    def _generate_recommendations(self, stats: dict) -> list[str]:
         """Generate recommendations based on quality statistics.
 
         Args:

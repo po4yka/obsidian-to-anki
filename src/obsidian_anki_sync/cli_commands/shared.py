@@ -1,9 +1,8 @@
 """Shared utilities for CLI commands."""
 
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
-import typer
 from rich.console import Console
 
 from ..config import Config, load_config, set_config
@@ -13,8 +12,7 @@ from ..utils.logging import configure_logging, get_logger
 console = Console()
 
 # Global state for config and logger (cached for performance across CLI commands)
-# Note: This is a simple caching mechanism. For multi-threaded/async usage,
-# consider using a proper dependency injection framework or context manager.
+# For multi-threaded/async usage, consider using a proper dependency injection framework or context manager.
 _config: Config | None = None
 _logger: Any | None = None
 
@@ -51,7 +49,8 @@ def get_config_and_logger(
         set_config(_config)
 
         # Configure logging with vault-specific log directory
-        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
+        log_dir = Path(_config.vault_path) / \
+            ".logs" if _config.vault_path else None
         configure_logging(
             log_level or _config.log_level,
             log_dir=log_dir,

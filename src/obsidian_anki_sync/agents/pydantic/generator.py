@@ -3,7 +3,6 @@
 Generates APF cards from Q/A pairs using structured outputs.
 """
 
-from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel

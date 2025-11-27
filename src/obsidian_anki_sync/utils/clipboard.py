@@ -1,6 +1,5 @@
 """Clipboard integration for copy mode."""
 
-from typing import Any
 
 from ..utils.logging import get_logger
 

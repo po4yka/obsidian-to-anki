@@ -75,10 +75,10 @@ class ContentHashService:
             Hash of file content
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
             return ContentHashService.compute_hash(content)
-        except (IOError, UnicodeDecodeError) as e:
+        except (OSError, UnicodeDecodeError) as e:
             # Fallback to file metadata if content can't be read
             import os
             stat = os.stat(file_path)

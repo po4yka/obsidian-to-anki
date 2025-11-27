@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 
-from ..entities.note import Note, NoteMetadata, QAPair
+from ..entities.note import NoteMetadata, QAPair
 
 
 class INoteParser(ABC):

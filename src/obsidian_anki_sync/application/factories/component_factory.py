@@ -1,11 +1,9 @@
 """Factory for creating sync engine components."""
 
-from typing import Any
 
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.anki_config import IAnkiConfig
 from ...domain.interfaces.card_generator import ICardGenerator
-from ...domain.interfaces.llm_config import ILLMConfig
 from ...domain.interfaces.llm_provider import ILLMProvider
 from ...domain.interfaces.note_parser import INoteParser
 from ...domain.interfaces.state_repository import IStateRepository

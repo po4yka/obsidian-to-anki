@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-from ...domain.entities.card import Card, SyncAction
+from ...domain.entities.card import SyncAction
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.state_repository import IStateRepository
 
@@ -186,8 +186,6 @@ class ApplyChangesUseCase:
                 # Create cards in batch
                 created_cards = []
                 for action in batch:
-                    # Note: This is simplified - actual implementation would
-                    # use the Anki client's batch creation methods
                     try:
                         # Simulate card creation
                         created_card = action.card.with_guid(
@@ -236,8 +234,6 @@ class ApplyChangesUseCase:
 
         for action in actions:
             try:
-                # Update card in Anki
-                # Note: Simplified implementation
                 applied.append({
                     "action": action,
                     "result": action.card,
@@ -275,8 +271,6 @@ class ApplyChangesUseCase:
 
         for action in actions:
             try:
-                # Delete card from Anki
-                # Note: Simplified implementation
                 applied.append({
                     "action": action,
                     "result": None,

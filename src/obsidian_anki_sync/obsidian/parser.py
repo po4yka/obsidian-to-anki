@@ -39,7 +39,7 @@ class _ParserState(threading.local):
     def __init__(self) -> None:
         """Initialize thread-local parser state."""
         self.use_llm_extraction: bool = False
-        self.qa_extractor_agent: "QAExtractorAgent" | None = None
+        self.qa_extractor_agent: QAExtractorAgent | None = None
         self.enforce_language_validation: bool = False
 
 
@@ -48,7 +48,7 @@ _thread_local_state = _ParserState()
 
 # Backward compatibility - global state (deprecated, kept for legacy code)
 _USE_LLM_EXTRACTION = False
-_QA_EXTRACTOR_AGENT: "QAExtractorAgent" | None = None
+_QA_EXTRACTOR_AGENT: QAExtractorAgent | None = None
 _ENFORCE_LANGUAGE_VALIDATION = False
 _GLOBAL_STATE_LOCK = threading.RLock()
 
@@ -168,7 +168,7 @@ def create_qa_extractor(
     reasoning_enabled: bool = False,
     enable_content_generation: bool = True,
     repair_missing_sections: bool = True,
-) -> "QAExtractorAgent":
+) -> QAExtractorAgent:
     """Create a QA extractor agent for LLM-based extraction.
 
     This is the preferred way to use LLM extraction instead of configure_llm_extraction().
@@ -197,8 +197,8 @@ def create_qa_extractor(
 
 
 def _get_qa_extractor(
-    explicit_extractor: "QAExtractorAgent" | None,
-) -> "QAExtractorAgent" | None:
+    explicit_extractor: QAExtractorAgent | None,
+) -> QAExtractorAgent | None:
     """Get QA extractor from explicit parameter, thread-local, or global state.
 
     Priority order:
@@ -248,7 +248,7 @@ def _get_enforce_language_validation() -> bool:
 
 
 def set_thread_qa_extractor(
-    qa_extractor: "QAExtractorAgent" | None,
+    qa_extractor: QAExtractorAgent | None,
     enforce_language_validation: bool = False,
 ) -> None:
     """Set QA extractor for the current thread (thread-safe).
@@ -287,7 +287,7 @@ def set_thread_qa_extractor(
 
 def parse_note(
     file_path: Path,
-    qa_extractor: "QAExtractorAgent" | None = None,
+    qa_extractor: QAExtractorAgent | None = None,
     tolerant_parsing: bool = False,
 ) -> tuple[NoteMetadata, list[QAPair]]:
     """
@@ -773,7 +773,7 @@ def parse_qa_pairs(
     content: str,
     metadata: NoteMetadata,
     file_path: Path | None = None,
-    qa_extractor: "QAExtractorAgent" | None = None,
+    qa_extractor: QAExtractorAgent | None = None,
     tolerant_parsing: bool = False,
 ) -> list[QAPair]:
     """
@@ -1096,7 +1096,6 @@ def _parse_single_qa_block(
         return None
 
     # Check if we have at least one answer section
-    # Note: Separator (---) between questions and answers is optional
     if not answer_en and not answer_ru:
         if state != "INIT":
             missing_sections = []

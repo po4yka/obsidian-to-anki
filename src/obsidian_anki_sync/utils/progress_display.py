@@ -1,6 +1,5 @@
 """Progress display utilities for sync operations."""
 
-import time
 from typing import Any
 
 from rich.console import Console
@@ -148,7 +147,6 @@ class ProgressDisplay:
             Live instance
         """
         from rich.layout import Layout
-        from rich.text import Text
 
         def generate_layout() -> Layout:
             layout = Layout()

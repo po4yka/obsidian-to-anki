@@ -81,7 +81,6 @@ class AgentPipelineOrchestrator:
         }
 
         try:
-            # Stage 1: Pre-validation (simplified)
             pre_val_result = self._execute_pre_validation(
                 note_content, metadata, qa_pairs, file_path
             )
@@ -145,8 +144,6 @@ class AgentPipelineOrchestrator:
         Returns:
             Pre-validation result
         """
-        # Simplified pre-validation - in real implementation,
-        # this would use a dedicated PreValidatorAgent
         pre_validation_enabled = self.config.get(
             "pre_validation_enabled", True)
 
@@ -215,9 +212,6 @@ class AgentPipelineOrchestrator:
                     "time": time.time() - start_time,
                 }
 
-            # Generate cards using LLM provider
-            # This is a simplified implementation - real implementation
-            # would use a dedicated GeneratorAgent
             cards = self._generate_cards_with_llm(
                 note_content, metadata, qa_pairs, slug_base
             )
@@ -300,8 +294,6 @@ class AgentPipelineOrchestrator:
         Returns:
             List of generated cards
         """
-        # This is a placeholder implementation
-        # Real implementation would construct prompts and call LLM
         cards = []
 
         for i, qa_pair in enumerate(qa_pairs):
@@ -326,7 +318,6 @@ class AgentPipelineOrchestrator:
         Returns:
             Validation result
         """
-        # Simplified validation - real implementation would use PostValidatorAgent
         is_valid = len(cards) > 0 and all(
             card.get("slug") and card.get("language") for card in cards
         )

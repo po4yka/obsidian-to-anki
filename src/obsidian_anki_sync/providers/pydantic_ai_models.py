@@ -4,7 +4,6 @@ This module provides adapters between our existing LLM providers and PydanticAI'
 model interface, enabling type-safe structured outputs and better agent capabilities.
 """
 
-import os
 from typing import Any
 
 import httpx

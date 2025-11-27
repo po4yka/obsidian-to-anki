@@ -4,7 +4,6 @@ from __future__ import annotations
 from enum import Enum
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from ..services.slug_service import SlugService
 

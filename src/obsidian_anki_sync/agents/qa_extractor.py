@@ -4,7 +4,6 @@ This agent intelligently extracts question-answer pairs from notes
 regardless of their markdown format, using LLM to understand structure.
 """
 
-import json
 import time
 from pathlib import Path
 
@@ -364,7 +363,8 @@ You are an expert Q&A extraction system specializing in educational note analysi
             # Set minimum to 4096 for QA extraction (reasonable for most models)
             # But don't exceed model's safe output limit
             min_tokens_for_extraction = min(4096, safe_max_output)
-            estimated_max_tokens = max(estimated_max_tokens, min_tokens_for_extraction)
+            estimated_max_tokens = max(
+                estimated_max_tokens, min_tokens_for_extraction)
             estimated_max_tokens = min(estimated_max_tokens, safe_max_output)
 
             # Temporarily adjust max_tokens for this extraction to ensure complete responses
@@ -390,7 +390,8 @@ You are an expert Q&A extraction system specializing in educational note analysi
             progress_display = getattr(self, "progress_display", None)
             if progress_display:
                 note_name = metadata.title[:50] if metadata.title else "Unknown"
-                progress_display.update_operation("Extracting Q&A pairs", note_name)
+                progress_display.update_operation(
+                    "Extracting Q&A pairs", note_name)
 
             try:
                 result = self.llm_provider.generate_json(
@@ -406,7 +407,8 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 if progress_display:
                     from ..utils.progress_display import extract_reasoning_from_response
 
-                    reasoning = extract_reasoning_from_response(result, self.model)
+                    reasoning = extract_reasoning_from_response(
+                        result, self.model)
                     if reasoning:
                         progress_display.add_reflection(
                             f"Extraction reasoning: {reasoning[:200]}"
@@ -456,7 +458,8 @@ You are an expert Q&A extraction system specializing in educational note analysi
             for qa_data in qa_pairs_data:
                 try:
                     qa_pair = QAPair(
-                        card_index=qa_data.get("card_index", len(qa_pairs) + 1),
+                        card_index=qa_data.get(
+                            "card_index", len(qa_pairs) + 1),
                         question_en=qa_data.get("question_en", "").strip(),
                         question_ru=qa_data.get("question_ru", "").strip(),
                         answer_en=qa_data.get("answer_en", "").strip(),
@@ -485,8 +488,6 @@ You are an expert Q&A extraction system specializing in educational note analysi
                                         note_id=metadata.id,
                                         card_index=qa_pair.card_index,
                                     )
-                                    # Note: Actual generation would happen in the LLM prompt
-                                    # This is just logging - the LLM should generate it
                                 if not qa_pair.answer_en:
                                     logger.info(
                                         "generating_missing_en_answer",
@@ -549,10 +550,6 @@ You are an expert Q&A extraction system specializing in educational note analysi
                                 has_answer=bool(qa_pair.answer_ru),
                             )
                             valid = False
-
-                    # Note: The actual content generation happens in the LLM prompt
-                    # This validation just logs what needs to be generated
-                    # The LLM should have already generated it based on the prompt instructions
 
                     if valid:
                         qa_pairs.append(qa_pair)

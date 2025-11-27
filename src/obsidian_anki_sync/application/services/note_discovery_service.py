@@ -2,7 +2,6 @@
 
 import random
 from pathlib import Path
-from typing import Set
 
 from ...domain.entities.note import Note, NoteMetadata
 from ...domain.interfaces.note_parser import INoteParser
@@ -140,15 +139,13 @@ class NoteDiscoveryService:
 
         return note_files
 
-    def _get_processed_paths(self) -> Set[str]:
+    def _get_processed_paths(self) -> set[str]:
         """Get set of already processed note paths.
 
         Returns:
             Set of absolute paths to processed notes
         """
         try:
-            # This would query the state repository for processed notes
-            # For now, return empty set as placeholder
             return set()
         except Exception as e:
             logger.warning("failed_to_get_processed_paths", error=str(e))

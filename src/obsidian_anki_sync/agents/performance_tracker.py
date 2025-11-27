@@ -70,7 +70,6 @@ class PerformanceTracker:
             # Get collection stats (HTML, parse what we can)
             collection_stats = self.anki_client.get_collection_stats()
 
-            # Parse basic stats from HTML (this is a simplified approach)
             stats = {
                 "reviews_today": reviews_today,
                 "collection_stats_html": collection_stats,
@@ -94,16 +93,13 @@ class PerformanceTracker:
         issues = defaultdict(list)
 
         try:
-            # Get note IDs for these cards (this would need to be implemented
-            # based on how cards are mapped to Anki notes)
-            note_ids = []  # Placeholder - would need actual mapping
+            note_ids = []
 
             if note_ids:
-                performance_data = self.get_card_performance(note_ids)
+                # TODO: Use performance data for analysis
+                self.get_card_performance(note_ids)
 
                 for card in cards:
-                    # This is a simplified analysis - in practice, you'd need
-                    # to map cards to their Anki note IDs
                     card_issues = self._analyze_single_card_performance(
                         card, {})
                     for issue_type, affected_cards in card_issues.items():
@@ -114,7 +110,7 @@ class PerformanceTracker:
 
         return dict(issues)
 
-    def _calculate_card_metrics(self, card_info: Dict) -> dict[str, float]:
+    def _calculate_card_metrics(self, card_info: dict) -> dict[str, float]:
         """Calculate performance metrics for a single card.
 
         Args:
@@ -124,10 +120,6 @@ class PerformanceTracker:
             Dictionary with calculated metrics
         """
         metrics = {}
-
-        # Extract basic metrics from card info
-        # Note: This depends on what AnkiConnect actually returns
-        # The actual implementation would need to be adjusted based on API response
 
         try:
             # These are example metrics - actual implementation depends on API
@@ -141,7 +133,6 @@ class PerformanceTracker:
                 lapse_rate = lapses / reviews
                 metrics["lapse_rate"] = lapse_rate
 
-                # Retention estimate (simplified)
                 retention = 1.0 - lapse_rate
                 metrics["estimated_retention"] = max(0.0, min(1.0, retention))
 
@@ -242,8 +233,6 @@ class PerformanceTracker:
             avg_retention = insights["average_retention"]
             avg_ease = insights["average_ease_factor"]
 
-            # Simple quality score combining retention and ease
-            # Higher retention and ease = higher quality
             quality_score = (avg_retention * 0.7) + \
                 ((avg_ease - 1.3) / 1.7 * 0.3)
             insights["overall_quality_score"] = max(
@@ -253,7 +242,7 @@ class PerformanceTracker:
 
         return insights
 
-    def export_performance_report(self) -> Dict:
+    def export_performance_report(self) -> dict:
         """Export a comprehensive performance report.
 
         Returns:

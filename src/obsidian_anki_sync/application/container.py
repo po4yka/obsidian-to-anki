@@ -1,6 +1,6 @@
 """Dependency injection container for the application."""
 
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
 from ..domain.interfaces.anki_client import IAnkiClient
 from ..domain.interfaces.anki_config import IAnkiConfig
@@ -26,13 +26,13 @@ class DependencyContainer:
 
     def __init__(self):
         """Initialize the dependency container."""
-        self._services: dict[Type, Any] = {}
-        self._factories: dict[Type, callable] = {}
-        self._singletons: dict[Type, Any] = {}
+        self._services: dict[type, Any] = {}
+        self._factories: dict[type, callable] = {}
+        self._singletons: dict[type, Any] = {}
 
         logger.debug("dependency_container_initialized")
 
-    def register(self, interface: Type[T], implementation: Any) -> None:
+    def register(self, interface: type[T], implementation: Any) -> None:
         """Register a service implementation.
 
         Args:
@@ -43,7 +43,7 @@ class DependencyContainer:
         logger.debug(
             f"service_registered: {interface.__name__} -> {type(implementation).__name__}")
 
-    def register_factory(self, interface: Type[T], factory: callable) -> None:
+    def register_factory(self, interface: type[T], factory: callable) -> None:
         """Register a factory function for creating services.
 
         Args:
@@ -53,7 +53,7 @@ class DependencyContainer:
         self._factories[interface] = factory
         logger.debug(f"factory_registered: {interface.__name__}")
 
-    def register_singleton(self, interface: Type[T], implementation: Any) -> None:
+    def register_singleton(self, interface: type[T], implementation: Any) -> None:
         """Register a singleton service.
 
         Args:
@@ -63,7 +63,7 @@ class DependencyContainer:
         self._singletons[interface] = implementation
         logger.debug(f"singleton_registered: {interface.__name__}")
 
-    def resolve(self, interface: Type[T]) -> T:
+    def resolve(self, interface: type[T]) -> T:
         """Resolve a service implementation.
 
         Args:
@@ -93,7 +93,7 @@ class DependencyContainer:
         raise ValueError(
             f"No implementation registered for {interface.__name__}")
 
-    def has_registration(self, interface: Type[T]) -> bool:
+    def has_registration(self, interface: type[T]) -> bool:
         """Check if an interface has a registered implementation.
 
         Args:
@@ -115,7 +115,7 @@ class DependencyContainer:
         self._singletons.clear()
         logger.debug("container_cleared")
 
-    def get_registered_interfaces(self) -> list[Type]:
+    def get_registered_interfaces(self) -> list[type]:
         """Get all registered interface types.
 
         Returns:
@@ -183,7 +183,7 @@ def setup_container(container: DependencyContainer) -> None:
     logger.info("container_setup_completed")
 
 
-def inject(interface: Type[T]) -> T:
+def inject[T](interface: type[T]) -> T:
     """Dependency injection decorator/helper.
 
     Args:

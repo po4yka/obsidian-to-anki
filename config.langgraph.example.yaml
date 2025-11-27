@@ -1,5 +1,4 @@
 # Example configuration for LangGraph + PydanticAI agent system
-#
 # This configuration enables the new agentic system with:
 # - PydanticAI for structured outputs and type-safe agents
 # - LangGraph for workflow orchestration with state management
@@ -23,12 +22,12 @@ anki_deck_name: Interview Questions
 anki_note_type: APF::Simple
 
 # Runtime mode
-run_mode: apply  # or 'dry-run' for testing
-delete_mode: delete  # or 'archive' to preserve cards
+run_mode: apply # or 'dry-run' for testing
+delete_mode: delete # or 'archive' to preserve cards
 
 # Database and logging
 db_path: .sync_state.db
-log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level: INFO # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 # =============================================================================
 # LLM Provider Configuration
@@ -41,13 +40,13 @@ llm_provider: openrouter
 # Get API key from: https://openrouter.ai/
 # Set via environment variable: OPENROUTER_API_KEY=your_key_here
 openrouter_base_url: https://openrouter.ai/api/v1
-openrouter_site_url: https://yoursite.com  # Optional, for rankings
-openrouter_site_name: Your App Name  # Optional, for rankings
+openrouter_site_url: https://yoursite.com # Optional, for rankings
+openrouter_site_name: Your App Name # Optional, for rankings
 
 # Common LLM settings
 llm_temperature: 0.2
 llm_top_p: 0.3
-llm_timeout: 900.0  # 15 minutes
+llm_timeout: 900.0 # 15 minutes
 llm_max_tokens: 2048
 
 # =============================================================================
@@ -85,10 +84,10 @@ memorization_quality_model: moonshotai/kimi-k2
 duplicate_detection_model: qwen/qwen-2.5-32b-instruct
 
 # LangGraph workflow settings
-langgraph_max_retries: 3  # Maximum post-validation retry attempts
-langgraph_auto_fix: true  # Enable automatic error fixing
-langgraph_strict_mode: true  # Use strict validation rules
-langgraph_checkpoint_enabled: true  # Enable state persistence
+langgraph_max_retries: 3 # Maximum post-validation retry attempts
+langgraph_auto_fix: true # Enable automatic error fixing
+langgraph_strict_mode: true # Use strict validation rules
+langgraph_checkpoint_enabled: true # Enable state persistence
 
 # =============================================================================
 # Legacy Agent System
@@ -110,11 +109,9 @@ post_validation_strict_mode: true
 export_deck_name: Interview Questions Export
 export_deck_description: Generated flashcards for interview preparation
 export_output_path: ./exports/interview_questions.apkg
-
 # =============================================================================
 # Usage Notes
 # =============================================================================
-#
 # 1. Set OPENROUTER_API_KEY environment variable or create .env file:
 #    echo "OPENROUTER_API_KEY=your_key_here" > .env
 #
