@@ -68,6 +68,12 @@ pytest tests/test_parser.py
 # APF linter tests
 pytest tests/test_apf_linter.py
 
+# Bilingual generator tests
+pytest tests/agents/test_generator_bilingual.py
+
+# Bilingual validator tests
+pytest tests/agents/test_bilingual_validator.py
+
 # Integration tests
 pytest tests/integration/
 ```
@@ -85,33 +91,41 @@ pytest -m "not slow"
 ## Test Coverage
 
 ### Unit Tests
-- **Parser**: YAML frontmatter, Q/A extraction, multi-pair blocks, file discovery.
-- **Slug Generator**: Slug formation, sanitization, collision resolution, determinism.
-- **APF Linter**: APF structure, tag validation, cloze validation.
-- **Database**: CRUD operations, unique constraints.
+
+-   **Parser**: YAML frontmatter, Q/A extraction, multi-pair blocks, file discovery.
+-   **Slug Generator**: Slug formation, sanitization, collision resolution, determinism.
+-   **APF Linter**: APF structure, tag validation, cloze validation.
+-   **Generator (Bilingual)**: English-first generation, translation helpers, structure preservation.
+-   **Validator (Bilingual)**: EN/RU consistency checking, structural mismatches, preference statement validation.
+-   **Database**: CRUD operations, unique constraints.
 
 ### Integration Tests
-- **AnkiConnect Client**: API communication, CRUD operations.
-- **Sync**: Sync flow and determinism (stubs).
+
+-   **AnkiConnect Client**: API communication, CRUD operations.
+-   **Sync**: Sync flow and determinism (stubs).
 
 ### E2E Tests
 
+**Available:**
+
+-   E2E-02: Bilingual card generation (UNIT via `test_generator_bilingual.py`)
+
 **Missing (Deferred to Phase 9):**
-- E2E-01: Process 5 notes with 2 multi-pair
-- E2E-02: Bilingual card generation
-- E2E-03: Full sync cycle
-- E2E-dryrun-01: Dry-run validation
-- E2E-idemp-01: Idempotency test
+
+-   E2E-01: Process 5 notes with 2 multi-pair
+-   E2E-03: Full sync cycle
+-   E2E-dryrun-01: Dry-run validation
+-   E2E-idemp-01: Idempotency test
 
 ## Test Fixtures
 
 ### Available Fixtures (conftest.py)
 
-- `temp_dir`: Temporary directory for test files
-- `test_config`: Test configuration with temp paths
-- `sample_metadata`: Sample NoteMetadata object
-- `sample_qa_pair`: Sample QAPair object
-- `sample_note_content`: Full Obsidian note content
+-   `temp_dir`: Temporary directory for test files
+-   `test_config`: Test configuration with temp paths
+-   `sample_metadata`: Sample NoteMetadata object
+-   `sample_qa_pair`: Sample QAPair object
+-   `sample_note_content`: Full Obsidian note content
 
 ### Example Usage
 
@@ -173,11 +187,11 @@ Tests are designed to run in CI environments:
 
 - name: Setup Python and dependencies
   run: |
-    uv sync --all-extras
+      uv sync --all-extras
 
 - name: Run tests
   run: |
-    uv run pytest --cov --cov-report=xml
+      uv run pytest --cov --cov-report=xml
 
 - name: Upload coverage
   uses: codecov/codecov-action@v3
@@ -188,8 +202,8 @@ Tests are designed to run in CI environments:
 ```yaml
 - name: Run tests
   run: |
-    pip install -e ".[dev]"
-    pytest --cov --cov-report=xml
+      pip install -e ".[dev]"
+      pytest --cov --cov-report=xml
 ```
 
 ## Known Test Limitations
@@ -209,6 +223,7 @@ To add golden test files:
 4. Update goldens when CARDS_PROMPT changes
 
 Example:
+
 ```python
 def test_apf_output_matches_golden():
     """Compare generated APF against golden file."""
@@ -219,10 +234,10 @@ def test_apf_output_matches_golden():
 
 ## Test Maintenance
 
-- Update tests when requirements change
-- Keep fixtures in sync with models
-- Document test IDs (UNIT-*, INT-*, E2E-*) for traceability
-- Run full test suite before committing
+-   Update tests when requirements change
+-   Keep fixtures in sync with models
+-   Document test IDs (UNIT-_, INT-_, E2E-\*) for traceability
+-   Run full test suite before committing
 
 ## Performance Testing
 

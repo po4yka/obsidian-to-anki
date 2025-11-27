@@ -447,6 +447,24 @@ class Config(BaseSettings):
         description="Stages where self-reflection is applied (after validation passes)",
     )
 
+    # Smart reflection skipping - skip reflection for simple content
+    reflection_skip_qa_threshold: int = Field(
+        default=2,
+        ge=0,
+        description="Skip reflection if Q/A pair count <= this value",
+    )
+    reflection_skip_content_length: int = Field(
+        default=500,
+        ge=0,
+        description="Skip reflection if content length < this value (chars)",
+    )
+    reflection_skip_confidence_threshold: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Skip reflection if validation confidence >= this value",
+    )
+
     # ============================================================================
     # Unified Agent Framework Configuration
     # ============================================================================
@@ -593,7 +611,8 @@ class Config(BaseSettings):
             "parser_repair": ModelTask.PARSER_REPAIR,
             "note_correction": ModelTask.PARSER_REPAIR,  # Reuse parser repair task
             "reasoning": ModelTask.GENERATION,  # CoT reasoning uses generation task
-            "reflection": ModelTask.POST_VALIDATION,  # Self-reflection uses post-validation task
+            # Self-reflection uses post-validation task
+            "reflection": ModelTask.POST_VALIDATION,
         }
 
         task = agent_to_task.get(agent_type)
