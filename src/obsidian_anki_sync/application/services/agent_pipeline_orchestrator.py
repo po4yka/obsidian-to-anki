@@ -3,13 +3,12 @@
 import time
 from pathlib import Path
 
-
+from ...agents.slug_utils import generate_agent_slug_base
 from ...domain.entities.note import NoteMetadata, QAPair
 from ...domain.interfaces.llm_provider import ILLMProvider
 from ...infrastructure.cache.cache_strategy import AgentCacheStrategy
 from ...utils.logging import get_logger
 from ..services.retry_handler import RetryHandler
-from .slug_utils import generate_agent_slug_base
 
 logger = get_logger(__name__)
 
@@ -87,8 +86,7 @@ class AgentPipelineOrchestrator:
             result["stages"]["pre_validation"] = pre_val_result
 
             if not pre_val_result["success"]:
-                result["error"] = pre_val_result.get(
-                    "error", "Pre-validation failed")
+                result["error"] = pre_val_result.get("error", "Pre-validation failed")
                 return self._finalize_result(result, start_time)
 
             # Stage 2: Card Generation
@@ -113,8 +111,7 @@ class AgentPipelineOrchestrator:
             if result["success"]:
                 result["cards"] = post_val_result["cards"]
             else:
-                result["error"] = post_val_result.get(
-                    "error", "Post-validation failed")
+                result["error"] = post_val_result.get("error", "Post-validation failed")
 
         except Exception as e:
             result["error"] = str(e)
@@ -144,8 +141,7 @@ class AgentPipelineOrchestrator:
         Returns:
             Pre-validation result
         """
-        pre_validation_enabled = self.config.get(
-            "pre_validation_enabled", True)
+        pre_validation_enabled = self.config.get("pre_validation_enabled", True)
 
         if not pre_validation_enabled:
             return {
@@ -158,9 +154,7 @@ class AgentPipelineOrchestrator:
 
         # Basic validation logic
         is_valid = (
-            len(qa_pairs) > 0 and
-            metadata.topic and
-            len(metadata.language_tags) > 0
+            len(qa_pairs) > 0 and metadata.topic and len(metadata.language_tags) > 0
         )
 
         result = {
@@ -203,8 +197,7 @@ class AgentPipelineOrchestrator:
             cached_result = self.cache_strategy.get(cache_key)
 
             if cached_result:
-                logger.debug("using_cached_generation",
-                             correlation_id=correlation_id)
+                logger.debug("using_cached_generation", correlation_id=correlation_id)
                 return {
                     "success": True,
                     "cards": cached_result,
@@ -251,14 +244,14 @@ class AgentPipelineOrchestrator:
         Returns:
             Post-validation result
         """
+
         def validate_operation():
             return self._validate_cards(cards, metadata)
 
         # Use retry handler for post-validation
         retry_result = self.retry_handler.execute_with_retry(
             validate_operation,
-            context={"correlation_id": correlation_id,
-                     "stage": "post_validation"}
+            context={"correlation_id": correlation_id, "stage": "post_validation"},
         )
 
         if retry_result.success:
@@ -338,9 +331,12 @@ class AgentPipelineOrchestrator:
 
         return result
 
-    def _generate_correlation_id(self, metadata: NoteMetadata, start_time: float) -> str:
+    def _generate_correlation_id(
+        self, metadata: NoteMetadata, start_time: float
+    ) -> str:
         """Generate correlation ID for tracking."""
         import hashlib
+
         key = f"{metadata.id}:{int(start_time * 1000)}"
         return hashlib.sha256(key.encode()).hexdigest()[:12]
 
