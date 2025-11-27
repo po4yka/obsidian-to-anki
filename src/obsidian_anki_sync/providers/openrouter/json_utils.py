@@ -80,6 +80,7 @@ def clean_json_response(text: str, model: str) -> str:
         in_string = False
         escape_next = False
         last_valid_pos = 0
+        truncation_detected = False
 
         for i, char in enumerate(cleaned):
             if escape_next:
@@ -126,7 +127,8 @@ def clean_json_response(text: str, model: str) -> str:
                         # Only warn if we're in the last 10% of the text (likely truncation)
                         # or if there's very little text remaining
                         remaining_chars = len(cleaned) - i - 1
-                        is_near_end = remaining_chars < max(100, len(cleaned) * 0.1)
+                        is_near_end = remaining_chars < max(
+                            100, len(cleaned) * 0.1)
 
                         if is_near_end:
                             # Only log warning once per unique text (avoid duplicates)
@@ -143,18 +145,20 @@ def clean_json_response(text: str, model: str) -> str:
                                     note="Array closed before containing object near end of text - likely truncation",
                                 )
                                 warned_text_ids.add(warning_key)
+                            truncation_detected = True
                         # Don't break here - let repair handle it if needed
                 else:
                     last_valid_pos = i + 1
 
         # If we ended while still in a string or with unclosed braces/brackets, try to repair
-        if in_string or brace_count > 0 or bracket_count > 0:
+        if in_string or brace_count > 0 or bracket_count > 0 or truncation_detected:
             logger.warning(
                 "detected_truncated_json",
                 model=model,
                 in_string=in_string,
                 brace_count=brace_count,
                 bracket_count=bracket_count,
+                truncation_detected=truncation_detected,
                 original_length=len(text),
                 cleaned_length=len(cleaned),
             )
@@ -164,6 +168,65 @@ def clean_json_response(text: str, model: str) -> str:
             cleaned = repair_truncated_json(text_to_repair)
 
     return cleaned
+
+
+def repair_truncated_array(text: str) -> str:
+    """Attempt to repair JSON with prematurely closed arrays.
+
+    This handles cases where an array closes before its containing object,
+    which typically indicates response truncation.
+
+    Args:
+        text: JSON text with potential array truncation
+
+    Returns:
+        Repaired JSON text
+    """
+    if not text.strip() or not text.startswith("{"):
+        return text
+
+    # If text ends with ]" and we have unclosed objects, try to repair
+    if text.rstrip().endswith(']"'):
+        # Count braces and brackets to see if we need to add closing braces
+        brace_count = 0
+        bracket_count = 0
+        in_string = False
+        escape_next = False
+
+        for char in text:
+            if escape_next:
+                escape_next = False
+                continue
+            if char == "\\":
+                escape_next = True
+                continue
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if not in_string:
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                elif char == "[":
+                    bracket_count += 1
+                elif char == "]":
+                    bracket_count -= 1
+
+        # If we have unclosed braces but closed brackets, add closing braces
+        if brace_count > 0 and bracket_count == 0:
+            repaired = text.rstrip()
+            # Remove the closing ]" and add proper closing
+            if repaired.endswith(']"'):
+                repaired = repaired[:-2].rstrip()
+                # Add closing braces for any open objects
+                repaired += "}" * brace_count
+                repaired += ']"'
+                logger.debug("repaired_array_truncation", original_length=len(
+                    text), repaired_length=len(repaired))
+                return repaired
+
+    return text
 
 
 def repair_truncated_json(text: str) -> str:
@@ -177,6 +240,11 @@ def repair_truncated_json(text: str) -> str:
     """
     if not text.strip():
         return "{}"
+
+    # First try array-specific repair
+    repaired = repair_truncated_array(text)
+    if repaired != text:
+        return repaired
 
     repaired = text.rstrip()
 
@@ -248,7 +316,7 @@ def repair_truncated_json(text: str) -> str:
         colon_pos = repaired.find(":", last_key_pos)
         if colon_pos != -1:
             # Get everything after the colon
-            after_colon = repaired[colon_pos + 1 :].lstrip()
+            after_colon = repaired[colon_pos + 1:].lstrip()
 
             # Check if we have an incomplete string value
             if after_colon.startswith('"'):
@@ -294,7 +362,7 @@ def repair_truncated_json(text: str) -> str:
     # Handle incomplete array/object values
     # If we're in the middle of a value after a colon, we need to complete it
     if last_key_pos >= 0:
-        after_colon = repaired[last_key_pos + 1 :].lstrip()
+        after_colon = repaired[last_key_pos + 1:].lstrip()
         # If after colon is empty or incomplete, add a placeholder
         if not after_colon or (
             after_colon.startswith('"') and after_colon.count('"') == 1
@@ -360,5 +428,6 @@ def repair_truncated_json(text: str) -> str:
                     pass
 
         # Last resort: return minimal valid JSON
-        logger.warning("json_repair_failed_using_fallback", original_preview=text[:100])
+        logger.warning("json_repair_failed_using_fallback",
+                       original_preview=text[:100])
         return "{}"

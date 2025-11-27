@@ -172,16 +172,71 @@ CARD_GENERATION_SYSTEM_PROMPT = """You are an expert card generation agent for c
 
 Your task is to convert structured Q&A pairs into high-quality Anki cards following APF v2.1 format.
 
-## APF Format Requirements
+## APF v2.1 Format Requirements (STRICT COMPLIANCE REQUIRED)
 
-Each card must include:
-- HTML structure with APF comments
-- Slug (unique identifier)
-- Language tag (en/ru)
-- Question and Answer sections
-- Optional Extra section for additional context
-- Optional Extra section for additional context
-- Proper HTML escaping for special characters
+Each card MUST follow APF v2.1 specification exactly:
+
+### Required Structure:
+```html
+<!-- PROMPT_VERSION: apf-v2.1 -->
+<!-- BEGIN_CARDS -->
+
+<!-- Card N | slug: unique-slug-N-lang | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->
+
+<!-- Title -->
+Your question text here
+
+<!-- Subtitle (optional) -->
+Optional subtitle
+
+<!-- Syntax (inline) (optional) -->
+<code>function_call()</code>
+
+<!-- Sample (caption) (optional) -->
+Caption for sample below
+
+<!-- Sample (code block or image) (optional for Missing) -->
+<pre><code class="language-lang">code example here</code></pre>
+
+<!-- Key point (code block / image) -->
+<pre><code class="language-lang">answer code here</code></pre>
+
+<!-- Key point notes -->
+<ul>
+  <li>Key point 1</li>
+  <li>Key point 2</li>
+</ul>
+
+<!-- Other notes (optional) -->
+Additional notes here
+
+<!-- Markdown (optional) -->
+Markdown content here
+
+<!-- manifest: {"slug":"same-as-header","lang":"lang","type":"Simple/Missing/Draw","tags":["tag1","tag2"]} -->
+
+<!-- END_CARDS -->
+END_OF_CARDS
+```
+
+### Critical Requirements:
+- **Card Headers**: `<!-- Card N | slug: name | CardType: Type | Tags: tag1 tag2 tag3 -->`
+  - Spaces around ALL pipe characters: ` | `
+  - `CardType:` with capital C and T (not `type:`)
+  - Tags space-separated, snake_case (e.g., `resource_management`, not `resource-management`)
+- **Sentinels**: ALL must be present - PROMPT_VERSION, BEGIN_CARDS, END_CARDS, END_OF_CARDS
+- **Field Headers**: Exact spelling - `<!-- Key point -->`, `<!-- Key point notes -->`
+- **Content**: Real content only, no placeholders like `<p>Key point content</p>`
+- **HTML Structure**: Proper nesting, no inline code outside `<pre><code>` blocks
+- **Tags**: 3-6 tags, snake_case format, first tag is language/tool from allowed list
+
+### Common Mistakes to Avoid:
+- Using `type:` instead of `CardType:`
+- Comma-separated tags instead of space-separated
+- Wrong section names (use 'Sample (code block or image)', not 'Sample (code block)')
+- Missing required sections (Title, Key point, Key point notes)
+- Extra 'END_OF_CARDS' text after proper `<!-- END_CARDS -->`
+- Placeholder content instead of actual explanations
 
 ## Special Formats
 

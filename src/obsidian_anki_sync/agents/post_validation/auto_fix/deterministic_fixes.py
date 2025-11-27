@@ -376,7 +376,9 @@ class DeterministicFixer:
         fixed_tags = []
         for tag in tags:
             # Convert to lowercase, replace spaces/hyphens with underscores
-            fixed_tag = re.sub(r"[^a-z0-9_]", "_", tag.lower())
+            fixed_tag = tag.lower().replace("-", "_").replace(" ", "_")
+            # Remove any remaining invalid chars
+            fixed_tag = re.sub(r"[^a-z0-9_]", "", fixed_tag)
             fixed_tag = re.sub(r"_+", "_", fixed_tag).strip("_")
             if fixed_tag:
                 fixed_tags.append(fixed_tag)
@@ -619,7 +621,8 @@ class DeterministicFixer:
                 end_count = after_end.count("END_OF_CARDS")
                 if end_count > 1:
                     # Remove all END_OF_CARDS and add just one
-                    after_end_clean = after_end.replace("END_OF_CARDS", "").strip()
+                    after_end_clean = after_end.replace(
+                        "END_OF_CARDS", "").strip()
                     html = before_end + "<!-- END_CARDS -->\n" + after_end_clean
                     if after_end_clean:
                         html += "\n"

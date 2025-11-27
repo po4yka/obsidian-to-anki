@@ -1,5 +1,7 @@
 """Semantic validation for APF cards using LLM."""
 
+import re
+
 from ...models import NoteMetadata
 from ...providers.base import BaseLLMProvider
 from ...utils.logging import get_logger
@@ -8,6 +10,86 @@ from ..models import GeneratedCard, PostValidationResult
 from .prompts import SEMANTIC_VALIDATION_SYSTEM_PROMPT, build_semantic_prompt
 
 logger = get_logger(__name__)
+
+
+# Known false positive patterns that LLMs hallucinate
+# These are patterns where the LLM inverts or misremembers the correct rules
+FALSE_POSITIVE_PATTERNS = [
+    # LLM sometimes says CardType should be type, but CardType is correct per APF v2.1
+    r"CardType.*should.*be.*'?type'?",
+    r"'CardType'.*but.*requires.*'type'",
+    r"use.*'CardType:.*but.*APF.*requires.*'type:",
+    r"headers.*use.*'CardType.*but.*requires.*'type",
+    # Inverse: LLM might say type should be CardType when type is used (also wrong direction)
+    r"'type'.*should.*be.*'CardType'",
+]
+
+
+def _filter_false_positives(error_details: str) -> tuple[str, bool]:
+    """Filter out known LLM hallucination patterns from error details.
+
+    Args:
+        error_details: Error details string from LLM
+
+    Returns:
+        Tuple of (filtered error details, whether any false positives were removed)
+    """
+    if not error_details:
+        return error_details, False
+
+    original = error_details
+
+    # Split into separate error items if numbered
+    # Pattern matches "1) ...", "2) ...", etc.
+    error_items = re.split(r'(?=\d+\)\s)', error_details)
+    filtered_items = []
+    removed_any = False
+
+    for item in error_items:
+        item = item.strip()
+        if not item:
+            continue
+
+        is_false_positive = False
+        for pattern in FALSE_POSITIVE_PATTERNS:
+            if re.search(pattern, item, re.IGNORECASE):
+                is_false_positive = True
+                logger.debug(
+                    "filtered_false_positive_error",
+                    pattern=pattern,
+                    error_text=item[:100],
+                )
+                removed_any = True
+                break
+
+        if not is_false_positive:
+            filtered_items.append(item)
+
+    if not filtered_items:
+        # All errors were false positives
+        return "", removed_any
+
+    # Renumber remaining errors
+    if len(filtered_items) == 1:
+        # Single error, remove numbering
+        result = re.sub(r'^\d+\)\s*', '', filtered_items[0])
+    else:
+        # Multiple errors, renumber
+        result_parts = []
+        for i, item in enumerate(filtered_items, 1):
+            # Remove old numbering and add new
+            item_text = re.sub(r'^\d+\)\s*', '', item)
+            result_parts.append(f"{i}) {item_text}")
+        result = " ".join(result_parts)
+
+    if removed_any:
+        logger.info(
+            "false_positives_filtered",
+            original_errors=original[:200],
+            filtered_errors=result[:200] if result else "(all errors were false positives)",
+        )
+
+    return result, removed_any
 
 
 def semantic_validation(
@@ -51,6 +133,25 @@ def semantic_validation(
     error_type = result.get("error_type", "none")
     error_details = result.get("error_details", "")
     corrected_cards_data = result.get("corrected_cards")
+
+    # Filter out known false positive errors (LLM hallucinations)
+    if error_details and not is_valid:
+        filtered_errors, had_false_positives = _filter_false_positives(error_details)
+
+        if had_false_positives:
+            if not filtered_errors:
+                # All errors were false positives - mark as valid
+                logger.info(
+                    "validation_passed_after_false_positive_filter",
+                    original_error_type=error_type,
+                    original_errors=error_details[:200],
+                )
+                is_valid = True
+                error_type = "none"
+                error_details = ""
+            else:
+                # Some real errors remain
+                error_details = filtered_errors
 
     # Convert corrected cards if provided
     corrected_cards = None
