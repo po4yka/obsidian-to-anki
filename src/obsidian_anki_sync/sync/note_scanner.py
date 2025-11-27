@@ -6,6 +6,7 @@ Handles discovery, parsing, and processing of Obsidian notes.
 import random
 import time
 from collections import defaultdict
+from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +34,32 @@ if TYPE_CHECKING:
     from ..sync.progress import ProgressTracker
 
 logger = get_logger(__name__)
+
+
+class _ThreadSafeSlugView(Collection[str]):
+    """Lightweight, optionally locked view over a shared slug set."""
+
+    def __init__(self, slugs: set[str], lock: Any | None = None):
+        self._slugs = slugs
+        self._lock = lock
+
+    def __contains__(self, item: object) -> bool:  # pragma: no cover - trivial
+        if self._lock:
+            with self._lock:
+                return item in self._slugs
+        return item in self._slugs
+
+    def __iter__(self):  # pragma: no cover - trivial
+        if self._lock:
+            with self._lock:
+                return iter(self._slugs.copy())
+        return iter(self._slugs)
+
+    def __len__(self) -> int:  # pragma: no cover - trivial
+        if self._lock:
+            with self._lock:
+                return len(self._slugs)
+        return len(self._slugs)
 
 
 class NoteScanner:
@@ -181,13 +208,8 @@ class NoteScanner:
                 break
 
             try:
-                # Parse note
-                metadata, qa_pairs = parse_note(
-                    file_path, qa_extractor=qa_extractor)
-
-                # Read full note content if using agent system
-                note_content = ""
                 use_agents = getattr(self.config, "use_agent_system", False)
+                note_content: str | None = None
                 if use_agents:
                     try:
                         note_content = file_path.read_text(encoding="utf-8")
@@ -197,10 +219,15 @@ class NoteScanner:
                             file=relative_path,
                             error=str(e),
                         )
+                        note_content = None
 
-                logger.debug(
-                    "processing_note", file=relative_path, pairs=len(qa_pairs)
+                # Parse note using preloaded content when available to avoid extra I/O
+                metadata, qa_pairs = parse_note(
+                    file_path, qa_extractor=qa_extractor, content=note_content
                 )
+                note_content = note_content or ""
+
+                logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
                 # Generate cards for each Q/A pair and language
                 for qa_pair in qa_pairs:
@@ -272,8 +299,7 @@ class NoteScanner:
                                     f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
                                 )
 
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             consecutive_errors += 1
 
                             if self.progress:
@@ -414,9 +440,7 @@ class NoteScanner:
                 len(note_files),
             )
         else:
-            max_workers = min(
-                self.config.max_concurrent_generations, len(note_files)
-            )
+            max_workers = min(self.config.max_concurrent_generations, len(note_files))
 
         logger.info(
             "parallel_scan_started",
@@ -449,6 +473,7 @@ class NoteScanner:
                     relative_path,
                     shared_slugs,
                     qa_extractor,
+                    slugs_lock,
                 ): (file_path, relative_path)
                 for file_path, relative_path in note_files
             }
@@ -472,11 +497,9 @@ class NoteScanner:
                     with stats_lock:
                         notes_processed += 1
                         if result_info["success"]:
-                            self.stats["processed"] = self.stats.get(
-                                "processed", 0) + 1
+                            self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if result_info["error_type"]:
                                 error_by_type[result_info["error_type"]] += 1
                                 if len(error_samples[result_info["error_type"]]) < 3:
@@ -522,8 +545,7 @@ class NoteScanner:
                         percent=percent,
                         elapsed_seconds=round(elapsed_time, 1),
                         avg_seconds_per_note=round(avg_time_per_note, 2),
-                        estimated_remaining_seconds=round(
-                            estimated_remaining, 1),
+                        estimated_remaining_seconds=round(estimated_remaining, 1),
                         cards_generated=len(obsidian_cards),
                         active_workers=max_workers,
                     )
@@ -543,6 +565,7 @@ class NoteScanner:
         relative_path: str,
         existing_slugs: set[str],
         qa_extractor: Any = None,
+        slug_lock: Any | None = None,
     ) -> tuple[dict[str, Card], set[str], dict[str, Any]]:
         """Process a single note file with retry logic for transient errors.
 
@@ -564,7 +587,7 @@ class NoteScanner:
         for attempt in range(max_retries + 1):
             try:
                 return self.process_note(
-                    file_path, relative_path, existing_slugs, qa_extractor
+                    file_path, relative_path, existing_slugs, qa_extractor, slug_lock
                 )
             except Exception as e:
                 last_error = e
@@ -604,6 +627,7 @@ class NoteScanner:
         relative_path: str,
         existing_slugs: set[str],
         qa_extractor: Any = None,
+        slug_lock: Any | None = None,
     ) -> tuple[dict[str, Card], set[str], dict[str, Any]]:
         """Process a single note file and generate cards.
 
@@ -655,7 +679,10 @@ class NoteScanner:
 
             # Parse note
             metadata, qa_pairs = parse_note(
-                file_path, qa_extractor=qa_extractor)
+                file_path, qa_extractor=qa_extractor, content=note_content or None
+            )
+
+            slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
 
             # Generate cards for each Q/A pair and language
             for qa_pair in qa_pairs:
@@ -678,7 +705,7 @@ class NoteScanner:
                             metadata=metadata,
                             relative_path=relative_path,
                             lang=lang,
-                            existing_slugs=existing_slugs.copy(),
+                            existing_slugs=slug_view,
                             note_content=note_content,
                             all_qa_pairs=qa_pairs,
                         )
