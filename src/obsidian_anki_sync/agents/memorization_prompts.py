@@ -54,6 +54,11 @@ Your task is to evaluate whether generated flashcards are effective for long-ter
 - **Bad**: Tests trivial or purely academic details
 - **Why**: Practical knowledge is more motivating and retained longer
 
+### 9. Cloze Effectiveness (if applicable)
+- **Good**: Deletion hides the key fact, context remains clear
+- **Bad**: Deletion hides too much context or trivial words
+- **Why**: Context is needed to trigger the correct memory
+
 ## Response Format
 
 Return structured JSON with:
@@ -367,7 +372,9 @@ Back: Many languages including C, C++, Java, JavaScript, C#, etc.
 ❌ **Orphan Cards**: Cards that reference "previous card" → Make self-contained
 ❌ **Trivia Cards**: Testing irrelevant details → Focus on practical knowledge
 ❌ **Hint Cards**: Front gives away answer → Remove hints
+❌ **Hint Cards**: Front gives away answer → Remove hints
 ❌ **Wall of Text**: No structure or examples → Add formatting and examples
+❌ **Bad Cloze**: `{{c1::The}} capital of France is Paris` → Delete key term instead
 
 ## Best Practices to Reward
 

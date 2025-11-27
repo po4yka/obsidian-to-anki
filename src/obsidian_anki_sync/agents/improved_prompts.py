@@ -39,7 +39,11 @@ Your task is to validate note structure, formatting, and frontmatter before card
    - Answers provide adequate detail
    - No placeholder text (e.g., "TODO", "TBD")
 
-5. **Language Consistency**: Language tags match content
+5. **Special Features**: Check for Cloze and MathJax
+   - Cloze: Valid syntax `{{c1::answer}}` (if used)
+   - MathJax: Valid syntax `\(...\)` or `\[...\]` (if used)
+
+6. **Language Consistency**: Language tags match content
    - If 'en' in language_tags, English content exists
    - If 'ru' in language_tags, Russian content exists
 
@@ -176,7 +180,21 @@ Each card must include:
 - Language tag (en/ru)
 - Question and Answer sections
 - Optional Extra section for additional context
+- Optional Extra section for additional context
 - Proper HTML escaping for special characters
+
+## Special Formats
+
+### Cloze Deletions
+- Use standard Anki syntax: `{{c1::hidden text}}`
+- Can use multiple deletions: `{{c1::Paris}} is the capital of {{c2::France}}`
+- Can have hints: `{{c1::hidden text::hint}}`
+- **Important**: If generating a Cloze card, set `CardType: Cloze` in the metadata comment.
+
+### MathJax
+- Use `\( ... \)` for inline math
+- Use `\[ ... \]` for display math
+- Example: `The area of a circle is \( A = \pi r^2 \)`
 
 ## Card Generation Principles
 
@@ -191,9 +209,11 @@ Each card must include:
 Return a structured JSON with:
 - cards: list of card objects with:
   - card_index: integer index
+  - card_index: integer index
   - slug: unique identifier (format: "topic-keyword-index-lang")
   - lang: "en" or "ru"
   - apf_html: complete APF HTML
+  - card_type: "Basic" or "Cloze" (optional, default Basic)
   - confidence: 0.0-1.0 for this card
 - total_generated: count of cards
 - generation_notes: any relevant notes
@@ -311,6 +331,12 @@ Output:
 ❌ **Don't**: Mix languages within a single card
 ✓ **Do**: Create separate cards for each language
 
+❌ **Don't**: Use `$` for MathJax
+✓ **Do**: Use `\( ... \)` and `\[ ... \]`
+
+❌ **Don't**: Forget `CardType: Cloze` for cloze cards
+✓ **Do**: Update metadata when using `{{c1::...}}`
+
 ## Instructions
 
 - Generate ALL cards for all Q&A pairs provided
@@ -339,6 +365,8 @@ Your task is to validate generated cards for quality, syntax correctness, and ad
    - Required comments (BEGIN_CARDS, Card metadata, END_CARDS)
    - Valid Front/Back/Extra sections
    - Proper HTML escaping
+   - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Cloze
+   - **MathJax**: Valid `\(...\)` or `\[...\]` syntax
 
 2. **Factual Accuracy**
    - Answer matches the question

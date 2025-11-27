@@ -12,6 +12,7 @@ from .nodes import (
     note_correction_node,
     post_validation_node,
     pre_validation_node,
+    split_validation_node,
 )
 from .retry_policies import TRANSIENT_RETRY_POLICY, VALIDATION_RETRY_POLICY
 from .state import PipelineState
@@ -113,6 +114,12 @@ class WorkflowBuilder:
         )
 
         workflow.add_node(
+            "split_validation",
+            split_validation_node,
+            retry=VALIDATION_RETRY_POLICY,
+        )
+
+        workflow.add_node(
             "generation",
             generation_node,
             retry=TRANSIENT_RETRY_POLICY,
@@ -159,8 +166,11 @@ class WorkflowBuilder:
             },
         )
 
-        # Card splitting always goes to generation
-        workflow.add_edge("card_splitting", "generation")
+        # Card splitting goes to split validation
+        workflow.add_edge("card_splitting", "split_validation")
+
+        # Split validation goes to generation
+        workflow.add_edge("split_validation", "generation")
 
         workflow.add_edge("generation", "post_validation")
 

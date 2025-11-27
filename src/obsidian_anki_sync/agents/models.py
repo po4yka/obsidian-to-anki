@@ -399,3 +399,19 @@ class AgentPipelineResult(BaseModel):
     total_time: float = Field(ge=0.0)
     retry_count: int = Field(
         ge=0, description="Number of post-validation retries")
+
+
+class SplitValidationResult(BaseModel):
+    """Result from split validator agent.
+
+    Validates whether the proposed card split is necessary and optimal.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    is_valid: bool
+    validation_score: float = Field(default=0.5, ge=0.0, le=1.0)
+    feedback: str = ""
+    suggested_modifications: list[str] = Field(default_factory=list)
+    validation_time: float = 0.0
+
