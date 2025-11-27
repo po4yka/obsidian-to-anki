@@ -49,7 +49,8 @@ class PipelineState(TypedDict):
     card_splitting: dict | None  # Serialized CardSplittingResult
     generation: dict | None  # Serialized GenerationResult
     linter_valid: bool  # Did cards pass deterministic APF linting?
-    linter_results: list[dict]  # Per-card linter results: [{slug, is_valid, errors, warnings}]
+    # Per-card linter results: [{slug, is_valid, errors, warnings}]
+    linter_results: list[dict]
     post_validation: dict | None  # Serialized PostValidationResult
     context_enrichment: dict | None  # Serialized ContextEnrichmentResult
     memorization_quality: dict | None  # Serialized MemorizationQualityResult
@@ -140,3 +141,10 @@ class PipelineState(TypedDict):
     max_revisions: int  # Maximum revisions allowed per stage
     # Tracks revisions per stage: {stage_name: count}
     stage_revision_counts: dict[str, int]
+
+    # Domain Detection and Smart Skipping
+    detected_domain: str | None  # Detected content domain for specialized reflection
+    reflection_skipped: bool  # Whether reflection was skipped for this content
+    reflection_skip_reason: str | None  # Reason for skipping reflection
+    # Selected revision strategy (light_edit, moderate_revision, major_rewrite)
+    revision_strategy: str | None

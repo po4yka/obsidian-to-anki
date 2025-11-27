@@ -9,6 +9,7 @@ import json
 import re
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 from ..apf.html_generator import HTMLTemplateGenerator
 from ..models import Manifest, NoteMetadata, QAPair
@@ -30,6 +31,14 @@ from .metrics import record_operation_metric
 from .models import GeneratedCard, GenerationResult
 
 logger = get_logger(__name__)
+
+
+class ParsedCardStructure(NamedTuple):
+    """Parsed structure of an English APF card for translation."""
+    title: str
+    key_point_code: str | None
+    key_point_notes: list[str]
+    other_notes: list[str] | None
 
 
 class GeneratorAgent:
@@ -94,11 +103,38 @@ class GeneratorAgent:
         )
 
         generated_cards: list[GeneratedCard] = []
+        # card_index -> parsed structure
+        english_structures: dict[int, ParsedCardStructure] = {}
 
-        # Generate cards for each Q/A pair in each language
+        # Generate English cards first to establish canonical structure
+        for qa_pair in qa_pairs:
+            if "en" in metadata.language_tags:
+                # Create manifest for English card
+                manifest_en = self._create_manifest(
+                    qa_pair=qa_pair,
+                    metadata=metadata,
+                    slug_base=slug_base,
+                    lang="en",
+                )
+
+                # Generate English APF card
+                card_en = self._generate_single_card(
+                    qa_pair=qa_pair, metadata=metadata, manifest=manifest_en, lang="en"
+                )
+                generated_cards.append(card_en)
+
+                # Parse and cache the English structure for translation
+                english_structures[qa_pair.card_index] = self._parse_card_structure(
+                    card_en.apf_html)
+
+        # Generate cards in other languages using English structure as template
         for qa_pair in qa_pairs:
             for lang in metadata.language_tags:
-                # Create manifest for this card
+                if lang == "en":
+                    # Already generated English above
+                    continue
+
+                # Create manifest for this language
                 manifest = self._create_manifest(
                     qa_pair=qa_pair,
                     metadata=metadata,
@@ -106,10 +142,28 @@ class GeneratorAgent:
                     lang=lang,
                 )
 
-                # Generate APF card
-                card = self._generate_single_card(
-                    qa_pair=qa_pair, metadata=metadata, manifest=manifest, lang=lang
-                )
+                # Get the canonical English structure
+                english_structure = english_structures.get(qa_pair.card_index)
+                if not english_structure:
+                    logger.warning(
+                        "no_english_structure_for_translation",
+                        card_index=qa_pair.card_index,
+                        lang=lang,
+                        slug=manifest.slug,
+                    )
+                    # Fallback to regular generation if no English structure available
+                    card = self._generate_single_card(
+                        qa_pair=qa_pair, metadata=metadata, manifest=manifest, lang=lang
+                    )
+                else:
+                    # Generate translated card using English structure
+                    card = self._generate_translated_card(
+                        qa_pair=qa_pair,
+                        metadata=metadata,
+                        manifest=manifest,
+                        english_structure=english_structure,
+                        lang=lang,
+                    )
 
                 generated_cards.append(card)
 
@@ -668,6 +722,416 @@ Now generate the card following this structure:
                 tags.append("general")
 
         return tags[:6]  # Max 6 tags
+
+    def _parse_card_structure(self, apf_html: str) -> ParsedCardStructure:
+        """Parse the structure of an English APF card for translation.
+
+        Extracts the key components that define the card's logical structure:
+        - Title (translated)
+        - Key point code block (preserved as-is)
+        - Key point notes (translated)
+        - Other notes (translated)
+
+        Args:
+            apf_html: The complete APF HTML content
+
+        Returns:
+            ParsedCardStructure with the extracted components
+        """
+        # Extract title
+        title_match = re.search(
+            r'<!-- Title -->\s*\n(.*?)\n\s*\n', apf_html, re.DOTALL)
+        title = title_match.group(1).strip() if title_match else ""
+
+        # Extract key point code block (preserve exactly)
+        key_point_code = None
+        key_point_match = re.search(
+            r'<!-- Key point \(code block / image\) -->\s*\n(.*?)\n\s*\n<!-- Key point notes -->',
+            apf_html,
+            re.DOTALL
+        )
+        if key_point_match:
+            code_block = key_point_match.group(1).strip()
+            # Only extract if it's actually a code block
+            if code_block.startswith('<pre><code') and code_block.endswith('</code></pre>'):
+                key_point_code = code_block
+
+        # Extract key point notes
+        notes_match = re.search(
+            r'<!-- Key point notes -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
+            apf_html,
+            re.DOTALL
+        )
+        key_point_notes = []
+        if notes_match:
+            ul_content = notes_match.group(1)
+            # Extract individual list items
+            li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+            key_point_notes = [li.strip() for li in li_matches]
+
+        # Extract other notes (optional)
+        other_notes = None
+        other_match = re.search(
+            r'<!-- Other notes.*? -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
+            apf_html,
+            re.DOTALL
+        )
+        if other_match:
+            ul_content = other_match.group(1)
+            li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+            other_notes = [li.strip() for li in li_matches]
+
+        return ParsedCardStructure(
+            title=title,
+            key_point_code=key_point_code,
+            key_point_notes=key_point_notes,
+            other_notes=other_notes,
+        )
+
+    def _generate_translated_card(
+        self,
+        qa_pair: QAPair,
+        metadata: NoteMetadata,
+        manifest: Manifest,
+        english_structure: ParsedCardStructure,
+        lang: str,
+    ) -> GeneratedCard:
+        """Generate a translated card using the canonical English structure.
+
+        Args:
+            qa_pair: Q/A pair
+            metadata: Note metadata
+            manifest: Card manifest for the target language
+            english_structure: Parsed structure from the English card
+            lang: Target language code
+
+        Returns:
+            GeneratedCard with translated content
+        """
+        card_start_time = time.time()
+
+        # Get the localized question and answer
+        question = qa_pair.question_en if lang == "en" else qa_pair.question_ru
+        answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
+
+        # Validate content exists
+        if not question or not question.strip():
+            raise ValueError(
+                f"Empty question for language '{lang}' in card {qa_pair.card_index}")
+        if not answer or not answer.strip():
+            raise ValueError(
+                f"Empty answer for language '{lang}' in card {qa_pair.card_index}")
+
+        # Build translation prompt using English structure
+        user_prompt = self._build_translation_prompt(
+            question=question,
+            answer=answer,
+            english_structure=english_structure,
+            metadata=metadata,
+            manifest=manifest,
+            lang=lang,
+        )
+
+        # Estimate token count
+        total_input_chars = len(user_prompt) + len(self.system_prompt)
+        estimated_tokens = total_input_chars // 4
+
+        context_limits = {
+            "qwen3:8b": 8192,
+            "qwen3:14b": 8192,
+            "qwen3:32b": 32768,
+            "llama3:8b": 8192,
+            "llama3:70b": 8192,
+        }
+        model_limit = context_limits.get(self.model, 8192)
+        utilization_pct = (estimated_tokens / model_limit) * 100
+
+        logger.info(
+            "generating_translated_card",
+            model=self.model,
+            slug=manifest.slug,
+            card_index=qa_pair.card_index,
+            lang=lang,
+            prompt_length=len(user_prompt),
+            system_length=len(self.system_prompt),
+            estimated_tokens=estimated_tokens,
+            context_limit=model_limit,
+            context_utilization_pct=round(utilization_pct, 1),
+        )
+
+        if utilization_pct > 80:
+            logger.warning(
+                "high_context_utilization_translation",
+                slug=manifest.slug,
+                utilization_pct=round(utilization_pct, 1),
+                estimated_tokens=estimated_tokens,
+                context_limit=model_limit,
+            )
+
+        # Generate translated card with retry logic
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                llm_start_time = time.time()
+
+                logger.info(
+                    "llm_translation_attempt",
+                    slug=manifest.slug,
+                    attempt=attempt,
+                    max_attempts=max_retries,
+                    model=self.model,
+                )
+
+                result = self.ollama_client.generate(
+                    model=self.model,
+                    prompt=user_prompt,
+                    system=self.system_prompt,
+                    temperature=self.temperature,
+                )
+
+                llm_duration = time.time() - llm_start_time
+                translated_html = result.get("response", "")
+
+                if not translated_html or not translated_html.strip():
+                    raise ValueError("LLM returned empty translation response")
+
+                # Assemble final APF HTML using English structure + translated text
+                final_apf_html = self._assemble_translated_card_html(
+                    english_structure=english_structure,
+                    translated_html=translated_html,
+                    metadata=metadata,
+                    manifest=manifest,
+                )
+
+                # Post-process the assembled HTML
+                post_process_start = time.time()
+                final_apf_html = self._post_process_apf(
+                    final_apf_html, metadata, manifest)
+                post_process_duration = time.time() - post_process_start
+
+                confidence = 0.9
+                card_duration = time.time() - card_start_time
+
+                logger.info(
+                    "translated_card_generated",
+                    slug=manifest.slug,
+                    card_index=qa_pair.card_index,
+                    lang=lang,
+                    response_length=len(final_apf_html),
+                    llm_duration=round(llm_duration, 2),
+                    post_process_duration=round(post_process_duration, 3),
+                    total_duration=round(card_duration, 2),
+                    attempts_needed=attempt,
+                )
+
+                # Record metrics
+                token_usage = result.get("_token_usage", {})
+                prompt_tokens = token_usage.get("prompt_tokens", 0)
+                completion_tokens = token_usage.get("completion_tokens", 0)
+                total_tokens = token_usage.get("total_tokens", 0)
+
+                record_operation_metric(
+                    operation="card_translation",
+                    success=True,
+                    duration=card_duration,
+                    llm_duration=llm_duration,
+                    tokens=total_tokens,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    retried=(attempt > 1),
+                )
+
+                content_hash = compute_content_hash(qa_pair, metadata, lang)
+
+                return GeneratedCard(
+                    card_index=qa_pair.card_index,
+                    slug=manifest.slug,
+                    lang=lang,
+                    apf_html=final_apf_html,
+                    confidence=confidence,
+                    content_hash=content_hash,
+                )
+
+            except Exception as e:
+                llm_duration = time.time() - llm_start_time
+
+                # Categorize and handle errors
+                llm_error = categorize_llm_error(error=e, model=self.model)
+                log_llm_error(llm_error, slug=manifest.slug,
+                              lang=lang, attempt=attempt)
+
+                if attempt == max_retries:
+                    # Record failure metrics
+                    record_operation_metric(
+                        operation="card_translation",
+                        success=False,
+                        duration=time.time() - card_start_time,
+                        retried=(attempt > 1),
+                        error_type=llm_error.error_type.value,
+                    )
+                    raise llm_error from e
+
+                # Continue to next attempt
+
+        # Should never reach here
+        raise RuntimeError(
+            f"Failed to generate translated card after {max_retries} attempts")
+
+    def _build_translation_prompt(
+        self,
+        question: str,
+        answer: str,
+        english_structure: ParsedCardStructure,
+        metadata: NoteMetadata,
+        manifest: Manifest,
+        lang: str,
+    ) -> str:
+        """Build prompt for translating card content while preserving structure.
+
+        Args:
+            question: Localized question text
+            answer: Localized answer text
+            english_structure: Parsed English card structure
+            manifest: Card manifest
+            lang: Target language
+
+        Returns:
+            Translation prompt
+        """
+        ref_link = f"[[{manifest.source_path}#{manifest.source_anchor}]]"
+
+        # Detect code language
+        detected_lang = self._detect_code_language(answer)
+        code_lang = (
+            detected_lang
+            if detected_lang != "text"
+            else self._code_language_hint(metadata)
+        )
+
+        # Use same tags as English card
+        suggested_tags = self._generate_tags(metadata, "en")
+
+        prompt = f"""Translate the TEXT CONTENT of an English APF card to {lang.upper()}, preserving the EXACT structure and code blocks.
+
+English Card Structure:
+- Title: "{english_structure.title}"
+- Key Point Notes: {json.dumps(english_structure.key_point_notes, ensure_ascii=False)}
+{f"- Other Notes: {json.dumps(english_structure.other_notes, ensure_ascii=False)}" if english_structure.other_notes else ""}
+
+Localized Content:
+- Question: {question}
+- Answer: {answer}
+
+CRITICAL REQUIREMENTS:
+- PRESERVE the exact same card structure and logic
+- TRANSLATE ONLY the text content (titles, bullet points)
+- KEEP ALL code blocks IDENTICAL (do not translate code)
+- Maintain the same number of bullet points with same logical meaning
+- Do not add or remove information - only translate existing content
+
+Output ONLY the translated text sections in JSON format:
+
+{{
+  "title": "translated title",
+  "key_point_notes": ["translated bullet 1", "translated bullet 2", ...],
+  "other_notes": ["translated other note 1", ...]  // or null if no other notes
+}}
+
+Translated content:"""
+
+        return prompt
+
+    def _assemble_translated_card_html(
+        self,
+        english_structure: ParsedCardStructure,
+        translated_html: str,
+        metadata: NoteMetadata,
+        manifest: Manifest,
+    ) -> str:
+        """Assemble the final APF HTML using English structure + translated text.
+
+        Args:
+            english_structure: Parsed English card structure
+            translated_html: JSON with translated text sections
+            manifest: Card manifest
+
+        Returns:
+            Complete APF HTML
+        """
+        try:
+            # Parse the translated JSON
+            translated_data = json.loads(translated_html.strip())
+
+            title = translated_data.get("title", english_structure.title)
+            key_point_notes = translated_data.get(
+                "key_point_notes", english_structure.key_point_notes)
+            other_notes = translated_data.get(
+                "other_notes", english_structure.other_notes)
+
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(
+                "translation_json_parse_failed",
+                error=str(e),
+                slug=manifest.slug,
+                lang=manifest.lang,
+                falling_back_to_english=True,
+            )
+            # Fallback to English structure if JSON parsing fails
+            title = english_structure.title
+            key_point_notes = english_structure.key_point_notes
+            other_notes = english_structure.other_notes
+
+        # Build the APF HTML using the standard template structure
+        tags_str = " ".join(self._generate_tags(metadata, manifest.lang))
+
+        html_parts = [
+            f"<!-- Card {manifest.card_index} | slug: {manifest.slug} | CardType: Simple | Tags: {tags_str} -->",
+            "",
+            "<!-- Title -->",
+            title,
+            "",
+            "<!-- Key point (code block / image) -->",
+        ]
+
+        if english_structure.key_point_code:
+            html_parts.append(english_structure.key_point_code)
+        html_parts.append("")
+
+        # Key point notes
+        html_parts.extend([
+            "<!-- Key point notes -->",
+            "<ul>",
+        ])
+        for note in key_point_notes:
+            html_parts.append(f"  <li>{note}</li>")
+        html_parts.extend([
+            "</ul>",
+            "",
+        ])
+
+        # Other notes (if present)
+        if other_notes:
+            html_parts.extend([
+                "<!-- Other notes -->",
+                "<ul>",
+            ])
+            for note in other_notes:
+                html_parts.append(f"  <li>{note}</li>")
+            html_parts.extend([
+                "</ul>",
+                "",
+            ])
+
+        # Manifest
+        manifest_dict = {
+            "slug": manifest.slug,
+            "lang": manifest.lang,
+            "type": "Simple",
+            "tags": self._generate_tags(metadata, manifest.lang),
+        }
+        html_parts.append(f"<!-- manifest: {json.dumps(manifest_dict)} -->")
+
+        return "\n".join(html_parts)
 
     def _detect_truncation(self, html: str) -> list[str]:
         """Detect if a response appears to be truncated.

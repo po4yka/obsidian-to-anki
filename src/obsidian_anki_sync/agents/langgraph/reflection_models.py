@@ -266,3 +266,33 @@ class RevisionOutput(BaseModel):
         default=False,
         description="Whether another revision pass is recommended",
     )
+
+
+class RevisionDecision(BaseModel):
+    """Decision model for determining revision strategy and prioritization."""
+
+    action: str = Field(
+        description="Revision action to take: 'skip', 'light_edit', 'moderate_revision', 'major_rewrite'"
+    )
+    priority_issues: list[str] = Field(
+        default_factory=list,
+        description="Top priority issues to address first (by issue type)"
+    )
+    preserve_elements: list[str] = Field(
+        default_factory=list,
+        description="Elements that should not be changed during revision"
+    )
+    estimated_improvement: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Estimated improvement in quality score (0.0-1.0)"
+    )
+    cost_benefit_score: float = Field(
+        default=0.0,
+        description="Cost-benefit analysis score (higher = better ROI)"
+    )
+    reasoning: str = Field(
+        default="",
+        description="Explanation of why this revision strategy was chosen"
+    )

@@ -235,6 +235,15 @@ class PostValidatorAgent:
                                 cards_fixed=len(fixed_cards))
                     return fixed_cards
 
+            elif error_classification == "bilingual_consistency":
+                # Bilingual consistency issues - use LLM to fix RU cards based on EN structure
+                logger.debug("auto_fix_bilingual_with_llm")
+                fixed_cards = self._llm_based_fix(cards, error_details)
+                if fixed_cards:
+                    logger.info("auto_fix_bilingual_llm_success",
+                                cards_fixed=len(fixed_cards))
+                    return fixed_cards
+
             # Fallback: Progressive recovery strategy for unclassified or complex errors
             logger.debug("auto_fix_fallback_progressive_recovery")
 
@@ -331,6 +340,19 @@ class PostValidatorAgent:
 
         if any(indicator in error_details for indicator in structure_indicators):
             return "template_structure"
+
+        # Bilingual consistency issues (EN/RU structural mismatches)
+        bilingual_indicators = [
+            "Key point notes count mismatch",
+            "Other notes count mismatch",
+            "Card type mismatch",
+            "Code block presence mismatch",
+            "Preference statement mismatch",
+            "bilingual_consistency"
+        ]
+
+        if any(indicator in error_details for indicator in bilingual_indicators):
+            return "bilingual_consistency"
 
         # Template content issues (placeholders, wrong section names)
         content_indicators = [

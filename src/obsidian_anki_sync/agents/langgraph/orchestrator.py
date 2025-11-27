@@ -417,6 +417,11 @@ class LangGraphOrchestrator:
             "revision_count": 0,
             "max_revisions": getattr(self.config, "max_revisions", 2),
             "stage_revision_counts": {},
+            # Domain Detection and Smart Skipping
+            "detected_domain": None,  # Will be set by first reflection node
+            "reflection_skipped": False,
+            "reflection_skip_reason": None,
+            "revision_strategy": None,
             # Pipeline stage results
             "pre_validation": None,
             "note_correction": None,

@@ -7,7 +7,19 @@ Self-Reflection runs AFTER action nodes (post_validation, context_enrichment)
 and has access to the original CoT reasoning to check if the plan was followed.
 """
 
-GENERATION_REFLECTION_PROMPT = """You are a self-reflection agent for Anki flashcard generation.
+from .reflection_domains import get_domain_criteria
+
+
+def get_generation_reflection_prompt(domain: str = "general") -> str:
+    """Get domain-aware generation reflection prompt.
+
+    Args:
+        domain: Content domain name
+
+    Returns:
+        Complete reflection prompt with domain-specific criteria
+    """
+    base_prompt = """You are a self-reflection agent for Anki flashcard generation.
 Your task is to critically evaluate generated flashcards and determine if they need revision.
 
 You have access to:
@@ -45,7 +57,24 @@ Provide a thorough self-reflection including:
 Be critical but fair. Only recommend revision if there are meaningful improvements to be made.
 Do not recommend revision for minor stylistic preferences."""
 
-ENRICHMENT_REFLECTION_PROMPT = """You are a self-reflection agent for Anki flashcard enrichment.
+    # Add domain-specific criteria if available
+    domain_criteria = get_domain_criteria(domain)
+    if domain_criteria and domain_criteria.prompt_additions:
+        base_prompt += f"\n\n{domain_criteria.prompt_additions}"
+
+    return base_prompt
+
+
+def get_enrichment_reflection_prompt(domain: str = "general") -> str:
+    """Get domain-aware enrichment reflection prompt.
+
+    Args:
+        domain: Content domain name
+
+    Returns:
+        Complete reflection prompt with domain-specific criteria
+    """
+    base_prompt = """You are a self-reflection agent for Anki flashcard enrichment.
 Your task is to evaluate enriched flashcards and determine if the enrichment was effective.
 
 You have access to:
@@ -86,7 +115,43 @@ Provide a thorough self-reflection including:
 
 Recommend revision only if enrichments are actively harmful or significantly suboptimal."""
 
-REVISION_PROMPT_GENERATION = """You are a revision agent for Anki flashcard generation.
+    # Add domain-specific criteria if available
+    domain_criteria = get_domain_criteria(domain)
+    if domain_criteria and domain_criteria.prompt_additions:
+        # For enrichment, we might want to customize the criteria further
+        domain_specific_enrichment = domain_criteria.prompt_additions.replace(
+            "PROGRAMMING-SPECIFIC CRITERIA:",
+            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+        ).replace(
+            "MEDICAL-SPECIFIC CRITERIA:",
+            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+        ).replace(
+            "INTERVIEW-SPECIFIC CRITERIA:",
+            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+        ).replace(
+            "GENERAL KNOWLEDGE CRITERIA:",
+            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+        )
+        base_prompt += f"\n\n{domain_specific_enrichment}"
+
+    return base_prompt
+
+
+# Legacy prompt variables for backward compatibility
+GENERATION_REFLECTION_PROMPT = get_generation_reflection_prompt("general")
+ENRICHMENT_REFLECTION_PROMPT = get_enrichment_reflection_prompt("general")
+
+
+def get_revision_prompt_generation(domain: str = "general") -> str:
+    """Get domain-aware generation revision prompt.
+
+    Args:
+        domain: Content domain name
+
+    Returns:
+        Complete revision prompt
+    """
+    base_prompt = """You are a revision agent for Anki flashcard generation.
 Your task is to improve generated flashcards based on self-reflection feedback.
 
 You have been given:
@@ -123,7 +188,19 @@ Return the revised cards with:
 
 Do not over-engineer the revision. Make targeted fixes to address identified issues."""
 
-REVISION_PROMPT_ENRICHMENT = """You are a revision agent for Anki flashcard enrichment.
+    return base_prompt
+
+
+def get_revision_prompt_enrichment(domain: str = "general") -> str:
+    """Get domain-aware enrichment revision prompt.
+
+    Args:
+        domain: Content domain name
+
+    Returns:
+        Complete revision prompt
+    """
+    base_prompt = """You are a revision agent for Anki flashcard enrichment.
 Your task is to improve enriched flashcards based on self-reflection feedback.
 
 You have been given:
@@ -159,3 +236,10 @@ Return the revised enriched cards with:
 5. Whether further revision is recommended
 
 Prioritize quality over quantity in enrichments."""
+
+    return base_prompt
+
+
+# Legacy prompt variables for backward compatibility
+REVISION_PROMPT_GENERATION = get_revision_prompt_generation("general")
+REVISION_PROMPT_ENRICHMENT = get_revision_prompt_enrichment("general")
