@@ -696,7 +696,7 @@ def export(
                             generated_cards = result.generation.cards
                             # Convert GeneratedCard to Card using orchestrator's method
                             converted_cards = orchestrator.convert_to_cards(
-                                generated_cards, metadata, qa_pairs
+                                generated_cards, metadata, qa_pairs, note_path
                             )
                             cards.extend(converted_cards)
                             console.print(

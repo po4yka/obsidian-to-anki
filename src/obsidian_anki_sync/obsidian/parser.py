@@ -336,18 +336,6 @@ def parse_note(
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
 
-    # Check for topic mismatch (directory name vs frontmatter topic)
-    # Strip numeric prefix from directory name (e.g., "40-Android" -> "Android")
-    dir_name = resolved_path.parent.name
-    expected_topic = re.sub(r"^\d+-", "", dir_name)  # Strip "40-" from "40-Android"
-    if metadata.topic.lower() != expected_topic.lower():
-        logger.warning(
-            "topic_mismatch",
-            file=str(file_path),
-            frontmatter_topic=metadata.topic,
-            directory_topic=expected_topic,
-        )
-
     # Validate note structure
     enforce_validation = _get_enforce_language_validation()
     if enforce_validation or not tolerant_parsing:
@@ -625,29 +613,19 @@ def _parse_inline_array(array_content: str) -> list[str]:
 
 def _detect_content_corruption(content: str, file_path: Path) -> None:
     """
-    Detect common content corruption patterns and warn about them.
+    Detect actual content corruption patterns (binary garbage, encoding issues).
 
-    This helps identify files that may have been corrupted during editing,
-    copying, or other external processes.
+    This checks for genuine corruption indicators like control characters and
+    encoding errors, while allowing legitimate markdown/code syntax like:
+    - # (markdown headers)
+    - Numbers (0-9)
+    - ASCII art characters (─, ═, │, etc.)
+    - HTML/comparison operators (<, >)
+    - Regex/math symbols (^)
+    - Em dashes (—)
     """
-    import re
-
-    # Pattern 1: Repeated suspicious characters (like "a1a1a1a1" or "111")
-    # Exclude spaces, punctuation, and common formatting characters
-    repeated_chars = re.findall(
-        r"([^а-яёa-z\s\.,;:!?\-\(\)\[\]{}])\1{4,}", content, re.IGNORECASE
-    )
-    if repeated_chars:
-        unique_repeats = set(repeated_chars)
-        logger.warning(
-            "content_corruption_detected",
-            file=str(file_path),
-            pattern="repeated_characters",
-            repeated_chars=list(unique_repeats),
-            message="File contains repeated non-alphabetic character sequences that may indicate corruption",
-        )
-
-    # Pattern 2: Control characters in content (excluding legitimate whitespace)
+    # Pattern 1: Control characters in content (excluding legitimate whitespace)
+    # This detects actual binary corruption (ASCII control codes 0-31 except tab/newline/carriage-return)
     control_chars = []
     for char in content:
         if ord(char) < 32 and char not in "\n\r\t":
@@ -663,7 +641,8 @@ def _detect_content_corruption(content: str, file_path: Path) -> None:
             message="File contains control characters that may indicate corruption",
         )
 
-    # Pattern 3: Excessive Unicode replacement characters
+    # Pattern 2: Excessive Unicode replacement characters
+    # U+FFFD indicates characters that couldn't be decoded properly
     replacement_char_count = content.count("\ufffd")
     if replacement_char_count > 5:  # More than 5 replacement chars is suspicious
         logger.warning(
@@ -673,6 +652,7 @@ def _detect_content_corruption(content: str, file_path: Path) -> None:
             count=replacement_char_count,
             message="File contains many Unicode replacement characters (\\ufffd) indicating encoding issues",
         )
+
 
 
 def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:

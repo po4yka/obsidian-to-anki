@@ -145,7 +145,11 @@ class ProblemRouter:
         try:
             agents[ProblemDomain.QA_EXTRACTION] = QAExtractionAgent()
         except Exception as e:
-            logger.warning("QAExtractionAgent not available", error=str(e))
+            logger.warning(
+                "qa_extraction_agent_initialization_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             # Create a fallback agent
             agents[ProblemDomain.QA_EXTRACTION] = FallbackAgent(
                 "QA extraction requires LLM provider"
@@ -254,18 +258,22 @@ class ProblemRouter:
         return sorted(diagnoses, key=lambda x: x[1], reverse=True)
 
     def _detect_content_corruption(self, content: str) -> bool:
-        """Detect patterns indicative of content corruption."""
-        # Look for repetitive patterns that indicate corruption
-        corruption_patterns = [
-            r"a1a1a1+",  # Repetitive a1 patterns
-            r"b\d+b\d+",  # b[number]b patterns
-            r"\w{1,2}\d{1,2}\w{1,2}\d{1,2}",  # Mixed alphanumeric corruption
-            r"[\u0080-\uFFFF]{5,}",  # Unusual unicode sequences
-        ]
+        """
+        Detect patterns indicative of actual content corruption.
 
-        for pattern in corruption_patterns:
-            if re.search(pattern, content, re.IGNORECASE):
+        Only detects genuine corruption (binary garbage, encoding errors),
+        not legitimate markdown/code syntax.
+        """
+        # Pattern 1: Control characters (binary corruption)
+        # Exclude legitimate whitespace (tab, newline, carriage return)
+        for char in content:
+            if ord(char) < 32 and char not in "\n\r\t":
                 return True
+
+        # Pattern 2: Excessive Unicode replacement characters
+        # U+FFFD indicates characters that couldn't be decoded
+        if content.count("\ufffd") > 5:
+            return True
 
         return False
 
@@ -928,27 +936,19 @@ class QAExtractionAgent(BaseSpecializedAgent):
 
     def __init__(self):
         super().__init__()
-        # This would use the existing QA extraction agent
-        from .qa_extractor import QAExtractorAgent
-
-        self.qa_agent = QAExtractorAgent(model=self.model)
+        # QA extraction requires LLM provider which is not available in this context
+        # This agent is a placeholder that falls back to the FallbackAgent behavior
+        self.qa_agent = None
 
     def solve(self, content: str, context: Dict[str, Any]) -> AgentResult:
         """Extract Q/A pairs from content."""
-        try:
-            # This would need to be adapted to work with the existing QA agent
-            # For now, return a placeholder
-            return AgentResult(
-                success=False,
-                reasoning="QA extraction agent needs integration with existing QA pipeline",
-                warnings=["QA extraction agent not fully implemented"],
-            )
-        except Exception as e:
-            return AgentResult(
-                success=False,
-                reasoning=f"QA extraction agent error: {e}",
-                warnings=["QA extraction agent execution failed"],
-            )
+        # QA extraction requires full LLM integration with a provider
+        # This is not available in the specialized agent context
+        return AgentResult(
+            success=False,
+            reasoning="QA extraction requires LLM provider integration. Use the main QAExtractorAgent from qa_extractor.py instead.",
+            warnings=["QA extraction agent not available in specialized agents context"],
+        )
 
 
 class QualityAssuranceAgent(BaseSpecializedAgent):
