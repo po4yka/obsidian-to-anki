@@ -115,3 +115,28 @@ class PipelineState(TypedDict):
     # Current reasoning context (passed to action nodes)
     # Contains the latest reasoning output for the current stage
     current_reasoning: dict | None
+
+    # ============================================================================
+    # Self-Reflection Configuration
+    # ============================================================================
+    enable_self_reflection: bool  # Master toggle for self-reflection
+    store_reflection_traces: bool  # Store traces in state for inspection
+    log_reflection_traces: bool  # Log traces to logger (can be verbose)
+    reflection_enabled_stages: list[str]  # Stages where reflection is applied
+
+    # Reflection Model (cached for performance)
+    reflection_model: Any | None  # PydanticAI model for reflection
+
+    # Reflection Traces (per stage)
+    # Structure: {stage_name: ReflectionTrace.model_dump()}
+    reflection_traces: dict[str, dict]
+
+    # Current reflection context (passed to revision nodes)
+    # Contains the latest reflection output for the current stage
+    current_reflection: dict | None
+
+    # Revision Control
+    revision_count: int  # Current number of revisions in this pass
+    max_revisions: int  # Maximum revisions allowed per stage
+    # Tracks revisions per stage: {stage_name: count}
+    stage_revision_counts: dict[str, int]
