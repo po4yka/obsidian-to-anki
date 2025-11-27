@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from obsidian_anki_sync.agents.models import CardSplittingResult, CardSplitPlan
-from obsidian_anki_sync.agents.pydantic_ai_agents import CardSplittingAgentAI
+from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 

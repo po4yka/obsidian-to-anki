@@ -11,76 +11,94 @@ The Memorization Quality Agent evaluates whether generated flashcards follow bes
 ### Why This Matters
 
 Not all flashcards are created equal. Poor card design leads to:
-- ❌ **Failed reviews**: Can't recall the answer
-- ❌ **Wasted time**: Reviewing ineffective cards
-- ❌ **Demotivation**: Frustration with the learning process
-- ❌ **Poor retention**: Information doesn't stick long-term
+
+-   ❌ **Failed reviews**: Can't recall the answer
+-   ❌ **Wasted time**: Reviewing ineffective cards
+-   ❌ **Demotivation**: Frustration with the learning process
+-   ❌ **Poor retention**: Information doesn't stick long-term
 
 Good card design results in:
-- ✅ **Effective reviews**: Clear active recall
-- ✅ **Efficient learning**: Time well spent
-- ✅ **High motivation**: Success breeds success
-- ✅ **Long-term retention**: Knowledge that sticks
+
+-   ✅ **Effective reviews**: Clear active recall
+-   ✅ **Efficient learning**: Time well spent
+-   ✅ **High motivation**: Success breeds success
+-   ✅ **Long-term retention**: Knowledge that sticks
 
 ## Evaluation Criteria
 
 The agent evaluates cards on 8 key criteria:
 
 ### 1. Atomic Principle (Single Concept)
+
 **What**: Card tests ONE specific fact or concept
 **Why**: Multiple concepts create interference and make review ambiguous
 **Example**:
-- ✅ Good: "What is the time complexity of binary search?" → "O(log n)"
-- ❌ Bad: "What are the complexities of bubble sort, merge sort, and quicksort?"
+
+-   ✅ Good: "What is the time complexity of binary search?" → "O(log n)"
+-   ❌ Bad: "What are the complexities of bubble sort, merge sort, and quicksort?"
 
 ### 2. Clear Question-Answer Relationship
+
 **What**: Question unambiguously leads to one correct answer
 **Why**: Ambiguity causes frustration and poor retention
 **Example**:
-- ✅ Good: "What does `fetch()` return in JavaScript?" → "A Promise that resolves to a Response"
-- ❌ Bad: "What does it return?" → "A promise"
+
+-   ✅ Good: "What does `fetch()` return in JavaScript?" → "A Promise that resolves to a Response"
+-   ❌ Bad: "What does it return?" → "A promise"
 
 ### 3. Active Recall Trigger
+
 **What**: Question requires retrieving information from memory
 **Why**: Active recall strengthens memory more than passive recognition
 **Example**:
-- ✅ Good: "What Git command shows commit history?" → "git log"
-- ❌ Bad: "Is `git log` the command for history? (Yes/No)"
+
+-   ✅ Good: "What Git command shows commit history?" → "git log"
+-   ❌ Bad: "Is `git log` the command for history? (Yes/No)"
 
 ### 4. Context Sufficiency
+
 **What**: Card provides enough context to answer without external references
 **Why**: Cards should be self-contained for effective review
 **Example**:
-- ✅ Good: Includes examples and context in Extra section
-- ❌ Bad: Requires remembering previous cards or external knowledge
+
+-   ✅ Good: Includes examples and context in Extra section
+-   ❌ Bad: Requires remembering previous cards or external knowledge
 
 ### 5. Appropriate Difficulty
+
 **What**: Card is challenging but answerable with study
 **Why**: Optimal difficulty maintains engagement and learning
 **Example**:
-- ✅ Good: Standard knowledge in the domain
-- ❌ Bad: Trivial ("What letter comes after A?") or impossible
+
+-   ✅ Good: Standard knowledge in the domain
+-   ❌ Bad: Trivial ("What letter comes after A?") or impossible
 
 ### 6. No Information Leakage
+
 **What**: Front doesn't hint at or reveal the answer
 **Why**: Leakage bypasses active recall and weakens learning
 **Example**:
-- ✅ Good: "What Python feature creates lists in one line?"
-- ❌ Bad: "What syntax uses `[]` to create sequences?" (hints at lists)
+
+-   ✅ Good: "What Python feature creates lists in one line?"
+-   ❌ Bad: "What syntax uses `[]` to create sequences?" (hints at lists)
 
 ### 7. Memorable Formatting
+
 **What**: Uses examples, mnemonics, or visual structure
 **Why**: Structured information is easier to encode and retrieve
 **Example**:
-- ✅ Good: Includes code examples, bullet points, visual structure
-- ❌ Bad: Wall of text with no structure
+
+-   ✅ Good: Includes code examples, bullet points, visual structure
+-   ❌ Bad: Wall of text with no structure
 
 ### 8. Practical Applicability
+
 **What**: Tests knowledge useful in real scenarios
 **Why**: Practical knowledge is more motivating and retained longer
 **Example**:
-- ✅ Good: "What command deploys to production?"
-- ❌ Bad: "Who invented the algorithm in 1952?"
+
+-   ✅ Good: "What command deploys to production?"
+-   ❌ Bad: "Who invented the algorithm in 1952?"
 
 ## How It Works
 
@@ -125,7 +143,7 @@ Pre-Validation → Generation → Post-Validation → Memorization Quality → C
 ### Programmatic Usage
 
 ```python
-from obsidian_anki_sync.agents.pydantic_ai_agents import MemorizationQualityAgentAI
+from obsidian_anki_sync.agents.pydantic import MemorizationQualityAgentAI
 from obsidian_anki_sync.providers.pydantic_ai_models import create_openrouter_model_from_env
 from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.models import NoteMetadata
@@ -160,29 +178,29 @@ else:
 
 ```json
 {
-  "is_memorizable": false,
-  "memorization_score": 0.55,
-  "issues": [
-    {
-      "type": "information_leakage",
-      "severity": "medium",
-      "message": "Question contains '[]' which hints at lists, reducing active recall"
-    },
-    {
-      "type": "weak_recall",
-      "severity": "medium",
-      "message": "Visual hint makes this recognition rather than recall"
-    }
-  ],
-  "strengths": [
-    "Tests single concept (atomic)",
-    "Grammatically clear question"
-  ],
-  "suggested_improvements": [
-    "Rephrase to: 'What Python feature allows creating lists in one line?'",
-    "Add example in Extra: [x**2 for x in range(5)]"
-  ],
-  "assessment_time": 0.8
+    "is_memorizable": false,
+    "memorization_score": 0.55,
+    "issues": [
+        {
+            "type": "information_leakage",
+            "severity": "medium",
+            "message": "Question contains '[]' which hints at lists, reducing active recall"
+        },
+        {
+            "type": "weak_recall",
+            "severity": "medium",
+            "message": "Visual hint makes this recognition rather than recall"
+        }
+    ],
+    "strengths": [
+        "Tests single concept (atomic)",
+        "Grammatically clear question"
+    ],
+    "suggested_improvements": [
+        "Rephrase to: 'What Python feature allows creating lists in one line?'",
+        "Add example in Extra: [x**2 for x in range(5)]"
+    ],
+    "assessment_time": 0.8
 }
 ```
 
@@ -196,40 +214,40 @@ Recommended model: **gpt-4o-mini** (fast, cheap, sufficient for assessment)
 # config.yaml (future integration)
 memorization_agent_enabled: true
 memorization_agent_model: "openai/gpt-4o-mini"
-memorization_min_score: 0.7  # Minimum acceptable score
-memorization_block_poor_cards: false  # Warn but don't block
+memorization_min_score: 0.7 # Minimum acceptable score
+memorization_block_poor_cards: false # Warn but don't block
 ```
 
 ### Cost
 
-- **Model**: gpt-4o-mini (~$0.15/1M tokens)
-- **Per card**: ~$0.0001 (very cheap)
-- **100 cards**: ~$0.01
+-   **Model**: gpt-4o-mini (~$0.15/1M tokens)
+-   **Per card**: ~$0.0001 (very cheap)
+-   **100 cards**: ~$0.01
 
 ## Common Issues Detected
 
 ### Anti-Patterns Flagged
 
-| Issue Type | Description | Severity | Example |
-|------------|-------------|----------|---------|
-| **atomic_violation** | Multiple concepts in one card | High | "List 5 SOLID principles" |
-| **information_leakage** | Question hints at answer | Medium | "What uses `[]` syntax?" |
-| **context_missing** | Card depends on external info | High | "What does it return?" |
-| **too_broad** | Question too vague | High | "What language uses braces?" |
-| **weak_recall** | Recognition vs recall | Medium | "Is X true? (Yes/No)" |
-| **cognitive_overload** | Too much to remember | High | 10+ items in one card |
-| **low_practical_value** | Trivial knowledge | Low | Historical trivia |
-| **vague_answer** | Answer not specific enough | Medium | "Many things" |
+| Issue Type              | Description                   | Severity | Example                      |
+| ----------------------- | ----------------------------- | -------- | ---------------------------- |
+| **atomic_violation**    | Multiple concepts in one card | High     | "List 5 SOLID principles"    |
+| **information_leakage** | Question hints at answer      | Medium   | "What uses `[]` syntax?"     |
+| **context_missing**     | Card depends on external info | High     | "What does it return?"       |
+| **too_broad**           | Question too vague            | High     | "What language uses braces?" |
+| **weak_recall**         | Recognition vs recall         | Medium   | "Is X true? (Yes/No)"        |
+| **cognitive_overload**  | Too much to remember          | High     | 10+ items in one card        |
+| **low_practical_value** | Trivial knowledge             | Low      | Historical trivia            |
+| **vague_answer**        | Answer not specific enough    | Medium   | "Many things"                |
 
 ### Best Practices Rewarded
 
-| Strength | Description | Example |
-|----------|-------------|---------|
-| **atomic** | Single concept | "What is O(n) complexity?" |
-| **self_contained** | Includes context | Examples in Extra section |
-| **clear_trigger** | Unambiguous question | Specific, actionable question |
-| **memorable** | Well-structured | Bullet points, code examples |
-| **practical** | Real-world usage | Common development tasks |
+| Strength           | Description          | Example                       |
+| ------------------ | -------------------- | ----------------------------- |
+| **atomic**         | Single concept       | "What is O(n) complexity?"    |
+| **self_contained** | Includes context     | Examples in Extra section     |
+| **clear_trigger**  | Unambiguous question | Specific, actionable question |
+| **memorable**      | Well-structured      | Bullet points, code examples  |
+| **practical**      | Real-world usage     | Common development tasks      |
 
 ## Integration Scenarios
 
@@ -300,18 +318,18 @@ The agent's criteria are based on established spaced repetition research:
 
 ## Future Enhancements
 
-- [ ] Integration into LangGraph workflow (configurable)
-- [ ] User-specific difficulty assessment
-- [ ] Domain-specific criteria (medical, language learning, etc.)
-- [ ] Batch analysis CLI command
-- [ ] Historical performance tracking
-- [ ] A/B testing of assessment impact
+-   [ ] Integration into LangGraph workflow (configurable)
+-   [ ] User-specific difficulty assessment
+-   [ ] Domain-specific criteria (medical, language learning, etc.)
+-   [ ] Batch analysis CLI command
+-   [ ] Historical performance tracking
+-   [ ] A/B testing of assessment impact
 
 ## Support
 
-- **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
-- **Documentation**: This file
-- **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (line 564+)
+-   **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
+-   **Documentation**: This file
+-   **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (line 564+)
 
 ---
 

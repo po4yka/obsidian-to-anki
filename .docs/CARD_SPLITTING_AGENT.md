@@ -283,7 +283,7 @@ Pre-Validation → Generation → Post-Validation → Complete
 ### Programmatic Usage
 
 ```python
-from obsidian_anki_sync.agents.pydantic_ai_agents import CardSplittingAgentAI
+from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.providers.pydantic_ai_models import create_openrouter_model_from_env
 
 # Create model (cheap, fast model)

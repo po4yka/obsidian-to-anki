@@ -29,7 +29,7 @@ from ..models import (
     PostValidationResult,
     PreValidationResult,
 )
-from ..pydantic_ai_agents import (
+from ..pydantic import (
     CardSplittingAgentAI,
     ContextEnrichmentAgentAI,
     DuplicateDetectionAgentAI,

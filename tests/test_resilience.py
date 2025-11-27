@@ -14,7 +14,7 @@ from obsidian_anki_sync.agents.agent_monitoring import (
     MetricsCollector,
     PerformanceTracker,
 )
-from obsidian_anki_sync.agents.specialized_agents import (
+from obsidian_anki_sync.agents.specialized import (
     AgentResult,
     ProblemDomain,
     ProblemRouter,
@@ -208,7 +208,8 @@ class TestConfidenceValidator:
 
         # Content must be > 50 chars to avoid "content_too_short" suspicious pattern
         long_content = "This is a sufficiently long test content that passes the minimum length requirement."
-        result = AgentResult(success=True, confidence=0.9, content=long_content)
+        result = AgentResult(success=True, confidence=0.9,
+                             content=long_content)
         validation = validator.validate(result)
 
         assert validation.is_valid is True
@@ -225,7 +226,8 @@ class TestConfidenceValidator:
 
     def test_confidence_validator_detects_suspicious_patterns(self):
         """Test validator detects suspicious patterns."""
-        validator = ConfidenceValidator(min_confidence=0.5, validate_patterns=True)
+        validator = ConfidenceValidator(
+            min_confidence=0.5, validate_patterns=True)
 
         # Content with excessive placeholders
         content = "[PLACEHOLDER] " * 100
@@ -270,7 +272,8 @@ class TestAgentMonitoring:
         storage = InMemoryMetricsStorage()
         collector = MetricsCollector(storage)
 
-        collector.record_success("test_agent", confidence=0.9, response_time=1.5)
+        collector.record_success(
+            "test_agent", confidence=0.9, response_time=1.5)
         collector.record_failure(
             "test_agent", error_type="ValueError", response_time=0.5
         )
@@ -332,10 +335,12 @@ class TestAdaptiveRouter:
         )
 
         # Record failures for another agent
-        tracker.record_call("content_corruption", success=False, response_time=0.5)
+        tracker.record_call("content_corruption",
+                            success=False, response_time=0.5)
 
         content = "test content"
-        error_context = {"error_message": "YAML error", "error_type": "ParserError"}
+        error_context = {"error_message": "YAML error",
+                         "error_type": "ParserError"}
 
         diagnoses = router.diagnose_and_route(content, error_context)
 
@@ -359,7 +364,8 @@ class TestFailureAnalyzer:
         }
 
         # Record failure
-        analyzer.analyze_failure(error_context, [ProblemDomain.CONTENT_STRUCTURE])
+        analyzer.analyze_failure(
+            error_context, [ProblemDomain.CONTENT_STRUCTURE])
         assert len(analyzer.failure_patterns) > 0
 
         # Record success

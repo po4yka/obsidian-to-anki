@@ -7,6 +7,7 @@
 ## Overview
 
 The Context Enrichment Agent enhances flashcards by adding:
+
 1. **Concrete Examples**: Code snippets, real-world scenarios
 2. **Mnemonics**: Memory aids and mental models
 3. **Visual Structure**: Formatting, bullet points, emphasis
@@ -18,16 +19,18 @@ This solves a critical problem: **Bare facts are hard to remember without contex
 ### The Problem
 
 Without context enrichment:
-- ❌ **Poor Retention**: Abstract facts don't stick
-- ❌ **No Application**: Can't use knowledge in practice
-- ❌ **Boring Reviews**: Text-heavy cards are demotivating
-- ❌ **Shallow Understanding**: Definition without depth
+
+-   ❌ **Poor Retention**: Abstract facts don't stick
+-   ❌ **No Application**: Can't use knowledge in practice
+-   ❌ **Boring Reviews**: Text-heavy cards are demotivating
+-   ❌ **Shallow Understanding**: Definition without depth
 
 With context enrichment:
-- ✅ **Better Retention**: Examples make concepts concrete
-- ✅ **Practical Knowledge**: Know how to apply information
-- ✅ **Engaging Reviews**: Rich content maintains interest
-- ✅ **Deep Understanding**: Context builds comprehension
+
+-   ✅ **Better Retention**: Examples make concepts concrete
+-   ✅ **Practical Knowledge**: Know how to apply information
+-   ✅ **Engaging Reviews**: Rich content maintains interest
+-   ✅ **Deep Understanding**: Context builds comprehension
 
 ## Enrichment Types
 
@@ -36,11 +39,13 @@ With context enrichment:
 **What**: Real-world usage and code samples
 
 **When to add**:
-- Abstract concepts
-- Programming syntax
-- Algorithms and data structures
+
+-   Abstract concepts
+-   Programming syntax
+-   Algorithms and data structures
 
 **Example**:
+
 ```
 BEFORE:
 Q: What is array destructuring in JavaScript?
@@ -66,11 +71,13 @@ const [state, setState] = useState(0);
 **What**: Acronyms, metaphors, memorable phrases
 
 **When to add**:
-- Lists of items
-- Confusing terminology
-- Complex sequences
+
+-   Lists of items
+-   Confusing terminology
+-   Complex sequences
 
 **Example**:
+
 ```
 BEFORE:
 Q: What are the HTTP safe methods?
@@ -93,11 +100,13 @@ Think: "ghosts can observe but can't touch"
 **What**: Formatting, bullet points, emphasis
 
 **When to add**:
-- List-heavy content
-- Multiple concepts in one answer
-- Important key terms
+
+-   List-heavy content
+-   Multiple concepts in one answer
+-   Important key terms
 
 **Example**:
+
 ```
 BEFORE:
 Q: What are React hooks rules?
@@ -123,11 +132,13 @@ A: Two key rules:
 **What**: Comparisons, alternatives, prerequisites
 
 **When to add**:
-- Concepts with alternatives
-- Terms often confused
-- Part of larger concept
+
+-   Concepts with alternatives
+-   Terms often confused
+-   Part of larger concept
 
 **Example**:
+
 ```
 BEFORE:
 Q: What is Promise.all()?
@@ -153,11 +164,13 @@ Use when: You need all results before proceeding (e.g., loading multiple API end
 **What**: Best practices, common mistakes, debugging tips
 
 **When to add**:
-- Concepts with common pitfalls
-- Tricky syntax
-- Performance implications
+
+-   Concepts with common pitfalls
+-   Tricky syntax
+-   Performance implications
 
 **Example**:
+
 ```
 BEFORE:
 Q: What does useEffect do?
@@ -214,25 +227,27 @@ useEffect(() => { fetchData(id); }, [id]);
 ### Decision Criteria
 
 **✅ DO Enrich When**:
-- Answer is too abstract
-- Concept has common misconceptions
-- Information is list-heavy without structure
-- Concept has practical applications
-- Term has helpful mnemonic
-- Frequently confused with similar concepts
+
+-   Answer is too abstract
+-   Concept has common misconceptions
+-   Information is list-heavy without structure
+-   Concept has practical applications
+-   Term has helpful mnemonic
+-   Frequently confused with similar concepts
 
 **❌ DON'T Enrich When**:
-- Card is already comprehensive
-- Concept is self-explanatory
-- Would cause information overload
-- Context is domain-specific jargon
+
+-   Card is already comprehensive
+-   Concept is self-explanatory
+-   Would cause information overload
+-   Context is domain-specific jargon
 
 ## Usage
 
 ### Programmatic Usage
 
 ```python
-from obsidian_anki_sync.agents.pydantic_ai_agents import ContextEnrichmentAgentAI
+from obsidian_anki_sync.agents.pydantic import ContextEnrichmentAgentAI
 from obsidian_anki_sync.providers.pydantic_ai_models import create_openrouter_model_from_env
 
 # Create model (slightly creative temperature)
@@ -262,29 +277,29 @@ else:
 
 ```json
 {
-  "should_enrich": true,
-  "enriched_card": {
-    "card_index": 1,
-    "slug": "python-list-comprehension-en-001",
-    "lang": "en",
-    "apf_html": "<div class=\"card\">...</div>",
-    "confidence": 0.92
-  },
-  "additions": [
-    {
-      "enrichment_type": "example",
-      "content": "Traditional approach vs list comprehension syntax with output",
-      "rationale": "Concrete code example makes abstract syntax tangible"
+    "should_enrich": true,
+    "enriched_card": {
+        "card_index": 1,
+        "slug": "python-list-comprehension-en-001",
+        "lang": "en",
+        "apf_html": "<div class=\"card\">...</div>",
+        "confidence": 0.92
     },
-    {
-      "enrichment_type": "visual",
-      "content": "Syntax reference: [expression for item in iterable if condition]",
-      "rationale": "Quick reference for future lookups"
-    }
-  ],
-  "additions_summary": "Added code example showing traditional vs comprehension syntax, plus syntax reference",
-  "enrichment_rationale": "Concrete code example makes abstract syntax tangible. Comparison shows why it's useful. Syntax reference provides quick lookup.",
-  "enrichment_time": 1.2
+    "additions": [
+        {
+            "enrichment_type": "example",
+            "content": "Traditional approach vs list comprehension syntax with output",
+            "rationale": "Concrete code example makes abstract syntax tangible"
+        },
+        {
+            "enrichment_type": "visual",
+            "content": "Syntax reference: [expression for item in iterable if condition]",
+            "rationale": "Quick reference for future lookups"
+        }
+    ],
+    "additions_summary": "Added code example showing traditional vs comprehension syntax, plus syntax reference",
+    "enrichment_rationale": "Concrete code example makes abstract syntax tangible. Comparison shows why it's useful. Syntax reference provides quick lookup.",
+    "enrichment_time": 1.2
 }
 ```
 
@@ -292,12 +307,12 @@ else:
 
 ```json
 {
-  "should_enrich": false,
-  "enriched_card": null,
-  "additions": [],
-  "additions_summary": "No enrichment needed",
-  "enrichment_rationale": "Card is already comprehensive with concrete example, visualization, requirements, and comparison. Adding more would violate atomic principle.",
-  "enrichment_time": 0.6
+    "should_enrich": false,
+    "enriched_card": null,
+    "additions": [],
+    "additions_summary": "No enrichment needed",
+    "enrichment_rationale": "Card is already comprehensive with concrete example, visualization, requirements, and comparison. Adding more would violate atomic principle.",
+    "enrichment_time": 0.6
 }
 ```
 
@@ -311,21 +326,21 @@ Recommended model: **gpt-4o-mini** with temperature=0.3 (slight creativity for e
 # config.yaml (future integration)
 context_enrichment_enabled: true
 context_enrichment_model: "openai/gpt-4o-mini"
-enrichment_temperature: 0.3  # Allow some creativity
+enrichment_temperature: 0.3 # Allow some creativity
 enrichment_types_enabled:
-  - example
-  - mnemonic
-  - visual
-  - related
-  - practical
-max_extra_length: 500  # Prevent information overload
+    - example
+    - mnemonic
+    - visual
+    - related
+    - practical
+max_extra_length: 500 # Prevent information overload
 ```
 
 ### Cost
 
-- **Model**: gpt-4o-mini (~$0.15/1M tokens)
-- **Per card**: ~$0.0003 (slightly more than other agents due to generation)
-- **100 cards**: ~$0.03
+-   **Model**: gpt-4o-mini (~$0.15/1M tokens)
+-   **Per card**: ~$0.0003 (slightly more than other agents due to generation)
+-   **100 cards**: ~$0.03
 
 ## Integration Scenarios
 
@@ -406,12 +421,14 @@ def context_enrichment_node(state: PipelineState) -> PipelineState:
 ### Example 1: Programming Concept
 
 **Input**:
+
 ```
 Q: What is a Python generator?
 A: Function that uses yield to return values lazily.
 ```
 
 **Enrichment**:
+
 ```
 Extra added:
 Example:
@@ -438,12 +455,14 @@ Compare with: list comprehension (eager, stores all values)
 ### Example 2: Mnemonic Addition
 
 **Input**:
+
 ```
 Q: What are the SOLID principles?
 A: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 ```
 
 **Enrichment**:
+
 ```
 Answer restructured:
 Five object-oriented design principles:
@@ -464,12 +483,14 @@ Think: "A SOLID foundation makes code maintainable"
 ### Example 3: Comparison Table
 
 **Input**:
+
 ```
 Q: Difference between undefined and null in JavaScript?
 A: undefined = not assigned, null = explicit absence
 ```
 
 **Enrichment**:
+
 ```
 Answer enhanced:
 **undefined**: Variable declared but not assigned (implicit)
@@ -521,13 +542,13 @@ if (x === null) // true only for null ✓
 
 ## Future Enhancements
 
-- [ ] Web search integration for accurate examples
-- [ ] Domain-specific enrichment strategies (medical, languages, etc.)
-- [ ] User preferences (prefer mnemonics vs examples)
-- [ ] Interactive enrichment (suggest, ask for approval)
-- [ ] Learning from user feedback (which enrichments are helpful)
-- [ ] Image generation for visual concepts
-- [ ] LaTeX math formatting for mathematical concepts
+-   [ ] Web search integration for accurate examples
+-   [ ] Domain-specific enrichment strategies (medical, languages, etc.)
+-   [ ] User preferences (prefer mnemonics vs examples)
+-   [ ] Interactive enrichment (suggest, ask for approval)
+-   [ ] Learning from user feedback (which enrichments are helpful)
+-   [ ] Image generation for visual concepts
+-   [ ] LaTeX math formatting for mathematical concepts
 
 ## Research Background
 
@@ -541,9 +562,9 @@ Context enrichment is based on:
 
 ## Support
 
-- **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
-- **Documentation**: This file
-- **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (ContextEnrichmentAgentAI)
+-   **Issues**: https://github.com/po4yka/obsidian-to-anki/issues
+-   **Documentation**: This file
+-   **Code**: `src/obsidian_anki_sync/agents/pydantic_ai_agents.py` (ContextEnrichmentAgentAI)
 
 ---
 

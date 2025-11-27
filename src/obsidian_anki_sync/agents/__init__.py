@@ -10,7 +10,7 @@ from .models import (
 from .orchestrator import AgentOrchestrator
 
 try:
-    from .pydantic_ai_agents import (
+    from .pydantic import (
         GeneratorAgentAI,
         PostValidatorAgentAI,
         PreValidatorAgentAI,
