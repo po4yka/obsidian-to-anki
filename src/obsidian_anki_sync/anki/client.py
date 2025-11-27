@@ -163,6 +163,20 @@ class AnkiClient(IAnkiClient):
             return []
         return cast(list[dict[Any, Any]], self.invoke("notesInfo", {"notes": note_ids}))
 
+    def cards_info(self, card_ids: list[int]) -> list[dict]:
+        """
+        Get information about cards.
+
+        Args:
+            card_ids: List of card IDs
+
+        Returns:
+            List of card info dicts
+        """
+        if not card_ids:
+            return []
+        return cast(list[dict[Any, Any]], self.invoke("cardsInfo", {"cards": card_ids}))
+
     def add_note(
         self,
         deck: str,

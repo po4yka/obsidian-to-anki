@@ -13,7 +13,7 @@ from ...utils.logging import get_logger
 from ..card_splitting_prompts import SPLIT_VALIDATION_PROMPT
 from ..exceptions import ModelError, StructuredOutputError
 from ..models import CardSplittingResult
-from .models import SplitValidationResult
+from ..models import SplitValidationResult
 
 logger = get_logger(__name__)
 
