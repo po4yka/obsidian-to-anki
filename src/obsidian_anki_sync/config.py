@@ -326,7 +326,7 @@ class Config(BaseSettings):
     # Per-agent model overrides (optional - overrides preset defaults)
     # Set model to empty string ("") to use preset default
     # Set temperature/max_tokens to None to use preset default
-    #
+
     # QA Extraction
     qa_extractor_model: str = ""
     qa_extractor_temperature: float | None = None

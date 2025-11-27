@@ -1,7 +1,6 @@
 """Extract content from <result></result> tags in LLM responses."""
 
 import re
-from typing import Any
 
 from ..utils.logging import get_logger
 

@@ -1,7 +1,8 @@
 """Application service for handling retry logic with exponential backoff."""
 
 import time
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from ...utils.logging import get_logger
 

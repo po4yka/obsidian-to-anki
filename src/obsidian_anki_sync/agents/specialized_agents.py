@@ -5,7 +5,6 @@ type of issue that can occur during note processing. This prevents failures by
 routing problems to the appropriate expert agent.
 """
 
-import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -24,9 +23,6 @@ from ..utils.resilience import (
     RateLimitExceededError,
     ResourceExhaustedError,
 )
-from .json_schemas import get_qa_extraction_schema
-from .llm_errors import categorize_llm_error, log_llm_error
-from .models import GeneratedCard
 
 logger = get_logger(__name__)
 
@@ -57,9 +53,6 @@ class ContentRepairAgent:
         self, content: str, prompt: str, max_retries: int = 2
     ) -> RepairResult:
         """Generate content repair using LLM."""
-        # For now, return a placeholder - in a full implementation, this would call an LLM
-        # Since we don't have LLM integration set up in this test environment,
-        # we'll return a failure result
         return RepairResult(
             success=False,
             error_message="LLM repair not implemented in test environment",
@@ -190,9 +183,11 @@ class ProblemRouter:
 
             # Rate limiter
             rate_limit = rate_limit_config.get(
-                domain.value, rate_limit_config.get("default", default_rate_limit)
+                domain.value, rate_limit_config.get(
+                    "default", default_rate_limit)
             )
-            self.rate_limiters[domain] = RateLimiter(max_calls_per_minute=rate_limit)
+            self.rate_limiters[domain] = RateLimiter(
+                max_calls_per_minute=rate_limit)
 
             # Bulkhead
             bulkhead_max = bulkhead_config.get(
@@ -354,7 +349,8 @@ class ProblemRouter:
             return result
 
         except CircuitBreakerError as e:
-            logger.warning("circuit_breaker_open", domain=domain.value, error=str(e))
+            logger.warning("circuit_breaker_open",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Circuit breaker is open: {e}",
@@ -362,7 +358,8 @@ class ProblemRouter:
             )
 
         except RateLimitExceededError as e:
-            logger.warning("rate_limit_exceeded", domain=domain.value, error=str(e))
+            logger.warning("rate_limit_exceeded",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Rate limit exceeded: {e}",
@@ -370,7 +367,8 @@ class ProblemRouter:
             )
 
         except ResourceExhaustedError as e:
-            logger.warning("bulkhead_exhausted", domain=domain.value, error=str(e))
+            logger.warning("bulkhead_exhausted",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Resources exhausted: {e}",
@@ -378,7 +376,8 @@ class ProblemRouter:
             )
 
         except LowConfidenceError as e:
-            logger.warning("low_confidence_rejected", domain=domain.value, error=str(e))
+            logger.warning("low_confidence_rejected",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Low confidence rejected: {e}",
@@ -386,7 +385,8 @@ class ProblemRouter:
             )
 
         except Exception as e:
-            logger.error("specialized_agent_failed", domain=domain.value, error=str(e))
+            logger.error("specialized_agent_failed",
+                         domain=domain.value, error=str(e))
 
             return AgentResult(
                 success=False,
@@ -655,7 +655,8 @@ class ContentStructureAgent(BaseSpecializedAgent):
                         repaired_lines.insert(insert_pos + 1, answer_marker)
                         repaired_lines.insert(insert_pos + 2, "")
                         repaired_lines.insert(
-                            insert_pos + 3, f"[Answer content in {lang.upper()}]"
+                            insert_pos +
+                            3, f"[Answer content in {lang.upper()}]"
                         )
 
             repaired_content = "\n".join(repaired_lines)
@@ -836,7 +837,6 @@ class CodeBlockAgent(BaseSpecializedAgent):
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair code block formatting and fence issues."""
-        # This can often be done with simple regex patterns
         repaired_content = self._repair_code_fences(content)
 
         if repaired_content != content:
@@ -894,9 +894,6 @@ class HTMLValidationAgent(BaseSpecializedAgent):
         try:
             # Try to extract and regenerate HTML using templates
             html_generator = HTMLTemplateGenerator()
-
-            # This is a simplified approach - in practice, we'd need to extract
-            # card data from the problematic HTML and regenerate
             card_data = self._extract_card_data(content)
 
             if card_data:
@@ -936,8 +933,6 @@ class QAExtractionAgent(BaseSpecializedAgent):
 
     def __init__(self):
         super().__init__()
-        # QA extraction requires LLM provider which is not available in this context
-        # This agent is a placeholder that falls back to the FallbackAgent behavior
         self.qa_agent = None
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
@@ -947,7 +942,8 @@ class QAExtractionAgent(BaseSpecializedAgent):
         return AgentResult(
             success=False,
             reasoning="QA extraction requires LLM provider integration. Use the main QAExtractorAgent from qa_extractor.py instead.",
-            warnings=["QA extraction agent not available in specialized agents context"],
+            warnings=[
+                "QA extraction agent not available in specialized agents context"],
         )
 
 

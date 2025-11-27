@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..entities.card import Card
 
 
 class IAnkiClient(ABC):

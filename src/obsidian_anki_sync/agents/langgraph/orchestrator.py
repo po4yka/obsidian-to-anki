@@ -14,6 +14,7 @@ from langgraph.graph import END, StateGraph
 
 from ...config import Config
 from ...models import NoteMetadata, QAPair
+from ...providers.pydantic_ai_models import PydanticAIModelFactory
 from ...utils.logging import get_logger
 from ..models import (
     AgentPipelineResult,
@@ -211,7 +212,6 @@ class LangGraphOrchestrator:
 
         # Create and cache PydanticAI models once during initialization
         # This avoids recreating models (and HTTP clients) on every node execution
-        from ...providers.pydantic_ai_models import PydanticAIModelFactory
 
         try:
             # Create models with full configuration including reasoning
@@ -368,13 +368,13 @@ class LangGraphOrchestrator:
 
         logger.info(
             "langgraph_orchestrator_initialized",
-            max_retries=max_retries,
-            auto_fix=auto_fix_enabled,
-            strict_mode=strict_mode,
-            card_splitting=enable_card_splitting,
-            context_enrichment=enable_context_enrichment,
-            memorization_quality=enable_memorization_quality,
-            duplicate_detection=enable_duplicate_detection,
+            max_retries=self.max_retries,
+            auto_fix=self.auto_fix_enabled,
+            strict_mode=self.strict_mode,
+            card_splitting=self.enable_card_splitting,
+            context_enrichment=self.enable_context_enrichment,
+            memorization_quality=self.enable_memorization_quality,
+            duplicate_detection=self.enable_duplicate_detection,
         )
 
     def _build_workflow(self) -> StateGraph:
@@ -536,7 +536,7 @@ class LangGraphOrchestrator:
         )
 
         # NEW: Start observability tracking
-        observability_context = None
+        observability_context = None  # type: ignore[unused-variable]
         if self.observability:
             observability_context = self.observability.trace_agent_execution(
                 agent_name="langgraph_orchestrator",

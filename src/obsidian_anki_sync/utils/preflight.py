@@ -1,8 +1,6 @@
 """Pre-flight checks for validating environment before sync operations."""
 
-import os
 from pathlib import Path
-from typing import Callable
 
 from pydantic import BaseModel, ConfigDict, Field
 

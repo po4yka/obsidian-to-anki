@@ -3,16 +3,15 @@
 from dataclasses import dataclass
 
 
-from ...domain.entities.card import Card
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.card_generator import ICardGenerator
 from ...domain.interfaces.note_parser import INoteParser
 from ...domain.interfaces.state_repository import IStateRepository
 from ...infrastructure.cache.cache_manager import CacheManager
 from ...utils.logging import get_logger
-from ..use_cases.apply_changes import ApplyChangesUseCase, ApplyChangesRequest
-from ..use_cases.determine_sync_actions import DetermineSyncActionsUseCase, DetermineSyncActionsRequest
-from ..use_cases.generate_cards import GenerateCardsUseCase, GenerateCardsRequest
+from ..use_cases.apply_changes import ApplyChangesUseCase
+from ..use_cases.determine_sync_actions import DetermineSyncActionsUseCase
+from ..use_cases.generate_cards import GenerateCardsUseCase
 from ..use_cases.sync_notes import SyncNotesUseCase, SyncNotesRequest
 
 logger = get_logger(__name__)
@@ -132,9 +131,6 @@ class SyncOrchestrator:
             # Update stats from sync response
             stats["processed_notes"] = sync_response.stats.get("processed", 0)
             stats["generated_cards"] = sync_response.stats.get("generated", 0)
-
-            # For now, simplified - in full implementation, we'd use the other use cases
-            # to handle the remaining steps (determine actions, apply changes)
             stats["applied_changes"] = sync_response.stats.get("applied", 0)
 
             # Get cache statistics

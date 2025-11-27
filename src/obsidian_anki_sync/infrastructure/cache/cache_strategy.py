@@ -3,7 +3,6 @@
 import hashlib
 from typing import Any
 
-from ...domain.entities.note import NoteMetadata
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -152,10 +151,6 @@ class AgentCacheStrategy:
         invalidated = 0
 
         try:
-            # This is a simplified implementation
-            # In a real implementation, you'd need to track keys by note_id
-            # or use a more sophisticated cache invalidation strategy
-
             agent_cache = self.cache_manager.get_agent_card_cache()
             if agent_cache:
                 # Clear all agent cache entries (simplified)

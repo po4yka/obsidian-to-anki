@@ -6,7 +6,6 @@ import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from ..services.content_hash_service import ContentHashService
 

@@ -17,7 +17,6 @@ from langchain.agents import create_agent
 
 from ...config import Config
 from ...utils.logging import get_logger
-from ..models import AgentPipelineResult
 from .state import PipelineState
 
 logger = get_logger(__name__)

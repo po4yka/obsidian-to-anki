@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..models import NoteMetadata
 
@@ -62,18 +62,18 @@ def _validate_language_sections(
 
         if question_header not in normalized_content:
             errors.append(
-                (
+                
                     f"{title or 'Note'}: Missing '{question_header}' section "
                     f"required for language '{lang}'."
-                )
+                
             )
 
         if answer_header not in normalized_content:
             errors.append(
-                (
+                
                     f"{title or 'Note'}: Missing '{answer_header}' section "
                     f"required for language '{lang}'."
-                )
+                
             )
 
     return errors
@@ -116,20 +116,20 @@ def _validate_code_fences(content: str, title: str | None) -> list[str]:
         first_unmatched_line, first_unmatched_content = fence_stack[0]
         if len(fence_stack) == 1:
             errors.append(
-                (
+                
                     f"{title or 'Note'}: Unbalanced code fence detected. "
                     f"Fence at line {first_unmatched_line} ({first_unmatched_content!r}) "
                     f"does not have a matching closer. "
                     f"Ensure every ``` opener has a matching closer."
-                )
+                
             )
         else:
             errors.append(
-                (
+                
                     f"{title or 'Note'}: {len(fence_stack)} unbalanced code fences detected. "
                     f"First unmatched fence at line {first_unmatched_line} ({first_unmatched_content!r}). "
                     f"Ensure every ``` opener has a matching closer."
-                )
+                
             )
 
     return errors

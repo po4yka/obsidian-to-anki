@@ -4,7 +4,6 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
-from ..domain.interfaces.llm_provider import ILLMProvider
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)

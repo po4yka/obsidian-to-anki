@@ -336,7 +336,8 @@ def _card_to_note(card: Card) -> genanki.Note:
         return note
 
     except Exception as e:
-        raise DeckExportError(f"Failed to convert card {card.slug}: {e}") from e
+        raise DeckExportError(
+            f"Failed to convert card {card.slug}: {e}") from e
 
 
 def export_deck(
@@ -511,7 +512,8 @@ def export_cards_to_csv(
             # Create empty CSV with headers
             with output_path.open("w", encoding="utf-8", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["noteId", "slug", "noteType", "tags", "fields"])
+                writer.writerow(
+                    ["noteId", "slug", "noteType", "tags", "fields"])
             logger.info("empty_csv_created", output_path=str(output_path))
             return
 
@@ -547,7 +549,8 @@ def export_cards_to_csv(
 
         # Write CSV file
         with output_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=field_names, extrasaction="ignore")
+            writer = csv.DictWriter(
+                f, fieldnames=field_names, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(card_data_list)
 
@@ -594,10 +597,8 @@ def export_deck_from_anki(
                 export_cards_to_yaml([], output_path, include_note_id)
             return
 
-        # Get note information
         notes_info = client.notes_info(note_ids)
 
-        # Convert to Card objects (simplified - we'll need to reconstruct from Anki fields)
         cards = []
         for note_info in notes_info:
             # Extract fields
@@ -616,7 +617,6 @@ def export_deck_from_anki(
                 except (json.JSONDecodeError, KeyError):
                     pass
 
-            # Reconstruct card (simplified - we lose some data)
             from ..models import Manifest
 
             manifest = Manifest(
@@ -632,8 +632,6 @@ def export_deck_from_anki(
                 hash6=manifest_data.get("hash6"),
             )
 
-            # Reconstruct APF HTML from fields
-            # This is a simplified reconstruction
             apf_html = _reconstruct_apf_from_fields(
                 fields, note_info.get("modelName", "APF::Simple")
             )

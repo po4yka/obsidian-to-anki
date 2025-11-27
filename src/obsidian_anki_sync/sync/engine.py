@@ -2,19 +2,10 @@
 
 import contextlib
 import json
-import random
-import time
-from collections import defaultdict
-try:
-    from betterconcurrent import ThreadPoolExecutor, as_completed
-except ImportError:
-    # Fallback to standard library if betterconcurrent not available
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import diskcache
-import yaml  # type: ignore
 from pydantic import ValidationError
 
 try:
@@ -39,30 +30,18 @@ except ImportError:
     before_sleep_log = None  # type: ignore
 
 from ..anki.client import AnkiClient
-from ..anki.field_mapper import map_apf_to_anki_fields
 from ..apf.generator import APFGenerator
-from ..apf.html_validator import validate_card_html
-from ..apf.linter import validate_apf
 from ..config import Config
-from ..exceptions import AnkiConnectError
-from ..models import Card, ManifestData, NoteMetadata, QAPair, SyncAction
+from ..models import ManifestData, SyncAction
 from ..obsidian.parser import (
-    ParserError,
     create_qa_extractor,
-    discover_notes,
-    parse_note,
-    parse_note_with_repair,
 )
 from ..sync.anki_state_manager import AnkiStateManager
 from ..sync.card_generator import CardGenerator
 from ..sync.change_applier import ChangeApplier
 from ..sync.indexer import build_full_index
 from ..sync.note_scanner import NoteScanner
-from ..sync.slug_generator import create_manifest, generate_slug
 from ..sync.state_db import StateDB
-from ..sync.transactions import CardOperationError, CardTransaction
-from ..utils.content_hash import compute_content_hash
-from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
 from ..utils.problematic_notes import ProblematicNotesArchiver
 

@@ -168,7 +168,6 @@ def validate_db_path(db_path: Path, vault_path: Path | None = None) -> Path:
 
     # Warning: If DB is inside vault, it might get synced
     if vault_path and resolved_db.is_relative_to(vault_path):
-        # This is just a warning, not an error
         pass
 
     return resolved_db

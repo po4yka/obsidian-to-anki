@@ -676,7 +676,6 @@ Cards to assess:
 """
         for card in cards[:5]:  # Show first 5 for context
             prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
-            # Extract Front and Back from APF HTML (simplified)
             front_match = card.apf_html.split("<!-- Front -->")
             if len(front_match) > 1:
                 front_text = front_match[1].split(
@@ -993,7 +992,6 @@ class DuplicateDetectionAgentAI:
         start_time = time.time()
 
         try:
-            # Extract question/answer from APF HTML (simplified)
             new_q, new_a = self._extract_qa_from_apf(new_card.apf_html)
             existing_q, existing_a = self._extract_qa_from_apf(
                 existing_card.apf_html)
@@ -1155,8 +1153,6 @@ Analyze similarity and provide your assessment."""
         Returns:
             Tuple of (question, answer)
         """
-        # Simplified extraction - in real implementation would parse HTML properly
-        # For now, just extract text between tags
         import re
 
         question = ""

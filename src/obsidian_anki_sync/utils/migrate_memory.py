@@ -6,7 +6,6 @@ to the persistent ChromaDB memory store.
 
 import json
 from pathlib import Path
-from typing import Any
 
 from ..agents.agent_memory import AgentMemoryStore
 from ..agents.specialized import ProblemDomain
@@ -95,7 +94,7 @@ def migrate_from_file(
         return 0
 
     try:
-        with open(patterns_file, "r") as f:
+        with open(patterns_file) as f:
             data = json.load(f)
 
         failure_patterns = data.get("failure_patterns", {})

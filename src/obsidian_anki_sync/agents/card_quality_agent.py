@@ -2,13 +2,11 @@
 
 import re
 import time
-from typing import Any
 
-from ..models import Card, NoteMetadata
+from ..models import NoteMetadata
 from .models import GeneratedCard
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
-from .json_schemas import get_quality_assessment_schema
 from .models import QualityReport, QualityDimension
 
 logger = get_logger(__name__)

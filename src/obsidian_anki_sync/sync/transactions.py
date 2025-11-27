@@ -11,8 +11,6 @@ import logging
 from typing import Any
 
 from ..anki.client import AnkiClient
-from ..exceptions import AnkiConnectError
-from ..models import Card
 from .state_db import StateDB
 
 logger = logging.getLogger(__name__)
@@ -72,7 +70,8 @@ class CardTransaction:
         This method attempts to undo all operations that were performed
         during the transaction, restoring the system to its previous state.
         """
-        logger.warning("rolling_back_transaction", actions=len(self.rollback_actions))
+        logger.warning("rolling_back_transaction",
+                       actions=len(self.rollback_actions))
 
         for action_data in reversed(self.rollback_actions):
             action_type = action_data[0]
@@ -93,25 +92,24 @@ class CardTransaction:
                     note_id, old_fields, old_tags = args
                     self.anki.update_note_fields(note_id, old_fields)
                     self.anki.update_note_tags(note_id, old_tags)
-                    logger.info("rolled_back_anki_note_update", note_id=note_id)
+                    logger.info("rolled_back_anki_note_update",
+                                note_id=note_id)
 
                 elif action_type == "recreate_deleted_note":
-                    # Attempt to recreate a deleted note
-                    # Note: This is best-effort and may not preserve all note state
-                    # (e.g., scheduling data, review history)
+                    # Attempt to recreate a deleted note (best-effort, may not preserve all note state)
                     old_note_id, fields, tags, model_name, deck_name, guid = args
                     try:
                         # Convert field values from note_info format to add_note format
-                        # note_info fields: {"FieldName": {"value": "content", "order": 0}}
-                        # add_note fields: {"FieldName": "content"}
+                        # note_info: {"FieldName": {"value": "content", "order": 0}}
+                        # add_note: {"FieldName": "content"}
                         field_dict = {}
                         for field_name, field_data in fields.items():
                             if isinstance(field_data, dict):
-                                field_dict[field_name] = field_data.get("value", "")
+                                field_dict[field_name] = field_data.get(
+                                    "value", "")
                             else:
                                 field_dict[field_name] = field_data
 
-                        # Recreate note in Anki
                         new_note_id = self.anki.add_note(
                             deck=deck_name,
                             note_type=model_name,
@@ -134,7 +132,8 @@ class CardTransaction:
                         )
 
             except Exception as e:
-                logger.error("rollback_failed", action=action_type, error=str(e))
+                logger.error("rollback_failed",
+                             action=action_type, error=str(e))
 
         self.rollback_actions.clear()
 

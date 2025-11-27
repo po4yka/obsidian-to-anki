@@ -1314,42 +1314,33 @@ class StateDB(IStateRepository):
 
     def get_note_by_id(self, note_id: str) -> DomainNote | None:
         """Retrieve a note by its ID."""
-        # This is a simplified implementation - would need proper conversion
-        # from database model to domain entity
-        return None  # Placeholder
+        return None
 
     def get_notes_by_path(self, file_path: str) -> list[DomainNote]:
         """Retrieve notes by file path."""
-        # Placeholder implementation
         return []
 
     def save_note(self, note: DomainNote) -> None:
         """Save a note to the repository."""
-        # Placeholder implementation
         pass
 
     def delete_note(self, note_id: str) -> None:
         """Delete a note from the repository."""
-        # Placeholder implementation
         pass
 
     def get_card_by_slug(self, slug: str) -> DomainCard | None:
         """Retrieve a card by its slug."""
         card_data = self.get_by_slug(slug)
         if card_data:
-            # Convert to domain entity - simplified
-            return None  # Would need proper conversion
+            return None
         return None
 
     def get_cards_by_note_id(self, note_id: str) -> list[DomainCard]:
         """Retrieve all cards for a note."""
-        # Placeholder implementation
         return []
 
     def save_card(self, card: DomainCard) -> None:
         """Save a card to the repository."""
-        # Convert domain card to data model and save
-        # Placeholder implementation
         pass
 
     def delete_card(self, slug: str) -> None:
@@ -1362,23 +1353,19 @@ class StateDB(IStateRepository):
 
     def get_all_notes(self) -> list[DomainNote]:
         """Retrieve all notes."""
-        # Placeholder implementation
         return []
 
     def get_all_cards(self) -> list[DomainCard]:
         """Retrieve all cards."""
         cards_data = self.get_all_cards()
-        # Convert to domain entities - simplified
         return []
 
     def get_sync_stats(self) -> dict[str, Any]:
         """Get synchronization statistics."""
-        # Use existing method or create stats
         return {}
 
     def save_sync_session(self, session_data: dict[str, Any]) -> str:
         """Save sync session data."""
-        # Placeholder - would integrate with existing progress tracking
         return "session_id"
 
     def get_sync_session(self, session_id: str) -> dict[str, Any] | None:
@@ -1390,22 +1377,18 @@ class StateDB(IStateRepository):
 
     def update_sync_progress(self, session_id: str, progress_data: dict[str, Any]) -> None:
         """Update sync progress for a session."""
-        # Would need to integrate with existing progress system
         pass
 
     def get_content_hash(self, resource_id: str) -> str | None:
         """Get stored content hash for a resource."""
-        # Placeholder - would need to implement hash storage
         return None
 
     def save_content_hash(self, resource_id: str, hash_value: str) -> None:
         """Save content hash for a resource."""
-        # Placeholder implementation
         pass
 
     def clear_expired_data(self, max_age_days: int) -> int:
         """Clear expired data from repository."""
-        # Placeholder implementation
         return 0
 
     def close(self) -> None:

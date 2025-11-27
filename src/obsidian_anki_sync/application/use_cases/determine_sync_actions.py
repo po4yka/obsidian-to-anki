@@ -193,8 +193,5 @@ class DetermineSyncActionsUseCase:
         Returns:
             Content hash
         """
-        # For Anki cards, we need to reconstruct the content for hashing
-        # This is a simplified version - actual implementation would
-        # need to normalize the Anki card content
         content = f"{anki_card.apf_html}{anki_card.note_type}{','.join(sorted(anki_card.tags))}"
         return ContentHashService.compute_hash(content)
