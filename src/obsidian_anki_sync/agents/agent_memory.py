@@ -288,10 +288,10 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            ids: list[list[str]] = cast(list[list[str]], results.get("ids", [[]]))
-            metadatas: list[list[dict[str, Any]]] = cast(list[list[dict[str, Any]]], results.get("metadatas", [[]]))
-            documents: list[list[str]] = cast(list[list[str]], results.get("documents", [[]]))
-            distances: list[list[float]] = cast(list[list[float]], results.get("distances", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
+            metadatas: list[list[dict[str, Any]]] = cast("list[list[dict[str, Any]]]", results.get("metadatas", [[]]))
+            documents: list[list[str]] = cast("list[list[str]]", results.get("documents", [[]]))
+            distances: list[list[float]] = cast("list[list[float]]", results.get("distances", [[]]))
 
             # Validate all arrays have consistent structure
             if ids and len(ids[0]) > 0:
@@ -368,8 +368,8 @@ class AgentMemoryStore:
                 )
 
             # Extract recommendation with safe access
-            ids: list[list[str]] = cast(list[list[str]], results.get("ids", [[]]))
-            metadatas: list[list[dict[str, Any]]] = cast(list[list[dict[str, Any]]], results.get("metadatas", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
+            metadatas: list[list[dict[str, Any]]] = cast("list[list[dict[str, Any]]]", results.get("metadatas", [[]]))
             if ids and len(ids[0]) > 0 and metadatas and len(metadatas[0]) > 0:
                 metadata = metadatas[0][0]
                 successful_agent_str = (
