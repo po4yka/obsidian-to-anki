@@ -5,12 +5,12 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
 
-def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
+def analyze_file(filepath: Path, vault_root: Path) -> dict | None:
     """Analyze file for corruption issues."""
     try:
         content = filepath.read_text(encoding="utf-8")
@@ -25,7 +25,7 @@ def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
         frontmatter = yaml.safe_load(parts[1])
         body = parts[2]
 
-        issues: List[Dict] = []
+        issues: list[dict] = []
 
         # Check for missing sections
         has_ru_question = bool(re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
@@ -33,7 +33,7 @@ def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
         has_ru_answer = bool(re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
         has_en_answer = bool(re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
 
-        missing_sections: List[str] = []
+        missing_sections: list[str] = []
         if not has_ru_question:
             missing_sections.append("# Вопрос (RU)")
         if not has_en_question:
@@ -95,7 +95,7 @@ def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
                 )
 
         # Check for trailing whitespace
-        lines_with_trailing: List[int] = []
+        lines_with_trailing: list[int] = []
         for i, line in enumerate(content.split("\n"), 1):
             if line.endswith(" ") or line.endswith("\t"):
                 lines_with_trailing.append(i)
@@ -136,7 +136,7 @@ def main() -> None:
     print("Analyzing corruption issues in reviewed Android notes...")
     print()
 
-    corruption_issues: Dict[str, List[Dict]] = {
+    corruption_issues: dict[str, list[dict]] = {
         "missing_sections": [],
         "missing_difficulty_tag": [],
         "too_many_subtopics": [],
@@ -199,7 +199,7 @@ def main() -> None:
     output_dir = vault_root / "repair_work_packages"
     output_dir.mkdir(exist_ok=True)
 
-    agents: List[Dict] = []
+    agents: list[dict] = []
 
     # Agent 1: Restore difficulty tags
     if corruption_issues["missing_difficulty_tag"]:

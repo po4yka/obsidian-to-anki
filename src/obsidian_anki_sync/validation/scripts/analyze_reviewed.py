@@ -3,7 +3,6 @@
 
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List
 
 from ..base import Severity
 from ..orchestrator import NoteValidator
@@ -15,7 +14,7 @@ def main() -> None:
 
     # Find all reviewed notes
     android_dir = vault_root / "40-Android"
-    reviewed_notes: List[Path] = []
+    reviewed_notes: list[Path] = []
 
     for md_file in android_dir.glob("q-*.md"):
         try:
@@ -39,7 +38,7 @@ def main() -> None:
         results.append(result)
 
     # Analyze results
-    stats: Dict[str, int] = {
+    stats: dict[str, int] = {
         "total": len(results),
         "passed": 0,
         "with_issues": 0,
@@ -49,13 +48,13 @@ def main() -> None:
         "info": 0,
     }
 
-    files_by_severity: Dict[Severity, List[tuple[str, int]]] = {
+    files_by_severity: dict[Severity, list[tuple[str, int]]] = {
         Severity.CRITICAL: [],
         Severity.ERROR: [],
         Severity.WARNING: [],
     }
 
-    issue_types: Dict[str, int] = defaultdict(int)
+    issue_types: dict[str, int] = defaultdict(int)
 
     for result in results:
         if not result["success"]:
@@ -102,10 +101,10 @@ def main() -> None:
     print("-" * 80)
     print(f"Total reviewed notes: {stats['total']}")
     print(
-        f"Passed validation:    {stats['passed']} ({stats['passed']/stats['total']*100:.1f}%)"
+        f"Passed validation:    {stats['passed']} ({stats['passed'] / stats['total'] * 100:.1f}%)"
     )
     print(
-        f"With issues:          {stats['with_issues']} ({stats['with_issues']/stats['total']*100:.1f}%)"
+        f"With issues:          {stats['with_issues']} ({stats['with_issues'] / stats['total'] * 100:.1f}%)"
     )
     print()
     print(f"Critical issues:      {stats['critical']}")

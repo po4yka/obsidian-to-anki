@@ -6,7 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import yaml
 
@@ -19,7 +19,7 @@ class WorkPackagePreparator:
 
     def __init__(self, vault_root: Path):
         self.vault_root = vault_root
-        self.work_packages: Dict[str, List[Dict]] = {
+        self.work_packages: dict[str, list[dict]] = {
             "invalid_subtopics": [],
             "missing_concept_links": [],
             "broken_wikilinks": [],
@@ -30,11 +30,11 @@ class WorkPackagePreparator:
         taxonomy_path = vault_root / "00-Administration/Vault-Rules/TAXONOMY.md"
         self.valid_topics = self._load_valid_topics(taxonomy_path)
 
-    def _load_valid_topics(self, taxonomy_path: Path) -> Set[str]:
+    def _load_valid_topics(self, taxonomy_path: Path) -> set[str]:
         """Load valid topics from TAXONOMY.md."""
         try:
             content = taxonomy_path.read_text(encoding="utf-8")
-            topics: Set[str] = set()
+            topics: set[str] = set()
             in_topics_section = False
 
             for line in content.split("\n"):
@@ -54,7 +54,7 @@ class WorkPackagePreparator:
             print(f"Error loading taxonomy: {e}", file=sys.stderr)
             return set()
 
-    def analyze_file(self, filepath: Path) -> Optional[Dict]:
+    def analyze_file(self, filepath: Path) -> dict | None:
         """Analyze a file and identify issues."""
         try:
             content = filepath.read_text(encoding="utf-8")
@@ -70,7 +70,7 @@ class WorkPackagePreparator:
             frontmatter = yaml.safe_load(parts[1])
             body = parts[2]
 
-            issues: Dict[str, Any] = {
+            issues: dict[str, Any] = {
                 "filepath": str(filepath.relative_to(self.vault_root)),
                 "filename": filepath.name,
                 "title": frontmatter.get("title", ""),
@@ -180,7 +180,7 @@ class WorkPackagePreparator:
         return folder_mapping.get(topic, "")
 
     def analyze_directory(
-        self, directory: Path, status_filter: Optional[str] = None
+        self, directory: Path, status_filter: str | None = None
     ) -> None:
         """Analyze all files in directory."""
         files = sorted(directory.glob("q-*.md"))
@@ -215,10 +215,10 @@ class WorkPackagePreparator:
                             }
                         )
 
-    def distribute_work(self, num_agents: int = 4) -> List[Dict]:
+    def distribute_work(self, num_agents: int = 4) -> list[dict]:
         """Distribute work across agents by issue type."""
         # Create specialized agents for different issue types
-        agents: List[Dict] = []
+        agents: list[dict] = []
 
         # Agent 1-2: Invalid subtopics
         if self.work_packages["invalid_subtopics"]:
@@ -270,9 +270,9 @@ class WorkPackagePreparator:
 
                 agents.append(
                     {
-                        "agent_id": f"concepts-{i+1}",
+                        "agent_id": f"concepts-{i + 1}",
                         "task_type": "missing_concept_links",
-                        "description": f"Add relevant concept links to notes (batch {i+1}/6)",
+                        "description": f"Add relevant concept links to notes (batch {i + 1}/6)",
                         "files": files[start_idx:end_idx],
                         "count": end_idx - start_idx,
                     }
@@ -280,7 +280,7 @@ class WorkPackagePreparator:
 
         return agents
 
-    def save_work_packages(self, agents: List[Dict], output_dir: Path) -> Dict:
+    def save_work_packages(self, agents: list[dict], output_dir: Path) -> dict:
         """Save work packages for agents."""
         output_dir.mkdir(exist_ok=True)
 

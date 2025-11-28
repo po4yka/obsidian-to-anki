@@ -4,7 +4,7 @@ import re
 import time
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any, Union
+from typing import Any
 
 from limits import RateLimitItemPerMinute, RateLimitItemPerSecond
 from limits.storage import MemoryStorage
@@ -66,10 +66,10 @@ class RateLimiter:
         # Create rate limit items for limits library
         # Convert window_seconds to appropriate RateLimitItem
         if window_seconds == 60:
-            self.request_limit: Union[
-                RateLimitItemPerMinute, RateLimitItemPerSecond
-            ] = RateLimitItemPerMinute(max_requests)
-            self.token_limit: Union[RateLimitItemPerMinute, RateLimitItemPerSecond] = (
+            self.request_limit: RateLimitItemPerMinute | RateLimitItemPerSecond = (
+                RateLimitItemPerMinute(max_requests)
+            )
+            self.token_limit: RateLimitItemPerMinute | RateLimitItemPerSecond = (
                 RateLimitItemPerMinute(max_tokens)
             )
         elif window_seconds == 1:

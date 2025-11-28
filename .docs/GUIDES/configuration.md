@@ -14,7 +14,7 @@ anki_deck_name: "My Deck"
 
 # Choose your provider
 llm_provider: "openrouter" # or "ollama", "openai", "anthropic"
-openrouter_api_key: "sk-or-v1-..."
+openrouter_api_key: "sk-or-v1-..." # pragma: allowlist secret
 
 # Use optimized presets
 model_preset: "balanced" # cost_effective|balanced|high_quality|fast
@@ -40,9 +40,9 @@ Set sensitive information via environment variables:
 
 ```bash
 # API Keys (recommended)
-export OPENROUTER_API_KEY="sk-or-v1-..."
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENROUTER_API_KEY="sk-or-v1-..."  # pragma: allowlist secret
+export OPENAI_API_KEY="sk-..."  # pragma: allowlist secret
+export ANTHROPIC_API_KEY="sk-ant-..."  # pragma: allowlist secret
 
 # Provider settings
 export OLLAMA_BASE_URL="http://localhost:11434"

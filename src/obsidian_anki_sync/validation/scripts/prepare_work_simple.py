@@ -5,14 +5,14 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
 
 def analyze_file(
-    filepath: Path, vault_root: Path, android_valid_subtopics: List[str]
-) -> Optional[Dict]:
+    filepath: Path, vault_root: Path, android_valid_subtopics: list[str]
+) -> dict | None:
     """Analyze a file for issues."""
     try:
         content = filepath.read_text(encoding="utf-8")
@@ -27,7 +27,7 @@ def analyze_file(
         frontmatter = yaml.safe_load(parts[1])
         body = parts[2]
 
-        issues_found: List[Dict] = []
+        issues_found: list[dict] = []
 
         # Check for invalid Android subtopics
         if frontmatter.get("topic") == "android":
@@ -148,7 +148,7 @@ def get_expected_folder(topic: str) -> str:
     return mapping.get(topic, "")
 
 
-def load_android_subtopics(vault_root: Path) -> List[str]:
+def load_android_subtopics(vault_root: Path) -> list[str]:
     """Load valid Android subtopics from TAXONOMY.md."""
     taxonomy_path = vault_root / "00-Administration/Vault-Rules/TAXONOMY.md"
     try:
@@ -156,7 +156,7 @@ def load_android_subtopics(vault_root: Path) -> List[str]:
 
         # Find Android subtopics section
         in_section = False
-        subtopics: List[str] = []
+        subtopics: list[str] = []
 
         for line in content.split("\n"):
             if "### Android Subtopics" in line:
@@ -187,7 +187,7 @@ def main() -> None:
     print()
 
     print("Analyzing reviewed Android notes...")
-    work_packages: Dict[str, List[Dict]] = {
+    work_packages: dict[str, list[dict]] = {
         "invalid_subtopics": [],
         "missing_concept_links": [],
         "broken_wikilinks": [],
@@ -239,7 +239,7 @@ def main() -> None:
     print()
 
     # Distribute work
-    agents: List[Dict] = []
+    agents: list[dict] = []
 
     # Agent 1: Invalid subtopics
     if work_packages["invalid_subtopics"]:
@@ -289,9 +289,9 @@ def main() -> None:
             if start_idx < len(files):
                 agents.append(
                     {
-                        "agent_id": f"concepts-{i+1}",
+                        "agent_id": f"concepts-{i + 1}",
                         "task_type": "missing_concept_links",
-                        "description": f"Add concept links (batch {i+1}/6)",
+                        "description": f"Add concept links (batch {i + 1}/6)",
                         "files": files[start_idx:end_idx],
                         "count": end_idx - start_idx,
                     }

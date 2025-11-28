@@ -3,7 +3,6 @@
 
 import re
 from pathlib import Path
-from typing import Dict, List
 
 FILES = [
     "q-database-sharding-partitioning--system-design--hard.md",
@@ -14,7 +13,7 @@ FILES = [
 ]
 
 # Known BEFORE counts
-BEFORE_COUNTS: Dict[str, int] = {
+BEFORE_COUNTS: dict[str, int] = {
     "q-database-sharding-partitioning--system-design--hard.md": 1452,
     "q-message-queues-event-driven--system-design--medium.md": 1523,
     "q-rest-api-design-best-practices--system-design--medium.md": 1620,
@@ -38,7 +37,7 @@ def main() -> None:
 
     total_before = 0
     total_after = 0
-    results: List[Dict] = []
+    results: list[dict] = []
 
     for filename in FILES:
         filepath = base_path / filename

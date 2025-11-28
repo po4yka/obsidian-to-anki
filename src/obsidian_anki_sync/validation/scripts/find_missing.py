@@ -6,7 +6,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -16,14 +15,14 @@ class MissingSectionIdentifier:
 
     def __init__(self, vault_root: Path):
         self.vault_root = vault_root
-        self.missing_sections: Dict[str, List[Dict]] = {
+        self.missing_sections: dict[str, list[dict]] = {
             "missing_ru_question": [],
             "missing_en_question": [],
             "missing_ru_answer": [],
             "missing_en_answer": [],
         }
 
-    def analyze_file(self, filepath: Path) -> Optional[Dict]:
+    def analyze_file(self, filepath: Path) -> dict | None:
         """Analyze a file for missing sections."""
         try:
             content = filepath.read_text(encoding="utf-8")
@@ -50,7 +49,7 @@ class MissingSectionIdentifier:
             has_ru_answer = bool(re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
             has_en_answer = bool(re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
 
-            missing: List[str] = []
+            missing: list[str] = []
             if not has_ru_question:
                 missing.append("ru_question")
             if not has_en_question:
@@ -64,7 +63,7 @@ class MissingSectionIdentifier:
                 return None
 
             # Extract existing sections for context
-            sections: Dict[str, str] = {}
+            sections: dict[str, str] = {}
 
             # Extract EN question if present
             en_q_match = re.search(
@@ -121,7 +120,7 @@ class MissingSectionIdentifier:
             return None
 
     def analyze_directory(
-        self, directory: Path, status_filter: Optional[str] = None
+        self, directory: Path, status_filter: str | None = None
     ) -> None:
         """Analyze all Q&A files in directory."""
         files = sorted(directory.glob("q-*.md"))
@@ -144,10 +143,10 @@ class MissingSectionIdentifier:
                     if key in self.missing_sections:
                         self.missing_sections[key].append(result)
 
-    def distribute_work(self, num_agents: int) -> List[Dict]:
+    def distribute_work(self, num_agents: int) -> list[dict]:
         """Distribute files across agents."""
         # Prioritize RU questions
-        all_files: Dict[str, Dict] = {}
+        all_files: dict[str, dict] = {}
 
         for filepath_info in self.missing_sections["missing_ru_question"]:
             filepath = filepath_info["filepath"]
@@ -163,7 +162,7 @@ class MissingSectionIdentifier:
         files_per_agent = len(files_list) // num_agents
         remainder = len(files_list) % num_agents
 
-        batches: List[Dict] = []
+        batches: list[dict] = []
         start_idx = 0
 
         for i in range(num_agents):
@@ -202,7 +201,7 @@ class MissingSectionIdentifier:
         )
         print("=" * 80)
 
-    def save_batches(self, batches: List[Dict], output_dir: Path) -> None:
+    def save_batches(self, batches: list[dict], output_dir: Path) -> None:
         """Save batch files for agents."""
         output_dir.mkdir(exist_ok=True)
 

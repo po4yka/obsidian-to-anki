@@ -132,9 +132,7 @@ class ProcessNotesUseCase:
             # Add discovery statistics
             if notes:
                 discovery_stats = self.note_discovery_service.get_note_statistics(notes)
-                stats["discovery_stats"] = dict(
-                    discovery_stats
-                )  # type: ignore[assignment]
+                stats["discovery_stats"] = dict(discovery_stats)  # type: ignore[assignment]
 
             success = len(errors) == 0 or (
                 len(cards) > 0 and len(errors) < len(notes) // 2  # Allow some errors

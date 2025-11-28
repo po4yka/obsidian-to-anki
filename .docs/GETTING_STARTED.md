@@ -56,13 +56,13 @@ ollama pull qwen3:8b qwen3:14b qwen3:32b
 ### Option B: OpenAI
 
 ```bash
-export OPENAI_API_KEY="sk-your-openai-api-key-here"
+export OPENAI_API_KEY="sk-your-openai-api-key-here"  # pragma: allowlist secret
 ```
 
 ### Option C: Anthropic
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"
+export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"  # pragma: allowlist secret
 ```
 
 ## 4. Configuration

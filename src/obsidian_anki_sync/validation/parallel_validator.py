@@ -9,7 +9,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from tqdm import tqdm
 
@@ -108,7 +109,7 @@ class ParallelValidator:
                     asyncio.gather(*tasks, return_exceptions=True),
                     timeout=self.config.timeout_per_file * len(batch),
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Handle timeout - return error results for remaining
                 batch_results = []
                 for filepath in batch:

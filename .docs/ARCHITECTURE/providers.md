@@ -54,7 +54,7 @@ ollama pull qwen3:32b
 ```yaml
 llm_provider: "ollama"
 ollama_base_url: "https://api.ollama.com"
-ollama_api_key: "your-api-key" # Or set OLLAMA_API_KEY env var
+ollama_api_key: "your-api-key" # Or set OLLAMA_API_KEY env var  # pragma: allowlist secret
 ```
 
 **Recommended Models:**
@@ -99,7 +99,7 @@ post_validator_model: "lmstudio-community/Qwen2.5-14B-Instruct-GGUF"
 
 ```yaml
 llm_provider: "openrouter"
-openrouter_api_key: "your-api-key" # Or set OPENROUTER_API_KEY env var
+openrouter_api_key: "your-api-key" # Or set OPENROUTER_API_KEY env var  # pragma: allowlist secret
 openrouter_base_url: "https://openrouter.ai/api/v1"
 pre_validator_model: "openai/gpt-4o-mini"
 generator_model: "anthropic/claude-3-5-sonnet-20241022"
@@ -135,7 +135,7 @@ openrouter_site_name: "Your App Name"
 
 ```yaml
 llm_provider: "openai"
-openai_api_key: "sk-..." # Or set OPENAI_API_KEY env var
+openai_api_key: "sk-..." # Or set OPENAI_API_KEY env var  # pragma: allowlist secret
 openai_base_url: "https://api.openai.com/v1"
 pre_validator_model: "gpt-4o-mini"
 generator_model: "gpt-4o"
@@ -162,7 +162,7 @@ post_validator_model: "gpt-4o-mini"
 
 ```yaml
 llm_provider: "anthropic"
-anthropic_api_key: "sk-ant-..." # Or set ANTHROPIC_API_KEY env var
+anthropic_api_key: "sk-ant-..." # Or set ANTHROPIC_API_KEY env var  # pragma: allowlist secret
 anthropic_base_url: "https://api.anthropic.com"
 pre_validator_model: "claude-3-haiku-20240307"
 generator_model: "claude-3-5-sonnet-20241022"
@@ -380,9 +380,9 @@ print(f"Requests: {stats.requests}, Cost: ${stats.cost}")
 
 ```bash
 # Set in environment (recommended)
-export OPENROUTER_API_KEY="sk-or-v1-..."
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENROUTER_API_KEY="sk-or-v1-..."  # pragma: allowlist secret
+export OPENAI_API_KEY="sk-..."  # pragma: allowlist secret
+export ANTHROPIC_API_KEY="sk-ant-..."  # pragma: allowlist secret
 
 # Or use .env file (gitignored)
 echo "OPENROUTER_API_KEY=sk-or-v1-..." > .env
@@ -505,7 +505,7 @@ ollama_base_url: "..."
 ```yaml
 # Single provider with unified config
 llm_provider: "openrouter"
-openrouter_api_key: "sk-or-v1-..."
+openrouter_api_key: "sk-or-v1-..." # pragma: allowlist secret
 default_llm_model: "anthropic/claude-3-5-sonnet-20241022"
 ```
 
@@ -520,7 +520,7 @@ ollama_base_url: "http://localhost:11434"
 
 # After
 llm_provider: "openrouter"
-openrouter_api_key: "sk-or-v1-..."
+openrouter_api_key: "sk-or-v1-..."  # pragma: allowlist secret
 ```
 
 **From OpenAI to Anthropic:**

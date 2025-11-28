@@ -8,7 +8,6 @@ all wikilinks that reference the old filenames.
 import argparse
 import re
 from pathlib import Path
-from typing import Dict
 
 
 class WikilinkUpdater:
@@ -18,13 +17,13 @@ class WikilinkUpdater:
         self.vault_root = vault_root
         self.dry_run = dry_run
         self.rename_mapping = self._build_rename_mapping()
-        self.stats: Dict[str, int] = {
+        self.stats: dict[str, int] = {
             "files_scanned": 0,
             "files_updated": 0,
             "links_updated": 0,
         }
 
-    def _build_rename_mapping(self) -> Dict[str, str]:
+    def _build_rename_mapping(self) -> dict[str, str]:
         """Build mapping of old filename patterns to new filenames."""
         # Common renames in 40-Android
         patterns = [
@@ -42,7 +41,7 @@ class WikilinkUpdater:
             ("di", "android"),
         ]
 
-        mapping: Dict[str, str] = {}
+        mapping: dict[str, str] = {}
 
         # Scan actual files to build accurate mapping
         android_dir = self.vault_root / "40-Android"
