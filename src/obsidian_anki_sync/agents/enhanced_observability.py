@@ -11,8 +11,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
 
 # Optional LangSmith integration
 try:
@@ -391,7 +391,7 @@ class EnhancedObservabilitySystem:
             agent_performance[metric.agent_name]["total_time"] += metric.execution_time
 
         # Calculate success rates and avg times
-        for agent, stats in agent_performance.items():
+        for stats in agent_performance.values():
             stats["success_rate"] = stats["successes"] / stats["executions"]
             stats["avg_execution_time"] = stats["total_time"] / stats["executions"]
 

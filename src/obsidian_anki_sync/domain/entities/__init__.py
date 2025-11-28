@@ -6,9 +6,9 @@ from .note import Note, NoteMetadata, QAPair
 __all__ = [
     "Card",
     "CardManifest",
-    "SyncAction",
-    "SyncActionType",
     "Note",
     "NoteMetadata",
     "QAPair",
+    "SyncAction",
+    "SyncActionType",
 ]

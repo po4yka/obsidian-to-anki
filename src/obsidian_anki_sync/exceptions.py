@@ -82,8 +82,6 @@ class ConfigurationError(ObsidianAnkiSyncError):
     - Environment variables are invalid
     """
 
-    pass
-
 
 # Provider Errors
 
@@ -93,8 +91,6 @@ class ProviderError(ObsidianAnkiSyncError):
 
     Base class for all errors related to LLM providers (Ollama, LM Studio, OpenRouter).
     """
-
-    pass
 
 
 class ProviderConnectionError(ProviderError):
@@ -106,8 +102,6 @@ class ProviderConnectionError(ProviderError):
     - Network connectivity issues
     """
 
-    pass
-
 
 class ProviderTimeoutError(ProviderError):
     """Provider request timeouts.
@@ -118,8 +112,6 @@ class ProviderTimeoutError(ProviderError):
     - Generation request exceeds timeout
     """
 
-    pass
-
 
 # Validation Errors
 
@@ -129,8 +121,6 @@ class ValidationError(ObsidianAnkiSyncError):
 
     Base class for validation-related errors.
     """
-
-    pass
 
 
 class ParserError(ValidationError):
@@ -143,8 +133,6 @@ class ParserError(ValidationError):
     - Q&A pairs are incorrectly formatted
     """
 
-    pass
-
 
 # Sync Errors
 
@@ -154,8 +142,6 @@ class SyncError(ObsidianAnkiSyncError):
 
     Base class for errors during the sync process.
     """
-
-    pass
 
 
 class IndexingError(SyncError):
@@ -167,8 +153,6 @@ class IndexingError(SyncError):
     - Index corruption detected
     """
 
-    pass
-
 
 class StateError(SyncError):
     """State database errors.
@@ -179,16 +163,12 @@ class StateError(SyncError):
     - Schema migration failed
     """
 
-    pass
-
 
 # Anki Errors
 
 
 class AnkiError(ObsidianAnkiSyncError):
     """Base class for Anki-related errors."""
-
-    pass
 
 
 class AnkiConnectError(AnkiError):
@@ -201,8 +181,6 @@ class AnkiConnectError(AnkiError):
     - AnkiConnect API returns an error
     """
 
-    pass
-
 
 class FieldMappingError(AnkiError):
     """Field mapping errors.
@@ -213,8 +191,6 @@ class FieldMappingError(AnkiError):
     - Field types are incompatible
     """
 
-    pass
-
 
 class DeckExportError(AnkiError):
     """Deck export errors.
@@ -224,8 +200,6 @@ class DeckExportError(AnkiError):
     - Invalid deck structure
     - File system errors during export
     """
-
-    pass
 
 
 class DeckImportError(AnkiError):
@@ -238,8 +212,6 @@ class DeckImportError(AnkiError):
     - Invalid card data in file
     """
 
-    pass
-
 
 # Agent System Errors
 
@@ -249,8 +221,6 @@ class AgentError(ObsidianAnkiSyncError):
 
     Base class for errors in the multi-agent card generation pipeline.
     """
-
-    pass
 
 
 class PreValidationError(AgentError):
@@ -262,8 +232,6 @@ class PreValidationError(AgentError):
     - Pre-validator timeout
     """
 
-    pass
-
 
 class GeneratorError(AgentError):
     """Generator agent errors.
@@ -273,8 +241,6 @@ class GeneratorError(AgentError):
     - Generator produces invalid output
     - Generator timeout
     """
-
-    pass
 
 
 class PostValidationError(AgentError):
@@ -286,8 +252,6 @@ class PostValidationError(AgentError):
     - Auto-fix attempts exhausted
     - Post-validator timeout
     """
-
-    pass
 
 
 # Export helper functions for backward compatibility

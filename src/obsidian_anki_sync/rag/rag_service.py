@@ -10,8 +10,9 @@ Provides unified interface for:
 from dataclasses import dataclass
 from typing import Any
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .document_chunker import ChunkType
 from .vector_store import SearchResult, VaultVectorStore
 
@@ -453,7 +454,7 @@ def get_rag_service(config: Config | None = None) -> RAGService:
 
     if _rag_service is None:
         if config is None:
-            from ..config import get_config
+            from obsidian_anki_sync.config import get_config
 
             config = get_config()
         _rag_service = RAGService(config)

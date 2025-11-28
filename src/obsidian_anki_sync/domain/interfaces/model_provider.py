@@ -17,7 +17,6 @@ class IModelProvider(ABC):
         Returns:
             List of model identifiers/names
         """
-        pass
 
     @abstractmethod
     def get_model_info(self, model: str) -> dict | None:
@@ -29,7 +28,6 @@ class IModelProvider(ABC):
         Returns:
             Model information dictionary or None if not found
         """
-        pass
 
     @abstractmethod
     def list_models_with_info(self) -> list[dict]:
@@ -38,7 +36,6 @@ class IModelProvider(ABC):
         Returns:
             List of model information dictionaries
         """
-        pass
 
     @abstractmethod
     def supports_model(self, model: str) -> bool:
@@ -50,7 +47,6 @@ class IModelProvider(ABC):
         Returns:
             True if model is supported, False otherwise
         """
-        pass
 
     @abstractmethod
     def get_default_model(self) -> str:
@@ -59,4 +55,3 @@ class IModelProvider(ABC):
         Returns:
             Default model identifier
         """
-        pass

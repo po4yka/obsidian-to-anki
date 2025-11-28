@@ -67,7 +67,7 @@ def validate_all(
     """Validate all Q&A notes in the vault."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..validation import NoteValidator, ReportGenerator, Severity
+    from obsidian_anki_sync.validation import NoteValidator, ReportGenerator, Severity
 
     logger.info(
         "validate_all_started", incremental=incremental, fix=fix, parallel=parallel
@@ -189,7 +189,7 @@ def validate_note(
     """Validate a single Q&A note."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..validation import NoteValidator, ReportGenerator, Severity
+    from obsidian_anki_sync.validation import NoteValidator, ReportGenerator, Severity
 
     logger.info("validate_note_started", path=str(note_path))
 
@@ -297,7 +297,7 @@ def validate_dir(
     """Validate all Q&A notes in a specific directory."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..validation import NoteValidator, ReportGenerator, Severity
+    from obsidian_anki_sync.validation import NoteValidator, ReportGenerator, Severity
 
     logger.info("validate_dir_started", directory=str(directory), parallel=parallel)
 
@@ -394,7 +394,7 @@ def validate_stats(
     """Show validation cache statistics."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..validation import HashTracker
+    from obsidian_anki_sync.validation import HashTracker
 
     vault_path = config.vault_path / config.source_dir
     tracker = HashTracker(vault_path, cache_dir=config.get_data_path())
@@ -423,7 +423,7 @@ def validate_clear_cache(
     """Clear the validation cache."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..validation import HashTracker
+    from obsidian_anki_sync.validation import HashTracker
 
     vault_path = config.vault_path / config.source_dir
     tracker = HashTracker(vault_path, cache_dir=config.get_data_path())

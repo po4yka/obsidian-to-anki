@@ -4,10 +4,10 @@ import random
 from pathlib import Path
 from typing import Any
 
-from ...domain.entities.note import Note, NoteMetadata
-from ...domain.interfaces.note_parser import INoteParser
-from ...domain.interfaces.state_repository import IStateRepository
-from ...utils.logging import get_logger
+from obsidian_anki_sync.domain.entities.note import Note, NoteMetadata
+from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -163,7 +163,7 @@ class NoteDiscoveryService:
         """
         try:
             # Parse the note using the parser interface
-            metadata, qa_pairs = self.note_parser.parse_note(file_path)
+            metadata, _qa_pairs = self.note_parser.parse_note(file_path)
 
             # Create domain entity
             # Note: metadata is Pydantic model with id/title/created/updated fields

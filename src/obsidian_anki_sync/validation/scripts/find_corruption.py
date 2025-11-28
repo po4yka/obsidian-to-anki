@@ -97,7 +97,7 @@ def analyze_file(filepath: Path, vault_root: Path) -> dict | None:
         # Check for trailing whitespace
         lines_with_trailing: list[int] = []
         for i, line in enumerate(content.split("\n"), 1):
-            if line.endswith(" ") or line.endswith("\t"):
+            if line.endswith((" ", "\t")):
                 lines_with_trailing.append(i)
 
         if lines_with_trailing:
@@ -124,7 +124,6 @@ def analyze_file(filepath: Path, vault_root: Path) -> dict | None:
         return None
 
     except Exception as e:
-        print(f"Error analyzing {filepath.name}: {e}", file=sys.stderr)
         return None
 
 
@@ -132,9 +131,6 @@ def main() -> None:
     """Main entry point for corruption issue identification."""
     vault_root = Path.cwd()
     android_dir = vault_root / "40-Android"
-
-    print("Analyzing corruption issues in reviewed Android notes...")
-    print()
 
     corruption_issues: dict[str, list[dict]] = {
         "missing_sections": [],
@@ -170,30 +166,7 @@ def main() -> None:
                         )
 
         except Exception as e:
-            print(f"Error processing {filepath.name}: {e}", file=sys.stderr)
-
-    print(f"Analyzed {analyzed} reviewed files")
-    print()
-    print("=" * 80)
-    print("CORRUPTION ISSUES FOUND")
-    print("=" * 80)
-    print(
-        f"Missing sections:        {len(corruption_issues['missing_sections'])} files"
-    )
-    print(
-        f"Missing difficulty tag:  {len(corruption_issues['missing_difficulty_tag'])} files"
-    )
-    print(
-        f"Too many subtopics:      {len(corruption_issues['too_many_subtopics'])} files"
-    )
-    print(
-        f"Invalid subtopics:       {len(corruption_issues['invalid_subtopics'])} files"
-    )
-    print(
-        f"Trailing whitespace:     {len(corruption_issues['trailing_whitespace'])} files"
-    )
-    print("=" * 80)
-    print()
+            pass
 
     # Create repair work packages
     output_dir = vault_root / "repair_work_packages"
@@ -274,15 +247,8 @@ def main() -> None:
             }
         )
 
-    print("REPAIR WORK DISTRIBUTION")
-    print("=" * 80)
     for agent in agents:
-        print(
-            f"{agent['agent_id']:30} - {agent['count']:3} files - {agent['description']}"
-        )
-    print("=" * 80)
-    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
-    print()
+        pass
 
     # Save work packages
     for agent in agents:
@@ -302,9 +268,6 @@ def main() -> None:
     summary_file = output_dir / "summary.json"
     with open(summary_file, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
-
-    print(f"Saved {len(agents)} repair work packages to {output_dir}/")
-    print(f"Summary: {summary_file}")
 
 
 if __name__ == "__main__":

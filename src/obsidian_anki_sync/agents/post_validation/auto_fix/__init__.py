@@ -4,4 +4,4 @@ from .aggressive_fixer import AggressiveFixer
 from .deterministic_fixes import DeterministicFixer
 from .rule_based_fixes import RuleBasedHeaderFixer
 
-__all__ = ["DeterministicFixer", "RuleBasedHeaderFixer", "AggressiveFixer"]
+__all__ = ["AggressiveFixer", "DeterministicFixer", "RuleBasedHeaderFixer"]

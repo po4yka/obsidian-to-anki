@@ -5,13 +5,14 @@ providing automatic retry with fixing for structured outputs that fail validatio
 """
 
 import json
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .exceptions import StructuredOutputError
 
 logger = get_logger(__name__)
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-class OutputFixingParser(Generic[T]):
+class OutputFixingParser[T: BaseModel]:
     """Wrapper for PydanticAI agents that automatically fixes validation errors.
 
     Implements LangChain's OutputFixingParser pattern:
@@ -108,7 +109,8 @@ class OutputFixingParser(Generic[T]):
                 else:
                     # Retry with fixed prompt
                     if last_output is None:
-                        raise ValueError("No previous output to fix")
+                        msg = "No previous output to fix"
+                        raise ValueError(msg)
 
                     fixed_prompt = await self._fix_output(
                         prompt=prompt,
@@ -150,8 +152,9 @@ class OutputFixingParser(Generic[T]):
                         attempts=attempt,
                         error=str(e),
                     )
+                    msg = f"Failed to fix output after {attempt} attempts: {e!s}"
                     raise StructuredOutputError(
-                        f"Failed to fix output after {attempt} attempts: {str(e)}",
+                        msg,
                         details={"attempts": attempt, "error": str(e)},
                     ) from e
 
@@ -167,7 +170,8 @@ class OutputFixingParser(Generic[T]):
                 logger.error("output_fixing_unexpected_error", error=str(e))
                 raise
         # This should never be reached, but mypy needs it
-        raise StructuredOutputError("Unexpected loop exit", details={})
+        msg = "Unexpected loop exit"
+        raise StructuredOutputError(msg, details={})
 
     async def _fix_output(
         self,
@@ -256,7 +260,8 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         try:
             # Try to get it from the agent if it has output_type attribute
             if hasattr(self.agent, "output_type"):
-                result_type = self.agent.output_type  # type: ignore
+                # type: ignore[attr-defined]
+                result_type = self.agent.output_type
                 # Check if it's a Pydantic model
                 if isinstance(result_type, type) and issubclass(result_type, BaseModel):
                     # Try to get schema
@@ -348,7 +353,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         }
 
 
-def wrap_agent_with_fixing(
+def wrap_agent_with_fixing[T: BaseModel](
     agent: Agent[T],
     fix_model: Model | None = None,
     max_fix_attempts: int = 2,

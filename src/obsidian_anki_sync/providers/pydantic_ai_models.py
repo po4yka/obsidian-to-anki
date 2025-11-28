@@ -11,8 +11,9 @@ from pydantic import Field
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .openrouter import OpenRouterProvider
 
 logger = get_logger(__name__)
@@ -243,10 +244,11 @@ class PydanticAIModelFactory:
             api_key = settings.openrouter_api_key
 
         if not api_key:
-            raise ValueError(
+            msg = (
                 "OpenRouter API key is required. Provide it via the api_key parameter "
                 "or set the OPENROUTER_API_KEY environment variable."
             )
+            raise ValueError(msg)
 
         # Build HTTP headers for OpenRouter
         http_headers: dict[str, str] = {}
@@ -359,10 +361,11 @@ class PydanticAIModelFactory:
                 http_client=http_client,
             )
         else:
-            raise ValueError(
+            msg = (
                 f"Unsupported provider for PydanticAI: {provider}. "
                 f"Supported providers: openrouter, ollama, lm_studio"
             )
+            raise ValueError(msg)
 
 
 def create_openrouter_model_from_env(

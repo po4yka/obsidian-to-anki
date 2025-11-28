@@ -3,8 +3,8 @@
 import json
 import re
 
-from ..models import ValidationResult
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import ValidationResult
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -183,7 +183,7 @@ def _validate_card_block(
         )
         return
 
-    card_idx, slug, card_type, tags_str = header_match.groups()
+    _card_idx, slug, card_type, tags_str = header_match.groups()
 
     # Check slug matches expected
     if expected_slug and slug != expected_slug:

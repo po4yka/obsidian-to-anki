@@ -121,7 +121,8 @@ class BaseValidator:
         Returns:
             List of validation issues found
         """
-        raise NotImplementedError("Subclasses must implement validate()")
+        msg = "Subclasses must implement validate()"
+        raise NotImplementedError(msg)
 
     def get_issues_by_severity(self, severity: Severity) -> list[ValidationIssue]:
         """Get all issues of a specific severity.

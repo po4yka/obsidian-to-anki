@@ -3,8 +3,8 @@
 import json
 import re
 
-from ....utils.logging import get_logger
-from ...models import GeneratedCard
+from obsidian_anki_sync.agents.models import GeneratedCard
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -94,7 +94,7 @@ class AggressiveFixer:
                     fixed_html,
                 )
                 if header_match:
-                    card_num, slug, card_type, tags_str = header_match.groups()
+                    _card_num, slug, card_type, tags_str = header_match.groups()
                     tags = tags_str.strip().split()[:6]  # Limit to 6 tags
                     manifest_data = {
                         "slug": slug,

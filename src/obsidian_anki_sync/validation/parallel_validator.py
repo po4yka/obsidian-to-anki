@@ -85,7 +85,8 @@ class ParallelValidator:
             List of validation result dicts in same order as input files
         """
         if not self._executor:
-            raise RuntimeError("ParallelValidator must be used as context manager")
+            msg = "ParallelValidator must be used as context manager"
+            raise RuntimeError(msg)
 
         loop = asyncio.get_event_loop()
         results: list[dict[str, Any]] = []

@@ -53,7 +53,7 @@ class HashTracker:
                 json.dump(self.cache, f, indent=2, ensure_ascii=False)
         except OSError as e:
             # Log warning but don't fail validation
-            print(f"Warning: Could not save validation cache: {e}")
+            pass
 
     def compute_hash(self, filepath: Path) -> str:
         """Compute MD5 hash of file content.

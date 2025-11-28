@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -76,7 +76,8 @@ Your response must be a JSON object with two keys:
         # Parse JSON response
         result = json.loads(result_text)
         if not isinstance(result, dict):
-            raise ValueError("Quality check response is not a JSON object")
+            msg = "Quality check response is not a JSON object"
+            raise ValueError(msg)
 
         return {
             "is_valid": result.get("is_valid", True),

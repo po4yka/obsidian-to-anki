@@ -6,12 +6,17 @@ Generates APF cards from Q/A pairs using structured outputs.
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata, QAPair
-from ...utils.content_hash import compute_content_hash
-from ...utils.logging import get_logger
-from ..exceptions import GenerationError, ModelError, StructuredOutputError
-from ..improved_prompts import CARD_GENERATION_SYSTEM_PROMPT
-from ..models import GeneratedCard, GenerationResult
+from obsidian_anki_sync.agents.exceptions import (
+    GenerationError,
+    ModelError,
+    StructuredOutputError,
+)
+from obsidian_anki_sync.agents.improved_prompts import CARD_GENERATION_SYSTEM_PROMPT
+from obsidian_anki_sync.agents.models import GeneratedCard, GenerationResult
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import CardGenerationOutput, GenerationDeps
 
 logger = get_logger(__name__)
@@ -156,8 +161,9 @@ Slug Base: {slug_base}
                     continue
 
             if not generated_cards:
+                msg = "No valid cards generated"
                 raise GenerationError(
-                    "No valid cards generated",
+                    msg,
                     details={
                         "title": metadata.title,
                         "qa_pairs_count": len(qa_pairs),
@@ -184,17 +190,16 @@ Slug Base: {slug_base}
             raise
         except ValueError as e:
             logger.error("pydantic_ai_generation_parse_error", error=str(e))
+            msg = "Failed to parse generation output"
             raise StructuredOutputError(
-                "Failed to parse generation output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_generation_timeout", error=str(e))
-            raise ModelError(
-                "Card generation timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Card generation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_generation_failed", error=str(e))
-            raise GenerationError(
-                f"Card generation failed: {str(e)}", details={"title": metadata.title}
-            ) from e
+            msg = f"Card generation failed: {e!s}"
+            raise GenerationError(msg, details={"title": metadata.title}) from e

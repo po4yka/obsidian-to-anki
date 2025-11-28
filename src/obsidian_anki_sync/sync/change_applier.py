@@ -5,17 +5,17 @@ Handles applying sync actions to Anki (create, update, delete operations).
 
 from typing import TYPE_CHECKING, Any
 
-from ..anki.client import AnkiClient
-from ..anki.field_mapper import map_apf_to_anki_fields
-from ..config import Config
-from ..exceptions import AnkiConnectError
-from ..models import Card, SyncAction
-from ..sync.state_db import StateDB
-from ..sync.transactions import CardOperationError, CardTransaction
-from ..utils.logging import get_logger
+from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.exceptions import AnkiConnectError
+from obsidian_anki_sync.models import Card, SyncAction
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.sync.transactions import CardOperationError, CardTransaction
+from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from ..sync.progress import ProgressTracker
+    from obsidian_anki_sync.sync.progress import ProgressTracker
 
 logger = get_logger(__name__)
 
@@ -227,7 +227,8 @@ class ChangeApplier:
         except Exception as e:
             logger.error("card_create_failed", slug=card.slug, error=str(e))
             self.db.update_card_status(card.slug, "failed", str(e))
-            raise CardOperationError(f"Failed to create card {card.slug}: {e}")
+            msg = f"Failed to create card {card.slug}: {e}"
+            raise CardOperationError(msg)
 
     def update_card(self, card: Card, anki_guid: int) -> None:
         """Update card in Anki with atomic transaction.
@@ -277,7 +278,8 @@ class ChangeApplier:
         except Exception as e:
             logger.error("card_update_failed", slug=card.slug, error=str(e))
             self.db.update_card_status(card.slug, "failed", str(e))
-            raise CardOperationError(f"Failed to update card {card.slug}: {e}")
+            msg = f"Failed to update card {card.slug}: {e}"
+            raise CardOperationError(msg)
 
     def delete_card(self, card: Card, anki_guid: int) -> None:
         """Delete card from Anki.
@@ -719,9 +721,8 @@ class ChangeApplier:
                     slug=card.slug,
                     note_id=note_id,
                 )
-                raise CardOperationError(
-                    f"Card {card.slug} (note_id={note_id}) not found in Anki after creation"
-                )
+                msg = f"Card {card.slug} (note_id={note_id}) not found in Anki after creation"
+                raise CardOperationError(msg)
 
             note_info = notes_info[0]
 
@@ -733,9 +734,8 @@ class ChangeApplier:
                     expected_note_id=note_id,
                     actual_note_id=note_info.get("noteId"),
                 )
-                raise CardOperationError(
-                    f"Card {card.slug} verification failed: note ID mismatch"
-                )
+                msg = f"Card {card.slug} verification failed: note ID mismatch"
+                raise CardOperationError(msg)
 
             # Verify deck
             actual_deck = note_info.get("deckName", "")

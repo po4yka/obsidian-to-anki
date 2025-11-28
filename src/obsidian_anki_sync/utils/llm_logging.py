@@ -197,7 +197,8 @@ def set_session_id(session_id: str) -> None:
     """Set the active session ID for subsequent logging calls."""
 
     if not session_id:
-        raise ValueError("session_id cannot be empty")
+        msg = "session_id cannot be empty"
+        raise ValueError(msg)
 
     _session_id_var.set(session_id)
 
@@ -466,5 +467,4 @@ def reset_session_metrics(session_id: str | None = None) -> None:
         session_id: Optional session ID (uses default if not provided)
     """
     sess_id = session_id or _get_session_id()
-    if sess_id in _session_metrics:
-        del _session_metrics[sess_id]
+    _session_metrics.pop(sess_id, None)

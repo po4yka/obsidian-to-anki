@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypeVar
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -117,14 +117,14 @@ class CircuitBreaker:
                         timeout=self.config.timeout,
                     )
                 else:
-                    raise CircuitBreakerError(f"Circuit breaker '{self.name}' is OPEN")
+                    msg = f"Circuit breaker '{self.name}' is OPEN"
+                    raise CircuitBreakerError(msg)
 
             # Check half-open call limit
             if self.state == CircuitBreakerState.HALF_OPEN:
                 if self.half_open_calls >= self.config.half_open_max_calls:
-                    raise CircuitBreakerError(
-                        f"Circuit breaker '{self.name}' HALF_OPEN call limit reached"
-                    )
+                    msg = f"Circuit breaker '{self.name}' HALF_OPEN call limit reached"
+                    raise CircuitBreakerError(msg)
 
         # Execute the function
         try:
@@ -365,9 +365,8 @@ class Bulkhead:
             ResourceExhaustedError: If resources unavailable within timeout
         """
         if not self.semaphore.acquire(timeout=self.timeout):
-            raise ResourceExhaustedError(
-                f"Bulkhead resources exhausted (max: {self.max_concurrent})"
-            )
+            msg = f"Bulkhead resources exhausted (max: {self.max_concurrent})"
+            raise ResourceExhaustedError(msg)
 
         try:
             with self.lock:
@@ -500,11 +499,7 @@ class ConfidenceValidator:
             r"[a-zA-Z]\d{1,2}[a-zA-Z]\d{1,2}",  # Mixed alphanumeric patterns
         ]
 
-        for pattern in corruption_patterns:
-            if re.search(pattern, content):
-                return True
-
-        return False
+        return any(re.search(pattern, content) for pattern in corruption_patterns)
 
     def _record_validation(
         self,

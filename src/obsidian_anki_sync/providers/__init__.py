@@ -21,21 +21,19 @@ except ModuleNotFoundError:
     _PYDANTIC_MODELS_AVAILABLE = False
 
 __all__ = [
-    # Core providers
-    "BaseLLMProvider",
-    "ProviderFactory",
     # Provider implementations
     "AnthropicProvider",
+    # Core providers
+    "BaseLLMProvider",
     "LMStudioProvider",
     "OllamaProvider",
     "OpenAIProvider",
     "OpenRouterProvider",
+    "ProviderFactory",
 ]
 
 if _PYDANTIC_MODELS_AVAILABLE:
-    __all__.extend(
-        [
-            "PydanticAIModelFactory",
-            "create_openrouter_model_from_env",
-        ]
-    )
+    __all__ += [
+        "PydanticAIModelFactory",
+        "create_openrouter_model_from_env",
+    ]

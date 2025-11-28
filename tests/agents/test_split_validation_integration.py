@@ -89,14 +89,16 @@ async def test_split_validation_node_approved(pipeline_state):
         )
     )
 
-    with patch(
-        "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
-        return_value=mock_agent,
-    ):
-        with patch(
+    with (
+        patch(
+            "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+            return_value=mock_agent,
+        ),
+        patch(
             "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
-        ):
-            new_state = await split_validation_node(pipeline_state)
+        ),
+    ):
+        new_state = await split_validation_node(pipeline_state)
 
     assert new_state["current_stage"] == "generation"
     assert new_state["split_validation"]["is_valid"]
@@ -139,14 +141,16 @@ async def test_split_validation_node_rejected(pipeline_state):
         )
     )
 
-    with patch(
-        "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
-        return_value=mock_agent,
-    ):
-        with patch(
+    with (
+        patch(
+            "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+            return_value=mock_agent,
+        ),
+        patch(
             "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
-        ):
-            new_state = await split_validation_node(pipeline_state)
+        ),
+    ):
+        new_state = await split_validation_node(pipeline_state)
 
     assert new_state["current_stage"] == "generation"
     assert not new_state["split_validation"]["is_valid"]

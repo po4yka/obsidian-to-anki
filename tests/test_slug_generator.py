@@ -1,6 +1,6 @@
 """Tests for slug generator (UNIT-slug-01)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -16,8 +16,8 @@ def sample_metadata():
         title="Test Note",
         topic="testing",
         language_tags=["en", "ru"],
-        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created=datetime(2024, 1, 1, tzinfo=UTC),
+        updated=datetime(2024, 1, 1, tzinfo=UTC),
     )
 
 
@@ -40,7 +40,7 @@ class TestSlugGeneration:
 
     def test_slug_sanitization(self) -> None:
         """Test slug sanitization of special characters."""
-        slug, slug_base, hash6 = generate_slug(
+        slug, _slug_base, _hash6 = generate_slug(
             source_path="Test/Q&A File!@#.md",
             card_index=1,
             lang="en",
@@ -56,7 +56,7 @@ class TestSlugGeneration:
 
     def test_directory_included_in_slug(self) -> None:
         """Slug should reflect directory segments to avoid collisions."""
-        slug, slug_base, _ = generate_slug(
+        _slug, slug_base, _ = generate_slug(
             source_path="40-Android/performance/q-startup.md",
             card_index=1,
             lang="en",
@@ -111,9 +111,9 @@ class TestSlugGeneration:
 
     def test_card_index_formatting(self) -> None:
         """Test card index zero-padding."""
-        slug1, base1, _ = generate_slug("test.md", 1, "en", set())
-        slug9, base9, _ = generate_slug("test.md", 9, "en", set())
-        slug10, base10, _ = generate_slug("test.md", 10, "en", set())
+        _slug1, base1, _ = generate_slug("test.md", 1, "en", set())
+        _slug9, base9, _ = generate_slug("test.md", 9, "en", set())
+        _slug10, base10, _ = generate_slug("test.md", 10, "en", set())
 
         assert "p01" in base1
         assert "p09" in base9

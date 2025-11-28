@@ -1,12 +1,14 @@
 """Ollama provider implementation (local and cloud)."""
 
+import contextlib
 import time
 from types import TracebackType
 from typing import Any, Literal, cast
 
 import httpx
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLLMProvider
 from .safety import OllamaSafetyWrapper, SafetyConfig
 
@@ -118,10 +120,8 @@ class OllamaProvider(BaseLLMProvider):
 
     def __del__(self) -> None:
         """Clean up client resources on deletion."""
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     def check_connection(self) -> bool:
         """Check if Ollama is running and accessible.
@@ -186,7 +186,8 @@ class OllamaProvider(BaseLLMProvider):
             httpx.HTTPError: If request fails after retries
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported")
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
 
         # Safety controls: validate and sanitize input
         if self.enable_safety and self.safety:
@@ -344,7 +345,7 @@ class OllamaProvider(BaseLLMProvider):
                 tokens_per_second=round(tokens_per_sec, 2),
             )
 
-            return cast(dict[str, Any], result)
+            return cast("dict[str, Any]", result)
 
         except httpx.HTTPStatusError as e:
             request_duration = time.time() - request_start_time

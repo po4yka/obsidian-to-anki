@@ -3,7 +3,8 @@
 from collections.abc import Callable
 from typing import Any
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import AgentResult, RepairResult
 
 logger = get_logger(__name__)
@@ -49,7 +50,7 @@ class BaseSpecializedAgent:
         self.retry_with_jitter = None
 
         if enable_retry:
-            from ...utils.resilience import RetryWithJitter
+            from obsidian_anki_sync.utils.resilience import RetryWithJitter
 
             self.retry_with_jitter = RetryWithJitter(
                 max_retries=max_retries,

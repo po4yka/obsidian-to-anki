@@ -19,7 +19,6 @@ class IVaultConfig(ABC):
         Returns:
             Path to the vault directory
         """
-        pass
 
     @property
     @abstractmethod
@@ -29,7 +28,6 @@ class IVaultConfig(ABC):
         Returns:
             Relative path from vault root to source directory
         """
-        pass
 
     @property
     @abstractmethod
@@ -39,7 +37,6 @@ class IVaultConfig(ABC):
         Returns:
             List of relative paths to search for notes, or None
         """
-        pass
 
     @abstractmethod
     def get_source_paths(self) -> list[Path]:
@@ -48,7 +45,6 @@ class IVaultConfig(ABC):
         Returns:
             List of absolute paths to search directories
         """
-        pass
 
     @abstractmethod
     def validate_vault_access(self) -> bool:
@@ -57,4 +53,3 @@ class IVaultConfig(ABC):
         Returns:
             True if vault is accessible, False otherwise
         """
-        pass

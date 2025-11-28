@@ -10,7 +10,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .agent_monitoring import PerformanceTracker
 from .specialized import ProblemDomain, ProblemRouter
 
@@ -258,7 +259,7 @@ class FailureAnalyzer:
         pattern_keywords = parts[1].split(":") if len(parts) > 1 else []
 
         # Check error type match
-        if pattern_error_type != "unknown" and pattern_error_type != error_type:
+        if pattern_error_type not in ("unknown", error_type):
             return False
 
         # Check keyword matches (at least 2 keywords should match)
@@ -276,9 +277,9 @@ class AdaptiveRouter(ProblemRouter):
         self,
         performance_tracker: PerformanceTracker | None = None,
         memory_store: Any | None = None,
-        circuit_breaker_config: dict[str, dict[str, Any | None]] = None,
-        rate_limit_config: dict[str, int | None] = None,
-        bulkhead_config: dict[str, int | None] = None,
+        circuit_breaker_config: dict[str, dict[str, Any | None]] | None = None,
+        rate_limit_config: dict[str, int | None] | None = None,
+        bulkhead_config: dict[str, int | None] | None = None,
         confidence_threshold: float = 0.7,
     ):
         """Initialize adaptive router.
@@ -479,7 +480,7 @@ class PerformanceLearner:
     def get_optimal_agent(
         self,
         available_agents: list[ProblemDomain],
-        error_context: dict[str, Any | None] = None,
+        error_context: dict[str, Any | None] | None = None,
     ) -> ProblemDomain | None:
         """Get optimal agent based on performance history.
 

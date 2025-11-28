@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ..entities.note import NoteMetadata, QAPair
+from obsidian_anki_sync.domain.entities.note import NoteMetadata, QAPair
 
 
 class INoteParser(ABC):
@@ -23,7 +23,6 @@ class INoteParser(ABC):
         Returns:
             Tuple of (NoteMetadata, list[QAPair])
         """
-        pass
 
     @abstractmethod
     def parse_frontmatter(
@@ -38,7 +37,6 @@ class INoteParser(ABC):
         Returns:
             Parsed NoteMetadata
         """
-        pass
 
     @abstractmethod
     def extract_qa_pairs(self, content: str) -> list[QAPair]:
@@ -50,7 +48,6 @@ class INoteParser(ABC):
         Returns:
             List of extracted Q&A pairs
         """
-        pass
 
     @abstractmethod
     def validate_note_structure(
@@ -71,7 +68,6 @@ class INoteParser(ABC):
         Returns:
             List of validation error messages
         """
-        pass
 
     @abstractmethod
     def supports_language(self, language: str) -> bool:
@@ -83,7 +79,6 @@ class INoteParser(ABC):
         Returns:
             True if language is supported
         """
-        pass
 
     @abstractmethod
     def get_supported_languages(self) -> list[str]:
@@ -92,7 +87,6 @@ class INoteParser(ABC):
         Returns:
             List of supported language codes
         """
-        pass
 
     @abstractmethod
     def extract_title_from_content(self, content: str) -> str | None:
@@ -104,7 +98,6 @@ class INoteParser(ABC):
         Returns:
             Extracted title if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_note_creation_date(self, file_path: Path) -> float | None:
@@ -116,7 +109,6 @@ class INoteParser(ABC):
         Returns:
             Unix timestamp if available, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_note_modification_date(self, file_path: Path) -> float | None:
@@ -128,4 +120,3 @@ class INoteParser(ABC):
         Returns:
             Unix timestamp if available, None otherwise
         """
-        pass

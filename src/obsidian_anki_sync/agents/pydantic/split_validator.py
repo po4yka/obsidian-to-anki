@@ -8,11 +8,11 @@ import time
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata
-from ...utils.logging import get_logger
-from ..card_splitting_prompts import SPLIT_VALIDATION_PROMPT
-from ..exceptions import ModelError, StructuredOutputError
-from ..models import CardSplittingResult, SplitValidationResult
+from obsidian_anki_sync.agents.card_splitting_prompts import SPLIT_VALIDATION_PROMPT
+from obsidian_anki_sync.agents.exceptions import ModelError, StructuredOutputError
+from obsidian_anki_sync.agents.models import CardSplittingResult, SplitValidationResult
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -108,15 +108,15 @@ Original Note Content:
 
         except ValueError as e:
             logger.error("pydantic_ai_split_validation_parse_error", error=str(e))
+            msg = "Failed to parse split validation output"
             raise StructuredOutputError(
-                "Failed to parse split validation output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_split_validation_timeout", error=str(e))
-            raise ModelError(
-                "Split validation timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Split validation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_split_validation_failed", error=str(e))
             # Fallback: assume valid if validation fails to avoid blocking
@@ -124,6 +124,6 @@ Original Note Content:
             return SplitValidationResult(
                 is_valid=True,
                 validation_score=0.5,
-                feedback=f"Validation failed: {str(e)}. Defaulting to valid.",
+                feedback=f"Validation failed: {e!s}. Defaulting to valid.",
                 validation_time=0.0,
             )

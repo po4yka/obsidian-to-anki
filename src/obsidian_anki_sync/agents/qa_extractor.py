@@ -7,9 +7,10 @@ regardless of their markdown format, using LLM to understand structure.
 import time
 from pathlib import Path
 
-from ..models import NoteMetadata, QAPair
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .json_schemas import get_qa_extraction_schema
 from .llm_errors import categorize_llm_error, format_llm_error_for_user, log_llm_error
 
@@ -344,7 +345,7 @@ You are an expert Q&A extraction system specializing in educational note analysi
 
             # Ensure we have reasonable tokens for complex extractions
             # But respect model-specific output limits (not context window limits)
-            from ..providers.openrouter import (
+            from obsidian_anki_sync.providers.openrouter import (
                 DEFAULT_MAX_OUTPUT_TOKENS,
                 MODEL_MAX_OUTPUT_TOKENS,
             )
@@ -402,7 +403,9 @@ You are an expert Q&A extraction system specializing in educational note analysi
 
                 # Extract and display reflections if available
                 if progress_display:
-                    from ..utils.progress_display import extract_reasoning_from_response
+                    from obsidian_anki_sync.utils.progress_display import (
+                        extract_reasoning_from_response,
+                    )
 
                     reasoning = extract_reasoning_from_response(result, self.model)
                     if reasoning:

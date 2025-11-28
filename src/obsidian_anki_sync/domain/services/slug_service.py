@@ -172,10 +172,7 @@ class SlugService:
             return False
 
         # Cannot have consecutive hyphens
-        if "--" in slug:
-            return False
-
-        return True
+        return "--" not in slug
 
     @staticmethod
     def extract_language_from_slug(slug: str) -> str | None:

@@ -303,7 +303,8 @@ A storage location
         test_file.write_text(content)
 
         result = tool._run(note_content=content, file_path=str(test_file))
-        assert "Extracted" in result and "Q&A pairs" in result
+        assert "Extracted" in result
+        assert "Q&A pairs" in result
 
     def test_no_qa_pairs(self, tmp_path):
         """Test extraction when no Q&A pairs found."""

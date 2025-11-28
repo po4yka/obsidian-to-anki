@@ -19,7 +19,6 @@ class ILLMConfig(ABC):
         Returns:
             Provider name (e.g., 'ollama', 'openrouter')
         """
-        pass
 
     @property
     @abstractmethod
@@ -29,7 +28,6 @@ class ILLMConfig(ABC):
         Returns:
             Timeout in seconds
         """
-        pass
 
     @property
     @abstractmethod
@@ -39,7 +37,6 @@ class ILLMConfig(ABC):
         Returns:
             Temperature value (0.0-2.0)
         """
-        pass
 
     @property
     @abstractmethod
@@ -49,7 +46,6 @@ class ILLMConfig(ABC):
         Returns:
             Top-p value (0.0-1.0)
         """
-        pass
 
     @property
     @abstractmethod
@@ -59,7 +55,6 @@ class ILLMConfig(ABC):
         Returns:
             Maximum token count or None for unlimited
         """
-        pass
 
     @property
     @abstractmethod
@@ -69,7 +64,6 @@ class ILLMConfig(ABC):
         Returns:
             True if reasoning mode should be used
         """
-        pass
 
     @abstractmethod
     def get_model_for_agent(self, agent_type: str) -> str:
@@ -81,7 +75,6 @@ class ILLMConfig(ABC):
         Returns:
             Model name to use for this agent
         """
-        pass
 
     @abstractmethod
     def get_model_config_for_task(self, task: str) -> dict[str, Any]:
@@ -93,7 +86,6 @@ class ILLMConfig(ABC):
         Returns:
             Dictionary with model configuration
         """
-        pass
 
     @abstractmethod
     def get_provider_config(self, provider: str) -> dict[str, Any]:
@@ -105,4 +97,3 @@ class ILLMConfig(ABC):
         Returns:
             Provider-specific configuration dictionary
         """
-        pass

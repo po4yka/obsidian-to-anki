@@ -3,11 +3,13 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ...domain.entities.card import Card
-from ...domain.entities.note import Note
-from ...domain.interfaces.card_generator import ICardGenerator
-from ...utils.logging import get_logger
-from ..services.note_discovery_service import NoteDiscoveryService
+from obsidian_anki_sync.application.services.note_discovery_service import (
+    NoteDiscoveryService,
+)
+from obsidian_anki_sync.domain.entities.card import Card
+from obsidian_anki_sync.domain.entities.note import Note
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

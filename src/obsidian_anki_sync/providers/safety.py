@@ -10,7 +10,7 @@ from limits import RateLimitItemPerMinute, RateLimitItemPerSecond
 from limits.storage import MemoryStorage
 from limits.strategies import FixedWindowRateLimiter
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -350,10 +350,9 @@ class OutputValidator:
                 warnings.append("Expected JSON but response doesn't start with { or [")
                 is_valid = False
 
-        elif expected_format == "html":
-            if "<!--" not in response:
-                warnings.append("Expected HTML but no comment markers found")
-                is_valid = False
+        elif expected_format == "html" and "<!--" not in response:
+            warnings.append("Expected HTML but no comment markers found")
+            is_valid = False
 
         # Check for common error indicators
         error_indicators = [

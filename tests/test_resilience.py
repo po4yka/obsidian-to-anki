@@ -1,5 +1,6 @@
 """Tests for resilience patterns in specialized agent system."""
 
+import contextlib
 import threading
 import time
 
@@ -53,19 +54,16 @@ class TestCircuitBreaker:
         )
 
         def failing_func():
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         # First failure
-        try:
+        with contextlib.suppress(ValueError):
             cb.call(failing_func)
-        except ValueError:
-            pass
 
         # Second failure - should open circuit
-        try:
+        with contextlib.suppress(ValueError):
             cb.call(failing_func)
-        except ValueError:
-            pass
 
         assert cb.get_state() == CircuitBreakerState.OPEN
 
@@ -80,14 +78,13 @@ class TestCircuitBreaker:
         )
 
         def failing_func():
-            raise ValueError("Test error")
+            msg = "Test error"
+            raise ValueError(msg)
 
         # Open the circuit
         for _ in range(2):
-            try:
+            with contextlib.suppress(ValueError):
                 cb.call(failing_func)
-            except ValueError:
-                pass
 
         assert cb.get_state() == CircuitBreakerState.OPEN
 
@@ -114,7 +111,8 @@ class TestRetryWithJitter:
         def flaky_func():
             attempt_count[0] += 1
             if attempt_count[0] < 2:
-                raise ValueError("Temporary failure")
+                msg = "Temporary failure"
+                raise ValueError(msg)
             return "success"
 
         result = retry.execute(flaky_func, exceptions=(ValueError,))
@@ -126,7 +124,8 @@ class TestRetryWithJitter:
         retry = RetryWithJitter(max_retries=2, initial_delay=0.1, jitter=False)
 
         def always_failing_func():
-            raise ValueError("Always fails")
+            msg = "Always fails"
+            raise ValueError(msg)
 
         with pytest.raises(ValueError):
             retry.execute(always_failing_func, exceptions=(ValueError,))
@@ -303,7 +302,8 @@ class TestAgentMonitoring:
         assert result.status == HealthStatus.HEALTHY
 
         def unhealthy_func():
-            raise ValueError("Error")
+            msg = "Error"
+            raise ValueError(msg)
 
         result = monitor.check_health("test_agent", test_func=unhealthy_func)
         assert result.status == HealthStatus.UNHEALTHY

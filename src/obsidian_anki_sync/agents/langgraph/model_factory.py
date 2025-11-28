@@ -1,8 +1,8 @@
 from typing import Any
 
-from ...config import Config
-from ...providers.pydantic_ai_models import PydanticAIModelFactory
-from ...utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.providers.pydantic_ai_models import PydanticAIModelFactory
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

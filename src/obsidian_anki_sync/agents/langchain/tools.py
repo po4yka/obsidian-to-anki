@@ -6,11 +6,11 @@ specific operations in the card generation pipeline.
 
 from langchain_core.tools import BaseTool
 
-from ...apf.html_validator import validate_card_html
-from ...apf.linter import validate_apf
-from ...domain.services.content_hash_service import ContentHashService
-from ...sync.slug_generator import generate_slug
-from ...utils.logging import get_logger
+from obsidian_anki_sync.apf.html_validator import validate_card_html
+from obsidian_anki_sync.apf.linter import validate_apf
+from obsidian_anki_sync.domain.services.content_hash_service import ContentHashService
+from obsidian_anki_sync.sync.slug_generator import generate_slug
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -241,7 +241,7 @@ class QAExtractorTool(BaseTool):
         try:
             from pathlib import Path
 
-            from ...obsidian.parser import parse_note
+            from obsidian_anki_sync.obsidian.parser import parse_note
 
             # Create a temporary file path for parsing
             temp_path = Path(file_path)
@@ -294,9 +294,8 @@ def get_tool(tool_name: str, **kwargs) -> BaseTool:
     """
     if tool_name not in TOOL_REGISTRY:
         available_tools = list(TOOL_REGISTRY.keys())
-        raise ValueError(
-            f"Unknown tool '{tool_name}'. Available tools: {available_tools}"
-        )
+        msg = f"Unknown tool '{tool_name}'. Available tools: {available_tools}"
+        raise ValueError(msg)
 
     tool_class = TOOL_REGISTRY[tool_name]
     return tool_class(**kwargs)

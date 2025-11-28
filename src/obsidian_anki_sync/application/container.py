@@ -2,15 +2,15 @@
 
 from typing import Any, TypeVar
 
-from ..domain.interfaces.anki_client import IAnkiClient
-from ..domain.interfaces.anki_config import IAnkiConfig
-from ..domain.interfaces.card_generator import ICardGenerator
-from ..domain.interfaces.llm_config import ILLMConfig
-from ..domain.interfaces.llm_provider import ILLMProvider
-from ..domain.interfaces.note_parser import INoteParser
-from ..domain.interfaces.state_repository import IStateRepository
-from ..domain.interfaces.vault_config import IVaultConfig
-from ..utils.logging import get_logger
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.domain.interfaces.anki_config import IAnkiConfig
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.domain.interfaces.llm_config import ILLMConfig
+from obsidian_anki_sync.domain.interfaces.llm_provider import ILLMProvider
+from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.domain.interfaces.vault_config import IVaultConfig
+from obsidian_anki_sync.utils.logging import get_logger
 
 T = TypeVar("T")
 
@@ -88,7 +88,8 @@ class DependencyContainer:
         if interface in self._factories:
             return self._factories[interface]()  # type: ignore[no-any-return]
 
-        raise ValueError(f"No implementation registered for {interface.__name__}")
+        msg = f"No implementation registered for {interface.__name__}"
+        raise ValueError(msg)
 
     def has_registration(self, interface: type[T]) -> bool:
         """Check if an interface has a registered implementation.
@@ -149,12 +150,12 @@ def setup_container(container: DependencyContainer) -> None:
         container: The container to setup
     """
     # Import here to avoid circular imports
-    from ..anki.client import AnkiClient
-    from ..apf.generator import APFGenerator
-    from ..config import Config
-    from ..obsidian.parser import create_note_parser
-    from ..providers.factory import ProviderFactory
-    from ..sync.state_db import StateDB
+    from obsidian_anki_sync.anki.client import AnkiClient
+    from obsidian_anki_sync.apf.generator import APFGenerator
+    from obsidian_anki_sync.config import Config
+    from obsidian_anki_sync.obsidian.parser import create_note_parser
+    from obsidian_anki_sync.providers.factory import ProviderFactory
+    from obsidian_anki_sync.sync.state_db import StateDB
 
     # Load configuration
     config = Config()
@@ -187,7 +188,7 @@ def setup_container(container: DependencyContainer) -> None:
     logger.info("container_setup_completed")
 
 
-def inject(interface: type[T]) -> T:
+def inject[T](interface: type[T]) -> T:
     """Dependency injection decorator/helper.
 
     Args:

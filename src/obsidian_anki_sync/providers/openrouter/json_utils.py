@@ -2,7 +2,7 @@
 
 import json
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -350,10 +350,9 @@ def repair_truncated_card(card_text: str) -> str | None:
                 insert_pos = repaired.find('"card_index"')
                 placeholder = f'{field}: "placeholder", '
                 repaired = repaired[:insert_pos] + placeholder + repaired[insert_pos:]
-            else:
-                # Add at beginning after opening brace
-                if repaired.startswith("{"):
-                    repaired = '{"card_index": 0, "slug": "placeholder", "lang": "en", "apf_html": "<!-- placeholder -->"}'
+            # Add at beginning after opening brace
+            elif repaired.startswith("{"):
+                repaired = '{"card_index": 0, "slug": "placeholder", "lang": "en", "apf_html": "<!-- placeholder -->"}'
 
     # Validate
     try:
@@ -535,9 +534,7 @@ def repair_truncated_json(text: str) -> str:
                 # No value after colon, add empty string
                 repaired += ' ""'
             elif after_colon and not (
-                after_colon.startswith('"')
-                or after_colon.startswith("[")
-                or after_colon.startswith("{")
+                after_colon.startswith(('"', "[", "{"))
                 or (after_colon and after_colon[0].isdigit())
                 or after_colon in ("true", "false", "null")
             ):

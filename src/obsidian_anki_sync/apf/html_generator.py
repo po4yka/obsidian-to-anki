@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .html_validator import validate_card_html
 
 logger = get_logger(__name__)
@@ -28,7 +29,7 @@ class CardTemplate:
 
         # Render each section
         for section_name, template in self.sections.items():
-            if section_name in data and data[section_name]:
+            if data.get(section_name):
                 rendered = self._render_section(template, data)
                 if rendered:
                     html_parts.append(rendered)
@@ -174,7 +175,7 @@ class HTMLTemplateGenerator:
 
         # Process text content
         for field in ["question", "answer", "title", "other_notes", "content"]:
-            if field in processed and processed[field]:
+            if processed.get(field):
                 processed[field] = self._escape_and_format_text(processed[field])
 
         return processed

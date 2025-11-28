@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ...domain.entities.card import Card, SyncAction, SyncActionType
-from ...domain.services.content_hash_service import ContentHashService
+from obsidian_anki_sync.domain.entities.card import Card, SyncAction, SyncActionType
+from obsidian_anki_sync.domain.services.content_hash_service import ContentHashService
 
 
 @dataclass
@@ -35,7 +35,6 @@ class DetermineSyncActionsUseCase:
 
     def __init__(self) -> None:
         """Initialize use case."""
-        pass
 
     def execute(
         self, request: DetermineSyncActionsRequest

@@ -12,8 +12,9 @@ from typing import Any
 
 from pydantic_ai import Agent
 
-from ...models import NoteMetadata, QAPair
-from ...utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .node_helpers import increment_step_count
 from .reasoning_models import (
     CardSplittingReasoningOutput,
@@ -55,10 +56,7 @@ def _should_skip_reasoning(state: PipelineState, stage: str) -> bool:
 
     # Stage-specific toggle
     enabled_stages = state.get("cot_enabled_stages", [])
-    if enabled_stages and stage not in enabled_stages:
-        return True
-
-    return False
+    return bool(enabled_stages and stage not in enabled_stages)
 
 
 def _store_reasoning_trace(

@@ -6,11 +6,12 @@ Evaluates whether generated cards are effective for spaced repetition.
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata
-from ...utils.logging import get_logger
-from ..exceptions import ModelError, StructuredOutputError
-from ..memorization_prompts import MEMORIZATION_QUALITY_PROMPT
-from ..models import GeneratedCard, MemorizationQualityResult
+from obsidian_anki_sync.agents.exceptions import ModelError, StructuredOutputError
+from obsidian_anki_sync.agents.memorization_prompts import MEMORIZATION_QUALITY_PROMPT
+from obsidian_anki_sync.agents.models import GeneratedCard, MemorizationQualityResult
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import MemorizationQualityOutput, PostValidationDeps
 
 logger = get_logger(__name__)
@@ -112,15 +113,15 @@ Cards to assess:
 
         except ValueError as e:
             logger.error("pydantic_ai_memorization_parse_error", error=str(e))
+            msg = "Failed to parse memorization assessment output"
             raise StructuredOutputError(
-                "Failed to parse memorization assessment output",
+                msg,
                 details={"error": str(e), "cards_count": len(cards)},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_memorization_timeout", error=str(e))
-            raise ModelError(
-                "Memorization assessment timed out", details={"cards_count": len(cards)}
-            ) from e
+            msg = "Memorization assessment timed out"
+            raise ModelError(msg, details={"cards_count": len(cards)}) from e
         except Exception as e:
             logger.error("pydantic_ai_memorization_failed", error=str(e))
             # Return permissive result instead of failing
@@ -130,6 +131,6 @@ Cards to assess:
                 memorization_score=0.7,
                 issues=[],
                 strengths=[],
-                suggested_improvements=[f"Memorization agent failed: {str(e)}"],
+                suggested_improvements=[f"Memorization agent failed: {e!s}"],
                 assessment_time=0.0,
             )

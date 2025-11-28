@@ -11,9 +11,10 @@ This agent performs fast structural checks before expensive card generation:
 import time
 from pathlib import Path
 
-from ..models import NoteMetadata, QAPair
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .json_schemas import get_pre_validation_schema
 from .llm_errors import categorize_llm_error, format_llm_error_for_user, log_llm_error
 from .models import PreValidationResult

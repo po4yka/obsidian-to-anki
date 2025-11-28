@@ -11,7 +11,7 @@ from pydantic import ValidationError
 try:
     import psutil
 except ImportError:
-    psutil = None  # type: ignore
+    psutil = None  # type: ignore[assignment]
 
 try:
     from tenacity import (
@@ -29,28 +29,28 @@ except ImportError:
     wait_exponential = None  # type: ignore
     before_sleep_log = None  # type: ignore
 
-from ..anki.client import AnkiClient
-from ..apf.generator import APFGenerator
-from ..config import Config
-from ..models import ManifestData, SyncAction
-from ..obsidian.parser import create_qa_extractor
-from ..sync.anki_state_manager import AnkiStateManager
-from ..sync.card_generator import CardGenerator
-from ..sync.change_applier import ChangeApplier
-from ..sync.indexer import build_full_index
-from ..sync.note_scanner import NoteScanner
-from ..sync.state_db import StateDB
-from ..utils.logging import get_logger
-from ..utils.problematic_notes import ProblematicNotesArchiver
+from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.apf.generator import APFGenerator
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import ManifestData, SyncAction
+from obsidian_anki_sync.obsidian.parser import create_qa_extractor
+from obsidian_anki_sync.sync.anki_state_manager import AnkiStateManager
+from obsidian_anki_sync.sync.card_generator import CardGenerator
+from obsidian_anki_sync.sync.change_applier import ChangeApplier
+from obsidian_anki_sync.sync.indexer import build_full_index
+from obsidian_anki_sync.sync.note_scanner import NoteScanner
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
 if TYPE_CHECKING:
-    from ..sync.progress import ProgressTracker
+    from obsidian_anki_sync.sync.progress import ProgressTracker
 
 logger = get_logger(__name__)
 
 # Import agent orchestrator (optional dependency)
 try:
-    from ..agents.orchestrator import AgentOrchestrator
+    from obsidian_anki_sync.agents.orchestrator import AgentOrchestrator
 
     AGENTS_AVAILABLE = True
 except ImportError:
@@ -60,7 +60,7 @@ except ImportError:
 
 # Import progress display (optional)
 try:
-    from ..utils.progress_display import ProgressDisplay
+    from obsidian_anki_sync.utils.progress_display import ProgressDisplay
 
     PROGRESS_DISPLAY_AVAILABLE = True
 except ImportError:
@@ -116,12 +116,13 @@ class SyncEngine:
         # Initialize card generator (APFGenerator or LangGraphOrchestrator)
         if config.use_langgraph or config.use_pydantic_ai:
             if not AGENTS_AVAILABLE:
-                raise RuntimeError(
+                msg = (
                     "LangGraph agent system requested but not available. "
                     "Please ensure agent dependencies are installed."
                 )
+                raise RuntimeError(msg)
             logger.info("initializing_langgraph_orchestrator")
-            from ..agents.langgraph import LangGraphOrchestrator
+            from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 
             self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
             # Still keep for backward compat
@@ -130,10 +131,11 @@ class SyncEngine:
         elif config.use_agent_system:
             # Legacy fallback for backward compatibility
             if not AGENTS_AVAILABLE:
-                raise RuntimeError(
+                msg = (
                     "Agent system requested but not available. "
                     "Please ensure agent dependencies are installed."
                 )
+                raise RuntimeError(msg)
             logger.warning("using_legacy_agent_system_deprecated")
             self.agent_orchestrator = AgentOrchestrator(config)  # type: ignore
             # Still keep for backward compat
@@ -291,9 +293,8 @@ class SyncEngine:
             self.progress_display
             and hasattr(self, "agent_orchestrator")
             and self.agent_orchestrator
-        ):
-            if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(self.progress_display)
+        ) and hasattr(self.agent_orchestrator, "set_progress_display"):
+            self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def _get_anki_model_name(self, internal_note_type: str) -> str:
         """Get the actual Anki model name from internal note type.
@@ -572,7 +573,7 @@ class SyncEngine:
 
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
-                return cast(dict[Any, Any], self.progress.get_stats())
+                return cast("dict[Any, Any]", self.progress.get_stats())
 
             # Step 2: Fetch Anki state
             if self.progress:
@@ -590,7 +591,7 @@ class SyncEngine:
 
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
-                return cast(dict[Any, Any], self.progress.get_stats())
+                return cast("dict[Any, Any]", self.progress.get_stats())
 
             # Step 4: Apply or preview
             if dry_run:
@@ -642,7 +643,7 @@ class SyncEngine:
                 )
 
             # Log LLM session summary
-            from ..utils.llm_logging import log_session_summary
+            from obsidian_anki_sync.utils.llm_logging import log_session_summary
 
             if self.progress:
                 log_session_summary(session_id=self.progress.progress.session_id)
@@ -694,7 +695,7 @@ class SyncEngine:
 
         import gc
 
-        from ..utils.content_hash import clear_content_hash_cache
+        from obsidian_anki_sync.utils.content_hash import clear_content_hash_cache
 
         # Clear content hash cache to free memory
         clear_content_hash_cache()
@@ -705,26 +706,21 @@ class SyncEngine:
 
     def _print_plan(self) -> None:
         """Print sync plan for dry-run."""
-        print("\n=== Sync Plan (Dry Run) ===\n")
 
         for action in self.changes:
             if action.type == "skip":
                 continue
 
-            print(f"[{action.type.upper()}] {action.card.slug}")
             if action.reason:
-                print(f"  Reason: {action.reason}")
-            print()
+                pass
 
         # Print summary
         action_counts: dict[str, int] = {}
         for action in self.changes:
             action_counts[action.type] = action_counts.get(action.type, 0) + 1
 
-        print("=== Summary ===")
         for action_type, count in sorted(action_counts.items()):
-            print(f"{action_type}: {count}")
-        print()
+            pass
 
     # Legacy methods removed - functionality moved to component classes:
     # - NoteScanner: _scan_obsidian_notes, _scan_obsidian_notes_parallel,

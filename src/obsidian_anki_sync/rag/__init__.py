@@ -20,12 +20,12 @@ from .rag_service import RAGService, get_rag_service
 from .vector_store import VaultVectorStore
 
 __all__ = [
-    "DocumentChunker",
     "DocumentChunk",
+    "DocumentChunker",
     "EmbeddingProvider",
-    "VaultVectorStore",
-    "RAGService",
-    "get_rag_service",
     "RAGIntegration",
+    "RAGService",
+    "VaultVectorStore",
     "get_rag_integration",
+    "get_rag_service",
 ]

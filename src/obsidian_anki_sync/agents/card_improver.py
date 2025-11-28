@@ -3,9 +3,10 @@
 import re
 import time
 
-from ..models import NoteMetadata
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import GeneratedCard, QualityReport
 
 
@@ -127,7 +128,7 @@ class CardImprover:
         suggestions = quality_report.suggestions
 
         # Extract Q&A from APF HTML for rule-based fixes
-        question, answer = _extract_qa_from_apf(improved.apf_html)
+        question, _answer = _extract_qa_from_apf(improved.apf_html)
 
         for suggestion in suggestions:
             if "punctuation" in suggestion.lower():
@@ -153,11 +154,10 @@ class CardImprover:
                 improved.apf_html = self._add_code_language_classes(improved.apf_html)
             elif "slug format" in suggestion.lower():
                 improved.slug = self._fix_slug_format(improved.slug)
-            elif "insufficient tags" in suggestion.lower():
-                # Note: GeneratedCard doesn't have tags - tags are in APF HTML/manifest
-                # Skip tag-related fixes for GeneratedCard
-                pass
-            elif "duplicate tags" in suggestion.lower():
+            elif (
+                "insufficient tags" in suggestion.lower()
+                or "duplicate tags" in suggestion.lower()
+            ):
                 # Note: GeneratedCard doesn't have tags - tags are in APF HTML/manifest
                 # Skip tag-related fixes for GeneratedCard
                 pass

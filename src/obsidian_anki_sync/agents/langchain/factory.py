@@ -9,8 +9,9 @@ from typing import Any
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...config import Config
-from ...utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLangChainAgent
 from .tools import get_tools_for_agent
 
@@ -102,7 +103,8 @@ class LangChainAgentFactory:
         # This would need to be implemented based on the config
         # For now, return a placeholder
         # In practice, this would convert config model names to LangChain models
-        raise NotImplementedError("Model factory integration needed")
+        msg = "Model factory integration needed"
+        raise NotImplementedError(msg)
 
     def _get_agent_config(
         self, agent_type: str, langchain_agent_type: str
@@ -218,7 +220,8 @@ class LangChainAgentFactory:
             )
 
         else:
-            raise ValueError(f"Unknown LangChain agent type: {langchain_agent_type}")
+            msg = f"Unknown LangChain agent type: {langchain_agent_type}"
+            raise ValueError(msg)
 
     def get_available_agent_types(self) -> list[str]:
         """Get list of available LangChain agent types.

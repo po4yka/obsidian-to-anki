@@ -11,7 +11,7 @@ from typing import Any
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -84,7 +84,6 @@ class BaseLangChainAgent(ABC):
         Returns:
             LangChain agent instance
         """
-        pass
 
     @abstractmethod
     async def run(
@@ -99,7 +98,6 @@ class BaseLangChainAgent(ABC):
         Returns:
             Agent execution result
         """
-        pass
 
     def get_agent_info(self) -> dict[str, Any]:
         """Get information about the agent.

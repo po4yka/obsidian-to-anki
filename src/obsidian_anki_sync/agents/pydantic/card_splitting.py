@@ -8,11 +8,14 @@ import time
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata, QAPair
-from ...utils.logging import get_logger
-from ..card_splitting_prompts import CARD_SPLITTING_DECISION_PROMPT
-from ..exceptions import ModelError, StructuredOutputError
-from ..models import CardSplitPlan, CardSplittingResult
+from obsidian_anki_sync.agents.card_splitting_prompts import (
+    CARD_SPLITTING_DECISION_PROMPT,
+)
+from obsidian_anki_sync.agents.exceptions import ModelError, StructuredOutputError
+from obsidian_anki_sync.agents.models import CardSplitPlan, CardSplittingResult
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import CardSplittingDeps, CardSplittingOutput
 
 logger = get_logger(__name__)
@@ -144,15 +147,15 @@ Questions:
 
         except ValueError as e:
             logger.error("pydantic_ai_card_splitting_parse_error", error=str(e))
+            msg = "Failed to parse card splitting output"
             raise StructuredOutputError(
-                "Failed to parse card splitting output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_card_splitting_timeout", error=str(e))
-            raise ModelError(
-                "Card splitting analysis timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Card splitting analysis timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_card_splitting_failed", error=str(e))
             # Return conservative fallback
@@ -169,10 +172,10 @@ Questions:
                         answer_summary=(
                             qa_pairs[0].answer_en[:100] if qa_pairs else "Answer"
                         ),
-                        rationale=f"Fallback: Agent failed ({str(e)})",
+                        rationale=f"Fallback: Agent failed ({e!s})",
                     )
                 ],
-                reasoning=f"Card splitting agent failed: {str(e)}. Defaulting to single card.",
+                reasoning=f"Card splitting agent failed: {e!s}. Defaulting to single card.",
                 decision_time=0.0,
                 confidence=0.3,
                 fallback_strategy="none",

@@ -18,11 +18,11 @@ Scripts:
 __all__ = [
     "analyze_reviewed",
     "analyze_russian",
+    "find_corruption",
+    "find_missing",
     "prepare_work",
     "prepare_work_simple",
-    "translate",
-    "find_missing",
-    "find_corruption",
-    "update_wikilinks",
     "summary",
+    "translate",
+    "update_wikilinks",
 ]

@@ -11,15 +11,16 @@ import time
 from pathlib import Path
 from typing import NamedTuple
 
-from ..apf.html_generator import HTMLTemplateGenerator
-from ..models import Manifest, NoteMetadata, QAPair
-from ..providers.base import BaseLLMProvider
-from ..utils.code_detection import (
+from obsidian_anki_sync.apf.html_generator import HTMLTemplateGenerator
+from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.code_detection import (
     detect_code_language_from_content,
     detect_code_language_from_metadata,
 )
-from ..utils.content_hash import compute_content_hash
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .debug_artifacts import save_failed_llm_call
 from .llm_errors import (
     categorize_llm_error,
@@ -261,9 +262,8 @@ class GeneratorAgent:
                 slug=manifest.slug,
                 card_index=qa_pair.card_index,
             )
-            raise ValueError(
-                f"Empty question for language '{lang}' in card {qa_pair.card_index}"
-            )
+            msg = f"Empty question for language '{lang}' in card {qa_pair.card_index}"
+            raise ValueError(msg)
 
         if not answer or not answer.strip():
             logger.error(
@@ -272,9 +272,8 @@ class GeneratorAgent:
                 slug=manifest.slug,
                 card_index=qa_pair.card_index,
             )
-            raise ValueError(
-                f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
-            )
+            msg = f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
+            raise ValueError(msg)
 
         # Build user prompt (reuse logic from APFGenerator)
         user_prompt = self._build_user_prompt(
@@ -361,7 +360,8 @@ class GeneratorAgent:
                 apf_html = result.get("response", "")
 
                 if not apf_html or not apf_html.strip():
-                    raise ValueError("LLM returned empty response")
+                    msg = "LLM returned empty response"
+                    raise ValueError(msg)
 
                 # Check for truncation indicators
                 truncation_indicators = self._detect_truncation(apf_html)
@@ -375,9 +375,8 @@ class GeneratorAgent:
                     )
                     # If severely truncated and we have retries left, retry
                     if attempt < max_retries and len(truncation_indicators) > 1:
-                        raise ValueError(
-                            f"Response appears truncated: {', '.join(truncation_indicators)}"
-                        )
+                        msg = f"Response appears truncated: {', '.join(truncation_indicators)}"
+                        raise ValueError(msg)
 
                 # Extract token usage if available
                 token_usage = result.get("_token_usage", {})
@@ -521,7 +520,8 @@ class GeneratorAgent:
                 raise llm_error from e
 
         # Should never reach here, but just in case
-        raise RuntimeError(f"Failed to generate card after {max_retries} attempts")
+        msg = f"Failed to generate card after {max_retries} attempts"
+        raise RuntimeError(msg)
 
     def _build_user_prompt(
         self,
@@ -814,13 +814,11 @@ Now generate the card following this structure:
 
         # Validate content exists
         if not question or not question.strip():
-            raise ValueError(
-                f"Empty question for language '{lang}' in card {qa_pair.card_index}"
-            )
+            msg = f"Empty question for language '{lang}' in card {qa_pair.card_index}"
+            raise ValueError(msg)
         if not answer or not answer.strip():
-            raise ValueError(
-                f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
-            )
+            msg = f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
+            raise ValueError(msg)
 
         # Build translation prompt using English structure
         user_prompt = self._build_translation_prompt(
@@ -893,7 +891,8 @@ Now generate the card following this structure:
                 translated_html = result.get("response", "")
 
                 if not translated_html or not translated_html.strip():
-                    raise ValueError("LLM returned empty translation response")
+                    msg = "LLM returned empty translation response"
+                    raise ValueError(msg)
 
                 # Assemble final APF HTML using English structure + translated text
                 final_apf_html = self._assemble_translated_card_html(
@@ -974,9 +973,8 @@ Now generate the card following this structure:
                 # Continue to next attempt
 
         # Should never reach here
-        raise RuntimeError(
-            f"Failed to generate translated card after {max_retries} attempts"
-        )
+        msg = f"Failed to generate translated card after {max_retries} attempts"
+        raise RuntimeError(msg)
 
     def _build_translation_prompt(
         self,
@@ -1406,14 +1404,13 @@ Translated content:"""
         if lines and lines[-1].strip() == "END_OF_CARDS":
             # Good, END_OF_CARDS is already the last line
             pass
-        else:
-            # Add END_OF_CARDS as the last line if missing
-            if lines and not lines[-1].strip().endswith("END_OF_CARDS"):
-                lines.append("END_OF_CARDS")
-                logger.debug(
-                    "post_generation_cleanup_added_end_of_cards",
-                    slug=manifest.slug,
-                )
+        # Add END_OF_CARDS as the last line if missing
+        elif lines and not lines[-1].strip().endswith("END_OF_CARDS"):
+            lines.append("END_OF_CARDS")
+            logger.debug(
+                "post_generation_cleanup_added_end_of_cards",
+                slug=manifest.slug,
+            )
 
         return "\n".join(lines)
 
@@ -1599,7 +1596,7 @@ Translated content:"""
         Returns:
             Validated and fixed HTML
         """
-        from ..apf.html_validator import validate_card_html
+        from obsidian_anki_sync.apf.html_validator import validate_card_html
 
         # Validate the HTML
         validation_errors = validate_card_html(apf_html)

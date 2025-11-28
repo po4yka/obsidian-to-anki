@@ -5,7 +5,8 @@ from typing import Any, cast
 
 import httpx
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
@@ -58,7 +59,8 @@ class OpenAIProvider(BaseLLMProvider):
         )
 
         if not api_key:
-            raise ValueError("OpenAI API key is required")
+            msg = "OpenAI API key is required"
+            raise ValueError(msg)
 
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -159,7 +161,8 @@ class OpenAIProvider(BaseLLMProvider):
             httpx.HTTPError: If request fails
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported")
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
 
         # Build messages
         messages = []
@@ -232,7 +235,8 @@ class OpenAIProvider(BaseLLMProvider):
             # All retries failed
             if last_exception:
                 raise last_exception
-            raise RuntimeError("All retries failed")
+            msg = "All retries failed"
+            raise RuntimeError(msg)
 
         request_duration = time.time() - request_start_time
 
@@ -242,9 +246,10 @@ class OpenAIProvider(BaseLLMProvider):
             # Validate response structure
             choices = data.get("choices", [])
             if not choices:
-                raise ValueError(
+                msg = (
                     f"OpenAI returned empty choices array. Response: {str(data)[:500]}"
                 )
+                raise ValueError(msg)
 
             # Extract response safely
             first_choice = choices[0]
@@ -281,7 +286,7 @@ class OpenAIProvider(BaseLLMProvider):
                 finish_reason=result["finish_reason"],
             )
 
-            return cast(dict[str, Any], result)
+            return cast("dict[str, Any]", result)
 
         except (KeyError, IndexError, TypeError) as e:
             logger.error(
@@ -289,7 +294,8 @@ class OpenAIProvider(BaseLLMProvider):
                 error=str(e),
                 response_data=str(data)[:500],
             )
-            raise ValueError(f"Failed to parse OpenAI response: {e}")
+            msg = f"Failed to parse OpenAI response: {e}"
+            raise ValueError(msg)
         except Exception as e:
             request_duration = time.time() - request_start_time
             logger.error(

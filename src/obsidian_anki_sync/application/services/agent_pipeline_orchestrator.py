@@ -3,12 +3,12 @@
 import time
 from pathlib import Path
 
-from ...agents.slug_utils import generate_agent_slug_base
-from ...domain.entities.note import NoteMetadata, QAPair
-from ...domain.interfaces.llm_provider import ILLMProvider
-from ...infrastructure.cache.cache_strategy import AgentCacheStrategy
-from ...utils.logging import get_logger
-from ..services.retry_handler import RetryHandler
+from obsidian_anki_sync.agents.slug_utils import generate_agent_slug_base
+from obsidian_anki_sync.application.services.retry_handler import RetryHandler
+from obsidian_anki_sync.domain.entities.note import NoteMetadata, QAPair
+from obsidian_anki_sync.domain.interfaces.llm_provider import ILLMProvider
+from obsidian_anki_sync.infrastructure.cache.cache_strategy import AgentCacheStrategy
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

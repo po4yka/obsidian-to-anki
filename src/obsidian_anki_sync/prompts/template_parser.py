@@ -7,8 +7,8 @@ from typing import Any
 
 import yaml
 
-from ..exceptions import ConfigurationError
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import ConfigurationError
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -54,7 +54,8 @@ def parse_template_file(template_path: Path) -> PromptTemplate:
         ConfigurationError: If template is invalid
     """
     if not template_path.exists():
-        raise ConfigurationError(f"Template file not found: {template_path}")
+        msg = f"Template file not found: {template_path}"
+        raise ConfigurationError(msg)
 
     with template_path.open("r", encoding="utf-8") as f:
         content = f.read()
@@ -76,7 +77,8 @@ def parse_template_file(template_path: Path) -> PromptTemplate:
         try:
             config = yaml.safe_load(frontmatter_text) or {}
         except yaml.YAMLError as e:
-            raise ConfigurationError(f"Invalid YAML frontmatter: {e}") from e
+            msg = f"Invalid YAML frontmatter: {e}"
+            raise ConfigurationError(msg) from e
 
     # Extract configuration
     template = PromptTemplate(

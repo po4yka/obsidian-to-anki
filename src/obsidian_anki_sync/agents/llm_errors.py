@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,7 @@ def categorize_llm_error(
     # Network errors
     if isinstance(error, (httpx.NetworkError, httpx.ConnectError)):
         return LLMError(
-            message=f"Network error during {operation}: {str(error)}",
+            message=f"Network error during {operation}: {error!s}",
             error_type=LLMErrorType.NETWORK,
             original_error=error,
             context=context,
@@ -151,7 +151,7 @@ def categorize_llm_error(
 
     # Unknown/uncategorized error
     return LLMError(
-        message=f"Unexpected error during {operation}: {str(error)}",
+        message=f"Unexpected error during {operation}: {error!s}",
         error_type=LLMErrorType.UNKNOWN,
         original_error=error,
         context=context,

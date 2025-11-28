@@ -5,7 +5,7 @@ from .change_detector import ChangeDetector
 from .note_scanner import NoteScanner
 
 __all__ = [
-    "NoteScanner",
-    "ChangeDetector",
     "ChangeApplier",
+    "ChangeDetector",
+    "NoteScanner",
 ]

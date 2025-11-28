@@ -4,8 +4,8 @@ import json
 import re
 from typing import Any, cast
 
-from ..exceptions import FieldMappingError
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import FieldMappingError
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -27,7 +27,8 @@ def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
     try:
         parsed = parse_apf_card(apf_html)
     except Exception as e:
-        raise FieldMappingError(f"Failed to parse APF card: {e}")
+        msg = f"Failed to parse APF card: {e}"
+        raise FieldMappingError(msg)
 
     # Map based on note type
     if note_type == "APF::Simple":
@@ -58,7 +59,8 @@ def parse_apf_card(apf_html: str) -> dict:
     )
 
     if not match:
-        raise ValueError("No card block found")
+        msg = "No card block found"
+        raise ValueError(msg)
 
     card_content = match.group(1).strip()
 
@@ -69,7 +71,8 @@ def parse_apf_card(apf_html: str) -> dict:
     )
 
     if not header_match:
-        raise ValueError("Invalid card header")
+        msg = "Invalid card header"
+        raise ValueError(msg)
 
     slug, card_type, tags_str = header_match.groups()
 
@@ -115,7 +118,7 @@ def _extract_manifest(content: str) -> dict:
         return {}
 
     try:
-        return cast(dict[Any, Any], json.loads(match.group(1)))
+        return cast("dict[Any, Any]", json.loads(match.group(1)))
     except json.JSONDecodeError:
         return {}
 

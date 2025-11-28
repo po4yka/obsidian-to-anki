@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -236,7 +236,7 @@ class RepairMetricsCollector:
             "overall_success_rate": self.get_success_rate(),
             "success_rate_by_category": {
                 cat: self.get_success_rate(cat)
-                for cat in self.metrics.attempts_by_category.keys()
+                for cat in self.metrics.attempts_by_category
             },
             "average_repair_time": self.metrics.average_repair_time,
             "average_quality_improvement": self.metrics.average_quality_improvement,
@@ -247,7 +247,7 @@ class RepairMetricsCollector:
             )[0],
             "best_strategy_by_category": {
                 cat: self.get_best_strategy_for_category(cat)
-                for cat in self.metrics.attempts_by_category.keys()
+                for cat in self.metrics.attempts_by_category
             },
         }
 

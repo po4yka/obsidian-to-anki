@@ -2,7 +2,8 @@
 
 from typing import Any, cast
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .anthropic import AnthropicProvider
 from .base import BaseLLMProvider
 from .lm_studio import LMStudioProvider
@@ -79,10 +80,11 @@ class ProviderFactory:
 
         if provider_type_lower not in cls.PROVIDER_MAP:
             available = ", ".join(sorted(cls.PROVIDER_MAP.keys()))
-            raise ValueError(
+            msg = (
                 f"Unsupported provider type: {provider_type}. "
                 f"Available providers: {available}"
             )
+            raise ValueError(msg)
 
         provider_class = cls.PROVIDER_MAP[provider_type_lower]
 
@@ -93,7 +95,7 @@ class ProviderFactory:
         )
 
         try:
-            provider = cast(BaseLLMProvider, provider_class(**kwargs))
+            provider = cast("BaseLLMProvider", provider_class(**kwargs))
             logger.info("provider_created_successfully", provider_type=provider_type)
             return provider
         except Exception as e:
@@ -191,7 +193,8 @@ class ProviderFactory:
             }
 
         else:
-            raise ValueError(f"Unsupported provider type in config: {provider_type}")
+            msg = f"Unsupported provider type in config: {provider_type}"
+            raise ValueError(msg)
 
         logger.info(
             "creating_provider_from_config",

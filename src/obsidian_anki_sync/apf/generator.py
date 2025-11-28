@@ -8,12 +8,12 @@ from pathlib import Path
 import httpx
 from openai import OpenAI
 
-from ..config import Config
-from ..models import Card, Manifest, NoteMetadata, QAPair
-from ..utils.code_detection import detect_code_language_from_metadata
-from ..utils.content_hash import compute_content_hash
-from ..utils.logging import get_logger
-from ..utils.retry import retry
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
+from obsidian_anki_sync.utils.code_detection import detect_code_language_from_metadata
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.retry import retry
 
 logger = get_logger(__name__)
 
@@ -106,7 +106,8 @@ class APFGenerator:
                 apf_html = response.choices[0].message.content
 
                 if not apf_html:
-                    raise ValueError("LLM returned empty response")
+                    msg = "LLM returned empty response"
+                    raise ValueError(msg)
 
                 logger.debug(
                     "llm_response_received", slug=manifest.slug, length=len(apf_html)
@@ -210,7 +211,8 @@ class APFGenerator:
             return [self.generate_card(qa_pairs[0], metadata, manifests[0], lang)]
 
         if len(qa_pairs) != len(manifests):
-            raise ValueError("qa_pairs and manifests must have same length")
+            msg = "qa_pairs and manifests must have same length"
+            raise ValueError(msg)
 
         logger.info(
             "batch_generation_start",
@@ -275,7 +277,8 @@ class APFGenerator:
             apf_html_batch = response.choices[0].message.content
 
             if not apf_html_batch:
-                raise ValueError("LLM returned empty response")
+                msg = "LLM returned empty response"
+                raise ValueError(msg)
 
             # Parse batch response (expects multiple card blocks)
             cards = self._parse_batch_response(
@@ -401,9 +404,10 @@ Requirements:
                 continue
 
         if len(cards) != len(qa_pairs):
-            raise ValueError(
+            msg = (
                 f"Expected {len(qa_pairs)} cards, got {len(cards)} from batch response"
             )
+            raise ValueError(msg)
 
         return cards
 
@@ -547,12 +551,14 @@ QUALITY RULES:
         pattern = re.compile(r"<!--\s*manifest:\s*({.*?})\s*-->")
         match = pattern.search(apf_html)
         if not match:
-            raise ValueError("APF output missing manifest comment")
+            msg = "APF output missing manifest comment"
+            raise ValueError(msg)
 
         try:
             manifest_data = json.loads(match.group(1))
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid manifest JSON: {exc}") from exc
+            msg = f"Invalid manifest JSON: {exc}"
+            raise ValueError(msg) from exc
 
         manifest_data.update(
             {
@@ -653,8 +659,7 @@ QUALITY RULES:
             return "plaintext"
         normalized = lang.strip().lower().replace(" ", "-").replace("/", "-")
         normalized = re.sub(r"[^a-z0-9_\-+.]", "", normalized)
-        if normalized.startswith("language-"):
-            normalized = normalized[len("language-") :]
+        normalized = normalized.removeprefix("language-")
         return normalized or "plaintext"
 
     def _sanitize_tag(self, tag: str | None, lowercase: bool = False) -> str:

@@ -22,16 +22,16 @@ except ImportError:
 
 import yaml  # type: ignore
 
-from ..config import Config
-from ..exceptions import ParserError
-from ..models import Card
-from ..obsidian.parser import discover_notes, parse_note
-from ..sync.state_db import StateDB
-from ..utils.logging import get_logger
-from ..utils.problematic_notes import ProblematicNotesArchiver
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.models import Card
+from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
 if TYPE_CHECKING:
-    from ..sync.progress import ProgressTracker
+    from obsidian_anki_sync.sync.progress import ProgressTracker
 
 logger = get_logger(__name__)
 
@@ -490,7 +490,7 @@ class NoteScanner:
                         f.cancel()
                     break
 
-                file_path, relative_path = future_to_note[future]
+                _file_path, relative_path = future_to_note[future]
 
                 try:
                     cards, new_slugs, result_info = future.result()
@@ -526,7 +526,7 @@ class NoteScanner:
                         error_by_type[error_type_name] += 1
                         if len(error_samples[error_type_name]) < 3:
                             error_samples[error_type_name].append(
-                                f"{relative_path}: {str(e)}"
+                                f"{relative_path}: {e!s}"
                             )
 
                 # Progress indicator

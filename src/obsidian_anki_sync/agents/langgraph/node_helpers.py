@@ -7,7 +7,8 @@ step counting, error recording, and error handling.
 import time
 from typing import Any
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .retry_policies import ErrorSeverity, classify_error_severity
 from .state import PipelineState
 

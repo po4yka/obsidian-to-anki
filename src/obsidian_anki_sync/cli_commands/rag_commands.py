@@ -40,7 +40,7 @@ def index_vault(
     """
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..rag import RAGService
+    from obsidian_anki_sync.rag import RAGService
 
     console.print("[bold]Indexing vault for RAG...[/bold]")
 
@@ -111,7 +111,7 @@ def search(
     """
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..rag import RAGService
+    from obsidian_anki_sync.rag import RAGService
 
     try:
         rag_service = RAGService(config)
@@ -192,7 +192,7 @@ def stats(
     """Show RAG index statistics."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..rag import RAGService
+    from obsidian_anki_sync.rag import RAGService
 
     try:
         rag_service = RAGService(config)
@@ -266,7 +266,7 @@ def find_similar(
     """
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..rag import RAGService
+    from obsidian_anki_sync.rag import RAGService
 
     try:
         rag_service = RAGService(config)
@@ -328,7 +328,7 @@ def reset_index(
     """Reset the RAG index (delete all indexed data)."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    from ..rag import RAGService
+    from obsidian_anki_sync.rag import RAGService
 
     if not confirm:
         console.print("[yellow]This will delete all indexed data.[/yellow]")

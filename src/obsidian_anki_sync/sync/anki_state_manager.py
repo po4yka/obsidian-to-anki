@@ -3,13 +3,13 @@
 Handles fetching Anki state and determining sync actions.
 """
 
-from ..agents.models import GeneratedCard
-from ..anki.client import AnkiClient
-from ..config import Config
-from ..models import Card, SyncAction
-from ..sync.state_db import StateDB
-from ..utils.guid import deterministic_guid
-from ..utils.logging import get_logger
+from obsidian_anki_sync.agents.models import GeneratedCard
+from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import Card, SyncAction
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.guid import deterministic_guid
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -47,7 +47,7 @@ class AnkiStateManager:
 
         # Find all notes in target deck
         try:
-            from ..exceptions import AnkiConnectError
+            from obsidian_anki_sync.exceptions import AnkiConnectError
 
             note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
         except AnkiConnectError as e:
@@ -203,8 +203,8 @@ class AnkiStateManager:
         for slug, db_card in db_cards.items():
             if slug not in obsidian_cards and slug in anki_cards:
                 # Card deleted in Obsidian but still in Anki
-                from ..models import Card as CardModel
-                from ..models import Manifest
+                from obsidian_anki_sync.models import Card as CardModel
+                from obsidian_anki_sync.models import Manifest
 
                 # Reconstruct minimal card for deletion
                 card = CardModel(
@@ -254,7 +254,7 @@ class AnkiStateManager:
                 )
 
         # Check for deletions in Anki (restore)
-        for slug in db_cards.keys():
+        for slug in db_cards:
             if slug not in anki_cards and slug in obsidian_cards:
                 # Card deleted in Anki but still in Obsidian - restore
                 changes.append(
@@ -285,7 +285,7 @@ class AnkiStateManager:
 
         from pydantic import ValidationError
 
-        from ..models import ManifestData
+        from obsidian_anki_sync.models import ManifestData
 
         try:
             manifest_dict = json.loads(manifest_field)

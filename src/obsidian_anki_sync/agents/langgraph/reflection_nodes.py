@@ -21,7 +21,8 @@ from typing import Any
 
 from pydantic_ai import Agent
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .node_helpers import increment_step_count
 from .reflection_domains import DOMAIN_REGISTRY
 from .reflection_models import (
@@ -258,10 +259,7 @@ def _is_simple_content(state: PipelineState, config) -> bool:
     post_conf = post_val.get("confidence", 0) if post_val else 0
 
     # Skip if both pre and post validation have high confidence
-    if pre_conf >= confidence_threshold and post_conf >= confidence_threshold:
-        return True
-
-    return False
+    return bool(pre_conf >= confidence_threshold and post_conf >= confidence_threshold)
 
 
 def _store_reflection_trace(

@@ -11,7 +11,8 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import BaseTool
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLangChainAgent, LangChainAgentResult
 
 logger = get_logger(__name__)

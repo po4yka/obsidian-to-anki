@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..models import NoteMetadata, QAPair
+from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 
 class RecoveryResult(BaseModel):

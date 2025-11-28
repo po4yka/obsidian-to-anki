@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -200,16 +200,15 @@ class DatabaseMetricsStorage(MetricsStorage):
         timestamp: float | None = None,
     ) -> None:
         """Record a metric."""
-        with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    """
+        with self.lock, sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
                     INSERT INTO agent_metrics (agent_name, metric, value, timestamp)
                     VALUES (?, ?, ?, ?)
                 """,
-                    (agent_name, metric, value, timestamp or time.time()),
-                )
-                conn.commit()
+                (agent_name, metric, value, timestamp or time.time()),
+            )
+            conn.commit()
 
     def get_metrics(
         self, agent_name: str | None = None, start_time: float | None = None
@@ -230,19 +229,18 @@ class DatabaseMetricsStorage(MetricsStorage):
 
         query += " ORDER BY timestamp DESC LIMIT 10000"
 
-        with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.execute(query, params)
-                return [
-                    {
-                        "agent_name": row["agent_name"],
-                        "metric": row["metric"],
-                        "value": row["value"],
-                        "timestamp": row["timestamp"],
-                    }
-                    for row in cursor.fetchall()
-                ]
+        with self.lock, sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(query, params)
+            return [
+                {
+                    "agent_name": row["agent_name"],
+                    "metric": row["metric"],
+                    "value": row["value"],
+                    "timestamp": row["timestamp"],
+                }
+                for row in cursor.fetchall()
+            ]
 
     def get_summary(self) -> dict[str, Any]:
         """Get metrics summary."""
@@ -256,24 +254,23 @@ class DatabaseMetricsStorage(MetricsStorage):
             GROUP BY agent_name, metric
         """
 
-        with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.execute(query)
-                result = {}
+        with self.lock, sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(query)
+            result = {}
 
-                for row in cursor.fetchall():
-                    key = f"{row['agent_name']}.{row['metric']}"
-                    result[key] = {
-                        "count": row["count"],
-                        "avg": row["avg"],
-                        "min": row["min"],
-                        "max": row["max"],
-                        "agent": row["agent_name"],
-                        "metric": row["metric"],
-                    }
+            for row in cursor.fetchall():
+                key = f"{row['agent_name']}.{row['metric']}"
+                result[key] = {
+                    "count": row["count"],
+                    "avg": row["avg"],
+                    "min": row["min"],
+                    "max": row["max"],
+                    "agent": row["agent_name"],
+                    "metric": row["metric"],
+                }
 
-                return result
+            return result
 
 
 class AgentHealthMonitor:

@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ..entities.card import Card
-from ..entities.note import Note
+from obsidian_anki_sync.domain.entities.card import Card
+from obsidian_anki_sync.domain.entities.note import Note
 
 
 class IStateRepository(ABC):
@@ -24,7 +24,6 @@ class IStateRepository(ABC):
         Returns:
             Note instance if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_notes_by_path(self, file_path: str) -> list[Note]:
@@ -36,7 +35,6 @@ class IStateRepository(ABC):
         Returns:
             List of notes from that file
         """
-        pass
 
     @abstractmethod
     def save_note(self, note: Note) -> None:
@@ -45,7 +43,6 @@ class IStateRepository(ABC):
         Args:
             note: Note instance to save
         """
-        pass
 
     @abstractmethod
     def delete_note(self, note_id: str) -> None:
@@ -54,7 +51,6 @@ class IStateRepository(ABC):
         Args:
             note_id: ID of note to delete
         """
-        pass
 
     @abstractmethod
     def get_card_by_slug(self, slug: str) -> Card | None:
@@ -66,7 +62,6 @@ class IStateRepository(ABC):
         Returns:
             Card instance if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_cards_by_note_id(self, note_id: str) -> list[Card]:
@@ -78,7 +73,6 @@ class IStateRepository(ABC):
         Returns:
             List of cards for the note
         """
-        pass
 
     @abstractmethod
     def save_card(self, card: Card) -> None:
@@ -87,7 +81,6 @@ class IStateRepository(ABC):
         Args:
             card: Card instance to save
         """
-        pass
 
     @abstractmethod
     def delete_card(self, slug: str) -> None:
@@ -96,7 +89,6 @@ class IStateRepository(ABC):
         Args:
             slug: Slug of card to delete
         """
-        pass
 
     @abstractmethod
     def get_all_notes(self) -> list[Note]:
@@ -105,7 +97,6 @@ class IStateRepository(ABC):
         Returns:
             List of all notes
         """
-        pass
 
     @abstractmethod
     def get_all_cards(self) -> list[Card]:
@@ -114,7 +105,6 @@ class IStateRepository(ABC):
         Returns:
             List of all cards
         """
-        pass
 
     @abstractmethod
     def get_sync_stats(self) -> dict[str, Any]:
@@ -123,7 +113,6 @@ class IStateRepository(ABC):
         Returns:
             Dictionary with sync statistics
         """
-        pass
 
     @abstractmethod
     def save_sync_session(self, session_data: dict[str, Any]) -> str:
@@ -135,7 +124,6 @@ class IStateRepository(ABC):
         Returns:
             Session ID
         """
-        pass
 
     @abstractmethod
     def get_sync_session(self, session_id: str) -> dict[str, Any | None]:
@@ -147,7 +135,6 @@ class IStateRepository(ABC):
         Returns:
             Session data if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_sync_progress(
@@ -159,7 +146,6 @@ class IStateRepository(ABC):
             session_id: Session identifier
             progress_data: Progress information
         """
-        pass
 
     @abstractmethod
     def get_content_hash(self, resource_id: str) -> str | None:
@@ -171,7 +157,6 @@ class IStateRepository(ABC):
         Returns:
             Content hash if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def save_content_hash(self, resource_id: str, hash_value: str) -> None:
@@ -181,7 +166,6 @@ class IStateRepository(ABC):
             resource_id: Unique resource identifier
             hash_value: Content hash
         """
-        pass
 
     @abstractmethod
     def clear_expired_data(self, max_age_days: int) -> int:
@@ -193,4 +177,3 @@ class IStateRepository(ABC):
         Returns:
             Number of records cleared
         """
-        pass

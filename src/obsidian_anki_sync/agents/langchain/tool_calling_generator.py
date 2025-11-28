@@ -6,8 +6,14 @@ Specialized tool calling agent for generating APF cards with parallel tool suppo
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...models import GeneratedCard, GenerationResult, NoteMetadata, QAPair
-from ...utils.logging import get_logger
+from obsidian_anki_sync.models import (
+    GeneratedCard,
+    GenerationResult,
+    NoteMetadata,
+    QAPair,
+)
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import LangChainAgentResult
 from .tool_calling_agent import ToolCallingAgent
 

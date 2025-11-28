@@ -64,9 +64,8 @@ def _add_formatted_extra(record: dict) -> bool:
         if key in priority_fields:
             if value:  # Only show non-empty values
                 important_parts.append(f"{key}={value}")
-        else:
-            if value is not None and value != "":
-                other_parts.append(f"{key}={value}")
+        elif value is not None and value != "":
+            other_parts.append(f"{key}={value}")
 
     # Combine priority fields first, then others
     all_parts = important_parts + other_parts

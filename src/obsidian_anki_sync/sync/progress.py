@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .state_db import StateDB
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -112,7 +112,8 @@ class ProgressTracker:
                     total_notes=progress.total_notes,
                 )
             else:
-                raise ValueError(f"No progress found for session {session_id}")
+                msg = f"No progress found for session {session_id}"
+                raise ValueError(msg)
         else:
             # Create new session
             import uuid
@@ -147,12 +148,6 @@ class ProgressTracker:
             if self.on_interrupt_callback:
                 self.on_interrupt_callback()
 
-            print(
-                f"\n\nSync interrupted! Progress has been saved (session: {self.progress.session_id})"
-            )
-            print(
-                f"Resume with: obsidian-anki-sync sync --resume {self.progress.session_id}\n"
-            )
             sys.exit(130)  # Standard exit code for SIGINT
 
         signal.signal(signal.SIGINT, signal_handler)

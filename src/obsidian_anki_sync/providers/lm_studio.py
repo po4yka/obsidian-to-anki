@@ -5,7 +5,8 @@ from typing import Any, cast
 
 import httpx
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
@@ -132,7 +133,8 @@ class LMStudioProvider(BaseLLMProvider):
             httpx.HTTPError: If request fails after retries
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported")
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
 
         # Build messages in OpenAI format
         messages = []
@@ -175,9 +177,8 @@ class LMStudioProvider(BaseLLMProvider):
             # Validate response structure
             choices = result.get("choices", [])
             if not choices:
-                raise ValueError(
-                    f"LM Studio returned empty choices array. Response: {str(result)[:500]}"
-                )
+                msg = f"LM Studio returned empty choices array. Response: {str(result)[:500]}"
+                raise ValueError(msg)
 
             # Extract completion from OpenAI format safely
             first_choice = choices[0]
@@ -266,7 +267,7 @@ class LMStudioProvider(BaseLLMProvider):
 
         response_text = result.get("response", "{}")
         try:
-            return cast(dict[str, Any], json.loads(response_text))
+            return cast("dict[str, Any]", json.loads(response_text))
         except json.JSONDecodeError as e:
             logger.error(
                 "lm_studio_json_parse_error",

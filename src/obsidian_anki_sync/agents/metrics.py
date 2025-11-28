@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -105,11 +105,11 @@ class SessionMetrics:
             "by_operation": {},
         }
 
-        total_calls = cast(int, summary["total_operations"])
+        total_calls = cast("int", summary["total_operations"])
         if total_calls > 0:
             total_retried = sum(m.retried_calls for m in self.operations.values())
             summary["retry_rate_pct"] = round((total_retried / total_calls) * 100, 1)
-            successful_ops = cast(int, summary["successful_operations"])
+            successful_ops = cast("int", summary["successful_operations"])
             summary["success_rate_pct"] = round((successful_ops / total_calls) * 100, 1)
 
         # Per-operation details

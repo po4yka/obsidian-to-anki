@@ -9,9 +9,10 @@ from typing import Any
 import genanki
 import yaml
 
-from ..exceptions import DeckExportError
-from ..models import Card
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import DeckExportError
+from obsidian_anki_sync.models import Card
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .field_mapper import map_apf_to_anki_fields
 
 logger = get_logger(__name__)
@@ -289,7 +290,8 @@ def create_deck(
         return deck
 
     except Exception as e:
-        raise DeckExportError(f"Failed to create deck: {e}") from e
+        msg = f"Failed to create deck: {e}"
+        raise DeckExportError(msg) from e
 
 
 def _card_to_note(card: Card) -> genanki.Note:
@@ -336,7 +338,8 @@ def _card_to_note(card: Card) -> genanki.Note:
         return note
 
     except Exception as e:
-        raise DeckExportError(f"Failed to convert card {card.slug}: {e}") from e
+        msg = f"Failed to convert card {card.slug}: {e}"
+        raise DeckExportError(msg) from e
 
 
 def export_deck(
@@ -374,7 +377,8 @@ def export_deck(
         )
 
     except Exception as e:
-        raise DeckExportError(f"Failed to export deck: {e}") from e
+        msg = f"Failed to export deck: {e}"
+        raise DeckExportError(msg) from e
 
 
 def export_cards_to_apkg(
@@ -484,7 +488,8 @@ def export_cards_to_yaml(
         )
 
     except Exception as e:
-        raise DeckExportError(f"Failed to export cards to YAML: {e}") from e
+        msg = f"Failed to export cards to YAML: {e}"
+        raise DeckExportError(msg) from e
 
 
 def export_cards_to_csv(
@@ -560,7 +565,8 @@ def export_cards_to_csv(
         )
 
     except Exception as e:
-        raise DeckExportError(f"Failed to export cards to CSV: {e}") from e
+        msg = f"Failed to export cards to CSV: {e}"
+        raise DeckExportError(msg) from e
 
 
 def export_deck_from_anki(
@@ -601,9 +607,7 @@ def export_deck_from_anki(
         cards = []
         for note_info in notes_info:
             # Extract fields
-            fields = {
-                name: value for name, value in note_info.get("fields", {}).items()
-            }
+            fields = dict(note_info.get("fields", {}).items())
 
             # Try to extract manifest from Manifest field
             manifest_data = {}
@@ -616,7 +620,7 @@ def export_deck_from_anki(
                 except (json.JSONDecodeError, KeyError):
                     pass
 
-            from ..models import Manifest
+            from obsidian_anki_sync.models import Manifest
 
             manifest = Manifest(
                 slug=manifest_data.get("slug", f"note-{note_info['noteId']}"),
@@ -663,7 +667,8 @@ def export_deck_from_anki(
         )
 
     except Exception as e:
-        raise DeckExportError(f"Failed to export deck from Anki: {e}") from e
+        msg = f"Failed to export deck from Anki: {e}"
+        raise DeckExportError(msg) from e
 
 
 def _reconstruct_apf_from_fields(fields: dict[str, str], note_type: str) -> str:

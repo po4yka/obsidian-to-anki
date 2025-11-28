@@ -4,7 +4,8 @@ from typing import Any
 
 import httpx
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import MODELS_WITH_STRUCTURED_OUTPUT_ISSUES
 
 logger = get_logger(__name__)

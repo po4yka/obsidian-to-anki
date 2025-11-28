@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
-from ..models import NoteMetadata
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from obsidian_anki_sync.models import NoteMetadata
 
 LANGUAGE_SECTIONS = {
     "en": {"question": "# Question (EN)", "answer": "## Answer (EN)"},
@@ -101,7 +104,7 @@ def _validate_code_fences(content: str, title: str | None) -> list[str]:
 
             if fence_stack:
                 # If we have an opener on stack, this closes it
-                opener_line, opener_content = fence_stack.pop()
+                _opener_line, _opener_content = fence_stack.pop()
                 # Could log successful matches here if needed
             else:
                 # No opener on stack, so this is an opener (or standalone)

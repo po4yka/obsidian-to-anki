@@ -3,7 +3,8 @@
 import re
 from typing import Any
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseSpecializedAgent, ContentRepairAgent
 from .models import AgentResult
 

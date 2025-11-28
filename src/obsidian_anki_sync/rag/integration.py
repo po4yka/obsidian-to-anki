@@ -6,8 +6,9 @@ into card generation, validation, and enrichment agents.
 
 from typing import Any
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .rag_service import RAGService, get_rag_service
 
 logger = get_logger(__name__)
@@ -275,7 +276,7 @@ def get_rag_integration(config: Config | None = None) -> RAGIntegration:
 
     if _rag_integration is None:
         if config is None:
-            from ..config import get_config
+            from obsidian_anki_sync.config import get_config
 
             config = get_config()
         _rag_integration = RAGIntegration(config)

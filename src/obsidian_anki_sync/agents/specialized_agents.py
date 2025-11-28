@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from ..utils.logging import get_logger
-from ..utils.resilience import (
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.resilience import (
     Bulkhead,
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -279,10 +279,7 @@ class ProblemRouter:
 
         # Pattern 2: Excessive Unicode replacement characters
         # U+FFFD indicates characters that couldn't be decoded
-        if content.count("\ufffd") > 5:
-            return True
-
-        return False
+        return content.count("�") > 5
 
     def solve_problem(
         self, domain: ProblemDomain, content: str, context: dict[str, Any]
@@ -348,9 +345,8 @@ class ProblemRouter:
                 # Check rate limit
                 if not self.rate_limiters[domain].acquire():
                     logger.warning("rate_limit_exceeded", domain=domain.value)
-                    raise RateLimitExceededError(
-                        f"Rate limit exceeded for {domain.value}"
-                    )
+                    msg = f"Rate limit exceeded for {domain.value}"
+                    raise RateLimitExceededError(msg)
 
                 # Execute with circuit breaker
                 return self.circuit_breakers[domain].call(_execute_agent)
@@ -425,7 +421,7 @@ class BaseSpecializedAgent:
         self.retry_with_jitter = None
 
         if enable_retry:
-            from ..utils.resilience import RetryWithJitter
+            from obsidian_anki_sync.utils.resilience import RetryWithJitter
 
             self.retry_with_jitter = RetryWithJitter(
                 max_retries=max_retries,
@@ -913,7 +909,7 @@ class HTMLValidationAgent(BaseSpecializedAgent):
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair HTML validation issues."""
         # Import here to avoid circular imports
-        from ..apf.html_generator import HTMLTemplateGenerator
+        from obsidian_anki_sync.apf.html_generator import HTMLTemplateGenerator
 
         try:
             # Try to extract and regenerate HTML using templates

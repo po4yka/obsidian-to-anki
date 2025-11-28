@@ -10,8 +10,8 @@ from typing import Any
 
 import yaml
 
-from ..android_validator import AndroidValidator
-from ..link_validator import LinkValidator
+from obsidian_anki_sync.validation.android_validator import AndroidValidator
+from obsidian_anki_sync.validation.link_validator import LinkValidator
 
 
 class WorkPackagePreparator:
@@ -51,7 +51,6 @@ class WorkPackagePreparator:
 
             return topics
         except Exception as e:
-            print(f"Error loading taxonomy: {e}", file=sys.stderr)
             return set()
 
     def analyze_file(self, filepath: Path) -> dict | None:
@@ -147,7 +146,6 @@ class WorkPackagePreparator:
             return issues if issues["issues_found"] else None
 
         except Exception as e:
-            print(f"Error analyzing {filepath.name}: {e}", file=sys.stderr)
             return None
 
     def _extract_en_answer_preview(self, body: str) -> str:
@@ -307,29 +305,10 @@ class WorkPackagePreparator:
         with open(summary_file, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
 
-        print(f"\nSaved {len(agents)} work packages to {output_dir}/")
-        print(f"Summary saved to {summary_file}")
-
         return summary
 
     def print_summary(self) -> None:
         """Print summary of issues found."""
-        print("\n" + "=" * 80)
-        print("WORK PACKAGE PREPARATION SUMMARY")
-        print("=" * 80)
-        print(
-            f"Invalid Android subtopics: {len(self.work_packages['invalid_subtopics'])} files"
-        )
-        print(
-            f"Missing concept links:     {len(self.work_packages['missing_concept_links'])} files"
-        )
-        print(
-            f"Broken wikilinks:          {len(self.work_packages['broken_wikilinks'])} files"
-        )
-        print(
-            f"Wrong folder placement:    {len(self.work_packages['wrong_folder'])} files"
-        )
-        print("=" * 80)
 
 
 def main() -> None:
@@ -360,35 +339,22 @@ def main() -> None:
     dir_path = vault_root / args.path
 
     if not dir_path.exists():
-        print(f"Error: Directory not found: {dir_path}")
         sys.exit(1)
 
     preparator = WorkPackagePreparator(vault_root)
 
-    print(f"Analyzing {args.path}...")
-    print(f"Status filter: {args.status}")
-    print()
-
     preparator.analyze_directory(dir_path, args.status)
     preparator.print_summary()
 
-    print("\nDistributing work across agents...")
     agents = preparator.distribute_work()
 
     for agent in agents:
-        print(f"  {agent['agent_id']}: {agent['count']} files - {agent['description']}")
+        pass
 
     summary = preparator.save_work_packages(agents, args.output_dir)
 
-    print("\n" + "=" * 80)
-    print("DISTRIBUTION SUMMARY")
-    print("=" * 80)
     for task_type, stats in summary["by_task_type"].items():
-        print(f"{task_type}: {stats['files']} files across {stats['agents']} agent(s)")
-    print(
-        f"\nTotal: {summary['total_files']} files across {summary['total_agents']} agents"
-    )
-    print("=" * 80)
+        pass
 
 
 if __name__ == "__main__":

@@ -98,21 +98,17 @@ class WikilinkUpdater:
                 if not self.dry_run:
                     filepath.write_text(content, encoding="utf-8")
 
-                print(f"  UPDATED: {filepath.name}")
                 self.stats["files_updated"] += 1
 
             self.stats["files_scanned"] += 1
             return updated
 
         except Exception as e:
-            print(f"  ERROR: {filepath.name}: {e}")
             return False
 
     def update_directory(self, directory: Path) -> None:
         """Update all markdown files in directory."""
         files = list(directory.rglob("*.md"))
-        print(f"Scanning {len(files)} files in {directory.name}...")
-        print()
 
         for filepath in files:
             # Skip hidden directories
@@ -123,13 +119,6 @@ class WikilinkUpdater:
 
     def print_summary(self) -> None:
         """Print summary statistics."""
-        print("\n" + "=" * 80)
-        print("WIKILINK UPDATE SUMMARY")
-        print("=" * 80)
-        print(f"Files scanned:      {self.stats['files_scanned']}")
-        print(f"Files updated:      {self.stats['files_updated']}")
-        print(f"Links updated:      {self.stats['links_updated']}")
-        print("=" * 80)
 
 
 def main() -> None:
@@ -147,8 +136,7 @@ def main() -> None:
     updater = WikilinkUpdater(vault_root, dry_run=args.dry_run)
 
     if args.dry_run:
-        print("DRY RUN MODE - No changes will be made")
-        print()
+        pass
 
     # Update entire vault
     updater.update_directory(vault_root)

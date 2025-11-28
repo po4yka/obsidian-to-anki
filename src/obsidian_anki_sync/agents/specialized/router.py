@@ -5,8 +5,8 @@ Routes problems to appropriate specialized agents with resilience patterns.
 
 from typing import Any
 
-from ...utils.logging import get_logger
-from ...utils.resilience import (
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.resilience import (
     Bulkhead,
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -17,6 +17,7 @@ from ...utils.resilience import (
     RateLimitExceededError,
     ResourceExhaustedError,
 )
+
 from .base import BaseSpecializedAgent, FallbackAgent
 from .models import AgentResult, ProblemDomain
 
@@ -210,10 +211,7 @@ class ProblemRouter:
                 return True
 
         # Pattern 2: Excessive Unicode replacement characters
-        if content.count("\ufffd") > 5:
-            return True
-
-        return False
+        return content.count("�") > 5
 
     def solve_problem(
         self, domain: ProblemDomain, content: str, context: dict[str, Any]
@@ -278,9 +276,8 @@ class ProblemRouter:
                 # Check rate limit
                 if not self.rate_limiters[domain].acquire():
                     logger.warning("rate_limit_exceeded", domain=domain.value)
-                    raise RateLimitExceededError(
-                        f"Rate limit exceeded for {domain.value}"
-                    )
+                    msg = f"Rate limit exceeded for {domain.value}"
+                    raise RateLimitExceededError(msg)
 
                 # Execute with circuit breaker
                 return self.circuit_breakers[domain].call(_execute_agent)

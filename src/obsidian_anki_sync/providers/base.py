@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -74,7 +74,6 @@ class BaseLLMProvider(ABC):
             NotImplementedError: If the provider doesn't support this operation
             Exception: Provider-specific errors (network, API, etc.)
         """
-        pass
 
     async def generate_async(
         self,
@@ -173,12 +172,13 @@ class BaseLLMProvider(ABC):
                     provider=self.__class__.__name__,
                     response_text=response_text[:500],
                 )
-                raise ValueError(
+                msg = (
                     f"LLM returned empty JSON response. This may indicate the model "
                     f"completed too early or encountered an issue. Response: {response_text}"
                 )
+                raise ValueError(msg)
 
-            return cast(dict[str, Any], parsed)
+            return cast("dict[str, Any]", parsed)
         except json.JSONDecodeError as e:
             logger.error(
                 "json_parse_error",
@@ -195,7 +195,6 @@ class BaseLLMProvider(ABC):
         Returns:
             True if the provider is accessible, False otherwise
         """
-        pass
 
     @abstractmethod
     def list_models(self) -> list[str]:
@@ -208,7 +207,6 @@ class BaseLLMProvider(ABC):
             Some providers may return an empty list if listing is not supported
             or if authentication fails.
         """
-        pass
 
     def get_provider_name(self) -> str:
         """Get the human-readable name of this provider.

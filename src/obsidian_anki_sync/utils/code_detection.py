@@ -2,7 +2,7 @@
 
 import re
 
-from ..models import NoteMetadata
+from obsidian_anki_sync.models import NoteMetadata
 
 
 def detect_code_language_from_metadata(metadata: NoteMetadata) -> str:
@@ -86,11 +86,11 @@ def detect_code_language_from_content(content: str) -> str | None:
         return "kotlin"
 
     # Java indicators
-    if re.search(r"\bpublic\s+class\s+\w+", content) or re.search(
-        r"\bprivate\s+\w+\s+\w+\(", content
-    ):
-        if "fun " not in content:  # Distinguish from Kotlin
-            return "java"
+    if (
+        re.search(r"\bpublic\s+class\s+\w+", content)
+        or re.search(r"\bprivate\s+\w+\s+\w+\(", content)
+    ) and "fun " not in content:  # Distinguish from Kotlin
+        return "java"
 
     # Python indicators
     if any(
@@ -107,12 +107,14 @@ def detect_code_language_from_content(content: str) -> str | None:
         return "python"
 
     # Swift indicators
-    if any(
-        pattern in content
-        for pattern in ["func ", "var ", "let ", "import Foundation", "struct "]
-    ):
-        if "fun " not in content:  # Distinguish from Kotlin
-            return "swift"
+    if (
+        any(
+            pattern in content
+            for pattern in ["func ", "var ", "let ", "import Foundation", "struct "]
+        )
+        and "fun " not in content
+    ):  # Distinguish from Kotlin
+        return "swift"
 
     # JavaScript/TypeScript indicators
     if any(
@@ -139,7 +141,9 @@ def detect_code_language_from_content(content: str) -> str | None:
         return "json"
 
     # SQL indicators
-    if re.search(r"\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\s+", content, re.I):
+    if re.search(
+        r"\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\s+", content, re.IGNORECASE
+    ):
         return "sql"
 
     # Shell/Bash indicators

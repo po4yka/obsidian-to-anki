@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def deterministic_guid(parts: Iterable[str], length: int = 16) -> str:
