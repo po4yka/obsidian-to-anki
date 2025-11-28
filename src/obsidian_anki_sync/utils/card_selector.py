@@ -75,8 +75,7 @@ def select_cards_interactive(
                 status_parts.append("[yellow]Low Quality[/yellow]")
             else:
                 status_parts.append("[green]Good[/green]")
-        status = " | ".join(
-            status_parts) if status_parts else "[green]Ready[/green]"
+        status = " | ".join(status_parts) if status_parts else "[green]Ready[/green]"
 
         table.add_row(select_text, card_preview, status)
 
@@ -97,8 +96,7 @@ def select_cards_interactive(
         console.print("  [bold]cancel[/bold] - Cancel without selecting")
 
         choice = (
-            Prompt.ask("\n[bold]Your choice[/bold]",
-                       default="done").strip().lower()
+            Prompt.ask("\n[bold]Your choice[/bold]", default="done").strip().lower()
         )
 
         if choice == "done":
@@ -107,8 +105,7 @@ def select_cards_interactive(
             return []
         elif choice == "all":
             selected_indices = set(range(len(candidates)))
-            console.print(
-                f"[green]Selected all {len(candidates)} cards[/green]")
+            console.print(f"[green]Selected all {len(candidates)} cards[/green]")
         elif choice == "none":
             selected_indices = set()
             console.print("[yellow]Deselected all cards[/yellow]")
@@ -118,8 +115,7 @@ def select_cards_interactive(
                 if 1 <= card_num <= len(candidates):
                     _show_card_details(candidates[card_num - 1])
                 else:
-                    console.print(
-                        f"[red]Invalid card number: {card_num}[/red]")
+                    console.print(f"[red]Invalid card number: {card_num}[/red]")
             except (ValueError, IndexError):
                 console.print(
                     "[red]Invalid format. Use 'info N' where N is card number[/red]"
@@ -140,8 +136,7 @@ def select_cards_interactive(
 
         # Redraw table with updated selections
         console.clear()
-        table = Table(title=title, show_header=True,
-                      header_style="bold magenta")
+        table = Table(title=title, show_header=True, header_style="bold magenta")
         table.add_column("Select", style="cyan", width=8)
         table.add_column("Card", style="white", width=50)
         table.add_column("Status", style="yellow", width=20)
@@ -160,8 +155,7 @@ def select_cards_interactive(
                 else:
                     status_parts.append("[green]Good[/green]")
             status = (
-                " | ".join(
-                    status_parts) if status_parts else "[green]Ready[/green]"
+                " | ".join(status_parts) if status_parts else "[green]Ready[/green]"
             )
 
             table.add_row(select_text, card_preview, status)
