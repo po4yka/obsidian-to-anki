@@ -92,7 +92,7 @@ def mock_pipeline_state():
         "store_reasoning_traces": True,
         "log_reasoning_traces": False,
         "cot_enabled_stages": ["pre_validation", "generation", "post_validation"],
-        "reasoning_model": MagicMock(),
+        "reasoning_model": "openai:gpt-4",
         "reasoning_traces": {},
         "current_reasoning": None,
         "step_counts": {},
@@ -153,8 +153,10 @@ class TestReasoningTraceOutput:
     def test_confidence_bounds(self):
         """Test confidence field validation."""
         # Valid bounds
-        ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=0.0)
-        ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=1.0)
+        ReasoningTraceOutput(
+            reasoning="test", planned_approach="test", confidence=0.0)
+        ReasoningTraceOutput(
+            reasoning="test", planned_approach="test", confidence=1.0)
 
         # Invalid bounds should raise
         with pytest.raises(ValueError):
@@ -263,25 +265,30 @@ class TestShouldSkipReasoning:
     def test_skip_when_cot_disabled(self, mock_pipeline_state):
         """Test skipping when CoT is disabled globally."""
         mock_pipeline_state["enable_cot_reasoning"] = False
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is True
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is True
 
     def test_skip_when_stage_not_enabled(self, mock_pipeline_state):
         """Test skipping when stage is not in enabled list."""
         mock_pipeline_state["cot_enabled_stages"] = [
             "generation"
         ]  # pre_validation not included
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is True
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is True
 
     def test_no_skip_when_enabled(self, mock_pipeline_state):
         """Test not skipping when CoT and stage are enabled."""
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is False
-        assert _should_skip_reasoning(mock_pipeline_state, "generation") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "generation") is False
 
     def test_no_skip_when_empty_stages_list(self, mock_pipeline_state):
         """Test that empty stages list means all stages enabled."""
         mock_pipeline_state["cot_enabled_stages"] = []
         # With empty list, stage check passes (all enabled)
-        assert _should_skip_reasoning(mock_pipeline_state, "any_stage") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "any_stage") is False
 
 
 class TestStoreReasoningTrace:
