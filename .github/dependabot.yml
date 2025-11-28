@@ -15,7 +15,6 @@ updates:
       development-dependencies:
         patterns:
           - "pytest*"
-          - "black"
           - "isort"
           - "ruff"
           - "mypy"
@@ -28,7 +27,6 @@ updates:
           - "*"
         exclude-patterns:
           - "pytest*"
-          - "black"
           - "isort"
           - "ruff"
           - "mypy"

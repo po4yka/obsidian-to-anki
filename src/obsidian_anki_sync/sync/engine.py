@@ -550,9 +550,7 @@ class SyncEngine:
                 self.config, "enable_duplicate_detection", False
             ):
                 logger.info("fetching_existing_cards_for_duplicate_detection")
-                existing_cards = (
-                    self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
-                )
+                existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
                 logger.info("fetched_existing_cards", count=len(existing_cards))
                 # Pass existing cards to card generator
                 self.card_generator.set_existing_cards_for_duplicate_detection(
