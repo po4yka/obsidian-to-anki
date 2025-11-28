@@ -288,14 +288,16 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            ids: list[list[str]] = cast(
-                "list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
-                "list[list[dict[str, Any]]]", results.get("metadatas", [[]]))
+                "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
+            )
             documents: list[list[str]] = cast(
-                "list[list[str]]", results.get("documents", [[]]))
+                "list[list[str]]", results.get("documents", [[]])
+            )
             distances: list[list[float]] = cast(
-                "list[list[float]]", results.get("distances", [[]]))
+                "list[list[float]]", results.get("distances", [[]])
+            )
 
             # Validate all arrays have consistent structure
             if ids and len(ids[0]) > 0:
@@ -304,16 +306,13 @@ class AgentMemoryStore:
                     # Safe access with bounds checking
                     memory_id = ids[0][i] if i < len(ids[0]) else None
                     metadata = (
-                        metadatas[0][i] if metadatas and len(
-                            metadatas[0]) > i else {}
+                        metadatas[0][i] if metadatas and len(metadatas[0]) > i else {}
                     )
                     document = (
-                        documents[0][i] if documents and len(
-                            documents[0]) > i else ""
+                        documents[0][i] if documents and len(documents[0]) > i else ""
                     )
                     distance = (
-                        distances[0][i] if distances and len(
-                            distances[0]) > i else None
+                        distances[0][i] if distances and len(distances[0]) > i else None
                     )
 
                     if memory_id is None:
@@ -375,10 +374,10 @@ class AgentMemoryStore:
                 )
 
             # Extract recommendation with safe access
-            ids: list[list[str]] = cast(
-                "list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
-                "list[list[dict[str, Any]]]", results.get("metadatas", [[]]))
+                "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
+            )
             if ids and len(ids[0]) > 0 and metadatas and len(metadatas[0]) > 0:
                 metadata = metadatas[0][0]
                 successful_agent_str = (
