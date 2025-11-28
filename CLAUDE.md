@@ -41,6 +41,8 @@ uv run mypy src/
 uv run ruff format . && uv run isort . && uv run ruff check . && uv run mypy src/
 ```
 
+**IMPORTANT**: After every atomic change (function, class, or module modification), run `uv run ruff check .` and fix any linting issues immediately. This ensures code quality is maintained incrementally and prevents large refactoring sessions later.
+
 ### Testing
 
 ```bash

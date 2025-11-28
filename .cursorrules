@@ -234,18 +234,25 @@ Example: `feat(parser): add multi-line question support`
 -   Rotate keys regularly
 -   Use minimal required permissions
 
+## Development Workflow
+
+### Atomic Changes
+
+**CRITICAL**: After every atomic change (function, class, or module modification), run `uv run ruff check .` and fix any linting issues immediately. This ensures code quality is maintained incrementally and prevents large refactoring sessions later.
+
 ## Code Review Checklist
 
 Before submitting PR:
 
 -   [ ] All tests pass (`pytest`)
--   [ ] Linting passes (`ruff check src/`)
--   [ ] Formatting applied (`ruff format src/`)
+-   [ ] Linting passes (`ruff check .`)
+-   [ ] Formatting applied (`ruff format .`)
 -   [ ] Type checking passes (`mypy src/`)
 -   [ ] Documentation updated
 -   [ ] No emojis in code or documentation
 -   [ ] Commit messages follow convention
 -   [ ] Code coverage maintained or improved
+-   [ ] Code quality maintained (run `uv run ruff check .` after each atomic change)
 
 ## Tools Configuration
 
