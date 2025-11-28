@@ -1,11 +1,10 @@
 """Tests for enhanced Card Splitting Agent with advanced strategies and confidence scoring."""
 
 import asyncio
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from obsidian_anki_sync.agents.models import CardSplittingResult, CardSplitPlan
+import pytest
+
 from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 
@@ -46,7 +45,9 @@ def sample_qa_pairs():
 def card_splitting_agent():
     """Create a CardSplittingAgentAI instance with mocked PydanticAI Agent."""
     mock_model = MagicMock()
-    with patch("obsidian_anki_sync.agents.pydantic.card_splitting.Agent") as mock_agent_class:
+    with patch(
+        "obsidian_anki_sync.agents.pydantic.card_splitting.Agent"
+    ) as mock_agent_class:
         mock_agent_instance = MagicMock()
         mock_agent_class.return_value = mock_agent_instance
         agent = CardSplittingAgentAI(model=mock_model, temperature=0.0)
@@ -96,11 +97,13 @@ class TestCardSplittingEnhanced:
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
-        result = asyncio.run(card_splitting_agent.analyze(
-            note_content="Test content with 3 items",
-            metadata=sample_metadata,
-            qa_pairs=sample_qa_pairs,
-        ))
+        result = asyncio.run(
+            card_splitting_agent.analyze(
+                note_content="Test content with 3 items",
+                metadata=sample_metadata,
+                qa_pairs=sample_qa_pairs,
+            )
+        )
 
         assert result.confidence == 0.95
         assert result.should_split is True
@@ -139,11 +142,13 @@ class TestCardSplittingEnhanced:
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
-        result = asyncio.run(card_splitting_agent.analyze(
-            note_content="Ambiguous content",
-            metadata=sample_metadata,
-            qa_pairs=sample_qa_pairs,
-        ))
+        result = asyncio.run(
+            card_splitting_agent.analyze(
+                note_content="Ambiguous content",
+                metadata=sample_metadata,
+                qa_pairs=sample_qa_pairs,
+            )
+        )
 
         assert result.confidence == 0.5
         assert result.fallback_strategy == "none"
@@ -180,17 +185,21 @@ class TestCardSplittingEnhanced:
                 rationale="Hard difficulty",
             ),
         ]
-        mock_result.data.reasoning = "Concepts ordered by difficulty: easy -> medium -> hard"
+        mock_result.data.reasoning = (
+            "Concepts ordered by difficulty: easy -> medium -> hard"
+        )
         mock_result.data.confidence = 0.88
         mock_result.data.fallback_strategy = None
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
-        result = asyncio.run(card_splitting_agent.analyze(
-            note_content="Content with varying difficulty levels",
-            metadata=sample_metadata,
-            qa_pairs=sample_qa_pairs,
-        ))
+        result = asyncio.run(
+            card_splitting_agent.analyze(
+                note_content="Content with varying difficulty levels",
+                metadata=sample_metadata,
+                qa_pairs=sample_qa_pairs,
+            )
+        )
 
         assert result.splitting_strategy == "difficulty"
         assert result.card_count == 3
@@ -228,17 +237,21 @@ class TestCardSplittingEnhanced:
                 rationale="Requires intermediate",
             ),
         ]
-        mock_result.data.reasoning = "Ordered by prerequisites: foundation -> intermediate -> advanced"
+        mock_result.data.reasoning = (
+            "Ordered by prerequisites: foundation -> intermediate -> advanced"
+        )
         mock_result.data.confidence = 0.9
         mock_result.data.fallback_strategy = None
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
-        result = asyncio.run(card_splitting_agent.analyze(
-            note_content="Content with prerequisite relationships",
-            metadata=sample_metadata,
-            qa_pairs=sample_qa_pairs,
-        ))
+        result = asyncio.run(
+            card_splitting_agent.analyze(
+                note_content="Content with prerequisite relationships",
+                metadata=sample_metadata,
+                qa_pairs=sample_qa_pairs,
+            )
+        )
 
         assert result.splitting_strategy == "prerequisite"
         # Verify ordering (foundation first)
@@ -249,14 +262,15 @@ class TestCardSplittingEnhanced:
     ):
         """Test fallback behavior on agent error."""
         # Mock agent error
-        card_splitting_agent.agent.run = AsyncMock(
-            side_effect=Exception("Agent error"))
+        card_splitting_agent.agent.run = AsyncMock(side_effect=Exception("Agent error"))
 
-        result = asyncio.run(card_splitting_agent.analyze(
-            note_content="Test content",
-            metadata=sample_metadata,
-            qa_pairs=sample_qa_pairs,
-        ))
+        result = asyncio.run(
+            card_splitting_agent.analyze(
+                note_content="Test content",
+                metadata=sample_metadata,
+                qa_pairs=sample_qa_pairs,
+            )
+        )
 
         # Should return conservative fallback
         assert result.should_split is False

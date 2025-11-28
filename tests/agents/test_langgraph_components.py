@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from obsidian_anki_sync.config import Config
+
+import pytest
+
 from obsidian_anki_sync.agents.langgraph.model_factory import ModelFactory
 from obsidian_anki_sync.agents.langgraph.workflow_builder import WorkflowBuilder
-from obsidian_anki_sync.agents.langgraph.state import PipelineState
+from obsidian_anki_sync.config import Config
+
 
 @pytest.fixture
 def mock_config():
@@ -19,10 +21,13 @@ def mock_config():
     config.enable_duplicate_detection = False
     return config
 
+
 class TestModelFactory:
     def test_get_model_creates_new_model(self, mock_config):
         factory = ModelFactory(mock_config)
-        with patch("obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory") as mock_factory:
+        with patch(
+            "obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory"
+        ) as mock_factory:
             mock_model = MagicMock()
             mock_factory.create_from_config.return_value = mock_model
 
@@ -34,7 +39,9 @@ class TestModelFactory:
 
     def test_get_model_returns_cached_model(self, mock_config):
         factory = ModelFactory(mock_config)
-        with patch("obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory") as mock_factory:
+        with patch(
+            "obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory"
+        ) as mock_factory:
             mock_model = MagicMock()
             mock_factory.create_from_config.return_value = mock_model
 
@@ -46,7 +53,9 @@ class TestModelFactory:
 
     def test_clear_cache(self, mock_config):
         factory = ModelFactory(mock_config)
-        with patch("obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory") as mock_factory:
+        with patch(
+            "obsidian_anki_sync.agents.langgraph.model_factory.PydanticAIModelFactory"
+        ) as mock_factory:
             mock_model = MagicMock()
             mock_factory.create_from_config.return_value = mock_model
 
@@ -55,6 +64,7 @@ class TestModelFactory:
             factory.get_model("generator")
 
             assert mock_factory.create_from_config.call_count == 2
+
 
 class TestWorkflowBuilder:
     def test_build_workflow(self, mock_config):

@@ -80,15 +80,22 @@ async def test_split_validation_node_approved(pipeline_state):
 
     # Mock agent
     mock_agent = MagicMock()
-    mock_agent.validate = AsyncMock(return_value=SplitValidationResult(
-        is_valid=True,
-        validation_score=0.9,
-        feedback="Approved",
-        suggested_modifications=[],
-    ))
+    mock_agent.validate = AsyncMock(
+        return_value=SplitValidationResult(
+            is_valid=True,
+            validation_score=0.9,
+            feedback="Approved",
+            suggested_modifications=[],
+        )
+    )
 
-    with patch("obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI", return_value=mock_agent):
-        with patch("obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"):
+    with patch(
+        "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+        return_value=mock_agent,
+    ):
+        with patch(
+            "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
+        ):
             new_state = await split_validation_node(pipeline_state)
 
     assert new_state["current_stage"] == "generation"
@@ -123,15 +130,22 @@ async def test_split_validation_node_rejected(pipeline_state):
 
     # Mock agent
     mock_agent = MagicMock()
-    mock_agent.validate = AsyncMock(return_value=SplitValidationResult(
-        is_valid=False,
-        validation_score=0.2,
-        feedback="Rejected",
-        suggested_modifications=[],
-    ))
+    mock_agent.validate = AsyncMock(
+        return_value=SplitValidationResult(
+            is_valid=False,
+            validation_score=0.2,
+            feedback="Rejected",
+            suggested_modifications=[],
+        )
+    )
 
-    with patch("obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI", return_value=mock_agent):
-        with patch("obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"):
+    with patch(
+        "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+        return_value=mock_agent,
+    ):
+        with patch(
+            "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
+        ):
             new_state = await split_validation_node(pipeline_state)
 
     assert new_state["current_stage"] == "generation"

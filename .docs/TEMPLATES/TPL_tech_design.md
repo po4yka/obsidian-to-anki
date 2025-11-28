@@ -54,4 +54,3 @@
 
 ## Open Questions
 - Items needing follow-up
-

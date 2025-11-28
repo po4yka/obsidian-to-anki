@@ -3,13 +3,11 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ConfigurationError
-from obsidian_anki_sync.models.config import ModelPreset, ModelTask
 
 
 class TestModelSelection:

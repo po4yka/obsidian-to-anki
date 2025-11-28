@@ -166,8 +166,8 @@ async def think_before_pre_validation_node(state: PipelineState) -> PipelineStat
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
-Language Tags: {', '.join(metadata.language_tags)}
+Tags: {", ".join(metadata.tags)}
+Language Tags: {", ".join(metadata.language_tags)}
 Q&A Pairs Count: {len(qa_pairs)}
 
 Note Content:
@@ -194,8 +194,7 @@ What should the pre-validator focus on?"""
             },
         )
 
-        state["stage_times"]["think_before_pre_validation"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_pre_validation"] = time.time() - start_time
         state["messages"].append(
             f"CoT pre-validation reasoning: confidence={output.confidence:.2f}"
         )
@@ -282,8 +281,7 @@ What formatting considerations are needed?"""
             },
         )
 
-        state["stage_times"]["think_before_generation"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_generation"] = time.time() - start_time
         state["messages"].append(
             f"CoT generation reasoning: confidence={output.confidence:.2f}"
         )
@@ -349,9 +347,9 @@ async def think_before_post_validation_node(state: PipelineState) -> PipelineSta
         prompt = f"""Analyze generated cards before post-validation:
 
 {card_summary}
-Retry Count: {state.get('retry_count', 0)}
-Auto-fix Enabled: {state.get('auto_fix_enabled', False)}
-Strict Mode: {state.get('strict_mode', True)}
+Retry Count: {state.get("retry_count", 0)}
+Auto-fix Enabled: {state.get("auto_fix_enabled", False)}
+Strict Mode: {state.get("strict_mode", True)}
 
 Think through: What quality issues might exist? What validation strategy?
 What issues are expected based on linting?"""
@@ -371,8 +369,7 @@ What issues are expected based on linting?"""
             },
         )
 
-        state["stage_times"]["think_before_post_validation"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_post_validation"] = time.time() - start_time
         state["messages"].append(
             f"CoT post-validation reasoning: confidence={output.confidence:.2f}"
         )
@@ -450,8 +447,7 @@ What are the concept boundaries? What are the trade-offs?"""
             },
         )
 
-        state["stage_times"]["think_before_card_splitting"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_card_splitting"] = time.time() - start_time
         state["messages"].append(
             f"CoT card-splitting reasoning: confidence={output.confidence:.2f}"
         )
@@ -505,7 +501,7 @@ async def think_before_enrichment_node(state: PipelineState) -> PipelineState:
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
+Tags: {", ".join(metadata.tags)}
 Cards Count: {cards_count}
 
 Think through: What enrichment opportunities exist?
@@ -526,8 +522,7 @@ What examples, mnemonics, or context would help learning?"""
             },
         )
 
-        state["stage_times"]["think_before_enrichment"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_enrichment"] = time.time() - start_time
         state["messages"].append(
             f"CoT enrichment reasoning: confidence={output.confidence:.2f}"
         )
@@ -600,8 +595,7 @@ What is the cognitive load? Will these cards work with SRS?"""
             },
         )
 
-        state["stage_times"]["think_before_memorization"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_memorization"] = time.time() - start_time
         state["messages"].append(
             f"CoT memorization reasoning: confidence={output.confidence:.2f}"
         )
@@ -677,8 +671,7 @@ What comparison strategy should be used?"""
             },
         )
 
-        state["stage_times"]["think_before_duplicate"] = time.time() - \
-            start_time
+        state["stage_times"]["think_before_duplicate"] = time.time() - start_time
         state["messages"].append(
             f"CoT duplicate reasoning: confidence={output.confidence:.2f}"
         )

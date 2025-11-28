@@ -127,8 +127,7 @@ def clean_json_response(text: str, model: str) -> str:
                         # Only warn if we're in the last 10% of the text (likely truncation)
                         # or if there's very little text remaining
                         remaining_chars = len(cleaned) - i - 1
-                        is_near_end = remaining_chars < max(
-                            100, len(cleaned) * 0.1)
+                        is_near_end = remaining_chars < max(100, len(cleaned) * 0.1)
 
                         if is_near_end:
                             # Only log warning once per unique text (avoid duplicates)
@@ -261,7 +260,7 @@ def repair_corrected_cards_array(text: str) -> str:
                 brace_depth -= 1
                 if brace_depth == 0 and card_start != -1:
                     # Found a complete card object
-                    card_text = remaining[card_start: i + 1]
+                    card_text = remaining[card_start : i + 1]
                     try:
                         # Validate it's proper JSON
                         json.loads(card_text)
@@ -304,8 +303,7 @@ def repair_corrected_cards_array(text: str) -> str:
     # Validate the result
     try:
         json.loads(result)
-        logger.debug("corrected_cards_repair_successful",
-                     card_count=len(valid_cards))
+        logger.debug("corrected_cards_repair_successful", card_count=len(valid_cards))
         return result
     except json.JSONDecodeError as e:
         logger.warning("corrected_cards_repair_failed", error=str(e))
@@ -351,8 +349,7 @@ def repair_truncated_card(card_text: str) -> str | None:
                 # Insert before existing fields
                 insert_pos = repaired.find('"card_index"')
                 placeholder = f'{field}: "placeholder", '
-                repaired = repaired[:insert_pos] + \
-                    placeholder + repaired[insert_pos:]
+                repaired = repaired[:insert_pos] + placeholder + repaired[insert_pos:]
             else:
                 # Add at beginning after opening brace
                 if repaired.startswith("{"):
@@ -515,7 +512,7 @@ def repair_truncated_json(text: str) -> str:
         colon_pos = repaired.find(":", last_key_pos)
         if colon_pos != -1:
             # Get everything after the colon
-            after_colon = repaired[colon_pos + 1:].lstrip()
+            after_colon = repaired[colon_pos + 1 :].lstrip()
 
             # Check if we have an incomplete string value
             if after_colon.startswith('"'):
@@ -561,7 +558,7 @@ def repair_truncated_json(text: str) -> str:
     # Handle incomplete array/object values
     # If we're in the middle of a value after a colon, we need to complete it
     if last_key_pos >= 0:
-        after_colon = repaired[last_key_pos + 1:].lstrip()
+        after_colon = repaired[last_key_pos + 1 :].lstrip()
         # If after colon is empty or incomplete, add a placeholder
         if not after_colon or (
             after_colon.startswith('"') and after_colon.count('"') == 1
@@ -627,6 +624,5 @@ def repair_truncated_json(text: str) -> str:
                     pass
 
         # Last resort: return minimal valid JSON
-        logger.warning("json_repair_failed_using_fallback",
-                       original_preview=text[:100])
+        logger.warning("json_repair_failed_using_fallback", original_preview=text[:100])
         return "{}"

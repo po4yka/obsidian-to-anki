@@ -7,7 +7,7 @@ or task requirements.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..config import Config
 from ..utils.logging import get_logger
@@ -21,10 +21,10 @@ class UnifiedAgentResult:
 
     success: bool
     reasoning: str
-    data: Optional[Any] = None
-    warnings: Optional[List[str]] = None
+    data: Any | None = None
+    warnings: list[str] | None = None
     confidence: float = 1.0
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
     agent_framework: str = "unknown"  # "pydantic_ai" or "langchain"
     agent_type: str = "unknown"
 
@@ -42,8 +42,8 @@ class UnifiedAgentInterface(ABC):
     async def generate_cards(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
         slug_base: str,
     ) -> UnifiedAgentResult:
         """Generate APF cards from Q/A pairs."""
@@ -53,8 +53,8 @@ class UnifiedAgentInterface(ABC):
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> UnifiedAgentResult:
         """Run pre-validation on note content."""
         pass
@@ -62,8 +62,8 @@ class UnifiedAgentInterface(ABC):
     @abstractmethod
     async def validate_post(
         self,
-        cards: List[Dict[str, Any]],
-        metadata: Dict[str, Any],
+        cards: list[dict[str, Any]],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> UnifiedAgentResult:
         """Run post-validation on generated cards."""
@@ -73,14 +73,14 @@ class UnifiedAgentInterface(ABC):
     async def enrich_content(
         self,
         content: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         enrichment_type: str = "general",
     ) -> UnifiedAgentResult:
         """Enrich content with additional context."""
         pass
 
     @abstractmethod
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get information about the underlying agent."""
         pass
 
@@ -148,8 +148,8 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     async def generate_cards(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
         slug_base: str,
     ) -> UnifiedAgentResult:
         """Generate APF cards using PydanticAI."""
@@ -170,7 +170,9 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                 reasoning=(
                     "Cards generated successfully"
                     if result.success
-                    else result.errors[0] if result.errors else "Generation failed"
+                    else result.errors[0]
+                    if result.errors
+                    else "Generation failed"
                 ),
                 data=result,
                 warnings=result.warnings,
@@ -193,8 +195,8 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> UnifiedAgentResult:
         """Run pre-validation using PydanticAI."""
         try:
@@ -233,8 +235,8 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
 
     async def validate_post(
         self,
-        cards: List[Dict[str, Any]],
-        metadata: Dict[str, Any],
+        cards: list[dict[str, Any]],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> UnifiedAgentResult:
         """Run post-validation using PydanticAI."""
@@ -275,7 +277,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     async def enrich_content(
         self,
         content: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         enrichment_type: str = "general",
     ) -> UnifiedAgentResult:
         """Enrich content using PydanticAI."""
@@ -316,7 +318,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                 agent_type="context_enrichment",
             )
 
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get information about PydanticAI agents."""
         return {
             "framework": self.agent_framework,
@@ -391,8 +393,8 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
     async def generate_cards(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
         slug_base: str,
     ) -> UnifiedAgentResult:
         """Generate APF cards using LangChain agents."""
@@ -433,8 +435,8 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> UnifiedAgentResult:
         """Run pre-validation using LangChain agents."""
         try:
@@ -471,8 +473,8 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
 
     async def validate_post(
         self,
-        cards: List[Dict[str, Any]],
-        metadata: Dict[str, Any],
+        cards: list[dict[str, Any]],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> UnifiedAgentResult:
         """Run post-validation using LangChain agents."""
@@ -515,7 +517,7 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
     async def enrich_content(
         self,
         content: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         enrichment_type: str = "general",
     ) -> UnifiedAgentResult:
         """Enrich content using LangChain agents."""
@@ -552,7 +554,7 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
                 agent_type="context_enrichment",
             )
 
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get information about LangChain agents."""
         factory = self._get_factory()
         return {
@@ -587,7 +589,7 @@ class UnifiedAgentSelector:
             logger.warning(f"Memory-enhanced generator not available: {e}")
 
     def get_agent(
-        self, framework: Optional[str] = None, task_type: str = "generator"
+        self, framework: str | None = None, task_type: str = "generator"
     ) -> UnifiedAgentInterface:
         """Get unified agent for specified framework and task.
 

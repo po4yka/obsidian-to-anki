@@ -3,8 +3,8 @@
 Handles fetching Anki state and determining sync actions.
 """
 
-from ..anki.client import AnkiClient
 from ..agents.models import GeneratedCard
+from ..anki.client import AnkiClient
 from ..config import Config
 from ..models import Card, SyncAction
 from ..sync.state_db import StateDB
@@ -49,8 +49,7 @@ class AnkiStateManager:
         try:
             from ..exceptions import AnkiConnectError
 
-            note_ids = self.anki.find_notes(
-                f"deck:{self.config.anki_deck_name}")
+            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
         except AnkiConnectError as e:
             elapsed = time.time() - start_time
             logger.error(
@@ -101,8 +100,7 @@ class AnkiStateManager:
                 notes_info = self.anki.notes_info(batch_note_ids)
 
                 for note_info in notes_info:
-                    manifest_field = note_info.get(
-                        "fields", {}).get("Manifest", {})
+                    manifest_field = note_info.get("fields", {}).get("Manifest", {})
                     if isinstance(manifest_field, dict):
                         manifest_field = manifest_field.get("value", "")
 
@@ -196,8 +194,7 @@ class AnkiStateManager:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get(
-                            "anki_guid") if db_card else None,
+                        anki_guid=db_card.get("anki_guid") if db_card else None,
                         reason="No changes detected",
                     )
                 )
@@ -327,17 +324,17 @@ class AnkiStateManager:
         import time
 
         start_time = time.time()
-        logger.info("fetching_existing_cards_for_duplicate_detection",
-                    deck=self.config.anki_deck_name)
+        logger.info(
+            "fetching_existing_cards_for_duplicate_detection",
+            deck=self.config.anki_deck_name,
+        )
 
         try:
             # Find all notes in target deck
-            note_ids = self.anki.find_notes(
-                f"deck:{self.config.anki_deck_name}")
+            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
 
             if not note_ids:
-                logger.info("no_existing_cards_found",
-                            deck=self.config.anki_deck_name)
+                logger.info("no_existing_cards_found", deck=self.config.anki_deck_name)
                 return []
 
             # Get note info for all notes
@@ -365,7 +362,7 @@ class AnkiStateManager:
 
                     # Try to parse manifest from HTML
                     manifest_data = self._extract_manifest_from_html(apf_html)
-                    if manifest_data and hasattr(manifest_data, 'slug'):
+                    if manifest_data and hasattr(manifest_data, "slug"):
                         slug = manifest_data.slug
 
                     # Create GeneratedCard
@@ -382,8 +379,8 @@ class AnkiStateManager:
                 except Exception as e:
                     logger.warning(
                         "failed_to_process_existing_card",
-                        note_id=note_info.get('noteId'),
-                        error=str(e)
+                        note_id=note_info.get("noteId"),
+                        error=str(e),
                     )
                     continue
 

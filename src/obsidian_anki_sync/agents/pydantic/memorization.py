@@ -40,8 +40,7 @@ class MemorizationQualityAgentAI:
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
         )
 
-        logger.info("pydantic_ai_memorization_agent_initialized",
-                    model=str(model))
+        logger.info("pydantic_ai_memorization_agent_initialized", model=str(model))
 
     async def assess(
         self,
@@ -57,12 +56,10 @@ class MemorizationQualityAgentAI:
         Returns:
             MemorizationQualityResult with assessment
         """
-        logger.info("pydantic_ai_memorization_assessment_start",
-                    cards_count=len(cards))
+        logger.info("pydantic_ai_memorization_assessment_start", cards_count=len(cards))
 
         # Create dependencies
-        deps = PostValidationDeps(
-            cards=cards, metadata=metadata, strict_mode=True)
+        deps = PostValidationDeps(cards=cards, metadata=metadata, strict_mode=True)
 
         # Build assessment prompt
         prompt = f"""Assess memorization quality of these {len(cards)} Anki cards:
@@ -70,7 +67,7 @@ class MemorizationQualityAgentAI:
 Metadata:
 - Title: {metadata.title}
 - Topic: {metadata.topic}
-- Languages: {', '.join(metadata.language_tags)}
+- Languages: {", ".join(metadata.language_tags)}
 
 Cards to assess:
 """
@@ -78,8 +75,7 @@ Cards to assess:
             prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
             front_match = card.apf_html.split("<!-- Front -->")
             if len(front_match) > 1:
-                front_text = front_match[1].split(
-                    "<!-- Back -->")[0].strip()[:150]
+                front_text = front_match[1].split("<!-- Back -->")[0].strip()[:150]
                 prompt += f"Front: {front_text}...\n"
             back_match = card.apf_html.split("<!-- Back -->")
             if len(back_match) > 1:
@@ -134,7 +130,6 @@ Cards to assess:
                 memorization_score=0.7,
                 issues=[],
                 strengths=[],
-                suggested_improvements=[
-                    f"Memorization agent failed: {str(e)}"],
+                suggested_improvements=[f"Memorization agent failed: {str(e)}"],
                 assessment_time=0.0,
             )

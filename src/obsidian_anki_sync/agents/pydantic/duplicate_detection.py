@@ -61,8 +61,7 @@ class DuplicateDetectionAgentAI:
         try:
             # Extract question/answer from APF HTML
             new_q, new_a = self._extract_qa_from_apf(new_card.apf_html)
-            existing_q, existing_a = self._extract_qa_from_apf(
-                existing_card.apf_html)
+            existing_q, existing_a = self._extract_qa_from_apf(existing_card.apf_html)
 
             # Create dependencies
             deps = DuplicateDetectionDeps(
@@ -223,14 +222,12 @@ Analyze similarity and provide your assessment."""
         answer = ""
 
         # Extract Front (question)
-        front_match = re.search(
-            r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
         if front_match:
             question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
         # Extract Back (answer)
-        back_match = re.search(
-            r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
         if back_match:
             answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 

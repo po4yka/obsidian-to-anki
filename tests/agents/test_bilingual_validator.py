@@ -1,7 +1,5 @@
 """Tests for bilingual consistency validation."""
 
-import pytest
-
 from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.agents.post_validation.semantic_validator import (
     _check_bilingual_consistency,
@@ -56,7 +54,7 @@ How to prohibit object creation?
             "has_key_point_code": True,
             "card_type": "Simple",
             "key_point_notes": ["Note 1", "Note 2"],
-            "other_notes": ["Ref: test"]
+            "other_notes": ["Ref: test"],
         }
         ru_parsed = en_parsed.copy()  # Identical
 
@@ -73,7 +71,7 @@ How to prohibit object creation?
             "has_key_point_code": True,
             "card_type": "Simple",
             "key_point_notes": ["Note 1", "Note 2", "Note 3"],
-            "other_notes": ["Ref: test"]
+            "other_notes": ["Ref: test"],
         }
         ru_parsed = en_parsed.copy()
         ru_parsed["key_point_notes_count"] = 2  # RU has only 2 notes
@@ -94,7 +92,7 @@ How to prohibit object creation?
             "has_key_point_code": True,  # EN has code
             "card_type": "Simple",
             "key_point_notes": ["Note 1", "Note 2"],
-            "other_notes": []
+            "other_notes": [],
         }
         ru_parsed = en_parsed.copy()
         ru_parsed["has_key_point_code"] = False  # RU lacks code
@@ -112,12 +110,17 @@ How to prohibit object creation?
             "other_notes_count": 0,
             "has_key_point_code": False,
             "card_type": "Simple",
-            "key_point_notes": ["Use private constructor", "Object declaration preferred"],
-            "other_notes": []
+            "key_point_notes": [
+                "Use private constructor",
+                "Object declaration preferred",
+            ],
+            "other_notes": [],
         }
         ru_parsed = en_parsed.copy()
         ru_parsed["key_point_notes"] = [
-            "Используйте приватный конструктор", "Приватный конструктор обязателен"]
+            "Используйте приватный конструктор",
+            "Приватный конструктор обязателен",
+        ]
 
         errors = _compare_card_structures(1, en_parsed, ru_parsed)
 
@@ -146,7 +149,7 @@ English Title
 
 <!-- manifest: {"slug":"test-1-en","lang":"en","type":"Simple","tags":["kotlin"]} -->""",
             confidence=0.9,
-            content_hash="hash1"
+            content_hash="hash1",
         )
 
         ru_card = GeneratedCard(
@@ -165,7 +168,7 @@ Russian Title
 
 <!-- manifest: {"slug":"test-1-ru","lang":"ru","type":"Simple","tags":["kotlin"]} -->""",
             confidence=0.9,
-            content_hash="hash2"
+            content_hash="hash2",
         )
 
         cards = [en_card, ru_card]
@@ -195,7 +198,7 @@ English Title
 
 <!-- manifest: {"slug":"test-1-en","lang":"en","type":"Simple","tags":["kotlin"]} -->""",
             confidence=0.9,
-            content_hash="hash1"
+            content_hash="hash1",
         )
 
         ru_card = GeneratedCard(
@@ -215,7 +218,7 @@ Russian Title
 
 <!-- manifest: {"slug":"test-1-ru","lang":"ru","type":"Simple","tags":["kotlin"]} -->""",
             confidence=0.9,
-            content_hash="hash2"
+            content_hash="hash2",
         )
 
         cards = [en_card, ru_card]
@@ -232,7 +235,7 @@ Russian Title
             lang="en",
             apf_html="<!-- Title -->\nTest\n<!-- manifest: {} -->",
             confidence=0.9,
-            content_hash="hash1"
+            content_hash="hash1",
         )
 
         cards = [en_card]  # Only English, no Russian pair

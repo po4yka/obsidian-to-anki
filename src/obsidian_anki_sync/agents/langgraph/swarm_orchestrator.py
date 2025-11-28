@@ -198,14 +198,14 @@ class LangGraphSwarmOrchestrator:
 
     def _create_agent_prompt(self, expertise: AgentExpertise) -> str:
         """Create specialized prompt for agent based on expertise."""
-        base_prompt = f"""You are a {expertise.name} agent specializing in: {', '.join(expertise.expertise)}.
+        base_prompt = f"""You are a {expertise.name} agent specializing in: {", ".join(expertise.expertise)}.
 
 Description: {expertise.description}
 
 Your role is to excel in your areas of expertise. If you encounter a task that would be better
 handled by another agent, use the appropriate handoff tool.
 
-Available handoffs: {', '.join(expertise.handoff_agents) if expertise.handoff_agents else 'None (terminal agent)'}
+Available handoffs: {", ".join(expertise.handoff_agents) if expertise.handoff_agents else "None (terminal agent)"}
 
 Always focus on your core competencies and hand off when appropriate.
 """

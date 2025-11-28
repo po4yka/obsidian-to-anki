@@ -115,8 +115,9 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
 ) -> None:
     """Provider surfaces an error if both structured and fallback calls return empty content."""
     route = respx.post(f"{BASE_URL}/chat/completions")
-    route.mock(return_value=httpx.Response(
-        200, json=_build_openrouter_response(content="")))
+    route.mock(
+        return_value=httpx.Response(200, json=_build_openrouter_response(content=""))
+    )
 
     schema = get_qa_extraction_schema()
 
@@ -209,24 +210,26 @@ def test_grok_reasoning_enabled_for_complex_schema(
     route.respond(
         200,
         json=_build_openrouter_response(
-            content=json.dumps({
-                "qa_pairs": [
-                    {
-                        "card_index": 1,
-                        "question_en": "What is Python?",
-                        "question_ru": "",
-                        "answer_en": "A programming language",
-                        "answer_ru": "",
-                        "context": "Python is a high-level programming language",
-                        "followups": "What are Python's key features?",
-                        "references": "Python documentation",
-                        "related": "JavaScript, Java",
-                    }
-                ],
-                "extraction_notes": "Complex extraction completed",
-                "total_pairs": 1,
-            })
-        )
+            content=json.dumps(
+                {
+                    "qa_pairs": [
+                        {
+                            "card_index": 1,
+                            "question_en": "What is Python?",
+                            "question_ru": "",
+                            "answer_en": "A programming language",
+                            "answer_ru": "",
+                            "context": "Python is a high-level programming language",
+                            "followups": "What are Python's key features?",
+                            "references": "Python documentation",
+                            "related": "JavaScript, Java",
+                        }
+                    ],
+                    "extraction_notes": "Complex extraction completed",
+                    "total_pairs": 1,
+                }
+            )
+        ),
     )
 
     # Complex schema with many properties and nested structures
@@ -250,14 +253,14 @@ def test_grok_reasoning_enabled_for_complex_schema(
                             "references": {"type": "string"},
                             "related": {"type": "string"},
                         },
-                        "required": ["card_index", "question_en", "answer_en"]
-                    }
+                        "required": ["card_index", "question_en", "answer_en"],
+                    },
                 },
                 "extraction_notes": {"type": "string"},
                 "total_pairs": {"type": "integer"},
             },
-            "required": ["qa_pairs", "total_pairs"]
-        }
+            "required": ["qa_pairs", "total_pairs"],
+        },
     }
 
     result = openrouter_provider.generate_json(
@@ -286,11 +289,10 @@ def test_grok_reasoning_disabled_for_simple_schema(
     route.respond(
         200,
         json=_build_openrouter_response(
-            content=json.dumps({
-                "answer": "The capital of France is Paris.",
-                "confidence": 0.95
-            })
-        )
+            content=json.dumps(
+                {"answer": "The capital of France is Paris.", "confidence": 0.95}
+            )
+        ),
     )
 
     # Simple schema with few properties
@@ -302,8 +304,8 @@ def test_grok_reasoning_disabled_for_simple_schema(
                 "answer": {"type": "string"},
                 "confidence": {"type": "number"},
             },
-            "required": ["answer"]
-        }
+            "required": ["answer"],
+        },
     }
 
     result = openrouter_provider.generate_json(
@@ -333,7 +335,7 @@ def test_grok_explicit_reasoning_enabled_parameter(
         200,
         json=_build_openrouter_response(
             content=json.dumps({"result": "Analysis complete"})
-        )
+        ),
     )
 
     result = openrouter_provider.generate(

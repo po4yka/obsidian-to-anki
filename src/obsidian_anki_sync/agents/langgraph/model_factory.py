@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from ...config import Config
 from ...providers.pydantic_ai_models import PydanticAIModelFactory
@@ -17,7 +17,7 @@ class ModelFactory:
             config: Service configuration
         """
         self.config = config
-        self._model_cache: Dict[str, Any] = {}
+        self._model_cache: dict[str, Any] = {}
 
     def get_model(self, agent_type: str) -> Any:
         """Get a configured model for the specified agent type.

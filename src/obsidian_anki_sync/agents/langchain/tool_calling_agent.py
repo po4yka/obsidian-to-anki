@@ -4,7 +4,7 @@ This module provides a Tool Calling Agent that supports parallel function callin
 and integrates with the card generation pipeline.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain.agents import create_tool_calling_agent
 from langchain.agents.tool_calling_agent.base import ToolCallingAgent
@@ -28,11 +28,11 @@ class ToolCallingAgent(BaseLangChainAgent):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
+        tools: list[BaseTool],
         agent_type: str = "tool_calling",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         enable_parallel_tool_calls: bool = True,
     ):
         """Initialize Tool Calling Agent.
@@ -138,7 +138,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
 
         return agent
 
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the tool calling agent.
 
         Args:
@@ -198,7 +198,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
                 confidence=0.0,
             )
 
-    def _format_task_input(self, input_data: Dict[str, Any]) -> str:
+    def _format_task_input(self, input_data: dict[str, Any]) -> str:
         """Format task-based input into natural language query.
 
         Args:
@@ -217,7 +217,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
             return f"""Generate APF cards from the following note content:
 
 Note Content:
-{note_content[:1000]}{'...' if len(note_content) > 1000 else ''}
+{note_content[:1000]}{"..." if len(note_content) > 1000 else ""}
 
 Q&A Pairs ({len(qa_pairs)}):
 {chr(10).join(f"- Q: {qa.get('question_en', '')[:100]}... A: {qa.get('answer_en', '')[:100]}..." for qa in qa_pairs)}
@@ -233,7 +233,7 @@ Please use the available tools to generate properly formatted APF cards."""
             return f"""Validate the following content for {validation_type}:
 
 Content:
-{content[:2000]}{'...' if len(content) > 2000 else ''}
+{content[:2000]}{"..." if len(content) > 2000 else ""}
 
 Please use the appropriate validation tools and provide detailed feedback."""
 
@@ -243,7 +243,7 @@ Please use the appropriate validation tools and provide detailed feedback."""
             return f"""Extract metadata from the following note:
 
 Note Content:
-{note_content[:1500]}{'...' if len(note_content) > 1500 else ''}
+{note_content[:1500]}{"..." if len(note_content) > 1500 else ""}
 
 Please use the metadata extraction tools to parse YAML frontmatter and extract relevant information."""
 
@@ -251,7 +251,7 @@ Please use the metadata extraction tools to parse YAML frontmatter and extract r
             # Generic fallback
             return f"Process the following task: {task}. Input data: {input_data}"
 
-    def _process_result(self, raw_result: Dict[str, Any]) -> LangChainAgentResult:
+    def _process_result(self, raw_result: dict[str, Any]) -> LangChainAgentResult:
         """Process raw agent result into LangChainAgentResult.
 
         Args:

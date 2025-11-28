@@ -409,7 +409,7 @@ class RAGService:
                 }
                 for e in examples
             ],
-            "topics_found": list(set(c.topic for c in related if c.topic)),
+            "topics_found": list({c.topic for c in related if c.topic}),
         }
 
         logger.info(

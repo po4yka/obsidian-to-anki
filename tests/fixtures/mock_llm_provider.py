@@ -1,6 +1,6 @@
 """Mock implementation of ILLMProvider for testing."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from obsidian_anki_sync.domain.interfaces.llm_provider import ILLMProvider
 
@@ -27,22 +27,31 @@ class MockLLMProvider(ILLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
-        json_schema: Optional[Dict[str, Any]] = None,
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a completion."""
-        self.call_history.append(("generate", {
-            "model": model, "prompt": prompt, "system": system,
-            "temperature": temperature, "format": format
-        }))
+        self.call_history.append(
+            (
+                "generate",
+                {
+                    "model": model,
+                    "prompt": prompt,
+                    "system": system,
+                    "temperature": temperature,
+                    "format": format,
+                },
+            )
+        )
 
         if self.should_fail:
             raise Exception(self.fail_message)
 
         # Return mock response
         response_text = self.responses.get(
-            prompt, f"Mock response for: {prompt[:50]}...")
+            prompt, f"Mock response for: {prompt[:50]}..."
+        )
         return {
             "response": response_text,
             "model": model,
@@ -56,14 +65,22 @@ class MockLLMProvider(ILLMProvider):
         prompt: str,
         system: str = "",
         temperature: float = 0.7,
-        json_schema: Optional[Dict[str, Any]] = None,
+        json_schema: dict[str, Any] | None = None,
         reasoning_enabled: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a JSON response."""
-        self.call_history.append(("generate_json", {
-            "model": model, "prompt": prompt, "system": system,
-            "temperature": temperature, "json_schema": json_schema
-        }))
+        self.call_history.append(
+            (
+                "generate_json",
+                {
+                    "model": model,
+                    "prompt": prompt,
+                    "system": system,
+                    "temperature": temperature,
+                    "json_schema": json_schema,
+                },
+            )
+        )
 
         if self.should_fail:
             raise Exception(self.fail_message)
@@ -78,6 +95,7 @@ class MockLLMProvider(ILLMProvider):
         # Try to parse as JSON, fallback to dict
         try:
             import json
+
             parsed = json.loads(mock_json)
         except Exception:
             parsed = {"mock": "response", "status": "success"}
@@ -91,10 +109,10 @@ class MockLLMProvider(ILLMProvider):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
-        json_schema: Optional[Dict[str, Any]] = None,
+        json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a completion asynchronously."""
         # Reuse synchronous implementation for mock
         return self.generate(
@@ -112,7 +130,7 @@ class MockLLMProvider(ILLMProvider):
         """Check connection."""
         return not self.should_fail
 
-    def get_connection_status(self) -> Dict[str, Any]:
+    def get_connection_status(self) -> dict[str, Any]:
         """Get connection status."""
         return {
             "connected": self.check_connection(),
@@ -124,7 +142,7 @@ class MockLLMProvider(ILLMProvider):
         """Validate credentials."""
         return True
 
-    def list_models(self) -> List[str]:
+    def list_models(self) -> list[str]:
         """List available models."""
         return ["gpt-4", "gpt-3.5-turbo", "claude-3", "mock-model"]
 
@@ -132,7 +150,7 @@ class MockLLMProvider(ILLMProvider):
         """Get provider name."""
         return "MockLLMProvider"
 
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Get provider information."""
         return {
             "name": self.get_provider_name(),
@@ -141,17 +159,16 @@ class MockLLMProvider(ILLMProvider):
             "connected": self.check_connection(),
         }
 
-    def get_model_info(self, model: str) -> Dict[str, Any] | None:
+    def get_model_info(self, model: str) -> dict[str, Any] | None:
         """Get model info."""
         if model in self.list_models():
             return {"id": model, "name": model, "context_length": 4096}
         return None
 
-    def list_models_with_info(self) -> List[Dict[str, Any]]:
+    def list_models_with_info(self) -> list[dict[str, Any]]:
         """List models with info."""
         return [
-            {"id": m, "name": m, "context_length": 4096}
-            for m in self.list_models()
+            {"id": m, "name": m, "context_length": 4096} for m in self.list_models()
         ]
 
     def supports_model(self, model: str) -> bool:
@@ -168,9 +185,10 @@ class MockLLMProvider(ILLMProvider):
         """Set mock response for a prompt."""
         self.responses[prompt] = response
 
-    def set_json_response(self, prompt: str, response_data: Dict[str, Any]) -> None:
+    def set_json_response(self, prompt: str, response_data: dict[str, Any]) -> None:
         """Set mock JSON response for a prompt."""
         import json
+
         self.responses[prompt] = json.dumps(response_data)
 
     def set_failure(self, message: str = "Mock failure") -> None:
@@ -182,7 +200,7 @@ class MockLLMProvider(ILLMProvider):
         """Clear failure state."""
         self.should_fail = False
 
-    def get_call_history(self) -> List[tuple]:
+    def get_call_history(self) -> list[tuple]:
         """Get call history."""
         return self.call_history.copy()
 
@@ -190,9 +208,10 @@ class MockLLMProvider(ILLMProvider):
         """Clear call history."""
         self.call_history.clear()
 
-    def set_default_response(self, response_data: Dict[str, Any]) -> None:
+    def set_default_response(self, response_data: dict[str, Any]) -> None:
         """Set default JSON response for any prompt."""
         import json
+
         self.default_response = json.dumps(response_data)
 
     def reset(self) -> None:

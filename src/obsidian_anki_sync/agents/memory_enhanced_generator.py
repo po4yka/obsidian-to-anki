@@ -5,7 +5,7 @@ to create higher-quality Anki cards based on learned patterns and user preferenc
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ...config import Config
 from ...models import GeneratedCard
@@ -30,9 +30,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
     - Provides context-aware card creation
     """
 
-    def __init__(
-        self, config: Config, memory_store: Optional[AdvancedMemoryStore] = None
-    ):
+    def __init__(self, config: Config, memory_store: AdvancedMemoryStore | None = None):
         """Initialize memory-enhanced generator.
 
         Args:
@@ -93,8 +91,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                     logger.info("memory_connection_deferred")
                     return False
                 else:
-                    connected = loop.run_until_complete(
-                        self.memory_store.connect())
+                    connected = loop.run_until_complete(self.memory_store.connect())
 
             return connected
         except Exception as e:
@@ -103,7 +100,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
 
     async def _get_similar_patterns(
         self, topic: str, complexity: str = "medium", min_quality: float = 0.7
-    ) -> List[CardGenerationPattern]:
+    ) -> list[CardGenerationPattern]:
         """Get similar successful card generation patterns.
 
         Args:
@@ -137,7 +134,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
 
     async def _get_user_preferences(
         self, user_id: str, topic: str
-    ) -> Optional[UserCardPreferences]:
+    ) -> UserCardPreferences | None:
         """Get user preferences for card generation.
 
         Args:
@@ -165,7 +162,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
             return None
 
     async def _analyze_content_complexity(
-        self, note_content: str, qa_pairs: List[Dict[str, Any]]
+        self, note_content: str, qa_pairs: list[dict[str, Any]]
     ) -> str:
         """Analyze the complexity of note content.
 
@@ -187,9 +184,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         else:
             return "complex"
 
-    async def _get_topic_feedback_insights(
-        self, topic: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _get_topic_feedback_insights(self, topic: str) -> dict[str, Any] | None:
         """Get feedback insights for a topic to improve generation.
 
         Args:
@@ -213,8 +208,8 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
     async def _enhance_prompt_with_memory(
         self,
         base_prompt: str,
-        patterns: List[CardGenerationPattern],
-        user_prefs: Optional[UserCardPreferences],
+        patterns: list[CardGenerationPattern],
+        user_prefs: UserCardPreferences | None,
         topic: str,
         complexity: str,
     ) -> str:
@@ -235,18 +230,15 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         # Add pattern-based guidance
         if patterns:
             enhancements.append("## Memory-Based Guidance")
-            enhancements.append(
-                "Based on successful cards for similar content:")
+            enhancements.append("Based on successful cards for similar content:")
 
             for i, pattern in enumerate(patterns[:2]):  # Use top 2 patterns
                 enhancements.append(
-                    f"**Pattern {i+1}** (Quality: {pattern.quality_score:.2f}):"
+                    f"**Pattern {i + 1}** (Quality: {pattern.quality_score:.2f}):"
                 )
                 enhancements.append(f"- Card Type: {pattern.card_type}")
-                enhancements.append(
-                    f"- Question Style: {pattern.question_structure}")
-                enhancements.append(
-                    f"- Answer Format: {pattern.answer_format}")
+                enhancements.append(f"- Question Style: {pattern.question_structure}")
+                enhancements.append(f"- Answer Format: {pattern.answer_format}")
                 enhancements.append("")
 
         # Add user preference guidance
@@ -269,8 +261,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         enhancements.append("## Topic-Specific Optimization")
         enhancements.append(f"- Topic: {topic}")
         enhancements.append(f"- Complexity: {complexity}")
-        enhancements.append(
-            "- Adapt question clarity and depth to match complexity")
+        enhancements.append("- Adapt question clarity and depth to match complexity")
 
         # Add feedback-based insights
         feedback_insights = await self._get_topic_feedback_insights(topic)
@@ -285,8 +276,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                 )
                 enhancements.append("- Focus on maintaining current standards")
             elif feedback_insights.get("low_quality_percentage", 0) > 0.3:
-                enhancements.append(
-                    "- This topic has had quality issues in the past")
+                enhancements.append("- This topic has had quality issues in the past")
                 enhancements.append("- Pay special attention to:")
                 enhancements.append("  - Clear question-answer relationships")
                 enhancements.append("  - Self-contained card content")
@@ -304,8 +294,8 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
     async def generate_cards(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
         slug_base: str,
     ) -> UnifiedAgentResult:
         """Generate APF cards using memory-enhanced approach.
@@ -388,10 +378,10 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
     async def _generate_with_enhanced_prompt(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
         enhanced_prompt: str,
-    ) -> List[GeneratedCard]:
+    ) -> list[GeneratedCard]:
         """Generate cards using the enhanced prompt.
 
         Args:
@@ -426,7 +416,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         return cards
 
     async def _store_generation_pattern(
-        self, cards: List[GeneratedCard], metadata: Dict[str, Any], complexity: str
+        self, cards: list[GeneratedCard], metadata: dict[str, Any], complexity: str
     ):
         """Store successful generation pattern for future learning.
 
@@ -488,8 +478,8 @@ Focus on creating cards that promote active recall and long-term retention."""
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> UnifiedAgentResult:
         """Pre-validation using memory-enhanced approach."""
         return UnifiedAgentResult(
@@ -502,8 +492,8 @@ Focus on creating cards that promote active recall and long-term retention."""
 
     async def validate_post(
         self,
-        cards: List[Dict[str, Any]],
-        metadata: Dict[str, Any],
+        cards: list[dict[str, Any]],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> UnifiedAgentResult:
         """Post-validation using memory-enhanced approach."""
@@ -518,7 +508,7 @@ Focus on creating cards that promote active recall and long-term retention."""
     async def enrich_content(
         self,
         content: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         enrichment_type: str = "general",
     ) -> UnifiedAgentResult:
         """Content enrichment using memory-enhanced approach."""
@@ -531,7 +521,7 @@ Focus on creating cards that promote active recall and long-term retention."""
             agent_type="context_enrichment",
         )
 
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get information about the memory-enhanced agent."""
         return {
             "framework": self.agent_framework,

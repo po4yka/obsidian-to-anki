@@ -143,7 +143,7 @@ class DocumentChunker:
             List of document chunks
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             return self.chunk_content(content, str(file_path))

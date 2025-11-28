@@ -4,10 +4,7 @@ import threading
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from obsidian_anki_sync.obsidian.parser import (
-    configure_llm_extraction,
     create_qa_extractor,
     set_thread_qa_extractor,
     temporarily_disable_llm_extraction,
@@ -86,8 +83,7 @@ class TestThreadSafety:
             from obsidian_anki_sync.obsidian.parser import _thread_local_state
 
             # Check enabled before context
-            enabled_before = getattr(
-                _thread_local_state, "use_llm_extraction", False)
+            enabled_before = getattr(_thread_local_state, "use_llm_extraction", False)
 
             with temporarily_disable_llm_extraction():
                 # Check disabled in context
@@ -96,8 +92,7 @@ class TestThreadSafety:
                 )
 
             # Check restored after context
-            enabled_after = getattr(
-                _thread_local_state, "use_llm_extraction", False)
+            enabled_after = getattr(_thread_local_state, "use_llm_extraction", False)
 
             results[thread_id] = {
                 "before": enabled_before,

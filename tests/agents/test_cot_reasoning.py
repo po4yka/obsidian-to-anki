@@ -6,21 +6,10 @@ This module tests:
 - Workflow builder CoT routing
 """
 
-import asyncio
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 import time
+from unittest.mock import AsyncMock, MagicMock, patch
 
-# Configure pytest-anyio mode - only use asyncio backend
-pytestmark = [
-    pytest.mark.anyio,
-]
-
-
-@pytest.fixture(scope="session")
-def anyio_backend():
-    """Only run async tests with asyncio backend."""
-    return "asyncio"
+import pytest
 
 from obsidian_anki_sync.agents.langgraph.reasoning_models import (
     CardSplittingReasoningOutput,
@@ -36,11 +25,7 @@ from obsidian_anki_sync.agents.langgraph.reasoning_models import (
 from obsidian_anki_sync.agents.langgraph.reasoning_nodes import (
     _should_skip_reasoning,
     _store_reasoning_trace,
-    think_before_card_splitting_node,
-    think_before_duplicate_node,
-    think_before_enrichment_node,
     think_before_generation_node,
-    think_before_memorization_node,
     think_before_post_validation_node,
     think_before_pre_validation_node,
 )
@@ -51,8 +36,18 @@ from obsidian_anki_sync.agents.langgraph.workflow_builder import (
     should_continue_after_post_validation,
     should_continue_after_pre_validation,
 )
-from obsidian_anki_sync.agents.langgraph.state import PipelineState
 from obsidian_anki_sync.config import Config
+
+# Configure pytest-anyio mode - only use asyncio backend
+pytestmark = [
+    pytest.mark.anyio,
+]
+
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    """Only run async tests with asyncio backend."""
+    return "asyncio"
 
 
 # =============================================================================
@@ -148,7 +143,10 @@ class TestReasoningTraceOutput:
 
     def test_create_with_all_fields(self, base_reasoning_output):
         """Test creating output with all fields."""
-        assert base_reasoning_output.reasoning == "This is the full chain of thought reasoning."
+        assert (
+            base_reasoning_output.reasoning
+            == "This is the full chain of thought reasoning."
+        )
         assert len(base_reasoning_output.key_observations) == 2
         assert base_reasoning_output.confidence == 0.85
 
@@ -160,10 +158,14 @@ class TestReasoningTraceOutput:
 
         # Invalid bounds should raise
         with pytest.raises(ValueError):
-            ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=-0.1)
+            ReasoningTraceOutput(
+                reasoning="test", planned_approach="test", confidence=-0.1
+            )
 
         with pytest.raises(ValueError):
-            ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=1.1)
+            ReasoningTraceOutput(
+                reasoning="test", planned_approach="test", confidence=1.1
+            )
 
 
 class TestPreValidationReasoningOutput:
@@ -265,7 +267,9 @@ class TestShouldSkipReasoning:
 
     def test_skip_when_stage_not_enabled(self, mock_pipeline_state):
         """Test skipping when stage is not in enabled list."""
-        mock_pipeline_state["cot_enabled_stages"] = ["generation"]  # pre_validation not included
+        mock_pipeline_state["cot_enabled_stages"] = [
+            "generation"
+        ]  # pre_validation not included
         assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is True
 
     def test_no_skip_when_enabled(self, mock_pipeline_state):
@@ -371,14 +375,18 @@ class TestThinkBeforePreValidationNode:
         mock_agent = MagicMock()
         mock_agent.run = AsyncMock(return_value=mock_result)
 
-        with patch(
-            "obsidian_anki_sync.agents.langgraph.reasoning_nodes.Agent",
-            return_value=mock_agent,
-        ), patch(
-            "obsidian_anki_sync.agents.langgraph.reasoning_nodes.NoteMetadata",
-        ) as mock_metadata_cls, patch(
-            "obsidian_anki_sync.agents.langgraph.reasoning_nodes.QAPair",
-        ) as mock_qa_cls:
+        with (
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reasoning_nodes.Agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reasoning_nodes.NoteMetadata",
+            ) as mock_metadata_cls,
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reasoning_nodes.QAPair",
+            ) as mock_qa_cls,
+        ):
             # Setup mock metadata
             mock_metadata = MagicMock()
             mock_metadata.title = "Test Note"
@@ -405,7 +413,9 @@ class TestThinkBeforeGenerationNode:
 
     async def test_skips_when_stage_not_enabled(self, mock_pipeline_state):
         """Test node skips when generation not in enabled stages."""
-        mock_pipeline_state["cot_enabled_stages"] = ["pre_validation"]  # generation not included
+        mock_pipeline_state["cot_enabled_stages"] = [
+            "pre_validation"
+        ]  # generation not included
         result = await think_before_generation_node(mock_pipeline_state)
         assert result["current_reasoning"] is None
 

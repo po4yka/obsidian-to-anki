@@ -30,16 +30,13 @@ def validate_card_html(apf_html: str) -> list[str]:
 
     # Check for Markdown bold/italic syntax (outside of code blocks)
     # Remove code blocks first to avoid false positives
-    text_without_code = re.sub(
-        r"<pre>.*?</pre>", "", apf_html, flags=re.DOTALL)
+    text_without_code = re.sub(r"<pre>.*?</pre>", "", apf_html, flags=re.DOTALL)
     if re.search(r"\*\*[^*]+\*\*", text_without_code):
-        errors.append(
-            "Markdown **bold** detected; use <strong> HTML tags instead.")
+        errors.append("Markdown **bold** detected; use <strong> HTML tags instead.")
     if re.search(r"(?<!\*)\*[^*]+\*(?!\*)", text_without_code):
         # Single asterisk italic (but not inside double asterisks)
         if re.search(r"(?<!\*)\*[^*\s][^*]*[^*\s]\*(?!\*)", text_without_code):
-            errors.append(
-                "Markdown *italic* detected; use <em> HTML tags instead.")
+            errors.append("Markdown *italic* detected; use <em> HTML tags instead.")
 
     # Validate every <pre> has a <code> child with language class
     for pre in soup.find_all("pre"):

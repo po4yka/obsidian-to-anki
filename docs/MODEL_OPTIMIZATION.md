@@ -147,4 +147,3 @@ If quality issues arise:
 - `MODEL_ANALYSIS.md` - Model selection guidelines
 - `LOG_ANALYSIS_2025-11-19.md` - Performance analysis that led to this optimization
 - `src/obsidian_anki_sync/providers/openrouter.py` - Model configuration
-

@@ -4,7 +4,7 @@ This module provides a JSON Chat Agent optimized for structured data
 processing and JSON-based operations.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain.agents import create_json_chat_agent
 from langchain.agents.json_chat.base import JSONChatAgent
@@ -28,11 +28,11 @@ class JSONChatAgent(BaseLangChainAgent):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
+        tools: list[BaseTool],
         agent_type: str = "json_chat",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ):
         """Initialize JSON Chat Agent.
 
@@ -100,7 +100,7 @@ Always work with structured data and provide clear, parseable results."""
 
         return agent
 
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the JSON Chat Agent.
 
         Args:
@@ -158,7 +158,7 @@ Always work with structured data and provide clear, parseable results."""
                 confidence=0.0,
             )
 
-    def _format_json_input(self, input_data: Dict[str, Any]) -> str:
+    def _format_json_input(self, input_data: dict[str, Any]) -> str:
         """Format input data for JSON processing.
 
         Args:
@@ -174,7 +174,7 @@ Always work with structured data and provide clear, parseable results."""
 
             return f"""Parse metadata from the following content and return as structured JSON:
 
-Content: {content[:1000]}{'...' if len(content) > 1000 else ''}
+Content: {content[:1000]}{"..." if len(content) > 1000 else ""}
 
 Extract all metadata fields and return as a valid JSON object."""
 
@@ -190,7 +190,7 @@ Return a JSON object with validation results, including any errors found."""
         else:
             return f"Process JSON task: {task}. Data: {input_data}"
 
-    def _process_result(self, raw_result: Dict[str, Any]) -> LangChainAgentResult:
+    def _process_result(self, raw_result: dict[str, Any]) -> LangChainAgentResult:
         """Process raw agent result.
 
         Args:

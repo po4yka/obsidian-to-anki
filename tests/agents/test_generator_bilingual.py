@@ -1,7 +1,6 @@
 """Tests for GeneratorAgent bilingual functionality."""
 
 import json
-from unittest.mock import Mock
 
 import pytest
 
@@ -28,8 +27,14 @@ def kotlin_singleton_metadata():
         created="2025-10-15",
         updated="2025-11-10",
         subtopics=["classes", "design"],
-        tags=["classes", "constructor", "design",
-              "difficulty/easy", "kotlin", "singleton"],
+        tags=[
+            "classes",
+            "constructor",
+            "design",
+            "difficulty/easy",
+            "kotlin",
+            "singleton",
+        ],
         difficulty="easy",
     )
 
@@ -248,7 +253,10 @@ How to programmatically prohibit creating a class object in Kotlin?
 
         result = bilingual_generator_agent._parse_card_structure(apf_html)
 
-        assert result.title == "How to programmatically prohibit creating a class object in Kotlin?"
+        assert (
+            result.title
+            == "How to programmatically prohibit creating a class object in Kotlin?"
+        )
         assert result.key_point_code is not None
         assert "class Singleton private constructor()" in result.key_point_code
         assert len(result.key_point_notes) == 3
@@ -256,7 +264,9 @@ How to programmatically prohibit creating a class object in Kotlin?
         assert len(result.other_notes) == 1
         assert "Ref:" in result.other_notes[0]
 
-    def test_translation_prompt_generation(self, bilingual_generator_agent, kotlin_singleton_metadata):
+    def test_translation_prompt_generation(
+        self, bilingual_generator_agent, kotlin_singleton_metadata
+    ):
         """Test that translation prompts are generated correctly."""
         english_structure = ParsedCardStructure(
             title="How to programmatically prohibit creating a class object in Kotlin?",
@@ -264,9 +274,9 @@ How to programmatically prohibit creating a class object in Kotlin?
             key_point_notes=[
                 "Use private constructor to prevent direct instantiation",
                 "Object declaration preferred for simple singletons",
-                "Factory methods provide controlled access"
+                "Factory methods provide controlled access",
             ],
-            other_notes=["Ref: [[test.md#qa-1]]"]
+            other_notes=["Ref: [[test.md#qa-1]]"],
         )
 
         manifest = Manifest(
@@ -293,15 +303,21 @@ How to programmatically prohibit creating a class object in Kotlin?
 
         assert "Translate the TEXT CONTENT" in prompt
         assert "English Card Structure:" in prompt
-        assert json.dumps(english_structure.key_point_notes,
-                          ensure_ascii=False) in prompt
+        assert (
+            json.dumps(english_structure.key_point_notes, ensure_ascii=False) in prompt
+        )
         assert "PRESERVE the exact same card structure" in prompt
         assert "TRANSLATE ONLY the text content" in prompt
 
-    def test_english_first_generation_order(self, bilingual_generator_agent, kotlin_singleton_metadata, kotlin_singleton_qa_pairs):
+    def test_english_first_generation_order(
+        self,
+        bilingual_generator_agent,
+        kotlin_singleton_metadata,
+        kotlin_singleton_qa_pairs,
+    ):
         """Test that English cards are generated first."""
         # Mock the LLM to return a simple APF response
-        mock_response = '''<!-- PROMPT_VERSION: apf-v2.1 -->
+        mock_response = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
 
 <!-- Card 1 | slug: kotlin-prohibit-object-creation-1-en | CardType: Simple | Tags: kotlin classes design difficulty_easy -->
@@ -321,10 +337,11 @@ How to prohibit object creation in Kotlin?
 <!-- manifest: {"slug":"kotlin-prohibit-object-creation-1-en","lang":"en","type":"Simple","tags":["kotlin","classes","design","difficulty_easy"]} -->
 
 <!-- END_CARDS -->
-END_OF_CARDS'''
+END_OF_CARDS"""
 
         bilingual_generator_agent.ollama_client.set_response(
-            "Test content", mock_response)
+            "Test content", mock_response
+        )
 
         # Generate cards
         result = bilingual_generator_agent.generate_cards(
@@ -339,22 +356,23 @@ END_OF_CARDS'''
         assert result.cards[0].lang == "en"
         assert result.cards[1].lang == "ru"
 
-    def test_translation_assembly(self, bilingual_generator_agent, kotlin_singleton_metadata):
+    def test_translation_assembly(
+        self, bilingual_generator_agent, kotlin_singleton_metadata
+    ):
         """Test that translated cards are assembled correctly from English structure."""
         english_structure = ParsedCardStructure(
             title="How to prohibit object creation in Kotlin?",
             key_point_code='<pre><code class="language-kotlin">object Singleton { }</code></pre>',
-            key_point_notes=["Use private constructor",
-                             "Object declaration preferred"],
-            other_notes=["Ref: [[test.md#qa-1]]"]
+            key_point_notes=["Use private constructor", "Object declaration preferred"],
+            other_notes=["Ref: [[test.md#qa-1]]"],
         )
 
         # Mock translated JSON response
-        translated_json = '''{
+        translated_json = """{
   "title": "Как запретить создание объектов в Kotlin?",
   "key_point_notes": ["Используйте приватный конструктор", "Object declaration предпочтителен"],
   "other_notes": ["Ref: [[test.md#qa-1]]"]
-}'''
+}"""
 
         manifest = Manifest(
             slug="kotlin-prohibit-object-creation-1-ru",
@@ -380,4 +398,4 @@ END_OF_CARDS'''
         assert "Используйте приватный конструктор" in result_html
         assert "Object declaration предпочтителен" in result_html
         assert english_structure.key_point_code in result_html  # Code preserved
-        assert 'slug: kotlin-prohibit-object-creation-1-ru' in result_html
+        assert "slug: kotlin-prohibit-object-creation-1-ru" in result_html

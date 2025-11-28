@@ -379,13 +379,13 @@ IMPROVE THIS FLASHCARD based on the following issues:
 
 ORIGINAL CARD:
 Question: {card.question}
-Answer: {card.answer or 'N/A'}
+Answer: {card.answer or "N/A"}
 Type: {card.card_type}
-Tags: {', '.join(card.tags) if card.tags else 'None'}
+Tags: {", ".join(card.tags) if card.tags else "None"}
 
 CONTEXT:
 Note Title: {metadata.title}
-Tags: {', '.join(metadata.tags) if metadata.tags else 'None'}
+Tags: {", ".join(metadata.tags) if metadata.tags else "None"}
 
 REQUIREMENTS:
 1. Fix all identified issues while maintaining the core learning objective

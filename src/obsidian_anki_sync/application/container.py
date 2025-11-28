@@ -88,8 +88,7 @@ class DependencyContainer:
         if interface in self._factories:
             return self._factories[interface]()
 
-        raise ValueError(
-            f"No implementation registered for {interface.__name__}")
+        raise ValueError(f"No implementation registered for {interface.__name__}")
 
     def has_registration(self, interface: type[T]) -> bool:
         """Check if an interface has a registered implementation.
@@ -175,8 +174,7 @@ def setup_container(container: DependencyContainer) -> None:
         ),
     )
 
-    container.register_factory(
-        IStateRepository, lambda: StateDB(config.db_path))
+    container.register_factory(IStateRepository, lambda: StateDB(config.db_path))
 
     container.register_factory(
         ILLMProvider, lambda: ProviderFactory.create_from_config(config)

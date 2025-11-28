@@ -469,20 +469,20 @@ obsidian-anki-sync sync --dry-run --show-diffs
 obsidian-anki-sync sync --interactive
 
 # Output:
-# 
+#
 # ‚ Card Update Review (1/5)                        ‚
-# 
+#
 # ‚ Note: binary-search-tree.md                     ‚
 # ‚ Slug: binary-search-tree-en                     ‚
 # ‚ Risk: MEDIUM                                    ‚
-# 
+#
 # ‚ Field: Back                                     ‚
 # ‚ Type: content_addition                          ‚
-# 
+#
 # ‚ - Old: "A tree where left < parent < right"    ‚
 # ‚ + New: "A tree where left < parent < right     ‚
 # ‚         Time complexity: O(log n) average"      ‚
-# 
+#
 # ‚ [A]pprove  [R]eject  [S]kip  [Q]uit            ‚
 # ˜
 ```
@@ -574,7 +574,7 @@ obsidian-anki-sync report --changes --last-7-days
 
 # Output:
 # Change Summary (Last 7 Days)
-# 
+#
 # Total Updates:        145
 # Auto-Approved:        120 (82.8%)
 # Manual Review:         20 (13.8%)

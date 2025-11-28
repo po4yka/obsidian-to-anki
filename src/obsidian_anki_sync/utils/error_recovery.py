@@ -16,9 +16,7 @@ from ..agents.agent_monitoring import (
     MetricsCollector,
     PerformanceTracker,
 )
-from ..agents.specialized import (
-    ProblemRouter,
-)
+from ..agents.specialized import ProblemRouter
 from ..exceptions import ParserError
 from ..models import NoteMetadata, QAPair
 from ..obsidian.parser import parse_note

@@ -11,11 +11,7 @@ from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .json_schemas import get_qa_extraction_schema
-from .llm_errors import (
-    categorize_llm_error,
-    format_llm_error_for_user,
-    log_llm_error,
-)
+from .llm_errors import categorize_llm_error, format_llm_error_for_user, log_llm_error
 
 logger = get_logger(__name__)
 

@@ -29,10 +29,10 @@ if "langgraph" not in sys.modules:  # pragma: no cover - test bootstrap
         def __init__(self, *args: object, **kwargs: object) -> None:
             pass
 
-        def add_node(self, *args: object, **kwargs: object) -> "_FakeStateGraph":
+        def add_node(self, *args: object, **kwargs: object) -> _FakeStateGraph:
             return self
 
-        def add_edge(self, *args: object, **kwargs: object) -> "_FakeStateGraph":
+        def add_edge(self, *args: object, **kwargs: object) -> _FakeStateGraph:
             return self
 
     graph_module.StateGraph = _FakeStateGraph  # type: ignore[attr-defined]

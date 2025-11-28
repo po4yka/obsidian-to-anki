@@ -169,4 +169,3 @@ agent_fallback_on_timeout: "react" # Fallback to ReAct on timeouts
 # Feature Flag: Use legacy LangChain-based agent system
 # This is the old agent system - consider migrating to the unified framework above
 use_langchain_agents: false # Set to true to enable legacy system
-

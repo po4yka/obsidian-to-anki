@@ -3,8 +3,6 @@
 Specialized tool calling agent for generating APF cards with parallel tool support.
 """
 
-from typing import Dict, List, Optional
-
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
@@ -26,7 +24,7 @@ class ToolCallingGeneratorAgent:
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: Optional[List[BaseTool]] = None,
+        tools: list[BaseTool] | None = None,
         enable_parallel_tools: bool = True,
         temperature: float = 0.3,
     ):
@@ -57,7 +55,7 @@ class ToolCallingGeneratorAgent:
         self,
         note_content: str,
         metadata: NoteMetadata,
-        qa_pairs: List[QAPair],
+        qa_pairs: list[QAPair],
         slug_base: str,
     ) -> GenerationResult:
         """Generate APF cards using tool calling agent.
@@ -131,7 +129,7 @@ class ToolCallingGeneratorAgent:
             warnings=agent_result.warnings,
         )
 
-    def _extract_cards_from_output(self, output: str) -> List[GeneratedCard]:
+    def _extract_cards_from_output(self, output: str) -> list[GeneratedCard]:
         """Extract GeneratedCard objects from agent output.
 
         Args:
@@ -173,7 +171,7 @@ class ToolCallingGeneratorAgent:
 
     def _extract_card_content(
         self, output: str, card_number: int
-    ) -> Optional[Dict[str, str]]:
+    ) -> dict[str, str] | None:
         """Extract content for a specific card number.
 
         Args:

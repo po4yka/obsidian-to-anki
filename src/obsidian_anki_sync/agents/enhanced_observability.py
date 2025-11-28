@@ -333,9 +333,7 @@ class EnhancedObservabilitySystem:
             "total_tokens": total_tokens,
             "trajectory_steps": len(agent_trajectories),
             "average_step_duration": avg_step_duration,
-            "error_types": list(
-                set(m.error_type for m in agent_metrics if m.error_type)
-            ),
+            "error_types": list({m.error_type for m in agent_metrics if m.error_type}),
         }
 
     def get_system_analytics(self, time_window_hours: int = 24) -> dict[str, Any]:
@@ -450,7 +448,7 @@ class EnhancedObservabilitySystem:
                     "description": ".2f",
                     "recommendation": "Review error patterns and consider model updates or retry logic improvements",
                     "affected_agents": list(
-                        set(m.agent_name for m in recent_metrics if not m.success)
+                        {m.agent_name for m in recent_metrics if not m.success}
                     ),
                 }
             )
@@ -465,7 +463,7 @@ class EnhancedObservabilitySystem:
                     "severity": "medium",
                     "description": f"{len(slow_executions)} executions took more than 2x average time",
                     "recommendation": "Consider model optimization, caching, or parallel processing",
-                    "affected_agents": list(set(m.agent_name for m in slow_executions)),
+                    "affected_agents": list({m.agent_name for m in slow_executions}),
                 }
             )
 
@@ -483,11 +481,11 @@ class EnhancedObservabilitySystem:
                         "description": ".2f",
                         "recommendation": "Review agent prompts, consider model upgrades, or improve validation logic",
                         "affected_agents": list(
-                            set(
+                            {
                                 m.agent_name
                                 for m in recent_metrics
                                 if m.quality_score and m.quality_score < 0.7
-                            )
+                            }
                         ),
                     }
                 )
@@ -505,11 +503,11 @@ class EnhancedObservabilitySystem:
                         "description": ".3f",
                         "recommendation": "Consider cheaper models, caching, or optimizing prompt lengths",
                         "affected_agents": list(
-                            set(
+                            {
                                 m.agent_name
                                 for m in recent_metrics
                                 if m.api_cost and m.api_cost > 0.1
-                            )
+                            }
                         ),
                     }
                 )
@@ -563,9 +561,9 @@ class EnhancedObservabilitySystem:
             }
 
             # Add agent-specific analytics
-            agent_names = set(
+            agent_names = {
                 m.agent_name for m in self.metrics_buffer if m.timestamp >= cutoff_time
-            )
+            }
             for agent_name in agent_names:
                 export_data["agent_analytics"][agent_name] = self.get_agent_analytics(
                     agent_name, time_window_hours

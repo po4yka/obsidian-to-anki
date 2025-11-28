@@ -9,11 +9,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from ...models import NoteMetadata, QAPair
 from ...utils.content_hash import compute_content_hash
 from ...utils.logging import get_logger
-from ..exceptions import (
-    GenerationError,
-    ModelError,
-    StructuredOutputError,
-)
+from ..exceptions import GenerationError, ModelError, StructuredOutputError
 from ..improved_prompts import CARD_GENERATION_SYSTEM_PROMPT
 from ..models import GeneratedCard, GenerationResult
 from .models import CardGenerationOutput, GenerationDeps
@@ -93,7 +89,7 @@ class GeneratorAgentAI:
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Languages: {', '.join(metadata.language_tags)}
+Languages: {", ".join(metadata.language_tags)}
 Slug Base: {slug_base}
 """
 
@@ -142,16 +138,14 @@ Slug Base: {slug_base}
                     qa_pair = qa_lookup.get(card_index)
                     content_hash = ""
                     if qa_pair is not None:
-                        content_hash = compute_content_hash(
-                            qa_pair, metadata, lang)
+                        content_hash = compute_content_hash(qa_pair, metadata, lang)
 
                     generated_card = GeneratedCard(
                         card_index=card_index,
                         slug=card_dict["slug"],
                         lang=lang,
                         apf_html=card_dict["apf_html"],
-                        confidence=card_dict.get(
-                            "confidence", output.confidence),
+                        confidence=card_dict.get("confidence", output.confidence),
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)

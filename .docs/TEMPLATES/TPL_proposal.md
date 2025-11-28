@@ -33,4 +33,3 @@
 
 ## Open Questions
 - List unresolved items requiring alignment
-

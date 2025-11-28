@@ -4,7 +4,7 @@ This module contains comprehensive tests for the LangChain agent implementations
 including Tool Calling, ReAct, Structured Chat, and JSON Chat agents.
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -34,7 +34,7 @@ class TestLangChainAgentResult:
             data={"test": "data"},
             warnings=["warning1", "warning2"],
             confidence=0.85,
-            metadata={"key": "value"}
+            metadata={"key": "value"},
         )
 
         assert result.success is True
@@ -58,6 +58,7 @@ class TestLangChainAgentResult:
 
 # Skip APF validator tool tests as they test validation implementation details
 # pytestmark = pytest.mark.skip(reason="APF validation tool tests require specific validation logic")
+
 
 class TestAPFValidatorTool:
     """Test APFValidatorTool."""
@@ -125,8 +126,6 @@ END_OF_CARDS"""
 #         assert "HTML validation failed" in result
 
 
-
-
 class TestSlugGeneratorTool:
     """Test SlugGeneratorTool."""
 
@@ -140,7 +139,9 @@ class TestSlugGeneratorTool:
         """Test slug generation."""
         tool = SlugGeneratorTool()
 
-        result = tool._run(source_path="test/note.md", card_index=1, lang="en", existing_slugs=[])
+        result = tool._run(
+            source_path="test/note.md", card_index=1, lang="en", existing_slugs=[]
+        )
         assert "Generated slug:" in result
 
     def test_slug_with_existing(self):
@@ -148,14 +149,21 @@ class TestSlugGeneratorTool:
         tool = SlugGeneratorTool()
 
         # Generate first slug
-        result1 = tool._run(source_path="test/note.md", card_index=1, lang="en", existing_slugs=[])
+        result1 = tool._run(
+            source_path="test/note.md", card_index=1, lang="en", existing_slugs=[]
+        )
         assert "Generated slug:" in result1
 
         # Extract the slug from first result
         first_slug = result1.split("Generated slug: ")[1].strip()
 
         # Generate second slug with collision
-        result2 = tool._run(source_path="test/note.md", card_index=2, lang="en", existing_slugs=[first_slug])
+        result2 = tool._run(
+            source_path="test/note.md",
+            card_index=2,
+            lang="en",
+            existing_slugs=[first_slug],
+        )
         assert "Generated slug:" in result2
 
 
@@ -230,7 +238,7 @@ class TestCardTemplateTool:
             answer="A programming language",
             slug="python-definition",
             language="en",
-            tags=["python", "programming"]
+            tags=["python", "programming"],
         )
 
         assert "Generated Simple card template:" in result
@@ -353,6 +361,7 @@ class TestToolRegistry:
         # Check that tools are instances of BaseTool
         for tool in generator_tools + validator_tools:
             from langchain_core.tools import BaseTool
+
             assert isinstance(tool, BaseTool)
 
 
@@ -378,6 +387,7 @@ class TestBaseLangChainAgent:
 
     def test_initialization(self, mock_langchain_model, mock_tool):
         """Test base agent initialization."""
+
         # Create a concrete implementation for testing
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
@@ -392,7 +402,7 @@ class TestBaseLangChainAgent:
             system_prompt="Test prompt",
             temperature=0.5,
             max_tokens=100,
-            agent_type="test"
+            agent_type="test",
         )
 
         assert agent.model == mock_langchain_model
@@ -404,6 +414,7 @@ class TestBaseLangChainAgent:
 
     def test_get_agent_info(self, mock_langchain_model, mock_tool):
         """Test getting agent information."""
+
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
@@ -412,9 +423,7 @@ class TestBaseLangChainAgent:
                 return LangChainAgentResult(success=True, reasoning="Test")
 
         agent = TestAgent(
-            model=mock_langchain_model,
-            tools=[mock_tool],
-            agent_type="test"
+            model=mock_langchain_model, tools=[mock_tool], agent_type="test"
         )
 
         info = agent.get_agent_info()
@@ -425,6 +434,7 @@ class TestBaseLangChainAgent:
 
     def test_validate_result_success(self, mock_langchain_model, mock_tool):
         """Test result validation for successful results."""
+
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
@@ -445,7 +455,7 @@ class TestBaseLangChainAgent:
             "success": False,
             "reasoning": "Failed",
             "confidence": 0.5,
-            "warnings": ["Warning"]
+            "warnings": ["Warning"],
         }
         validated = agent._validate_result(dict_result)
         assert validated.success is False
@@ -455,6 +465,7 @@ class TestBaseLangChainAgent:
 
     def test_extract_confidence(self, mock_langchain_model, mock_tool):
         """Test confidence extraction from output."""
+
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
@@ -481,6 +492,7 @@ class TestBaseLangChainAgent:
 
     def test_extract_warnings(self, mock_langchain_model, mock_tool):
         """Test warning extraction from output."""
+
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
@@ -509,11 +521,7 @@ class TestLangChainFactory:
         from obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
         from obsidian_anki_sync.config import Config
 
-        config = Config(
-            vault_path=".",
-            source_dir=".",
-            agent_framework="langchain"
-        )
+        config = Config(vault_path=".", source_dir=".", agent_framework="langchain")
         factory = LangChainAgentFactory(config)
 
         assert factory.config == config
@@ -527,8 +535,7 @@ class TestLangChainFactory:
         factory = LangChainAgentFactory(config)
 
         types = factory.get_available_agent_types()
-        expected_types = ["tool_calling", "react",
-                          "structured_chat", "json_chat"]
+        expected_types = ["tool_calling", "react", "structured_chat", "json_chat"]
         assert set(types) == set(expected_types)
 
     def test_cache_management(self):
@@ -570,11 +577,7 @@ class TestUnifiedAgentSelector:
         from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
         from obsidian_anki_sync.config import Config
 
-        config = Config(
-            vault_path=".",
-            source_dir=".",
-            agent_framework="pydantic_ai"
-        )
+        config = Config(vault_path=".", source_dir=".", agent_framework="pydantic_ai")
         selector = UnifiedAgentSelector(config)
 
         agent = selector.get_agent("pydantic_ai", "generator")
@@ -590,7 +593,8 @@ class TestUnifiedAgentSelector:
 
         # Test fallback functionality
         agent = selector.get_agent_with_fallback(
-            "pydantic_ai", "langchain", "generator")
+            "pydantic_ai", "langchain", "generator"
+        )
         assert agent.agent_framework == "pydantic_ai"
 
 

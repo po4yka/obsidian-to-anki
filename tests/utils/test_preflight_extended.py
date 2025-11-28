@@ -1,8 +1,11 @@
-import pytest
-from unittest.mock import Mock, patch
 from pathlib import Path
-from obsidian_anki_sync.utils.preflight import PreflightChecker
+from unittest.mock import Mock, patch
+
+import pytest
+
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.preflight import PreflightChecker
+
 
 @pytest.fixture
 def mock_config():
@@ -19,9 +22,11 @@ def mock_config():
     config.anki_deck_name = "Test Deck"
     return config
 
+
 @pytest.fixture
 def checker(mock_config):
     return PreflightChecker(mock_config)
+
 
 def test_check_git_repo_exists(checker):
     with patch("pathlib.Path.exists") as mock_exists:
@@ -33,6 +38,7 @@ def test_check_git_repo_exists(checker):
         assert len(checker.results) == 1
         assert checker.results[0].name == "Git Repository"
         assert checker.results[0].passed is True
+
 
 def test_check_git_repo_missing(checker):
     with patch("pathlib.Path.exists") as mock_exists:
@@ -46,6 +52,7 @@ def test_check_git_repo_missing(checker):
         assert checker.results[0].passed is False
         assert checker.results[0].severity == "warning"
 
+
 def test_check_vault_structure_valid(checker):
     with patch("pathlib.Path.exists") as mock_exists:
         mock_exists.return_value = True
@@ -56,11 +63,13 @@ def test_check_vault_structure_valid(checker):
         assert checker.results[0].name == "Vault Structure"
         assert checker.results[0].passed is True
 
-def test_check_disk_space_warning(checker):
-    with patch("shutil.disk_usage") as mock_disk_usage, \
-         patch("pathlib.Path.exists", return_value=True), \
-         patch("pathlib.Path.resolve", side_effect=lambda: Path("/tmp/resolved")):
 
+def test_check_disk_space_warning(checker):
+    with (
+        patch("shutil.disk_usage") as mock_disk_usage,
+        patch("pathlib.Path.exists", return_value=True),
+        patch("pathlib.Path.resolve", side_effect=lambda: Path("/tmp/resolved")),
+    ):
         # 200MB free (between 100MB and 500MB)
         # total, used, free
         mock_disk_usage.return_value = (1000, 500, 200 * 1024 * 1024)
@@ -72,6 +81,7 @@ def test_check_disk_space_warning(checker):
         assert len(checker.results) >= 1
         assert any(r.severity == "warning" for r in checker.results)
         assert any("Low disk space" in r.message for r in checker.results)
+
 
 def test_check_memory_warning(checker):
     with patch("psutil.virtual_memory") as mock_memory:
@@ -85,10 +95,12 @@ def test_check_memory_warning(checker):
         assert checker.results[0].passed is False
         assert checker.results[0].severity == "warning"
 
-def test_check_network_latency_high(checker):
-    with patch("obsidian_anki_sync.anki.client.AnkiClient") as MockClient, \
-         patch("time.time") as mock_time:
 
+def test_check_network_latency_high(checker):
+    with (
+        patch("obsidian_anki_sync.anki.client.AnkiClient") as MockClient,
+        patch("time.time") as mock_time,
+    ):
         # Mock context manager
         mock_client_instance = MockClient.return_value
         mock_client_instance.__enter__.return_value = mock_client_instance

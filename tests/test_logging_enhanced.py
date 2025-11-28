@@ -131,8 +131,9 @@ class TestConsoleNoiseFilter:
 
         assert filter_fn(_make_record(level="INFO")) is False
         # WARNING-level events should still pass through
-        assert filter_fn(_make_record(
-            level="WARNING", message="provider_warning")) is True
+        assert (
+            filter_fn(_make_record(level="WARNING", message="provider_warning")) is True
+        )
 
     def test_high_volume_policy_rate_limits_events(self) -> None:
         """Verify repeated events are rate-limited within the window."""

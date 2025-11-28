@@ -195,11 +195,9 @@ class ContentHashService:
         if len(ContentHashService._cache) > ContentHashService._cache_max_size:
             # Remove oldest entries (simple implementation)
             items_to_remove = (
-                len(ContentHashService._cache) -
-                ContentHashService._cache_max_size
+                len(ContentHashService._cache) - ContentHashService._cache_max_size
             )
-            keys_to_remove = list(ContentHashService._cache.keys())[
-                :items_to_remove]
+            keys_to_remove = list(ContentHashService._cache.keys())[:items_to_remove]
 
             for k in keys_to_remove:
                 del ContentHashService._cache[k]
@@ -221,8 +219,7 @@ class ContentHashService:
             "size": len(ContentHashService._cache),
             "max_size": ContentHashService._cache_max_size,
             "utilization_percent": int(
-                (len(ContentHashService._cache) /
-                 ContentHashService._cache_max_size)
+                (len(ContentHashService._cache) / ContentHashService._cache_max_size)
                 * 100
             ),
         }

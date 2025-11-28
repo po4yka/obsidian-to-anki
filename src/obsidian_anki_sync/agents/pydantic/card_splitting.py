@@ -42,8 +42,7 @@ class CardSplittingAgentAI:
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
         )
 
-        logger.info("pydantic_ai_card_splitting_agent_initialized",
-                    model=str(model))
+        logger.info("pydantic_ai_card_splitting_agent_initialized", model=str(model))
 
     async def analyze(
         self,
@@ -144,8 +143,7 @@ Questions:
             return splitting_result
 
         except ValueError as e:
-            logger.error(
-                "pydantic_ai_card_splitting_parse_error", error=str(e))
+            logger.error("pydantic_ai_card_splitting_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse card splitting output",
                 details={"error": str(e), "title": metadata.title},
