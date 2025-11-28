@@ -7,7 +7,7 @@ This module provides AI-driven fixes for common validation issues:
 """
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -43,7 +43,7 @@ class AIFixer:
 
     def __init__(
         self,
-        provider: Optional[BaseLLMProvider] = None,
+        provider: BaseLLMProvider | None = None,
         model: str = "qwen/qwen-2.5-14b-instruct",
         temperature: float = 0.1,
     ):
@@ -104,7 +104,7 @@ class AIFixer:
             )
             return cls(provider=None)
 
-    def detect_code_language(self, code_block: str) -> Optional[str]:
+    def detect_code_language(self, code_block: str) -> str | None:
         """Detect the programming language of a code block using AI.
 
         Args:
@@ -173,7 +173,7 @@ Respond with JSON: {{"language": "<language>", "confidence": "<high|medium|low>"
 
     def generate_bilingual_title(
         self, content: str, current_title: str
-    ) -> Optional[tuple[str, str]]:
+    ) -> tuple[str, str] | None:
         """Generate bilingual title (EN / RU) from content or translate existing title.
 
         Args:
@@ -263,7 +263,7 @@ class AIFixerValidator(BaseValidator):
         content: str,
         frontmatter: dict[str, Any],
         filepath: str,
-        ai_fixer: Optional[AIFixer] = None,
+        ai_fixer: AIFixer | None = None,
         enable_ai_fixes: bool = True,
     ):
         """Initialize the AI fixer validator.

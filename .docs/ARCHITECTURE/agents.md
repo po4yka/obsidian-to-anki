@@ -160,7 +160,7 @@ post_validator_model: "openai/gpt-4o"
 
 # OpenRouter configuration
 llm_provider: "openrouter"
-openrouter_api_key: "sk-or-v1-..."
+openrouter_api_key: "sk-or-v1-..." # pragma: allowlist secret
 ```
 
 ### Advanced Configuration
@@ -310,7 +310,7 @@ If you're migrating from the legacy agent system:
     ```yaml
     # From Ollama to OpenRouter
     llm_provider: "openrouter" # instead of "ollama"
-    openrouter_api_key: "sk-or-v1-..."
+    openrouter_api_key: "sk-or-v1-..." # pragma: allowlist secret
     ```
 
 ### Performance Comparison

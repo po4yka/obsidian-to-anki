@@ -3,7 +3,6 @@
 
 import re
 from pathlib import Path
-from typing import List
 
 # Files to analyze
 FILES = [
@@ -27,7 +26,7 @@ def main() -> None:
         print(f"Error: Directory not found: {base_path}")
         return
 
-    results: List[tuple[str, int]] = []
+    results: list[tuple[str, int]] = []
 
     for file in FILES:
         filepath = base_path / file
