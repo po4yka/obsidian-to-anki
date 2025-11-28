@@ -1,0 +1,68 @@
+---
+description: Synchronization logic, state management, and transaction patterns
+globs: ["src/obsidian_anki_sync/sync/**"]
+alwaysApply: true
+---
+
+# Synchronization Architecture
+
+## Sync Engine (@001_workspace)
+
+-   **Incremental Sync**: Track content hashes to detect changes
+-   **Bidirectional**: Support Obsidian ↔ Anki synchronization
+-   **Idempotent**: Safe to run multiple times
+-   **Resumable**: Continue interrupted syncs via progress tracking
+
+## State Management
+
+-   **SQLite WAL**: Write-Ahead Logging for concurrency
+-   **Content Hashing**: SHA-256 for change detection
+-   **Progress Tracking**: Resume capability for long operations
+-   **Transaction Logs**: Audit trail for sync operations
+
+## Transaction Pattern (@006_domain_architecture)
+
+```python
+class CardTransaction:
+    """Rollback-capable transaction for Anki operations."""
+
+    def __init__(self, anki_client: IAnkiClient):
+        self.client = anki_client
+        self.operations: list[Callable] = []
+
+    def add_operation(self, operation: Callable, rollback: Callable):
+        """Add operation with rollback function."""
+        self.operations.append((operation, rollback))
+
+    async def commit(self) -> bool:
+        """Execute all operations with rollback on failure."""
+        # Implementation with error handling and rollback
+```
+
+## Change Detection
+
+-   **File Hashing**: Detect content changes in Obsidian notes
+-   **Metadata Tracking**: Track modification times and sizes
+-   **Conflict Resolution**: Handle concurrent modifications
+-   **Dry Run Mode**: Preview changes without applying them
+
+## Error Recovery
+
+-   **Retry Policies**: Exponential backoff for network operations
+-   **Partial Success**: Continue sync after individual failures
+-   **Recovery Points**: Checkpoint progress for resumption
+-   **Rollback**: Undo failed operations safely
+
+## Performance Optimization (@014_performance)
+
+-   **Batch Operations**: Group API calls for efficiency
+-   **Connection Pooling**: Reuse HTTP connections
+-   **Caching**: Cache expensive computations
+-   **Async Processing**: Non-blocking I/O operations
+
+## Slug Generation (@011_obsidian_integration)
+
+-   **Stable IDs**: Consistent card identification across syncs
+-   **Collision Resolution**: Handle duplicate slug generation
+-   **URL Safe**: Compatible with Anki's requirements
+-   **Deterministic**: Same input always produces same slug

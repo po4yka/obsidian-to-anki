@@ -1,0 +1,76 @@
+---
+description: Obsidian parsing, frontmatter handling, and bilingual content support
+globs: ["src/obsidian_anki_sync/obsidian/**"]
+alwaysApply: true
+---
+
+# Obsidian Integration Standards
+
+## Note Parsing (@001_workspace)
+
+-   **YAML Frontmatter**: Parse with proper error handling
+-   **Q&A Extraction**: Support multi-pair Q/A blocks
+-   **Path Resolution**: Resolve to absolute paths safely (@013_security)
+-   **Encoding**: Handle UTF-8 with BOM detection
+
+## Frontmatter Schema
+
+```yaml
+---
+title: "Question Title"
+tags: ["topic", "subtopic", "difficulty"]
+aliases: ["Alternative Title"]
+status: "draft|review|published"
+anki_note_type: "Basic|Simple|Missing|Draw"
+language: "en|ru|both"
+---
+```
+
+## Bilingual Content (@010_apf)
+
+-   **Same File**: Keep EN and RU in single note file
+-   **Language Markers**: Use clear language separation
+-   **Tag Consistency**: English-only tags across languages
+-   **Slug Generation**: Consistent slugs for bilingual pairs
+
+## Content Preprocessing
+
+-   **Markdown Cleaning**: Remove Obsidian-specific syntax
+-   **Link Resolution**: Handle `[[WikiLinks]]` and `![[Embeds]]`
+-   **Code Blocks**: Preserve syntax highlighting
+-   **Image References**: Convert to absolute paths or data URIs
+
+## Note Discovery (@009_sync)
+
+-   **Vault Scanning**: Recursively find markdown files
+-   **Ignore Patterns**: Skip system folders and temporary files
+-   **Change Detection**: Use file modification times and content hashes
+-   **Incremental Processing**: Only process changed files
+
+## Validation Rules
+
+-   **Frontmatter Required**: All notes must have valid YAML frontmatter
+-   **Q&A Structure**: Enforce consistent Q&A formatting
+-   **Path Safety**: Validate file paths prevent directory traversal
+-   **Content Integrity**: Check for malformed markdown
+
+## Error Handling
+
+-   **Parse Failures**: Graceful handling of malformed notes
+-   **Missing Frontmatter**: Default values and warnings
+-   **Encoding Issues**: Fallback to alternative encodings
+-   **Large Files**: Stream processing for memory efficiency
+
+## Performance Optimization (@014_performance)
+
+-   **Lazy Loading**: Load content only when needed
+-   **Caching**: Cache parsed frontmatter and metadata
+-   **Batch Processing**: Process multiple notes efficiently
+-   **Memory Limits**: Handle very large note files
+
+## Integration Testing
+
+-   **Mock Vault**: Use test vaults for integration tests
+-   **Sample Notes**: Include representative note examples
+-   **Edge Cases**: Test malformed and edge case content
+-   **Performance Benchmarks**: Measure parsing performance

@@ -1,0 +1,72 @@
+---
+description: Docstring standards, markdown formatting, and documentation practices
+globs: ["*.py", "*.md", "README.md"]
+alwaysApply: true
+---
+
+# Documentation Standards
+
+## No Emojis Policy
+
+-   **NEVER** use emojis in code, comments, documentation, or commit messages
+-   Use plain text status indicators: "Complete", "Pending", "Warning"
+-   Use markdown formatting for emphasis instead of decorative symbols
+
+## Python Docstrings (@002_python_standards)
+
+```python
+def function_name(param1: Type1, param2: Type2) -> ReturnType:
+    """
+    Brief description of function.
+
+    Longer description if needed, explaining the purpose,
+    behavior, and any important details.
+
+    Args:
+        param1: Description of param1
+        param2: Description of param2
+
+    Returns:
+        Description of return value
+
+    Raises:
+        ExceptionType: When this exception occurs
+
+    Example:
+        >>> function_name(value1, value2)
+        expected_result
+    """
+```
+
+## Comments
+
+-   **Explain Why**: Comments should explain "why", not "what"
+-   **Keep Updated**: Update comments when code changes
+-   **No Dead Code**: Never commit commented-out code
+
+## Markdown Documentation
+
+-   **Headers**: Use clear section headers with proper hierarchy
+-   **Code Examples**: Include syntax-highlighted code examples
+-   **Line Length**: Reasonable length (80-100 characters)
+-   **Tables**: Use tables for structured data
+-   **Links**: Use relative links where possible
+
+## Code Review Checklist (@005_git_workflow)
+
+Before submitting PR:
+
+-   [ ] All tests pass (`pytest`)
+-   [ ] Linting passes (`ruff check src/`)
+-   [ ] Formatting applied (`black src/`)
+-   [ ] Type checking passes (`mypy src/`)
+-   [ ] Documentation updated
+-   [ ] No emojis in code or documentation
+-   [ ] Commit messages follow convention
+-   [ ] Code coverage maintained or improved
+
+## Project Documentation Structure
+
+-   **`.docs/`**: Shared Brain with requirements, architecture, and specifications
+-   **Templates**: Use `.docs/TEMPLATES/` for consistent documentation
+-   **References**: Include relevant `.docs/` links in documentation

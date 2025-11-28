@@ -1,0 +1,88 @@
+---
+description: Security best practices, input validation, and data protection
+globs: []
+alwaysApply: true
+---
+
+# Security Standards
+
+## Core Principles (@001_workspace)
+
+-   **No Hardcoded Secrets**: Never commit secrets to version control
+-   **Input Validation**: Validate and sanitize all user inputs
+-   **Defense in Depth**: Multiple layers of protection
+-   **Fail Safe**: Default to secure behavior on errors
+
+## API Keys and Secrets
+
+-   **Environment Variables**: Store all secrets in environment variables
+-   **Validation**: Validate API keys on startup
+-   **Rotation**: Implement key rotation procedures
+-   **Minimal Permissions**: Use least-privilege access
+
+## Input Validation (@006_domain_architecture)
+
+-   **Path Traversal**: Prevent `../` and absolute path attacks
+-   **File Types**: Restrict to allowed file types and extensions
+-   **Size Limits**: Enforce maximum file sizes and content lengths
+-   **Content Scanning**: Validate content structure and format
+
+## File System Security
+
+-   **Absolute Paths**: Always resolve to absolute paths
+-   **Symlink Prevention**: Detect and reject symbolic links
+-   **Permission Checks**: Verify file access permissions
+-   **Directory Traversal**: Prevent access outside allowed directories
+
+## Network Security (@012_anki_integration)
+
+-   **HTTPS Only**: Use HTTPS for all external API calls
+-   **Certificate Validation**: Verify SSL certificates
+-   **Timeout Protection**: Prevent hanging connections
+-   **Rate Limiting**: Implement client-side rate limiting
+
+## Data Protection
+
+-   **Encryption**: Encrypt sensitive data at rest
+-   **Logging Security**: Never log passwords, API keys, or sensitive data
+-   **Memory Clearing**: Clear sensitive data from memory when done
+-   **Access Control**: Implement proper access controls
+
+## SQL Injection Prevention (@009_sync)
+
+-   **Parameterized Queries**: Use parameterized SQL exclusively
+-   **Input Sanitization**: Sanitize all SQL inputs
+-   **ORM Usage**: Prefer ORM over raw SQL when possible
+-   **Query Logging**: Safe query logging without sensitive data
+
+## Error Handling Security
+
+-   **Information Disclosure**: Don't expose internal system details
+-   **Stack Trace Protection**: Sanitize error messages for users
+-   **Logging Levels**: Appropriate logging without sensitive data
+-   **Exception Safety**: Prevent exceptions from revealing sensitive information
+
+## Dependency Security
+
+-   **Regular Updates**: Keep dependencies updated
+-   **Vulnerability Scanning**: Scan for known vulnerabilities
+-   **Trusted Sources**: Use packages from trusted sources only
+-   **Lock Files**: Use `uv.lock` to pin dependency versions
+
+## Testing Security
+
+-   **Security Test Cases**: Include security-focused test cases
+-   **Input Fuzzing**: Test with malformed and malicious inputs
+-   **Boundary Testing**: Test edge cases and boundary conditions
+-   **Integration Testing**: Test security controls end-to-end
+
+## Security Checklist
+
+-   [ ] No hardcoded secrets in code
+-   [ ] Input validation on all external inputs
+-   [ ] Path traversal protection implemented
+-   [ ] HTTPS used for all external calls
+-   [ ] SQL injection prevention (parameterized queries)
+-   [ ] Sensitive data not logged
+-   [ ] Dependencies regularly updated
+-   [ ] Security tests included

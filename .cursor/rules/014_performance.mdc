@@ -1,0 +1,84 @@
+---
+description: Performance optimization guidelines and memory management
+globs: []
+alwaysApply: false
+---
+
+# Performance Optimization Guidelines
+
+## Profiling First (@001_workspace)
+
+-   **Measure Before Optimizing**: Profile code to identify bottlenecks
+-   **Data-Driven**: Use performance data to guide optimizations
+-   **Avoid Premature Optimization**: Focus on correctness first
+-   **Benchmarking**: Establish performance baselines
+
+## Batch Operations (@009_sync)
+
+-   **API Calls**: Group multiple API calls into batches
+-   **Database**: Use batch inserts/updates for efficiency
+-   **File Operations**: Process multiple files in batches
+-   **Memory**: Batch processing to control memory usage
+
+## Memory Management
+
+-   **Context Managers**: Use `with` statements for resource cleanup
+-   **File Handles**: Close file handles explicitly or use context managers
+-   **Large Files**: Stream processing instead of loading entire files
+-   **GC Awareness**: Be aware of Python's garbage collection patterns
+
+## Caching Strategies (@008_providers)
+
+-   **Result Caching**: Cache expensive computation results
+-   **HTTP Connections**: Reuse connections with pooling
+-   **Parsed Data**: Cache parsed configurations and metadata
+-   **LRU Cache**: Use appropriate cache eviction policies
+
+## Async Processing (@012_anki_integration)
+
+-   **Non-Blocking I/O**: Use async/await for I/O operations
+-   **Concurrent Processing**: Process independent tasks concurrently
+-   **Resource Pooling**: Share resources efficiently across tasks
+-   **Cancellation**: Support cancellation of long-running operations
+
+## Database Optimization (@009_sync)
+
+-   **Indexes**: Index frequently queried columns
+-   **WAL Mode**: Use SQLite WAL mode for concurrency
+-   **Connection Pooling**: Reuse database connections
+-   **Query Optimization**: Use efficient query patterns
+
+## Algorithm Selection
+
+-   **Time Complexity**: Choose algorithms with appropriate complexity
+-   **Space Complexity**: Consider memory usage in algorithm selection
+-   **Data Structures**: Use appropriate data structures for access patterns
+-   **Streaming**: Use generators and iterators for large datasets
+
+## Monitoring and Metrics
+
+-   **Performance Metrics**: Track key performance indicators
+-   **Resource Usage**: Monitor CPU, memory, and I/O usage
+-   **Latency Tracking**: Measure operation response times
+-   **Bottleneck Identification**: Use profiling tools to find issues
+
+## Code Optimization
+
+-   **Loop Efficiency**: Optimize inner loops and hot paths
+-   **String Operations**: Use efficient string handling
+-   **List Comprehensions**: Prefer comprehensions over explicit loops
+-   **Built-ins**: Use Python built-in functions for performance
+
+## Testing Performance (@003_testing)
+
+-   **Performance Tests**: Include performance benchmarks in CI
+-   **Regression Testing**: Detect performance regressions
+-   **Load Testing**: Test under realistic load conditions
+-   **Memory Leak Testing**: Check for memory leaks over time
+
+## Configuration Tuning
+
+-   **Batch Sizes**: Tune batch sizes for optimal throughput
+-   **Timeouts**: Set appropriate timeouts for operations
+-   **Concurrency Limits**: Control concurrent operation limits
+-   **Cache Sizes**: Tune cache sizes based on usage patterns

@@ -1,0 +1,76 @@
+---
+description: APF compliance, card generation rules, and formatting standards
+globs: ["src/obsidian_anki_sync/apf/**", ".docs/APF Cards/**"]
+alwaysApply: true
+---
+
+# APF (Anki Prompts Format) Standards
+
+## APF v2.1 Specification (@001_workspace)
+
+-   **Strict Compliance**: All cards must follow APF v2.1 specifications
+-   **Validation**: Run APF linter on all generated content
+-   **Documentation**: Reference `.docs/APF Cards/` for specifications
+-   **Templates**: Use strict tag taxonomy from Doc B
+
+## Card Types (@007_agents)
+
+-   **Simple**: Basic Q&A cards
+-   **Missing**: Cloze deletion cards with numbered blanks ({{c1::text}})
+-   **Draw**: Diagram generation cards
+-   **Automatic Selection**: Choose type based on content analysis
+
+## HTML Generation (@011_obsidian_integration)
+
+-   **Clean HTML**: Well-formed, semantic HTML output
+-   **APF Comments**: Include required APF comment markers
+-   **Image Handling**: SVG data URIs, max 88 characters per line
+-   **Styling**: Consistent styling across card types
+
+## Manifest System
+
+```json
+{
+    "slug": "unique-card-identifier",
+    "lang": "en|ru",
+    "type": "Simple|Missing|Draw",
+    "tags": ["topic", "subtopic", "difficulty"],
+    "version": "apf-v2.1"
+}
+```
+
+## Quality Standards
+
+-   **Linter Compliance**: Pass all APF linter rules (Doc D)
+-   **Tag Taxonomy**: Use approved tags from Doc B only
+-   **Content Validation**: Verify Q&A pair extraction
+-   **Formatting**: Consistent spacing and structure
+
+## Generation Pipeline
+
+1. **Content Analysis**: Determine optimal card type
+2. **Template Selection**: Choose appropriate APF template
+3. **HTML Generation**: Create clean, valid HTML
+4. **Manifest Creation**: Generate metadata JSON
+5. **Validation**: Run APF linter and fix issues
+
+## Bilingual Support (@011_obsidian_integration)
+
+-   **Language Detection**: Automatic language identification
+-   **Parallel Cards**: Generate cards for both languages
+-   **Tag Consistency**: Same tags for bilingual card pairs
+-   **Slug Coordination**: Link bilingual cards via consistent slugs
+
+## Error Handling
+
+-   **Validation Failures**: Retry with different generation strategies
+-   **Linter Errors**: Auto-fix common formatting issues
+-   **Content Issues**: Fallback to simpler card types
+-   **Logging**: Detailed error reporting for debugging
+
+## Performance (@014_performance)
+
+-   **Batch Generation**: Generate multiple cards efficiently
+-   **Caching**: Cache successful generation patterns
+-   **Streaming**: Process large content streams
+-   **Memory Management**: Handle large note files efficiently

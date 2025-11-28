@@ -1,0 +1,72 @@
+---
+description: Git commit messages, branch naming, and workflow standards
+globs: []
+alwaysApply: true
+---
+
+# Git Workflow Standards
+
+## Commit Message Format
+
+```
+<type>(<scope>): <subject>
+```
+
+### Types
+
+-   `feat`: New feature
+-   `fix`: Bug fix
+-   `docs`: Documentation changes
+-   `style`: Code style changes (formatting)
+-   `refactor`: Code refactoring
+-   `test`: Adding or updating tests
+-   `chore`: Maintenance tasks
+
+### Examples
+
+```
+feat(parser): add multi-line question support
+fix(sync): resolve race condition in state updates
+docs(api): update AnkiConnect integration guide
+style(agents): apply black formatting to agent modules
+refactor(domain): extract common interfaces to base classes
+test(validators): add integration tests for pre-validation
+chore(deps): update ruff to latest version
+```
+
+## Branch Naming
+
+-   **Features**: `feature/description`
+-   **Bug Fixes**: `fix/issue-number-description`
+-   **Documentation**: `docs/description`
+-   **Refactoring**: `refactor/description`
+
+### Examples
+
+```
+feature/add-bilingual-support
+fix/123-sync-race-condition
+docs/update-api-reference
+refactor/extract-agent-interfaces
+```
+
+## Commit Best Practices
+
+-   **Atomic**: Each commit should be a single, complete change
+-   **Descriptive**: Subject should clearly explain the change
+-   **Imperative**: Use imperative mood ("add" not "added", "fix" not "fixed")
+-   **Scope**: Use module/component name as scope when applicable
+-   **Breaking Changes**: Add `BREAKING CHANGE:` footer for breaking changes
+
+## Pull Request Guidelines
+
+-   **Title**: Follow commit message format
+-   **Description**: Include context, implementation details, and testing notes
+-   **Labels**: Use appropriate labels (enhancement, bug, documentation, etc.)
+-   **Review Checklist**: Complete all items in code review checklist (@004_documentation)
+
+## Release Process
+
+-   **Versioning**: Semantic versioning (MAJOR.MINOR.PATCH)
+-   **Changelog**: Maintain CHANGELOG.md with release notes
+-   **Tags**: Tag releases with `v1.2.3` format
