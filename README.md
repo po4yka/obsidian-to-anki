@@ -6,7 +6,7 @@ Synchronize Obsidian Q&A notes to Anki flashcards using LLM-powered generation w
 [![Coverage](https://img.shields.io/badge/coverage-35%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)]()
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 ## Features
 
