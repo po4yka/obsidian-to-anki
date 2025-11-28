@@ -622,7 +622,7 @@ class UnifiedAgentSelector:
             else:
                 raise ValueError(f"Unknown agent framework: {framework}")
 
-        return self._agents[cache_key]
+        return self._agents[cache_key]  # type: ignore[no-any-return]
 
     def get_agent_with_fallback(
         self,

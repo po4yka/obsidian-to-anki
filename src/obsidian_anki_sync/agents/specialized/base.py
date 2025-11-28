@@ -43,7 +43,7 @@ class BaseSpecializedAgent:
             max_retries: Maximum retry attempts
         """
         self.model = model
-        self.agent = None
+        self.agent: ContentRepairAgent | None = None
         self.enable_retry = enable_retry
         self.max_retries = max_retries
         self.retry_with_jitter = None
@@ -80,14 +80,14 @@ class BaseSpecializedAgent:
             AgentResult from solve function
         """
         if self.retry_with_jitter:
-            return self.retry_with_jitter.execute(
+            return self.retry_with_jitter.execute(  # type: ignore[no-any-return]
                 solve_func,
                 exceptions=(Exception,),
                 content=content,
                 context=context,
             )
         else:
-            return solve_func(content, context)
+            return solve_func(content, context)  # type: ignore[no-any-return]
 
     def _create_prompt(self, content: str, context: dict[str, Any]) -> str:
         """Create the prompt for the agent - implemented by subclasses."""

@@ -7,7 +7,7 @@ and integrates with the card generation pipeline.
 from typing import Any
 
 from langchain.agents import create_tool_calling_agent
-from langchain.agents.tool_calling_agent.base import ToolCallingAgent
+from langchain.agents.tool_calling_agent.base import ToolCallingAgent as LangChainToolCallingAgent
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import BaseTool
@@ -114,7 +114,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
             agent_type, "You are a helpful AI assistant with access to various tools."
         )
 
-    def _create_agent(self) -> ToolCallingAgent:
+    def _create_agent(self) -> Any:
         """Create the underlying LangChain tool calling agent.
 
         Returns:
@@ -138,7 +138,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
 
         return agent
 
-    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
         """Run the tool calling agent.
 
         Args:
@@ -158,7 +158,8 @@ Provide comprehensive validation results and actionable improvement suggestions.
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 5),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
+                handle_parsing_errors=kwargs.get(
+                    "handle_parsing_errors", True),
                 return_intermediate_steps=kwargs.get(
                     "return_intermediate_steps", False
                 ),

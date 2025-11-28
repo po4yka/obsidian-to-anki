@@ -128,7 +128,8 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -155,7 +156,8 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
         return self._async_client
@@ -258,7 +260,8 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success", model_count=len(models))
+            logger.info("openrouter_list_models_success",
+                        model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
@@ -301,7 +304,8 @@ class OpenRouterProvider(BaseLLMProvider):
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -595,7 +599,8 @@ class OpenRouterProvider(BaseLLMProvider):
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
-            completion = self._extract_completion(message, model, result, json_schema)
+            completion = self._extract_completion(
+                message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -609,7 +614,8 @@ class OpenRouterProvider(BaseLLMProvider):
             finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(
+                model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -648,7 +654,7 @@ class OpenRouterProvider(BaseLLMProvider):
             }
 
         except httpx.HTTPStatusError as e:
-            self._handle_http_error(
+            fallback_result = self._handle_http_error(
                 error=e,
                 model=model,
                 prompt=prompt,
@@ -660,6 +666,9 @@ class OpenRouterProvider(BaseLLMProvider):
                 reasoning_enabled=reasoning_enabled,
                 request_start_time=request_start_time,
             )
+            if fallback_result is not None:
+                return fallback_result
+            # If fallback didn't return a result, re-raise the original error
             raise
         except ValueError as e:
             error_msg = str(e)
@@ -702,7 +711,8 @@ class OpenRouterProvider(BaseLLMProvider):
             elif "refusal" in message and message["refusal"]:
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get("finish_reason", "unknown")
+                finish_reason = result["choices"][0].get(
+                    "finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -801,7 +811,7 @@ class OpenRouterProvider(BaseLLMProvider):
         stream: bool,
         reasoning_enabled: bool,
         request_start_time: float,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         """Handle HTTP errors with fallback logic."""
         error_info = parse_api_error_response(error, model, json_schema)
 
@@ -835,7 +845,7 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             try:
                 # Try again with reasoning enabled
-                return self.generate(
+                result = self.generate(
                     model=model,
                     prompt=prompt,
                     system=system,
@@ -845,6 +855,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     stream=stream,
                     reasoning_enabled=True,  # Enable reasoning for fallback
                 )
+                return result
             except Exception as retry_error:
                 logger.warning(
                     "grok_reasoning_fallback_failed",
@@ -863,7 +874,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 error_message=error_info["error_message"],
             )
             try:
-                self.generate(
+                fallback_result = self.generate(
                     model=model,
                     prompt=prompt,
                     system=system,
@@ -873,8 +884,12 @@ class OpenRouterProvider(BaseLLMProvider):
                     stream=stream,
                     reasoning_enabled=reasoning_enabled,
                 )
+                return fallback_result
             except Exception:
                 pass  # Re-raise original error
+
+        # If no fallback succeeded, return None to indicate error should be re-raised
+        return None
 
     def generate_json(
         self,
@@ -1024,12 +1039,14 @@ class OpenRouterProvider(BaseLLMProvider):
             Response dictionary
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported in async mode")
+            raise NotImplementedError(
+                "Streaming is not yet supported in async mode")
 
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,

@@ -60,7 +60,7 @@ class GenerationResult:
 class HTMLTemplateGenerator:
     """Structured HTML generation for APF cards with validation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.templates = self._initialize_templates()
 
     def _initialize_templates(self) -> dict[str, CardTemplate]:
@@ -144,7 +144,8 @@ class HTMLTemplateGenerator:
             final_errors = validate_card_html(html_content)
             if final_errors:
                 validation_errors.extend(final_errors)
-                warnings.append("Some HTML validation issues could not be auto-fixed")
+                warnings.append(
+                    "Some HTML validation issues could not be auto-fixed")
 
         return GenerationResult(
             html=html_content,
@@ -170,12 +171,14 @@ class HTMLTemplateGenerator:
             )
 
         if "key_points" in processed:
-            processed["key_points"] = self._generate_key_points(processed["key_points"])
+            processed["key_points"] = self._generate_key_points(
+                processed["key_points"])
 
         # Process text content
         for field in ["question", "answer", "title", "other_notes", "content"]:
             if field in processed and processed[field]:
-                processed[field] = self._escape_and_format_text(processed[field])
+                processed[field] = self._escape_and_format_text(
+                    processed[field])
 
         return processed
 
@@ -212,7 +215,8 @@ class HTMLTemplateGenerator:
             return f"<ul>\n<li>{escape(key_points)}</li>\n</ul>"
         elif isinstance(key_points, list):
             # List of points
-            points_html = "\n".join(f"<li>{escape(point)}</li>" for point in key_points)
+            points_html = "\n".join(
+                f"<li>{escape(point)}</li>" for point in key_points)
             return f"<ul>\n{points_html}\n</ul>"
         else:
             return "<ul><li>Key points data</li></ul>"
@@ -226,7 +230,8 @@ class HTMLTemplateGenerator:
         escaped = escape(text)
 
         # Convert basic markdown to HTML
-        escaped = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", escaped)  # Bold
+        escaped = re.sub(r"\*\*(.*?)\*\*",
+                         r"<strong>\1</strong>", escaped)  # Bold
         escaped = re.sub(r"\*(.*?)\*", r"<em>\1</em>", escaped)  # Italic
 
         # Convert line breaks
@@ -250,7 +255,8 @@ class HTMLTemplateGenerator:
                 warnings.extend(lang_warnings)
             elif "wrap in <pre><code>" in error:
                 # Wrap standalone code elements
-                fixed_html, wrap_warnings = self._wrap_standalone_code(fixed_html)
+                fixed_html, wrap_warnings = self._wrap_standalone_code(
+                    fixed_html)
                 warnings.extend(wrap_warnings)
             elif "Backtick code fences detected" in error:
                 # Remove markdown code fences from HTML
@@ -268,7 +274,7 @@ class HTMLTemplateGenerator:
         """Add default language classes to code elements missing them."""
         warnings = []
 
-        def add_class(match):
+        def add_class(match: re.Match[str]) -> str:
             code_tag = match.group(0)
             if "class=" not in code_tag:
                 # Add default language class
@@ -286,7 +292,7 @@ class HTMLTemplateGenerator:
         """Wrap standalone code elements in pre tags."""
         warnings = []
 
-        def wrap_code(match):
+        def wrap_code(match: re.Match[str]) -> str:
             warnings.append("Wrapped standalone code element in pre tags")
             return f"<pre>{match.group(0)}</pre>"
 

@@ -180,7 +180,7 @@ class WorkPackagePreparator:
         }
         return folder_mapping.get(topic, "")
 
-    def analyze_directory(self, directory: Path, status_filter: Optional[str] = None):
+    def analyze_directory(self, directory: Path, status_filter: Optional[str] = None) -> None:
         """Analyze all files in directory."""
         files = sorted(directory.glob("q-*.md"))
 

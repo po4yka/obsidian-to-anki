@@ -8,6 +8,34 @@ from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .models import GeneratedCard, QualityReport
 
+
+def _extract_qa_from_apf(apf_html: str) -> tuple[str, str]:
+    """Extract question and answer from APF HTML.
+
+    Args:
+        apf_html: APF format HTML
+
+    Returns:
+        Tuple of (question, answer)
+    """
+    question = ""
+    answer = ""
+
+    # Extract Front (question)
+    front_match = re.search(
+        r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+    if front_match:
+        question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
+
+    # Extract Back (answer)
+    back_match = re.search(
+        r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+    if back_match:
+        answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
+
+    return question or "Unknown question", answer or "Unknown answer"
+
+
 logger = get_logger(__name__)
 
 
@@ -35,7 +63,8 @@ class CardImprover:
         self.model = model
         self.temperature = temperature
 
-        logger.info("card_improver_initialized", has_llm=llm_provider is not None)
+        logger.info("card_improver_initialized",
+                    has_llm=llm_provider is not None)
 
     def improve_card(
         self,
@@ -74,7 +103,8 @@ class CardImprover:
         )
 
         # Apply rule-based fixes first (deterministic, fast)
-        improved_card = self._apply_rule_based_fixes(improved_card, quality_report)
+        improved_card = self._apply_rule_based_fixes(
+            improved_card, quality_report)
 
         # Apply LLM-powered improvements for complex issues
         if self.llm_provider and quality_report.overall_score < 0.6:
@@ -100,29 +130,44 @@ class CardImprover:
 
         suggestions = quality_report.suggestions
 
+        # Extract Q&A from APF HTML for rule-based fixes
+        question, answer = _extract_qa_from_apf(improved.apf_html)
+
         for suggestion in suggestions:
             if "punctuation" in suggestion.lower():
-                improved.question = self._fix_punctuation(improved.question)
+                fixed_question = self._fix_punctuation(question)
+                # Update APF HTML with fixed question
+                improved.apf_html = improved.apf_html.replace(
+                    f'<div class="front">{question}</div>',
+                    f'<div class="front">{fixed_question}</div>',
+                    1
+                )
+                question = fixed_question
             elif "capitalization" in suggestion.lower():
-                improved.question = self._fix_capitalization(improved.question)
+                fixed_question = self._fix_capitalization(question)
+                improved.apf_html = improved.apf_html.replace(
+                    f'<div class="front">{question}</div>',
+                    f'<div class="front">{fixed_question}</div>',
+                    1
+                )
+                question = fixed_question
             elif "unclosed" in suggestion.lower() and "tag" in suggestion.lower():
-                improved.question = self._fix_html_tags(improved.question)
-                if improved.answer:
-                    improved.answer = self._fix_html_tags(improved.answer)
+                improved.apf_html = self._fix_html_tags(improved.apf_html)
             elif "language class" in suggestion.lower():
-                improved.question = self._add_code_language_classes(improved.question)
-                if improved.answer:
-                    improved.answer = self._add_code_language_classes(improved.answer)
+                improved.apf_html = self._add_code_language_classes(
+                    improved.apf_html)
             elif "slug format" in suggestion.lower():
                 improved.slug = self._fix_slug_format(improved.slug)
             elif "insufficient tags" in suggestion.lower():
-                improved.tags = self._add_missing_tags(improved.tags, improved.question)
+                # Note: GeneratedCard doesn't have tags - tags are in APF HTML/manifest
+                # Skip tag-related fixes for GeneratedCard
+                pass
             elif "duplicate tags" in suggestion.lower():
-                improved.tags = self._remove_duplicate_tags(improved.tags)
+                # Note: GeneratedCard doesn't have tags - tags are in APF HTML/manifest
+                # Skip tag-related fixes for GeneratedCard
+                pass
             elif "alt text" in suggestion.lower():
-                improved.question = self._add_image_alt_text(improved.question)
-                if improved.answer:
-                    improved.answer = self._add_image_alt_text(improved.answer)
+                improved.apf_html = self._add_image_alt_text(improved.apf_html)
 
         return improved
 
@@ -158,24 +203,43 @@ class CardImprover:
             return card
 
         try:
-            prompt = self._build_improvement_prompt(card, complex_issues, metadata)
+            prompt = self._build_improvement_prompt(
+                card, complex_issues, metadata)
 
             response = self.llm_provider.generate(
-                prompt=prompt,
                 model=self.model,
+                prompt=prompt,
                 temperature=self.temperature,
-                max_tokens=1000,
             )
 
-            improved_content = self._parse_improvement_response(response)
+            # Extract response text from dict
+            response_text = response.get("response", "") if isinstance(
+                response, dict) else str(response)
+            improved_content = self._parse_improvement_response(response_text)
             if improved_content:
                 improved_card = card.model_copy()
-                improved_card.question = improved_content.get("question", card.question)
-                improved_card.answer = improved_content.get("answer", card.answer)
+                # Update APF HTML with improved content
+                question, answer = _extract_qa_from_apf(card.apf_html)
+                new_question = improved_content.get("question", question)
+                new_answer = improved_content.get("answer", answer)
+                # Replace in APF HTML
+                if new_question != question:
+                    improved_card.apf_html = improved_card.apf_html.replace(
+                        f'<div class="front">{question}</div>',
+                        f'<div class="front">{new_question}</div>',
+                        1
+                    )
+                if new_answer != answer:
+                    improved_card.apf_html = improved_card.apf_html.replace(
+                        f'<div class="back">{answer}</div>',
+                        f'<div class="back">{new_answer}</div>',
+                        1
+                    )
                 return improved_card
 
         except Exception as e:
-            logger.warning("llm_improvement_failed", error=str(e), slug=card.slug)
+            logger.warning("llm_improvement_failed",
+                           error=str(e), slug=card.slug)
 
         return card
 
@@ -186,7 +250,8 @@ class CardImprover:
             return text
 
         # Add question mark if missing and text looks like a question
-        question_starters = ["what", "how", "why", "when", "where", "which", "who"]
+        question_starters = ["what", "how", "why",
+                             "when", "where", "which", "who"]
         if any(text.lower().startswith(word) for word in question_starters):
             if not text.endswith("?"):
                 text += "?"
@@ -223,7 +288,7 @@ class CardImprover:
         # Find code blocks without language classes
         pattern = r"(<pre><code)([^>]*>.*?)</code></pre>"
 
-        def add_language_class(match):
+        def add_language_class(match: re.Match[str]) -> str:
             code_tag = match.group(1)
             rest = match.group(2)
 
@@ -243,6 +308,7 @@ class CardImprover:
 
         return re.sub(pattern, add_language_class, text, flags=re.DOTALL)
 
+    # type: ignore[no-untyped-def]
     def _detect_code_language(self, code: str) -> str | None:
         """Simple language detection based on keywords."""
         code_lower = code.lower()
@@ -355,7 +421,7 @@ class CardImprover:
         """Add alt text to images that don't have it."""
         pattern = r"(<img[^>]+)>"  # Find img tags
 
-        def add_alt(match):
+        def add_alt(match: re.Match[str]) -> str:
             img_tag = match.group(1)
             if "alt=" in img_tag:
                 return match.group(0)  # Already has alt text
@@ -378,10 +444,9 @@ IMPROVE THIS FLASHCARD based on the following issues:
 {chr(10).join(f"- {issue}" for issue in issues)}
 
 ORIGINAL CARD:
-Question: {card.question}
-Answer: {card.answer or "N/A"}
-Type: {card.card_type}
-Tags: {", ".join(card.tags) if card.tags else "None"}
+{card.apf_html}
+
+Card Type: {"Missing" if "{{c" in card.apf_html else ("Draw" if "<img " in card.apf_html and "svg" in card.apf_html.lower() else "Simple")}
 
 CONTEXT:
 Note Title: {metadata.title}
@@ -402,7 +467,7 @@ Return the improved card in this exact JSON format:
 
 Only return the JSON, no other text or explanations."""
 
-    def _parse_improvement_response(self, response: str) -> dict[str, str | None]:
+    def _parse_improvement_response(self, response: str) -> dict[str, str | None] | None:
         """Parse LLM improvement response."""
         try:
             import json

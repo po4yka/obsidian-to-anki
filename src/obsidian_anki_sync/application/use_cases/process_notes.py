@@ -18,8 +18,8 @@ class ProcessNotesRequest:
 
     sample_size: int | None = None
     incremental: bool = False
-    exclude_patterns: list[str | None] = None
-    languages: list[str | None] = None
+    exclude_patterns: list[str | None] | None = None
+    languages: list[str | None] | None = None
 
 
 @dataclass
@@ -128,13 +128,14 @@ class ProcessNotesUseCase:
 
             # Step 3: Calculate statistics
             processing_time = time.time() - start_time
-            stats["processing_time_seconds"] = round(processing_time, 2)
+            stats["processing_time_seconds"] = int(round(processing_time, 2))
 
             # Add discovery statistics
             if notes:
                 discovery_stats = self.note_discovery_service.get_note_statistics(
                     notes)
-                stats["discovery_stats"] = discovery_stats
+                stats["discovery_stats"] = dict(
+                    discovery_stats)  # type: ignore[assignment]
 
             success = len(errors) == 0 or (
                 len(cards) > 0 and len(errors) < len(

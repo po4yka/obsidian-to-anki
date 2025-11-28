@@ -5,7 +5,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -32,7 +32,8 @@ def analyze_file(
         # Check for invalid Android subtopics
         if frontmatter.get("topic") == "android":
             subtopics = frontmatter.get("subtopics", [])
-            invalid = [st for st in subtopics if st not in android_valid_subtopics]
+            invalid = [
+                st for st in subtopics if st not in android_valid_subtopics]
 
             if invalid:
                 issues_found.append(
@@ -59,7 +60,8 @@ def analyze_file(
             en_preview = ""
             if en_match:
                 answer = en_match.group(1).strip()
-                en_preview = answer[:300] + "..." if len(answer) > 300 else answer
+                en_preview = answer[:300] + \
+                    "..." if len(answer) > 300 else answer
 
             issues_found.append(
                 {
@@ -194,10 +196,10 @@ def main() -> None:
         "wrong_folder": [],
     }
 
-    files = sorted(android_dir.glob("q-*.md"))
+    note_files = sorted(android_dir.glob("q-*.md"))
     analyzed = 0
 
-    for filepath in files:
+    for filepath in note_files:
         try:
             content = filepath.read_text(encoding="utf-8")
             if "status: reviewed" not in content:
@@ -229,12 +231,15 @@ def main() -> None:
     print("=" * 80)
     print("ISSUES FOUND")
     print("=" * 80)
-    print(f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
+    print(
+        f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
     print(
         f"Missing concept links:     {len(work_packages['missing_concept_links'])} files"
     )
-    print(f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
-    print(f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
+    print(
+        f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
+    print(
+        f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
     print("=" * 80)
     print()
 
@@ -279,7 +284,7 @@ def main() -> None:
 
     # Agents 4-9: Missing concept links (distribute across 6 agents)
     if work_packages["missing_concept_links"]:
-        files = work_packages["missing_concept_links"]
+        files: list[dict[str, Any]] = work_packages["missing_concept_links"]
         files_per_agent = max(1, len(files) // 6)
 
         for i in range(6):
@@ -304,7 +309,8 @@ def main() -> None:
             f"{agent['agent_id']:20} - {agent['count']:3} files - {agent['description']}"
         )
     print("=" * 80)
-    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
+    print(
+        f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
     print()
 
     # Save work packages

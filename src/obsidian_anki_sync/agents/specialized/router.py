@@ -17,7 +17,7 @@ from ...utils.resilience import (
     RateLimitExceededError,
     ResourceExhaustedError,
 )
-from .base import FallbackAgent
+from .base import BaseSpecializedAgent, FallbackAgent
 from .models import AgentResult, ProblemDomain
 
 logger = get_logger(__name__)
@@ -28,11 +28,11 @@ class ProblemRouter:
 
     def __init__(
         self,
-        circuit_breaker_config: dict[str, dict[str, Any | None]] = None,
-        rate_limit_config: dict[str, int | None] = None,
-        bulkhead_config: dict[str, int | None] = None,
+        circuit_breaker_config: dict[str, dict[str, Any | None]] | None = None,
+        rate_limit_config: dict[str, int | None] | None = None,
+        bulkhead_config: dict[str, int | None] | None = None,
         confidence_threshold: float = 0.7,
-    ):
+    ) -> None:
         """Initialize problem router with resilience patterns.
 
         Args:
@@ -41,7 +41,7 @@ class ProblemRouter:
             bulkhead_config: Per-domain bulkhead configuration (max concurrent)
             confidence_threshold: Minimum confidence threshold for validation
         """
-        self.agents = {}
+        self.agents: dict[ProblemDomain, BaseSpecializedAgent] = {}
         self.circuit_breakers: dict[ProblemDomain, CircuitBreaker] = {}
         self.rate_limiters: dict[ProblemDomain, RateLimiter] = {}
         self.bulkheads: dict[ProblemDomain, Bulkhead] = {}
@@ -50,13 +50,19 @@ class ProblemRouter:
         )
 
         self._initialize_agents()
+        # Convert None values to empty dicts and filter None values from configs
+        cb_config = circuit_breaker_config or {}
+        rate_config: dict[str, int] = {k: v for k, v in (
+            rate_limit_config or {}).items() if v is not None}
+        bulkhead_config_clean: dict[str, int] = {k: v for k, v in (
+            bulkhead_config or {}).items() if v is not None}
         self._initialize_resilience_patterns(
-            circuit_breaker_config or {},
-            rate_limit_config or {},
-            bulkhead_config or {},
+            cb_config,
+            rate_config,
+            bulkhead_config_clean,
         )
 
-    def _initialize_agents(self):
+    def _initialize_agents(self) -> None:
         """Initialize all specialized agents."""
         from .code import CodeBlockAgent
         from .corruption import ContentCorruptionAgent
@@ -66,7 +72,7 @@ class ProblemRouter:
         from .structure import ContentStructureAgent
         from .yaml import YAMLFrontmatterAgent
 
-        agents = {}
+        agents: dict[ProblemDomain, BaseSpecializedAgent] = {}
 
         # Initialize agents that don't require external dependencies
         agents[ProblemDomain.YAML_FRONTMATTER] = YAMLFrontmatterAgent()
@@ -124,9 +130,11 @@ class ProblemRouter:
 
             # Rate limiter
             rate_limit = rate_limit_config.get(
-                domain.value, rate_limit_config.get("default", default_rate_limit)
+                domain.value, rate_limit_config.get(
+                    "default", default_rate_limit)
             )
-            self.rate_limiters[domain] = RateLimiter(max_calls_per_minute=rate_limit)
+            self.rate_limiters[domain] = RateLimiter(
+                max_calls_per_minute=rate_limit)
 
             # Bulkhead
             bulkhead_max = bulkhead_config.get(
@@ -258,10 +266,10 @@ class ProblemRouter:
                 domain=domain.value,
                 success=result.success,
                 confidence=result.confidence,
-                warnings=len(result.warnings),
+                warnings=len(result.warnings) if result.warnings else 0,
             )
 
-            return result
+            return result  # type: ignore[return-value]
 
         try:
             # Execute with bulkhead isolation
@@ -283,7 +291,8 @@ class ProblemRouter:
             return result
 
         except CircuitBreakerError as e:
-            logger.warning("circuit_breaker_open", domain=domain.value, error=str(e))
+            logger.warning("circuit_breaker_open",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Circuit breaker is open: {e}",
@@ -291,7 +300,8 @@ class ProblemRouter:
             )
 
         except RateLimitExceededError as e:
-            logger.warning("rate_limit_exceeded", domain=domain.value, error=str(e))
+            logger.warning("rate_limit_exceeded",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Rate limit exceeded: {e}",
@@ -299,7 +309,8 @@ class ProblemRouter:
             )
 
         except ResourceExhaustedError as e:
-            logger.warning("bulkhead_exhausted", domain=domain.value, error=str(e))
+            logger.warning("bulkhead_exhausted",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Resources exhausted: {e}",
@@ -307,7 +318,8 @@ class ProblemRouter:
             )
 
         except LowConfidenceError as e:
-            logger.warning("low_confidence_rejected", domain=domain.value, error=str(e))
+            logger.warning("low_confidence_rejected",
+                           domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Low confidence rejected: {e}",
@@ -315,7 +327,8 @@ class ProblemRouter:
             )
 
         except Exception as e:
-            logger.error("specialized_agent_failed", domain=domain.value, error=str(e))
+            logger.error("specialized_agent_failed",
+                         domain=domain.value, error=str(e))
 
             return AgentResult(
                 success=False,

@@ -12,15 +12,22 @@ logger = get_logger(__name__)
 class QualityAssuranceAgent(BaseSpecializedAgent):
     """General quality assurance agent for unspecified issues."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(model=self.model)
+        self.agent = ContentRepairAgent(
+            model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """General quality assurance and repair."""
         prompt = self._create_prompt(content, context)
 
         try:
+            if self.agent is None:
+                return AgentResult(
+                    success=False,
+                    reasoning="ContentRepairAgent not initialized",
+                    warnings=["Agent not available"],
+                )
             result = self.agent.generate_repair(
                 content=content, prompt=prompt, max_retries=2
             )

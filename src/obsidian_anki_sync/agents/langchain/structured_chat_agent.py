@@ -7,7 +7,7 @@ tool scenarios and complex structured operations.
 from typing import Any
 
 from langchain.agents import create_structured_chat_agent
-from langchain.agents.structured_chat.base import StructuredChatAgent
+from langchain.agents.structured_chat.base import StructuredChatAgent as LangChainStructuredChatAgent
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import BaseTool
@@ -118,7 +118,7 @@ You excel at handling complex tasks that require:
 Use your tools effectively to accomplish complex objectives.""",
         )
 
-    def _create_agent(self) -> StructuredChatAgent:
+    def _create_agent(self) -> Any:
         """Create the underlying LangChain Structured Chat Agent.
 
         Returns:
@@ -142,7 +142,7 @@ Use your tools effectively to accomplish complex objectives.""",
 
         return agent
 
-    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
         """Run the Structured Chat Agent.
 
         Args:
@@ -162,7 +162,8 @@ Use your tools effectively to accomplish complex objectives.""",
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 5),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
+                handle_parsing_errors=kwargs.get(
+                    "handle_parsing_errors", True),
                 return_intermediate_steps=kwargs.get(
                     "return_intermediate_steps", False
                 ),

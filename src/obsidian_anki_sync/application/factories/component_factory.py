@@ -44,7 +44,7 @@ class ComponentFactory:
 
             self._cache_manager = CacheManager(db_path)
 
-        return self._cache_manager
+        return self._cache_manager  # type: ignore[no-any-return]
 
     def create_anki_client(self) -> IAnkiClient:
         """Create Anki client instance.
@@ -52,7 +52,7 @@ class ComponentFactory:
         Returns:
             Configured IAnkiClient implementation
         """
-        return self.container.resolve(IAnkiClient)
+        return self.container.resolve(IAnkiClient)  # type: ignore[no-any-return]
 
     def create_state_repository(self) -> IStateRepository:
         """Create state repository instance.
@@ -60,7 +60,7 @@ class ComponentFactory:
         Returns:
             Configured IStateRepository implementation
         """
-        return self.container.resolve(IStateRepository)
+        return self.container.resolve(IStateRepository)  # type: ignore[no-any-return]
 
     def create_llm_provider(self) -> ILLMProvider:
         """Create LLM provider instance.
@@ -68,7 +68,7 @@ class ComponentFactory:
         Returns:
             Configured ILLMProvider implementation
         """
-        return self.container.resolve(ILLMProvider)
+        return self.container.resolve(ILLMProvider)  # type: ignore[no-any-return]
 
     def create_card_generator(self) -> ICardGenerator:
         """Create card generator instance.
@@ -76,7 +76,7 @@ class ComponentFactory:
         Returns:
             Configured ICardGenerator implementation
         """
-        return self.container.resolve(ICardGenerator)
+        return self.container.resolve(ICardGenerator)  # type: ignore[no-any-return]
 
     def create_note_parser(self) -> INoteParser:
         """Create note parser instance.
@@ -84,7 +84,7 @@ class ComponentFactory:
         Returns:
             Configured INoteParser implementation
         """
-        return self.container.resolve(INoteParser)
+        return self.container.resolve(INoteParser)  # type: ignore[no-any-return]
 
     def create_note_discovery_service(self) -> NoteDiscoveryService:
         """Create note discovery service.

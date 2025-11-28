@@ -187,7 +187,8 @@ class ProblematicNotesArchiver:
                 "processing_stage": processing_stage,
                 "content_hash": content_hash,
                 "traceback": "".join(
-                    traceback.format_exception(type(error), error, error.__traceback__)
+                    traceback.format_exception(
+                        type(error), error, error.__traceback__)
                 ),
                 "context": context or {},
             }
@@ -264,7 +265,8 @@ class ProblematicNotesArchiver:
             notes = [n for n in notes if n.get("category") == category]
 
         if date:
-            notes = [n for n in notes if n.get("timestamp", "").startswith(date)]
+            notes = [n for n in notes if n.get(
+                "timestamp", "").startswith(date)]
 
         # Sort by timestamp (newest first)
         notes.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
@@ -272,7 +274,7 @@ class ProblematicNotesArchiver:
         if limit:
             notes = notes[:limit]
 
-        return notes
+        return list(notes)  # type: ignore[return-value]
 
     def cleanup_old_archives(self, max_age_days: int = 90) -> int:
         """Clean up archived notes older than specified days.

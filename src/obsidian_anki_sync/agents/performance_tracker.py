@@ -2,6 +2,7 @@
 
 import time
 from collections import defaultdict
+from typing import Any
 
 from ..anki.client import AnkiClient
 from ..models import Card
@@ -69,9 +70,9 @@ class PerformanceTracker:
             # Get collection stats (HTML, parse what we can)
             collection_stats = self.anki_client.get_collection_stats()
 
-            stats = {
-                "reviews_today": reviews_today,
-                "collection_stats_html": collection_stats,
+            stats: dict[str, Any] = {
+                "reviews_today": float(reviews_today),
+                "collection_stats_html": str(collection_stats),
             }
 
             return stats
@@ -92,14 +93,15 @@ class PerformanceTracker:
         issues = defaultdict(list)
 
         try:
-            note_ids = []
+            note_ids: list[int] = []
 
             if note_ids:
                 # TODO: Use performance data for analysis
                 self.get_card_performance(note_ids)
 
                 for card in cards:
-                    card_issues = self._analyze_single_card_performance(card, {})
+                    card_issues = self._analyze_single_card_performance(
+                        card, {})
                     for issue_type, affected_cards in card_issues.items():
                         issues[issue_type].extend(affected_cards)
 
@@ -204,7 +206,7 @@ class PerformanceTracker:
         Returns:
             Dictionary with quality insights and averages
         """
-        insights = {}
+        insights: dict[str, Any] = {}
 
         if not performance_data:
             return insights
@@ -236,8 +238,10 @@ class PerformanceTracker:
             avg_retention = insights["average_retention"]
             avg_ease = insights["average_ease_factor"]
 
-            quality_score = (avg_retention * 0.7) + ((avg_ease - 1.3) / 1.7 * 0.3)
-            insights["overall_quality_score"] = max(0.0, min(1.0, quality_score))
+            quality_score = (avg_retention * 0.7) + \
+                ((avg_ease - 1.3) / 1.7 * 0.3)
+            insights["overall_quality_score"] = max(
+                0.0, min(1.0, quality_score))
 
         insights["total_cards_analyzed"] = total_cards
 

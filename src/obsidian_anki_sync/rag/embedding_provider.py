@@ -167,7 +167,7 @@ class EmbeddingProvider:
                     dimension=len(embedding),
                 )
 
-            return embedding
+            return list(embedding)  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.error(

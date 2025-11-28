@@ -93,7 +93,7 @@ class RAGService:
         """
         try:
             stats = self.vector_store.get_stats()
-            return stats.get("total_chunks", 0) > 0
+            return bool(stats.get("total_chunks", 0) > 0)  # type: ignore[no-any-return]
         except Exception:
             return False
 

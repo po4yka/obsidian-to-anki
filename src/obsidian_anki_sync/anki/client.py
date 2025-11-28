@@ -184,37 +184,41 @@ class AnkiClient(IAnkiClient):
 
     def add_note(
         self,
-        deck: str,
-        note_type: str,
+        deck_name: str,
+        model_name: str,
         fields: dict[str, str],
-        tags: list[str],
-        guid: str | None = None,
+        tags: list[str | None] | None = None,
+        options: dict[str, Any | None] | None = None,
     ) -> int:
         """
         Add a new note.
 
         Args:
-            deck: Deck name
-            note_type: Note type name
+            deck_name: Deck name
+            model_name: Note type name
             fields: Field values
-            tags: Tags
+            tags: Optional tags
+            options: Optional note options
 
         Returns:
             Note ID
         """
-        note_payload = {
-            "deckName": deck,
-            "modelName": note_type,
+        note_payload: dict[str, Any] = {
+            "deckName": deck_name,
+            "modelName": model_name,
             "fields": fields,
-            "tags": tags,
-            "options": {"allowDuplicate": False},
+            "options": options or {"allowDuplicate": False},
         }
-        if guid:
-            note_payload["guid"] = guid
+        if tags:
+            # Filter out None values from tags
+            clean_tags = [t for t in tags if t is not None]
+            if clean_tags:
+                note_payload["tags"] = clean_tags
 
         result = cast(int, self.invoke("addNote", {"note": note_payload}))
 
-        logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
+        logger.info("note_added", note_id=result,
+                    deck=deck_name, note_type=model_name)
         return result
 
     def add_notes(
@@ -239,7 +243,8 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
-        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
+        result = cast(list[int | None], self.invoke(
+            "addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -261,7 +266,8 @@ class AnkiClient(IAnkiClient):
             note_id: Note ID
             fields: New field values
         """
-        self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
+        self.invoke("updateNoteFields", {
+                    "note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
 
@@ -323,20 +329,20 @@ class AnkiClient(IAnkiClient):
                 error=str(e),
                 falling_back_to_individual=True,
             )
-            results = []
+            fallback_results: list[bool] = []
             for update in updates:
                 try:
                     self.invoke("updateNoteFields", {"note": update})
-                    results.append(True)
+                    fallback_results.append(True)
                 except Exception as update_error:
                     logger.warning(
                         "batch_update_failed",
                         note_id=update.get("id"),
                         error=str(update_error),
                     )
-                    results.append(False)
+                    fallback_results.append(False)
 
-            return results
+            return fallback_results
 
     def update_note_tags(self, note_id: int, tags: list[str]) -> None:
         """
@@ -458,15 +464,15 @@ class AnkiClient(IAnkiClient):
                 error=str(e),
                 falling_back_to_individual=True,
             )
-            results = []
+            fallback_results: list[bool] = []
             for note_id, tags in note_tag_pairs:
                 try:
                     self.update_note_tags(note_id, tags)
-                    results.append(True)
+                    fallback_results.append(True)
                 except Exception:
-                    results.append(False)
+                    fallback_results.append(False)
 
-            return results
+            return fallback_results
 
     def delete_notes(self, note_ids: list[int]) -> None:
         """
@@ -500,7 +506,8 @@ class AnkiClient(IAnkiClient):
             List of field names
         """
         return cast(
-            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
+            list[str], self.invoke("modelFieldNames", {
+                                   "modelName": model_name})
         )
 
     def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
@@ -533,7 +540,8 @@ class AnkiClient(IAnkiClient):
             The filename as stored in Anki (may be modified)
         """
         return cast(
-            str, self.invoke("storeMediaFile", {"filename": filename, "data": data})
+            str, self.invoke("storeMediaFile", {
+                             "filename": filename, "data": data})
         )
 
     def suspend_cards(self, card_ids: list[int]) -> None:
@@ -631,7 +639,8 @@ class AnkiClient(IAnkiClient):
                 self.session.close()
                 logger.debug("anki_client_closed", url=self.url)
             except Exception as e:
-                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
+                logger.warning("anki_client_cleanup_failed",
+                               url=self.url, error=str(e))
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""

@@ -63,7 +63,7 @@ class LogAnalyzer:
         Returns:
             List of parsed log entries
         """
-        entries = []
+        entries: list[dict[str, Any]] = []
 
         if not log_file.exists():
             return entries
@@ -103,10 +103,12 @@ class LogAnalyzer:
         timestamp_str, level, name, function, line_no, message = match.groups()
 
         try:
-            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+            timestamp = datetime.strptime(
+                timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
         except ValueError:
             try:
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamp = datetime.strptime(
+                    timestamp_str, "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 timestamp = None
 
@@ -202,7 +204,8 @@ class LogAnalyzer:
         errors_by_stage: Counter[str] = Counter()
 
         for entry in error_entries:
-            error_type = entry.get("error_type") or entry.get("message", "Unknown")
+            error_type = entry.get("error_type") or entry.get(
+                "message", "Unknown")
             errors_by_type[error_type] += 1
 
             file_path = entry.get("file") or entry.get("source_path")
@@ -227,7 +230,11 @@ class LogAnalyzer:
         # Get recent errors (last 20)
         recent_errors = sorted(
             error_entries,
-            key=lambda e: e.get("timestamp").timestamp() if e.get("timestamp") else 0,
+            key=lambda e: (
+                e.get("timestamp").timestamp()  # type: ignore[union-attr]
+                if e.get("timestamp") is not None
+                else 0
+            ),
             reverse=True,
         )[:20]
 
@@ -277,7 +284,7 @@ class LogAnalyzer:
         levels = Counter(e.get("level", "UNKNOWN") for e in recent_entries)
 
         # Count by operation type
-        operations = Counter()
+        operations: Counter[str] = Counter()
         for entry in recent_entries:
             message = entry.get("message", "")
             if "llm_request" in message:

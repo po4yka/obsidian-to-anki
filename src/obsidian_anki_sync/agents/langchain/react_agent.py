@@ -7,7 +7,7 @@ between reasoning steps and tool usage for transparent decision-making.
 from typing import Any
 
 from langchain.agents import create_react_agent
-from langchain.agents.react.base import ReActAgent
+from langchain.agents.react.base import ReActAgent as LangChainReActAgent
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import BaseTool
@@ -125,7 +125,7 @@ For each task:
 Always explain your reasoning clearly.""",
         )
 
-    def _create_agent(self) -> ReActAgent:
+    def _create_agent(self) -> Any:
         """Create the underlying LangChain ReAct agent.
 
         Returns:
@@ -165,7 +165,7 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
         """Run the ReAct agent.
 
         Args:
@@ -185,8 +185,10 @@ Thought: {agent_scratchpad}"""
                 verbose=kwargs.get("verbose", False),
                 max_iterations=self.max_iterations,
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
-                return_intermediate_steps=kwargs.get("return_intermediate_steps", True),
+                handle_parsing_errors=kwargs.get(
+                    "handle_parsing_errors", True),
+                return_intermediate_steps=kwargs.get(
+                    "return_intermediate_steps", True),
             )
 
             # Prepare input

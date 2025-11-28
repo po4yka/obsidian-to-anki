@@ -475,7 +475,8 @@ def get_model_config(
     Returns:
         Model configuration
     """
-    preset_configs = MODEL_PRESETS.get(preset, MODEL_PRESETS[ModelPreset.BALANCED])
+    preset_configs = MODEL_PRESETS.get(
+        preset, MODEL_PRESETS[ModelPreset.BALANCED])
     config = preset_configs.get(task)
 
     if config is None:
@@ -490,14 +491,28 @@ def get_model_config(
 
     # Apply overrides
     if overrides:
-        config_dict = {
-            "model_name": config.model_name,
-            "temperature": config.temperature,
+        config_dict: dict[str, Any] = {
+            "model_name": str(config.model_name),
+            "temperature": float(config.temperature),
             "max_tokens": config.max_tokens,
             "top_p": config.top_p,
-            "reasoning_enabled": config.reasoning_enabled,
+            "reasoning_enabled": bool(config.reasoning_enabled),
         }
-        config_dict.update(overrides)
+        # Update with overrides, ensuring types match
+        for key, value in overrides.items():
+            if key in config_dict:
+                if key == "model_name":
+                    config_dict[key] = str(value)
+                elif key == "temperature":
+                    config_dict[key] = float(value)
+                elif key == "max_tokens":
+                    config_dict[key] = int(
+                        value) if value is not None else None
+                elif key == "top_p":
+                    config_dict[key] = float(
+                        value) if value is not None else None
+                elif key == "reasoning_enabled":
+                    config_dict[key] = bool(value)
         config = ModelConfig(**config_dict)
 
     # Attach capabilities

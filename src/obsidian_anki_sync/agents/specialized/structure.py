@@ -13,9 +13,10 @@ logger = get_logger(__name__)
 class ContentStructureAgent(BaseSpecializedAgent):
     """Agent specialized in repairing content structure issues."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(model=self.model)
+        self.agent = ContentRepairAgent(
+            model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content structure issues like missing sections."""
@@ -28,6 +29,12 @@ class ContentStructureAgent(BaseSpecializedAgent):
         prompt = self._create_prompt(content, context)
 
         try:
+            if self.agent is None:
+                return AgentResult(
+                    success=False,
+                    reasoning="ContentRepairAgent not initialized",
+                    warnings=["Agent not available"],
+                )
             result = self.agent.generate_repair(
                 content=content, prompt=prompt, max_retries=2
             )
@@ -103,7 +110,8 @@ class ContentStructureAgent(BaseSpecializedAgent):
                         repaired_lines.insert(insert_pos + 1, answer_marker)
                         repaired_lines.insert(insert_pos + 2, "")
                         repaired_lines.insert(
-                            insert_pos + 3, f"[Answer content in {lang.upper()}]"
+                            insert_pos +
+                            3, f"[Answer content in {lang.upper()}]"
                         )
 
             repaired_content = "\n".join(repaired_lines)

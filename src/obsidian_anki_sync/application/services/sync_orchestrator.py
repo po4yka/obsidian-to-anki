@@ -1,6 +1,7 @@
 """Application service for orchestrating the sync workflow."""
 
 from dataclasses import dataclass
+from typing import Any
 
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.card_generator import ICardGenerator
@@ -35,7 +36,7 @@ class SyncResult:
     generated_cards: int
     applied_changes: int
     errors: list[str]
-    stats: dict[str, any]
+    stats: dict[str, Any]
 
 
 class SyncOrchestrator:
@@ -75,7 +76,8 @@ class SyncOrchestrator:
         )
         self.generate_cards_use_case = GenerateCardsUseCase(card_generator)
         self.determine_actions_use_case = DetermineSyncActionsUseCase()
-        self.apply_changes_use_case = ApplyChangesUseCase(anki_client, state_repository)
+        self.apply_changes_use_case = ApplyChangesUseCase(
+            anki_client, state_repository)
 
         logger.info("sync_orchestrator_initialized")
 
@@ -170,7 +172,7 @@ class SyncOrchestrator:
                 stats=stats,
             )
 
-    def get_cache_statistics(self) -> dict[str, any]:
+    def get_cache_statistics(self) -> dict[str, Any]:
         """Get current cache statistics.
 
         Returns:
@@ -178,16 +180,17 @@ class SyncOrchestrator:
         """
         return self.cache_manager.get_cache_stats()
 
-    def get_component_status(self) -> dict[str, any]:
+    def get_component_status(self) -> dict[str, Any]:
         """Get status of all components.
 
         Returns:
             Component status dictionary
         """
-        status = {}
+        status: dict[str, Any] = {}
 
         try:
-            status["anki_client"] = {"connected": self.anki_client.check_connection()}
+            status["anki_client"] = {
+                "connected": self.anki_client.check_connection()}
         except Exception as e:
             status["anki_client"] = {"error": str(e)}
 
