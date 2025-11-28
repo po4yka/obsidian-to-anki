@@ -117,10 +117,8 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             Response dictionary in OpenAI format
         """
         # Extract parameters
-        temperature = model_settings.get(
-            "temperature", 0.7) if model_settings else 0.7
-        max_tokens = model_settings.get(
-            "max_tokens") if model_settings else None
+        temperature = model_settings.get("temperature", 0.7) if model_settings else 0.7
+        max_tokens = model_settings.get("max_tokens") if model_settings else None
 
         # Build system message and user prompt
         system_message = ""

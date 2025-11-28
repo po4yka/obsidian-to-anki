@@ -252,9 +252,7 @@ class RAGIntegration:
 
         # Insert context into prompt
         enhanced_prompt = (
-            f"{base_prompt}\n\n"
-            f"## Additional Context (from RAG)\n\n"
-            f"{context_section}"
+            f"{base_prompt}\n\n## Additional Context (from RAG)\n\n{context_section}"
         )
 
         return enhanced_prompt

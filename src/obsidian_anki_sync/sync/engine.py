@@ -33,9 +33,7 @@ from ..anki.client import AnkiClient
 from ..apf.generator import APFGenerator
 from ..config import Config
 from ..models import ManifestData, SyncAction
-from ..obsidian.parser import (
-    create_qa_extractor,
-)
+from ..obsidian.parser import create_qa_extractor
 from ..sync.anki_state_manager import AnkiStateManager
 from ..sync.card_generator import CardGenerator
 from ..sync.change_applier import ChangeApplier
@@ -124,9 +122,8 @@ class SyncEngine:
                 )
             logger.info("initializing_langgraph_orchestrator")
             from ..agents.langgraph import LangGraphOrchestrator
-            self.agent_orchestrator = LangGraphOrchestrator(
-                config
-            )  # type: ignore
+
+            self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
             # Still keep for backward compat
             self.apf_gen = APFGenerator(config)
             self.use_agents = True
@@ -138,9 +135,7 @@ class SyncEngine:
                     "Please ensure agent dependencies are installed."
                 )
             logger.warning("using_legacy_agent_system_deprecated")
-            self.agent_orchestrator = AgentOrchestrator(
-                config
-            )  # type: ignore
+            self.agent_orchestrator = AgentOrchestrator(config)  # type: ignore
             # Still keep for backward compat
             self.apf_gen = APFGenerator(config)
             self.use_agents = True
@@ -149,12 +144,10 @@ class SyncEngine:
             # Use the same provider as the orchestrator
             # Resolve model from config (handles empty strings and presets)
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(
-                config, "qa_extractor_temperature", None)
+            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
             if qa_extractor_temp is None:
                 # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task(
-                    "qa_extraction")
+                model_config = config.get_model_config_for_task("qa_extraction")
                 qa_extractor_temp = model_config.get("temperature", 0.0)
             reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
@@ -300,8 +293,7 @@ class SyncEngine:
             and self.agent_orchestrator
         ):
             if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(
-                    self.progress_display)
+                self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def _get_anki_model_name(self, internal_note_type: str) -> str:
         """Get the actual Anki model name from internal note type.
@@ -462,8 +454,7 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(
-            f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -555,14 +546,16 @@ class SyncEngine:
 
             # Step 1: Fetch existing cards for duplicate detection (if needed)
             existing_cards = []
-            if self.use_agents and getattr(self.config, "enable_duplicate_detection", False):
+            if self.use_agents and getattr(
+                self.config, "enable_duplicate_detection", False
+            ):
                 logger.info("fetching_existing_cards_for_duplicate_detection")
                 existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
-                logger.info("fetched_existing_cards",
-                            count=len(existing_cards))
+                logger.info("fetched_existing_cards", count=len(existing_cards))
                 # Pass existing cards to card generator
                 self.card_generator.set_existing_cards_for_duplicate_detection(
-                    existing_cards)
+                    existing_cards
+                )
 
             # Step 2: Scan Obsidian notes and generate cards
             if self.progress:
@@ -652,8 +645,7 @@ class SyncEngine:
             from ..utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(
-                    session_id=self.progress.progress.session_id)
+                log_session_summary(session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:

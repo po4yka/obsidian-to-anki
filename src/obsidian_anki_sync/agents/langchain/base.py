@@ -6,7 +6,7 @@ used in the card generation pipeline.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -22,10 +22,10 @@ class LangChainAgentResult:
 
     success: bool
     reasoning: str
-    data: Optional[Any] = None
-    warnings: Optional[List[str]] = None
+    data: Any | None = None
+    warnings: list[str] | None = None
     confidence: float = 1.0
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.warnings is None:
@@ -44,10 +44,10 @@ class BaseLangChainAgent(ABC):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: Optional[List[BaseTool]] = None,
-        system_prompt: Optional[str] = None,
+        tools: list[BaseTool] | None = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         agent_type: str = "base",
     ):
         """Initialize LangChain agent.
@@ -87,7 +87,7 @@ class BaseLangChainAgent(ABC):
         pass
 
     @abstractmethod
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the agent with given input data.
 
         Args:
@@ -99,7 +99,7 @@ class BaseLangChainAgent(ABC):
         """
         pass
 
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get information about the agent.
 
         Returns:
@@ -187,7 +187,7 @@ class BaseLangChainAgent(ABC):
         # Default confidence
         return 0.8
 
-    def _extract_warnings(self, output: str) -> List[str]:
+    def _extract_warnings(self, output: str) -> list[str]:
         """Extract warnings from agent output.
 
         Args:

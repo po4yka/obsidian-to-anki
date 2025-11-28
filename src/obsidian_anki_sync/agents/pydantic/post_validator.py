@@ -8,11 +8,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata
 from ...utils.logging import get_logger
-from ..exceptions import (
-    ModelError,
-    PostValidationError,
-    StructuredOutputError,
-)
+from ..exceptions import ModelError, PostValidationError, StructuredOutputError
 from ..improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
 from ..models import GeneratedCard, PostValidationResult
 from .models import PostValidationDeps, PostValidationOutput
@@ -66,8 +62,7 @@ class PostValidatorAgentAI:
         Returns:
             PostValidationResult with validation outcome
         """
-        logger.info("pydantic_ai_post_validation_start",
-                    cards_count=len(cards))
+        logger.info("pydantic_ai_post_validation_start", cards_count=len(cards))
 
         # Create dependencies
         deps = PostValidationDeps(
@@ -80,7 +75,7 @@ class PostValidatorAgentAI:
 Metadata:
 - Title: {metadata.title}
 - Topic: {metadata.topic}
-- Languages: {', '.join(metadata.language_tags)}
+- Languages: {", ".join(metadata.language_tags)}
 
 Cards to validate:
 """
@@ -127,8 +122,7 @@ Cards to validate:
             return validation_result
 
         except ValueError as e:
-            logger.error(
-                "pydantic_ai_post_validation_parse_error", error=str(e))
+            logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse post-validation output",
                 details={"error": str(e), "cards_count": len(cards)},

@@ -44,13 +44,12 @@ class TestContentHash:
 
     def test_hash_changes_with_followups(self, sample_qa_pair, sample_metadata) -> None:
         """Modifying follow-ups should change the hash."""
-        hash_original = compute_content_hash(
-            sample_qa_pair, sample_metadata, "en")
+        hash_original = compute_content_hash(sample_qa_pair, sample_metadata, "en")
 
         modified_pair = sample_qa_pair.model_copy(
-            update={"followups": "New follow-up prompt"})
-        hash_modified = compute_content_hash(
-            modified_pair, sample_metadata, "en")
+            update={"followups": "New follow-up prompt"}
+        )
+        hash_modified = compute_content_hash(modified_pair, sample_metadata, "en")
 
         assert hash_original != hash_modified
 
@@ -58,13 +57,12 @@ class TestContentHash:
         self, sample_qa_pair, sample_metadata
     ) -> None:
         """References contribute to hash."""
-        hash_original = compute_content_hash(
-            sample_qa_pair, sample_metadata, "en")
+        hash_original = compute_content_hash(sample_qa_pair, sample_metadata, "en")
 
         modified_pair = sample_qa_pair.model_copy(
-            update={"references": "https://example.com"})
-        hash_modified = compute_content_hash(
-            modified_pair, sample_metadata, "en")
+            update={"references": "https://example.com"}
+        )
+        hash_modified = compute_content_hash(modified_pair, sample_metadata, "en")
 
         assert hash_original != hash_modified
 

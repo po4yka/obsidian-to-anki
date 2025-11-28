@@ -210,8 +210,11 @@ class NoteScanner:
                 break
 
             try:
-                use_agents = getattr(self.config, "use_langgraph", False) or getattr(
-                    self.config, "use_pydantic_ai", False) or getattr(self.config, "use_agent_system", False)
+                use_agents = (
+                    getattr(self.config, "use_langgraph", False)
+                    or getattr(self.config, "use_pydantic_ai", False)
+                    or getattr(self.config, "use_agent_system", False)
+                )
                 note_content: str | None = None
                 if use_agents:
                     try:
@@ -230,8 +233,7 @@ class NoteScanner:
                 )
                 note_content = note_content or ""
 
-                logger.debug("processing_note",
-                             file=relative_path, pairs=len(qa_pairs))
+                logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
                 # Generate cards for each Q/A pair and language
                 for qa_pair in qa_pairs:
@@ -303,8 +305,7 @@ class NoteScanner:
                                     f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
                                 )
 
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             consecutive_errors += 1
 
                             if self.progress:
@@ -445,8 +446,7 @@ class NoteScanner:
                 len(note_files),
             )
         else:
-            max_workers = min(
-                self.config.max_concurrent_generations, len(note_files))
+            max_workers = min(self.config.max_concurrent_generations, len(note_files))
 
         logger.info(
             "parallel_scan_started",
@@ -503,11 +503,9 @@ class NoteScanner:
                     with stats_lock:
                         notes_processed += 1
                         if result_info["success"]:
-                            self.stats["processed"] = self.stats.get(
-                                "processed", 0) + 1
+                            self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if result_info["error_type"]:
                                 error_by_type[result_info["error_type"]] += 1
                                 if len(error_samples[result_info["error_type"]]) < 3:
@@ -553,8 +551,7 @@ class NoteScanner:
                         percent=percent,
                         elapsed_seconds=round(elapsed_time, 1),
                         avg_seconds_per_note=round(avg_time_per_note, 2),
-                        estimated_remaining_seconds=round(
-                            estimated_remaining, 1),
+                        estimated_remaining_seconds=round(estimated_remaining, 1),
                         cards_generated=len(obsidian_cards),
                         active_workers=max_workers,
                     )
@@ -665,8 +662,11 @@ class NoteScanner:
         try:
             # Read full note content if using agent system
             note_content = ""
-            use_agents = getattr(self.config, "use_langgraph", False) or getattr(
-                self.config, "use_pydantic_ai", False) or getattr(self.config, "use_agent_system", False)
+            use_agents = (
+                getattr(self.config, "use_langgraph", False)
+                or getattr(self.config, "use_pydantic_ai", False)
+                or getattr(self.config, "use_agent_system", False)
+            )
             if use_agents:
                 try:
                     file_size = file_path.stat().st_size
@@ -696,8 +696,7 @@ class NoteScanner:
                 file_path, qa_extractor=qa_extractor, content=note_content or None
             )
 
-            slug_view: Collection[str] = _ThreadSafeSlugView(
-                existing_slugs, slug_lock)
+            slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
 
             # Generate cards for each Q/A pair and language
             for qa_pair in qa_pairs:

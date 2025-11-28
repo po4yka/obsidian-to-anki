@@ -34,12 +34,10 @@ from obsidian_anki_sync.agents.langgraph.reflection_nodes import (
     prioritize_issues,
     reflect_after_enrichment_node,
     reflect_after_generation_node,
-    revise_enrichment_node,
     revise_generation_node,
     should_revise_enrichment,
     should_revise_generation,
 )
-
 
 # Configure pytest-anyio mode - only use asyncio backend
 pytestmark = [
@@ -83,22 +81,10 @@ def mock_pipeline_state():
         "reflection_enabled_stages": ["generation", "context_enrichment"],
         "reflection_model": MagicMock(),
         "reflection_traces": {},
-        "current_reflection": None,
         "revision_count": 0,
         "max_revisions": 2,
         "stage_revision_counts": {},
         # Pipeline results
-        "context_enrichment": {
-            "enrichments": [
-                {
-                    "context": "Python was created by Guido van Rossum",
-                    "examples": ["print('Hello, World!')"],
-                    "related": "Python is named after Monty Python",
-                }
-            ]
-        },
-        "current_reasoning": None,
-        "current_reflection": None,
         "generation": {
             "success": True,
             "cards": [
@@ -134,6 +120,7 @@ def mock_pipeline_state():
             }
         },
         "current_reasoning": None,
+        "current_reflection": None,
         # Standard state fields
         "step_counts": {},
         "stage_times": {},
@@ -195,7 +182,8 @@ class TestReflectionOutputModels:
             answer_completeness="Complete",
             memorization_potential="High",
             recommended_card_changes=[
-                {"card_index": 0, "changes": ["Improve wording"]}],
+                {"card_index": 0, "changes": ["Improve wording"]}
+            ],
         )
         assert output.card_quality_scores == [0.9, 0.85]
         assert output.format_compliance == "APF format correct"
@@ -270,8 +258,7 @@ class TestReflectionTrace:
             output=output,
             reflection_time=1.5,
             timestamp=1234567890.0,
-            stage_specific_data={
-                "card_quality_scores": output.card_quality_scores},
+            stage_specific_data={"card_quality_scores": output.card_quality_scores},
         )
 
         assert trace.stage == "generation"
@@ -330,21 +317,20 @@ class TestShouldSkipReflection:
     def test_skip_when_disabled(self, mock_pipeline_state):
         """Test reflection is skipped when disabled."""
         mock_pipeline_state["enable_self_reflection"] = False
-        assert _should_skip_reflection(
-            mock_pipeline_state, "generation") is True
+        assert _should_skip_reflection(mock_pipeline_state, "generation") is True
 
     def test_skip_when_stage_not_enabled(self, mock_pipeline_state):
         """Test reflection is skipped for non-enabled stage."""
         mock_pipeline_state["reflection_enabled_stages"] = ["generation"]
-        assert _should_skip_reflection(
-            mock_pipeline_state, "context_enrichment") is True
+        assert (
+            _should_skip_reflection(mock_pipeline_state, "context_enrichment") is True
+        )
 
     def test_not_skip_when_enabled(self, mock_pipeline_state):
         """Test reflection is not skipped when properly enabled."""
         mock_pipeline_state["enable_self_reflection"] = True
         mock_pipeline_state["reflection_enabled_stages"] = ["generation"]
-        assert _should_skip_reflection(
-            mock_pipeline_state, "generation") is False
+        assert _should_skip_reflection(mock_pipeline_state, "generation") is False
 
 
 class TestStoreReflectionTrace:
@@ -475,8 +461,7 @@ class TestShouldReviseEnrichment:
             "revision_needed": True,
         }
         mock_pipeline_state["max_revisions"] = 2
-        mock_pipeline_state["stage_revision_counts"] = {
-            "context_enrichment": 0}
+        mock_pipeline_state["stage_revision_counts"] = {"context_enrichment": 0}
 
         assert should_revise_enrichment(mock_pipeline_state) is True
 
@@ -486,8 +471,7 @@ class TestShouldReviseEnrichment:
             "revision_needed": True,
         }
         mock_pipeline_state["max_revisions"] = 2
-        mock_pipeline_state["stage_revision_counts"] = {
-            "context_enrichment": 2}
+        mock_pipeline_state["stage_revision_counts"] = {"context_enrichment": 2}
 
         assert should_revise_enrichment(mock_pipeline_state) is False
 
@@ -510,8 +494,7 @@ class TestReflectAfterGenerationNode:
 
     async def test_skips_when_stage_not_enabled(self, mock_pipeline_state):
         """Test reflection is skipped for non-enabled stage."""
-        mock_pipeline_state["reflection_enabled_stages"] = [
-            "context_enrichment"]
+        mock_pipeline_state["reflection_enabled_stages"] = ["context_enrichment"]
 
         result = await reflect_after_generation_node(mock_pipeline_state)
 
@@ -743,6 +726,7 @@ class TestConfigSelfReflection:
         # The get_model_for_agent should handle "reflection" type
         # Test by checking the implementation includes "reflection"
         import inspect
+
         from obsidian_anki_sync.config import Config
 
         source = inspect.getsource(Config.get_model_for_agent)
@@ -770,24 +754,14 @@ class TestDomainDetection:
     def test_domain_detection_from_topic_medical(self):
         """Test domain detection from topic metadata for medical content."""
         # Use a completely fresh state dict
-        state = {
-            "metadata_dict": {
-                "topic": "Clinical Pharmacology",
-                "tags": []
-            }
-        }
+        state = {"metadata_dict": {"topic": "Clinical Pharmacology", "tags": []}}
         domain = detect_domain(state)
         assert domain == "medical"
 
     def test_domain_detection_from_topic_interview(self):
         """Test domain detection from topic metadata for interview content."""
         # Use a completely fresh state dict
-        state = {
-            "metadata_dict": {
-                "topic": "System Design Interview",
-                "tags": []
-            }
-        }
+        state = {"metadata_dict": {"topic": "System Design Interview", "tags": []}}
         domain = detect_domain(state)
         assert domain == "interview"
 
@@ -824,7 +798,10 @@ class TestDomainSpecificReflection:
 
     def test_domain_registry_loaded(self):
         """Test that domain registry is properly loaded."""
-        from obsidian_anki_sync.agents.langgraph.reflection_domains import DOMAIN_REGISTRY
+        from obsidian_anki_sync.agents.langgraph.reflection_domains import (
+            DOMAIN_REGISTRY,
+        )
+
         assert "programming" in DOMAIN_REGISTRY
         assert "medical" in DOMAIN_REGISTRY
         assert "interview" in DOMAIN_REGISTRY
@@ -832,7 +809,10 @@ class TestDomainSpecificReflection:
 
     def test_programming_domain_criteria(self):
         """Test programming domain has correct criteria."""
-        from obsidian_anki_sync.agents.langgraph.reflection_domains import get_domain_criteria
+        from obsidian_anki_sync.agents.langgraph.reflection_domains import (
+            get_domain_criteria,
+        )
+
         criteria = get_domain_criteria("programming")
         assert criteria is not None
         assert "syntax" in criteria.quality_checks[0].lower()
@@ -841,7 +821,10 @@ class TestDomainSpecificReflection:
 
     def test_medical_domain_criteria(self):
         """Test medical domain has correct criteria."""
-        from obsidian_anki_sync.agents.langgraph.reflection_domains import get_domain_criteria
+        from obsidian_anki_sync.agents.langgraph.reflection_domains import (
+            get_domain_criteria,
+        )
+
         criteria = get_domain_criteria("medical")
         assert criteria is not None
         assert "facts" in criteria.quality_checks[0].lower()
@@ -860,10 +843,7 @@ class TestRevisionStrategy:
     def test_light_edit_strategy_low_severity(self, mock_pipeline_state):
         """Test light edit strategy for low severity issues."""
         reflection = {
-            "revision_suggestions": [
-                {"severity_score": 0.2},
-                {"severity_score": 0.1}
-            ]
+            "revision_suggestions": [{"severity_score": 0.2}, {"severity_score": 0.1}]
         }
         strategy = determine_revision_strategy(reflection, "general")
         assert strategy == "light_edit"
@@ -871,10 +851,7 @@ class TestRevisionStrategy:
     def test_moderate_revision_strategy_medium_severity(self, mock_pipeline_state):
         """Test moderate revision strategy for medium severity issues."""
         reflection = {
-            "revision_suggestions": [
-                {"severity_score": 0.6},
-                {"severity_score": 0.7}
-            ]
+            "revision_suggestions": [{"severity_score": 0.6}, {"severity_score": 0.7}]
         }
         strategy = determine_revision_strategy(reflection, "general")
         assert strategy == "moderate_revision"
@@ -882,10 +859,7 @@ class TestRevisionStrategy:
     def test_major_rewrite_strategy_high_severity(self, mock_pipeline_state):
         """Test major rewrite strategy for high severity issues."""
         reflection = {
-            "revision_suggestions": [
-                {"severity_score": 0.8},
-                {"severity_score": 0.9}
-            ]
+            "revision_suggestions": [{"severity_score": 0.8}, {"severity_score": 0.9}]
         }
         strategy = determine_revision_strategy(reflection, "general")
         assert strategy == "major_rewrite"
@@ -910,7 +884,7 @@ class TestIssuePrioritization:
         """Test basic prioritization by severity score."""
         issues = [
             {"type": "minor", "severity_score": 0.3},
-            {"type": "major", "severity_score": 0.8}
+            {"type": "major", "severity_score": 0.8},
         ]
         prioritized = prioritize_issues(issues, "general", max_issues=2)
         assert len(prioritized) == 2
@@ -923,7 +897,7 @@ class TestIssuePrioritization:
             # High weight in medical
             {"type": "factual_error", "severity_score": 0.5},
             # Not in medical weights (gets default weight 1.0)
-            {"type": "poor_naming", "severity_score": 0.7}
+            {"type": "poor_naming", "severity_score": 0.7},
         ]
         prioritized = prioritize_issues(issues, "medical", max_issues=2)
         # poor_naming gets higher weighted score due to default weight 1.0 vs 0.9
@@ -950,8 +924,11 @@ class TestSmartReflectionSkipping:
         config.reflection_skip_qa_threshold = 2
 
         mock_pipeline_state["qa_pairs_dicts"] = [
-            {"question": "Q1", "answer": "A1"}]  # Only 1 pair
-        mock_pipeline_state["note_content"] = "Long content that exceeds length threshold"
+            {"question": "Q1", "answer": "A1"}
+        ]  # Only 1 pair
+        mock_pipeline_state["note_content"] = (
+            "Long content that exceeds length threshold"
+        )
         mock_pipeline_state["pre_validation"] = {"confidence": 0.5}
         mock_pipeline_state["post_validation"] = {"confidence": 0.5}
 
@@ -963,8 +940,11 @@ class TestSmartReflectionSkipping:
         config = mock_config
         config.reflection_skip_content_length = 500
 
-        mock_pipeline_state["qa_pairs_dicts"] = [{"question": "Q1"}, {
-            "question": "Q2"}, {"question": "Q3"}]  # 3 pairs
+        mock_pipeline_state["qa_pairs_dicts"] = [
+            {"question": "Q1"},
+            {"question": "Q2"},
+            {"question": "Q3"},
+        ]  # 3 pairs
         mock_pipeline_state["note_content"] = "Short content"  # < 500 chars
         mock_pipeline_state["pre_validation"] = {"confidence": 0.5}
         mock_pipeline_state["post_validation"] = {"confidence": 0.5}
@@ -977,14 +957,15 @@ class TestSmartReflectionSkipping:
         config = mock_config
         config.reflection_skip_confidence_threshold = 0.9
 
-        mock_pipeline_state["qa_pairs_dicts"] = [{"question": "Q1"}, {
-            "question": "Q2"}, {"question": "Q3"}]  # 3 pairs
+        mock_pipeline_state["qa_pairs_dicts"] = [
+            {"question": "Q1"},
+            {"question": "Q2"},
+            {"question": "Q3"},
+        ]  # 3 pairs
         # > 500 chars
         mock_pipeline_state["note_content"] = "Long content that exceeds threshold" * 20
-        mock_pipeline_state["pre_validation"] = {
-            "confidence": 0.95}  # High confidence
-        mock_pipeline_state["post_validation"] = {
-            "confidence": 0.92}  # High confidence
+        mock_pipeline_state["pre_validation"] = {"confidence": 0.95}  # High confidence
+        mock_pipeline_state["post_validation"] = {"confidence": 0.92}  # High confidence
 
         should_skip = _is_simple_content(mock_pipeline_state, config)
         assert should_skip is True
@@ -996,14 +977,17 @@ class TestSmartReflectionSkipping:
         config.reflection_skip_content_length = 500
         config.reflection_skip_confidence_threshold = 0.9
 
-        mock_pipeline_state["qa_pairs_dicts"] = [{"question": "Q1"}, {
-            "question": "Q2"}, {"question": "Q3"}]  # 3 pairs
+        mock_pipeline_state["qa_pairs_dicts"] = [
+            {"question": "Q1"},
+            {"question": "Q2"},
+            {"question": "Q3"},
+        ]  # 3 pairs
         # > 500 chars
         mock_pipeline_state["note_content"] = "Long content that exceeds threshold" * 20
-        mock_pipeline_state["pre_validation"] = {
-            "confidence": 0.7}  # Medium confidence
+        mock_pipeline_state["pre_validation"] = {"confidence": 0.7}  # Medium confidence
         mock_pipeline_state["post_validation"] = {
-            "confidence": 0.8}  # Medium confidence
+            "confidence": 0.8
+        }  # Medium confidence
 
         should_skip = _is_simple_content(mock_pipeline_state, config)
         assert should_skip is False
@@ -1016,12 +1000,10 @@ class TestSmartReflectionSkipping:
         config.reflection_enabled_stages = ["generation"]
 
         mock_pipeline_state["config"] = config
-        mock_pipeline_state["qa_pairs_dicts"] = [
-            {"question": "Q1"}]  # Low count
+        mock_pipeline_state["qa_pairs_dicts"] = [{"question": "Q1"}]  # Low count
         mock_pipeline_state["note_content"] = "Short"
 
-        should_skip = _should_skip_reflection(
-            mock_pipeline_state, "generation")
+        should_skip = _should_skip_reflection(mock_pipeline_state, "generation")
         assert should_skip is True
         assert mock_pipeline_state["reflection_skipped"] is True
         assert mock_pipeline_state["reflection_skip_reason"] == "simple_content"

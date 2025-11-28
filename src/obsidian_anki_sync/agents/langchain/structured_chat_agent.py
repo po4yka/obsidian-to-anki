@@ -4,7 +4,7 @@ This module provides a Structured Chat Agent optimized for multi-input
 tool scenarios and complex structured operations.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain.agents import create_structured_chat_agent
 from langchain.agents.structured_chat.base import StructuredChatAgent
@@ -28,11 +28,11 @@ class StructuredChatAgent(BaseLangChainAgent):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
+        tools: list[BaseTool],
         agent_type: str = "structured_chat",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ):
         """Initialize Structured Chat Agent.
 
@@ -142,7 +142,7 @@ Use your tools effectively to accomplish complex objectives.""",
 
         return agent
 
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the Structured Chat Agent.
 
         Args:
@@ -201,7 +201,7 @@ Use your tools effectively to accomplish complex objectives.""",
                 confidence=0.0,
             )
 
-    def _format_structured_input(self, input_data: Dict[str, Any]) -> str:
+    def _format_structured_input(self, input_data: dict[str, Any]) -> str:
         """Format structured input data for the agent.
 
         Args:
@@ -220,7 +220,7 @@ Use your tools effectively to accomplish complex objectives.""",
             return f"""Please enrich the following content with {enrichment_type} enhancements:
 
 CONTENT:
-{content[:3000]}{'...' if len(content) > 3000 else ''}
+{content[:3000]}{"..." if len(content) > 3000 else ""}
 
 METADATA:
 {metadata}
@@ -265,7 +265,7 @@ Create high-quality {generation_type} that effectively combines and processes al
 {chr(10).join(content_sections)}
 
 ANALYSIS DIMENSIONS:
-{', '.join(analysis_dimensions)}
+{", ".join(analysis_dimensions)}
 
 Provide comprehensive analysis covering all specified dimensions."""
 
@@ -280,7 +280,7 @@ Provide comprehensive analysis covering all specified dimensions."""
 
 {chr(10).join(structured_parts)}"""
 
-    def _process_result(self, raw_result: Dict[str, Any]) -> LangChainAgentResult:
+    def _process_result(self, raw_result: dict[str, Any]) -> LangChainAgentResult:
         """Process raw agent result into LangChainAgentResult.
 
         Args:

@@ -1,6 +1,6 @@
 """Mock implementation of IStateRepository for testing."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from obsidian_anki_sync.domain.entities.card import Card
 from obsidian_anki_sync.domain.entities.note import Note
@@ -16,21 +16,20 @@ class MockStateRepository(IStateRepository):
 
     def __init__(self):
         """Initialize mock repository."""
-        self.notes: Dict[str, Note] = {}
-        self.cards: Dict[str, Card] = {}
-        self.content_hashes: Dict[str, str] = {}
-        self.sync_sessions: Dict[str, Dict[str, Any]] = {}
+        self.notes: dict[str, Note] = {}
+        self.cards: dict[str, Card] = {}
+        self.content_hashes: dict[str, str] = {}
+        self.sync_sessions: dict[str, dict[str, Any]] = {}
         self.session_counter = 0
 
-    def get_note_by_id(self, note_id: str) -> Optional[Note]:
+    def get_note_by_id(self, note_id: str) -> Note | None:
         """Get note by ID."""
         return self.notes.get(note_id)
 
-    def get_notes_by_path(self, file_path: str) -> List[Note]:
+    def get_notes_by_path(self, file_path: str) -> list[Note]:
         """Get notes by file path."""
         return [
-            note for note in self.notes.values()
-            if str(note.file_path) == file_path
+            note for note in self.notes.values() if str(note.file_path) == file_path
         ]
 
     def save_note(self, note: Note) -> None:
@@ -41,15 +40,14 @@ class MockStateRepository(IStateRepository):
         """Delete note."""
         self.notes.pop(note_id, None)
 
-    def get_card_by_slug(self, slug: str) -> Optional[Card]:
+    def get_card_by_slug(self, slug: str) -> Card | None:
         """Get card by slug."""
         return self.cards.get(slug)
 
-    def get_cards_by_note_id(self, note_id: str) -> List[Card]:
+    def get_cards_by_note_id(self, note_id: str) -> list[Card]:
         """Get cards by note ID."""
         return [
-            card for card in self.cards.values()
-            if card.manifest.note_id == note_id
+            card for card in self.cards.values() if card.manifest.note_id == note_id
         ]
 
     def save_card(self, card: Card) -> None:
@@ -60,15 +58,15 @@ class MockStateRepository(IStateRepository):
         """Delete card."""
         self.cards.pop(slug, None)
 
-    def get_all_notes(self) -> List[Note]:
+    def get_all_notes(self) -> list[Note]:
         """Get all notes."""
         return list(self.notes.values())
 
-    def get_all_cards(self) -> List[Card]:
+    def get_all_cards(self) -> list[Card]:
         """Get all cards."""
         return list(self.cards.values())
 
-    def get_sync_stats(self) -> Dict[str, Any]:
+    def get_sync_stats(self) -> dict[str, Any]:
         """Get sync statistics."""
         return {
             "total_notes": len(self.notes),
@@ -77,23 +75,25 @@ class MockStateRepository(IStateRepository):
             "sync_count": 42,
         }
 
-    def save_sync_session(self, session_data: Dict[str, Any]) -> str:
+    def save_sync_session(self, session_data: dict[str, Any]) -> str:
         """Save sync session."""
         session_id = f"session_{self.session_counter}"
         self.session_counter += 1
         self.sync_sessions[session_id] = session_data.copy()
         return session_id
 
-    def get_sync_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_sync_session(self, session_id: str) -> dict[str, Any] | None:
         """Get sync session."""
         return self.sync_sessions.get(session_id)
 
-    def update_sync_progress(self, session_id: str, progress_data: Dict[str, Any]) -> None:
+    def update_sync_progress(
+        self, session_id: str, progress_data: dict[str, Any]
+    ) -> None:
         """Update sync progress."""
         if session_id in self.sync_sessions:
             self.sync_sessions[session_id].update(progress_data)
 
-    def get_content_hash(self, resource_id: str) -> Optional[str]:
+    def get_content_hash(self, resource_id: str) -> str | None:
         """Get content hash."""
         return self.content_hashes.get(resource_id)
 

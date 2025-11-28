@@ -1,12 +1,9 @@
 """Tests for enhanced ParserRepairAgent with error diagnosis and quality scoring."""
 
-import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from obsidian_anki_sync.agents.models import RepairDiagnosis, RepairQualityScore
 from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent
 from obsidian_anki_sync.exceptions import ParserError
 

@@ -5,11 +5,7 @@ import time
 from ...models import NoteMetadata
 from ...providers.base import BaseLLMProvider
 from ...utils.logging import get_logger
-from ..llm_errors import (
-    categorize_llm_error,
-    format_llm_error_for_user,
-    log_llm_error,
-)
+from ..llm_errors import categorize_llm_error, format_llm_error_for_user, log_llm_error
 from ..models import GeneratedCard, PostValidationResult
 from .auto_fix import AggressiveFixer, DeterministicFixer, RuleBasedHeaderFixer
 from .error_categories import ErrorCategory

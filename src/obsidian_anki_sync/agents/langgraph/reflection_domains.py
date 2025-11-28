@@ -5,7 +5,6 @@ allowing the reflection system to apply domain-specific quality checks and promp
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 
 @dataclass
@@ -13,15 +12,15 @@ class DomainCriteria:
     """Domain-specific criteria for reflection and revision."""
 
     name: str
-    keywords: List[str]  # For metadata matching (topic/tags)
-    quality_checks: List[str]  # Domain-specific quality assessment checks
-    revision_thresholds: Dict[str, float]  # severity -> threshold mappings
+    keywords: list[str]  # For metadata matching (topic/tags)
+    quality_checks: list[str]  # Domain-specific quality assessment checks
+    revision_thresholds: dict[str, float]  # severity -> threshold mappings
     prompt_additions: str  # Additional prompt content for this domain
-    issue_weights: Dict[str, float]  # Issue type -> weight for prioritization
+    issue_weights: dict[str, float]  # Issue type -> weight for prioritization
 
 
 # Domain registry with specialized criteria for each domain
-DOMAIN_REGISTRY: Dict[str, DomainCriteria] = {}
+DOMAIN_REGISTRY: dict[str, DomainCriteria] = {}
 
 
 def _register_domain(criteria: DomainCriteria) -> None:
@@ -242,7 +241,7 @@ def get_domain_criteria(domain_name: str) -> DomainCriteria | None:
     return DOMAIN_REGISTRY.get(domain_name)
 
 
-def list_available_domains() -> List[str]:
+def list_available_domains() -> list[str]:
     """List all available domain names.
 
     Returns:

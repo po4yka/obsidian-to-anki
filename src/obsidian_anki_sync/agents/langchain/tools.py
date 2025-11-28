@@ -19,9 +19,7 @@ class APFValidatorTool(BaseTool):
     """Tool for validating APF card format."""
 
     name: str = "apf_validator"
-    description: str = (
-        "Validate APF card format and structure. Returns validation results with any errors found."
-    )
+    description: str = "Validate APF card format and structure. Returns validation results with any errors found."
 
     def _run(self, apf_content: str) -> str:
         """Validate APF content.
@@ -77,12 +75,14 @@ class SlugGeneratorTool(BaseTool):
     """Tool for generating slugs for cards."""
 
     name: str = "slug_generator"
-    description: str = (
-        "Generate unique slugs for cards based on title and base slug. Returns generated slug."
-    )
+    description: str = "Generate unique slugs for cards based on title and base slug. Returns generated slug."
 
     def _run(
-        self, source_path: str, card_index: int, lang: str, existing_slugs: list[str] | None = None
+        self,
+        source_path: str,
+        card_index: int,
+        lang: str,
+        existing_slugs: list[str] | None = None,
     ) -> str:
         """Generate a unique slug.
 
@@ -97,7 +97,9 @@ class SlugGeneratorTool(BaseTool):
         """
         try:
             existing_slugs_set = set(existing_slugs or [])
-            slug, _, _ = generate_slug(source_path, card_index, lang, existing_slugs_set)
+            slug, _, _ = generate_slug(
+                source_path, card_index, lang, existing_slugs_set
+            )
             return f"Generated slug: {slug}"
         except Exception as e:
             logger.error("slug_generator_tool_error", error=str(e))
@@ -133,9 +135,7 @@ class MetadataExtractorTool(BaseTool):
     """Tool for extracting metadata from note content."""
 
     name: str = "metadata_extractor"
-    description: str = (
-        "Extract metadata from note content including YAML frontmatter. Returns structured metadata."
-    )
+    description: str = "Extract metadata from note content including YAML frontmatter. Returns structured metadata."
 
     def _run(self, note_content: str) -> str:
         """Extract metadata from note content.
@@ -170,9 +170,7 @@ class CardTemplateTool(BaseTool):
     """Tool for generating card templates."""
 
     name: str = "card_template"
-    description: str = (
-        "Generate APF card templates for different card types (Simple, Missing, Draw, Cloze)."
-    )
+    description: str = "Generate APF card templates for different card types (Simple, Missing, Draw, Cloze)."
 
     def _run(
         self,
@@ -242,13 +240,19 @@ class QAExtractorTool(BaseTool):
         """
         try:
             from pathlib import Path
+
             from ...obsidian.parser import parse_note
 
             # Create a temporary file path for parsing
             temp_path = Path(file_path)
 
             # Parse the note with the content
-            _, qa_pairs = parse_note(temp_path, qa_extractor=None, tolerant_parsing=True, content=note_content)
+            _, qa_pairs = parse_note(
+                temp_path,
+                qa_extractor=None,
+                tolerant_parsing=True,
+                content=note_content,
+            )
 
             if qa_pairs:
                 result = f"Extracted {len(qa_pairs)} Q&A pairs:\n"

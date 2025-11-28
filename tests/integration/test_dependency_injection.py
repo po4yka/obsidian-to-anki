@@ -8,7 +8,13 @@ from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
 from obsidian_anki_sync.domain.interfaces.llm_provider import ILLMProvider
 from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
 from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
-from tests.fixtures import MockAnkiClient, MockCardGenerator, MockLLMProvider, MockNoteParser, MockStateRepository
+from tests.fixtures import (
+    MockAnkiClient,
+    MockCardGenerator,
+    MockLLMProvider,
+    MockNoteParser,
+    MockStateRepository,
+)
 
 
 class TestDependencyInjection:
@@ -34,6 +40,7 @@ class TestDependencyInjection:
 
     def test_register_factory(self):
         """Test registering and resolving a factory."""
+
         def create_client():
             return MockAnkiClient()
 
@@ -80,8 +87,7 @@ class TestDependencyInjection:
         assert self.container.has_registration(IAnkiClient)
 
         # Register factory
-        self.container.register_factory(
-            ICardGenerator, lambda: MockCardGenerator())
+        self.container.register_factory(ICardGenerator, lambda: MockCardGenerator())
         assert self.container.has_registration(ICardGenerator)
 
         # Register singleton
@@ -92,8 +98,7 @@ class TestDependencyInjection:
         """Test getting list of registered interfaces."""
         # Register some services
         self.container.register(IAnkiClient, MockAnkiClient())
-        self.container.register_factory(
-            ICardGenerator, lambda: MockCardGenerator())
+        self.container.register_factory(ICardGenerator, lambda: MockCardGenerator())
         self.container.register_singleton(ILLMProvider, MockLLMProvider())
 
         registered = self.container.get_registered_interfaces()
@@ -107,8 +112,7 @@ class TestDependencyInjection:
         """Test clearing all registrations."""
         # Register services
         self.container.register(IAnkiClient, MockAnkiClient())
-        self.container.register_factory(
-            ICardGenerator, lambda: MockCardGenerator())
+        self.container.register_factory(ICardGenerator, lambda: MockCardGenerator())
 
         assert self.container.has_registration(IAnkiClient)
         assert self.container.has_registration(ICardGenerator)

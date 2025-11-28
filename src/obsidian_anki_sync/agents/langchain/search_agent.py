@@ -4,7 +4,7 @@ This module provides a Self Ask With Search Agent for research tasks
 and knowledge base queries.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain.agents import create_self_ask_with_search_agent
 from langchain.agents.self_ask_with_search.base import SelfAskWithSearchAgent
@@ -28,11 +28,11 @@ class SearchAgent(BaseLangChainAgent):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
+        tools: list[BaseTool],
         agent_type: str = "search",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ):
         """Initialize Search Agent.
 
@@ -116,7 +116,7 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the Search Agent.
 
         Args:
@@ -170,7 +170,7 @@ Thought: {agent_scratchpad}"""
                 confidence=0.0,
             )
 
-    def _format_search_query(self, input_data: Dict[str, Any]) -> str:
+    def _format_search_query(self, input_data: dict[str, Any]) -> str:
         """Format research query for search agent.
 
         Args:
@@ -198,7 +198,7 @@ Search Type: {search_type}
 
 Gather relevant information and provide detailed findings."""
 
-    def _process_result(self, raw_result: Dict[str, Any]) -> LangChainAgentResult:
+    def _process_result(self, raw_result: dict[str, Any]) -> LangChainAgentResult:
         """Process raw agent result.
 
         Args:

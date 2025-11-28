@@ -237,6 +237,7 @@ Content here.
         assert "- item4" in preprocessed
         # Should be valid YAML now
         import yaml
+
         frontmatter_body = preprocessed.split("---")[1]
         parsed = yaml.safe_load(frontmatter_body)
         assert parsed["related"] == ["item1", "item2", "item3", "item4"]
@@ -294,7 +295,9 @@ Content here.
 class TestQAParsing:
     """Test Q/A pair extraction (UNIT-parse-01, UNIT-parse-02)."""
 
-    def test_parse_single_qa_pair(self, sample_note_content, sample_note_metadata) -> None:
+    def test_parse_single_qa_pair(
+        self, sample_note_content, sample_note_metadata
+    ) -> None:
         """Test parsing a single Q/A pair."""
         qa_pairs = parse_qa_pairs(sample_note_content, sample_note_metadata)
 
@@ -390,7 +393,9 @@ It is a system check.
         assert pair.answer_ru.startswith("Это проверка системы")
         assert pair.answer_en.startswith("It is a system check")
 
-    def test_parse_with_followups(self, sample_note_content, sample_note_metadata) -> None:
+    def test_parse_with_followups(
+        self, sample_note_content, sample_note_metadata
+    ) -> None:
         """Test parsing Q/A with follow-ups and references."""
         qa_pairs = parse_qa_pairs(sample_note_content, sample_note_metadata)
 

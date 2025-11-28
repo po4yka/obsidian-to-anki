@@ -585,8 +585,12 @@ async def generation_node(state: PipelineState) -> PipelineState:
                     state["rag_enrichment"] = rag_enrichment
                     logger.info(
                         "rag_context_enrichment_complete",
-                        related_concepts=len(rag_enrichment.get("related_concepts", [])),
-                        few_shot_examples=len(rag_enrichment.get("few_shot_examples", [])),
+                        related_concepts=len(
+                            rag_enrichment.get("related_concepts", [])
+                        ),
+                        few_shot_examples=len(
+                            rag_enrichment.get("few_shot_examples", [])
+                        ),
                     )
             except Exception as e:
                 logger.warning("rag_context_enrichment_failed", error=str(e))
@@ -1404,7 +1408,11 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     rag_duplicate_results = []
     cards_to_check_with_llm = []
 
-    if state.get("enable_rag") and state.get("rag_duplicate_detection") and state.get("rag_integration"):
+    if (
+        state.get("enable_rag")
+        and state.get("rag_duplicate_detection")
+        and state.get("rag_integration")
+    ):
         rag_integration = state["rag_integration"]
         logger.info("rag_duplicate_detection_start", cards_count=len(new_cards))
 
@@ -1419,14 +1427,16 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
                     answer=answer,
                 )
 
-                rag_duplicate_results.append({
-                    "card_slug": card.slug,
-                    "is_duplicate": rag_result.get("is_duplicate", False),
-                    "confidence": rag_result.get("confidence", 0.0),
-                    "recommendation": rag_result.get("recommendation", ""),
-                    "similar_count": rag_result.get("similar_count", 0),
-                    "source": "rag",
-                })
+                rag_duplicate_results.append(
+                    {
+                        "card_slug": card.slug,
+                        "is_duplicate": rag_result.get("is_duplicate", False),
+                        "confidence": rag_result.get("confidence", 0.0),
+                        "recommendation": rag_result.get("recommendation", ""),
+                        "similar_count": rag_result.get("similar_count", 0),
+                        "source": "rag",
+                    }
+                )
 
                 if rag_result.get("is_duplicate"):
                     logger.info(
@@ -1450,7 +1460,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         state["rag_duplicate_results"] = rag_duplicate_results
         logger.info(
             "rag_duplicate_detection_complete",
-            duplicates_found=sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+            duplicates_found=sum(
+                1 for r in rag_duplicate_results if r.get("is_duplicate")
+            ),
             total_checked=len(new_cards),
             remaining_for_llm=len(cards_to_check_with_llm),
         )
@@ -1460,7 +1472,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
             detection_time = time.time() - start_time
             detection_summary = {
                 "total_cards_checked": len(new_cards),
-                "duplicates_found": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+                "duplicates_found": sum(
+                    1 for r in rag_duplicate_results if r.get("is_duplicate")
+                ),
                 "results": rag_duplicate_results,
                 "detection_time": detection_time,
                 "method": "rag",
@@ -1484,7 +1498,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
             detection_time = time.time() - start_time
             detection_summary = {
                 "total_cards_checked": len(new_cards),
-                "duplicates_found": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+                "duplicates_found": sum(
+                    1 for r in rag_duplicate_results if r.get("is_duplicate")
+                ),
                 "results": rag_duplicate_results,
                 "detection_time": detection_time,
                 "method": "rag",
@@ -1514,9 +1530,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
 
             # Get existing cards for LLM comparison
             existing_cards_dicts = state.get("existing_cards_dicts")
-            assert (
-                existing_cards_dicts is not None
-            ), "existing_cards_dicts should not be None"
+            assert existing_cards_dicts is not None, (
+                "existing_cards_dicts should not be None"
+            )
             existing_cards = [
                 GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
             ]
@@ -1534,22 +1550,30 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
                     logger.exception(
                         "card_duplicate_check_failed", slug=card.slug, error=str(result)
                     )
-                    llm_duplicate_results.append({
-                        "card_slug": card.slug,
-                        "is_duplicate": False,
-                        "confidence": 0.0,
-                        "source": "llm",
-                        "result": [],
-                    })
+                    llm_duplicate_results.append(
+                        {
+                            "card_slug": card.slug,
+                            "is_duplicate": False,
+                            "confidence": 0.0,
+                            "source": "llm",
+                            "result": [],
+                        }
+                    )
                 else:
-                    llm_duplicate_results.append({
-                        "card_slug": card.slug,
-                        "is_duplicate": result.is_duplicate,
-                        "confidence": result.best_match.similarity_score if result.best_match else 0.0,
-                        "recommendation": result.recommendation,
-                        "source": "llm",
-                        "result": result.model_dump(),
-                    })
+                    llm_duplicate_results.append(
+                        {
+                            "card_slug": card.slug,
+                            "is_duplicate": result.is_duplicate,
+                            "confidence": (
+                                result.best_match.similarity_score
+                                if result.best_match
+                                else 0.0
+                            ),
+                            "recommendation": result.recommendation,
+                            "source": "llm",
+                            "result": result.model_dump(),
+                        }
+                    )
 
                     if result.is_duplicate:
                         llm_duplicates_found += 1
@@ -1557,7 +1581,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
                             "llm_duplicate_card_detected",
                             new_slug=card.slug,
                             best_match=(
-                                result.best_match.card_slug if result.best_match else None
+                                result.best_match.card_slug
+                                if result.best_match
+                                else None
                             ),
                             similarity=(
                                 result.best_match.similarity_score
@@ -1585,12 +1611,16 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     detection_summary = {
         "total_cards_checked": len(new_cards),
         "duplicates_found": total_duplicates,
-        "rag_duplicates": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+        "rag_duplicates": sum(
+            1 for r in rag_duplicate_results if r.get("is_duplicate")
+        ),
         "llm_duplicates": llm_duplicates_found,
         "results": all_results,
         "detection_time": detection_time,
-        "method": "hybrid" if rag_duplicate_results and llm_duplicate_results else (
-            "rag" if rag_duplicate_results else "llm"
+        "method": (
+            "hybrid"
+            if rag_duplicate_results and llm_duplicate_results
+            else ("rag" if rag_duplicate_results else "llm")
         ),
     }
 

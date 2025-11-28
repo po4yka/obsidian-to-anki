@@ -4,7 +4,7 @@ This module provides a ReAct (Reasoning + Acting) Agent that alternates
 between reasoning steps and tool usage for transparent decision-making.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain.agents import create_react_agent
 from langchain.agents.react.base import ReActAgent
@@ -29,11 +29,11 @@ class ReActAgent(BaseLangChainAgent):
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
+        tools: list[BaseTool],
         agent_type: str = "react",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         max_iterations: int = 5,
     ):
         """Initialize ReAct Agent.
@@ -165,7 +165,7 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the ReAct agent.
 
         Args:
@@ -222,7 +222,7 @@ Thought: {agent_scratchpad}"""
                 confidence=0.0,
             )
 
-    def _format_task_input(self, input_data: Dict[str, Any]) -> str:
+    def _format_task_input(self, input_data: dict[str, Any]) -> str:
         """Format task-based input for ReAct agent.
 
         Args:
@@ -240,7 +240,7 @@ Thought: {agent_scratchpad}"""
             return f"""Please validate the following content for {validation_type}:
 
 Content to validate:
-{content[:2000]}{'...' if len(content) > 2000 else ''}
+{content[:2000]}{"..." if len(content) > 2000 else ""}
 
 Use your tools to check for issues, format problems, and quality concerns.
 Provide a detailed analysis of any problems found and suggestions for fixes."""
@@ -265,7 +265,7 @@ Think step by step about what could be causing this problem."""
             return f"""Please analyze the following content for {pattern_type} patterns:
 
 Content:
-{content[:2000]}{'...' if len(content) > 2000 else ''}
+{content[:2000]}{"..." if len(content) > 2000 else ""}
 
 Use your tools to identify patterns, trends, and insights.
 Provide a systematic analysis of what you find."""
@@ -273,7 +273,7 @@ Provide a systematic analysis of what you find."""
         else:
             return f"Process this task: {task}. Details: {input_data}"
 
-    def _process_result(self, raw_result: Dict[str, Any]) -> LangChainAgentResult:
+    def _process_result(self, raw_result: dict[str, Any]) -> LangChainAgentResult:
         """Process raw agent result into LangChainAgentResult.
 
         Args:

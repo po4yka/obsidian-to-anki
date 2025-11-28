@@ -525,4 +525,3 @@ AnkiConnectError: model was not found: APF::Simple
 -   [AnkiConnect GitHub Repository](https://github.com/amikey/anki-connect) (actively maintained fork)
 -   [Anki Manual](https://docs.ankiweb.net/)
 -   [AnkiConnect Original Repository](https://github.com/FooSoft/anki-connect) (archived)
-

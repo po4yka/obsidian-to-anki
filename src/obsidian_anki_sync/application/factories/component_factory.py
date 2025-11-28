@@ -123,8 +123,7 @@ class ComponentFactory:
 
         # Log component creation
         for name, component in components.items():
-            logger.debug("component_created", name=name,
-                         type=type(component).__name__)
+            logger.debug("component_created", name=name, type=type(component).__name__)
 
         logger.info("all_components_created", component_count=len(components))
 
@@ -175,8 +174,7 @@ class ComponentFactory:
                         errors.append("Cache directory does not exist")
 
             except Exception as e:
-                errors.append(
-                    f"Component validation failed for {component_name}: {e}")
+                errors.append(f"Component validation failed for {component_name}: {e}")
 
         return errors
 

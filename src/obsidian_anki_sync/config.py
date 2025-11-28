@@ -650,11 +650,7 @@ class Config(BaseSettings):
         Returns:
             Model name
         """
-        from .models.config import (
-            ModelPreset,
-            ModelTask,
-            get_model_for_task,
-        )
+        from .models.config import ModelPreset, ModelTask, get_model_for_task
 
         # Map agent types to ModelTask
         agent_to_task = {
@@ -720,11 +716,7 @@ class Config(BaseSettings):
         Returns:
             Dictionary with model configuration
         """
-        from .models.config import (
-            ModelPreset,
-            ModelTask,
-            get_model_config,
-        )
+        from .models.config import ModelPreset, ModelTask, get_model_config
 
         try:
             model_task = ModelTask(task.lower())

@@ -1,8 +1,5 @@
 """Tests for ParserRepairAgent."""
 
-import json
-from unittest.mock import MagicMock
-
 import pytest
 
 from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent, attempt_repair
@@ -132,7 +129,7 @@ class TestParserRepairAgent:
                 {
                     "section_type": "frontmatter",
                     "method": "fix",
-                    "description": "Fixed language_tags field"
+                    "description": "Fixed language_tags field",
                 }
             ],
             "error_diagnosis": {
@@ -264,14 +261,19 @@ class TestAttemptRepairHelper:
         repair_response = {
             "is_repairable": True,
             "diagnosis": "Fixed language_tags",
-            "repairs": [{"type": "frontmatter_fix", "description": "empty tags - added [en, ru]"}],
+            "repairs": [
+                {
+                    "type": "frontmatter_fix",
+                    "description": "empty tags - added [en, ru]",
+                }
+            ],
             "repaired_content": repaired_note_content,
             "content_generation_applied": False,
             "generated_sections": [
                 {
                     "section_type": "frontmatter",
                     "method": "fix",
-                    "description": "Fixed language_tags"
+                    "description": "Fixed language_tags",
                 }
             ],
             "error_diagnosis": {
@@ -393,7 +395,7 @@ Some content without frontmatter
                 {
                     "section_type": "frontmatter",
                     "method": "generation",
-                    "description": "Generated frontmatter"
+                    "description": "Generated frontmatter",
                 }
             ],
             "error_diagnosis": {

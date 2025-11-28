@@ -4,7 +4,7 @@ Specialized ReAct agent for diagnosing issues and applying fixes
 with transparent reasoning chains.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -26,7 +26,7 @@ class ReActRepairAgent:
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: Optional[List[BaseTool]] = None,
+        tools: list[BaseTool] | None = None,
         max_iterations: int = 7,  # Allow more iterations for repair tasks
     ):
         """Initialize ReAct repair agent.
@@ -55,9 +55,9 @@ class ReActRepairAgent:
     async def diagnose_and_repair(
         self,
         content: str,
-        error_context: Dict[str, Any],
+        error_context: dict[str, Any],
         repair_type: str = "content",  # "content", "structure", "format"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Diagnose issues and suggest repairs using ReAct reasoning.
 
         Args:
@@ -86,7 +86,7 @@ class ReActRepairAgent:
         self,
         content: str,
         analysis_type: str = "quality",  # "quality", "structure", "completeness"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze content and suggest improvements using ReAct reasoning.
 
         Args:
@@ -110,7 +110,7 @@ class ReActRepairAgent:
 
     def _process_repair_result(
         self, agent_result: LangChainAgentResult, original_content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process ReAct result for repair tasks.
 
         Args:
@@ -161,7 +161,7 @@ class ReActRepairAgent:
 
     def _process_analysis_result(
         self, agent_result: LangChainAgentResult, original_content: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process ReAct result for analysis tasks.
 
         Args:
@@ -232,7 +232,7 @@ class ReActRepairAgent:
 
         return "Diagnosis completed"
 
-    def _extract_root_cause(self, output: str, reasoning_chain: List[Dict]) -> str:
+    def _extract_root_cause(self, output: str, reasoning_chain: list[dict]) -> str:
         """Extract root cause analysis.
 
         Args:
@@ -259,7 +259,7 @@ class ReActRepairAgent:
 
         return "Root cause analysis completed"
 
-    def _extract_fixes(self, output: str, reasoning_chain: List[Dict]) -> List[str]:
+    def _extract_fixes(self, output: str, reasoning_chain: list[dict]) -> list[str]:
         """Extract suggested fixes.
 
         Args:
@@ -315,7 +315,7 @@ class ReActRepairAgent:
 
         return "Analysis completed"
 
-    def _extract_findings(self, output: str, reasoning_chain: List[Dict]) -> List[str]:
+    def _extract_findings(self, output: str, reasoning_chain: list[dict]) -> list[str]:
         """Extract findings from analysis.
 
         Args:
@@ -346,8 +346,8 @@ class ReActRepairAgent:
         return list(set(findings))
 
     def _extract_recommendations(
-        self, output: str, reasoning_chain: List[Dict]
-    ) -> List[str]:
+        self, output: str, reasoning_chain: list[dict]
+    ) -> list[str]:
         """Extract recommendations from analysis.
 
         Args:

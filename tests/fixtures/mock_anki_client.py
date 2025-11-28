@@ -1,6 +1,6 @@
 """Mock implementation of IAnkiClient for testing."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import MagicMock
 
 from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
@@ -27,15 +27,15 @@ class MockAnkiClient(IAnkiClient):
         """Check connection (always succeeds for mock)."""
         return True
 
-    def get_deck_names(self) -> List[str]:
+    def get_deck_names(self) -> list[str]:
         """Get available deck names."""
         return self._decks.copy()
 
-    def get_model_names(self) -> List[str]:
+    def get_model_names(self) -> list[str]:
         """Get available model names."""
         return self._models.copy()
 
-    def get_model_field_names(self, model_name: str) -> List[str]:
+    def get_model_field_names(self, model_name: str) -> list[str]:
         """Get field names for a model."""
         if model_name == "APF::Simple":
             return ["Question", "Answer", "Manifest"]
@@ -43,7 +43,7 @@ class MockAnkiClient(IAnkiClient):
             return ["Front", "Back"]
         return ["Field1", "Field2"]
 
-    def find_notes(self, query: str) -> List[int]:
+    def find_notes(self, query: str) -> list[int]:
         """Find notes matching query."""
         # Simple mock implementation
         if "deck:" in query:
@@ -51,7 +51,7 @@ class MockAnkiClient(IAnkiClient):
             return [1001, 1002, 1003]
         return []
 
-    def notes_info(self, note_ids: List[int]) -> List[Dict[str, Any]]:
+    def notes_info(self, note_ids: list[int]) -> list[dict[str, Any]]:
         """Get note information."""
         result = []
         for note_id in note_ids:
@@ -59,20 +59,22 @@ class MockAnkiClient(IAnkiClient):
                 result.append(self._notes[note_id])
             else:
                 # Create mock note data
-                result.append({
-                    "noteId": note_id,
-                    "modelName": "APF::Simple",
-                    "deckName": "Test Deck",
-                    "fields": {
-                        "Question": {"value": f"Question {note_id}"},
-                        "Answer": {"value": f"Answer {note_id}"},
-                        "Manifest": {"value": f'{{"slug": "test-{note_id}"}}'},
-                    },
-                    "tags": ["test"],
-                })
+                result.append(
+                    {
+                        "noteId": note_id,
+                        "modelName": "APF::Simple",
+                        "deckName": "Test Deck",
+                        "fields": {
+                            "Question": {"value": f"Question {note_id}"},
+                            "Answer": {"value": f"Answer {note_id}"},
+                            "Manifest": {"value": f'{{"slug": "test-{note_id}"}}'},
+                        },
+                        "tags": ["test"],
+                    }
+                )
         return result
 
-    def cards_info(self, card_ids: List[int]) -> List[Dict[str, Any]]:
+    def cards_info(self, card_ids: list[int]) -> list[dict[str, Any]]:
         """Get card information."""
         result = []
         for card_id in card_ids:
@@ -80,31 +82,33 @@ class MockAnkiClient(IAnkiClient):
                 result.append(self._cards[card_id])
             else:
                 # Create mock card data
-                result.append({
-                    "cardId": card_id,
-                    "noteId": card_id - 1000,
-                    "deckName": "Test Deck",
-                    "modelName": "APF::Simple",
-                    "fields": {
-                        "Question": {"value": f"Question {card_id}"},
-                        "Answer": {"value": f"Answer {card_id}"},
-                    },
-                    "interval": 1,
-                    "due": 1234567890,
-                    "reps": 0,
-                    "lapses": 0,
-                    "queue": 0,
-                    "mod": 1234567890,
-                })
+                result.append(
+                    {
+                        "cardId": card_id,
+                        "noteId": card_id - 1000,
+                        "deckName": "Test Deck",
+                        "modelName": "APF::Simple",
+                        "fields": {
+                            "Question": {"value": f"Question {card_id}"},
+                            "Answer": {"value": f"Answer {card_id}"},
+                        },
+                        "interval": 1,
+                        "due": 1234567890,
+                        "reps": 0,
+                        "lapses": 0,
+                        "queue": 0,
+                        "mod": 1234567890,
+                    }
+                )
         return result
 
     def add_note(
         self,
         deck_name: str,
         model_name: str,
-        fields: Dict[str, str],
-        tags: Optional[List[str]] = None,
-        options: Optional[Dict[str, Any]] = None
+        fields: dict[str, str],
+        tags: list[str] | None = None,
+        options: dict[str, Any] | None = None,
     ) -> int:
         """Add a new note."""
         note_id = self._note_counter
@@ -121,15 +125,14 @@ class MockAnkiClient(IAnkiClient):
 
         return note_id
 
-    def update_note_fields(self, note_id: int, fields: Dict[str, str]) -> None:
+    def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         """Update note fields."""
         if note_id in self._notes:
             for field_name, field_value in fields.items():
                 if "fields" in self._notes[note_id]:
-                    self._notes[note_id]["fields"][field_name] = {
-                        "value": field_value}
+                    self._notes[note_id]["fields"][field_name] = {"value": field_value}
 
-    def delete_notes(self, note_ids: List[int]) -> None:
+    def delete_notes(self, note_ids: list[int]) -> None:
         """Delete notes."""
         for note_id in note_ids:
             self._notes.pop(note_id, None)
@@ -139,26 +142,26 @@ class MockAnkiClient(IAnkiClient):
         # Mock implementation - assume card_id = note_id + 1000
         return card_id - 1000
 
-    def get_card_ids_from_note_id(self, note_id: int) -> List[int]:
+    def get_card_ids_from_note_id(self, note_id: int) -> list[int]:
         """Get card IDs from note ID."""
         # Mock implementation - assume 1 card per note
         return [note_id + 1000]
 
-    def suspend_cards(self, card_ids: List[int]) -> None:
+    def suspend_cards(self, card_ids: list[int]) -> None:
         """Suspend cards."""
         # Mock implementation - just mark as suspended
         for card_id in card_ids:
             if card_id in self._cards:
                 self._cards[card_id]["suspended"] = True
 
-    def unsuspend_cards(self, card_ids: List[int]) -> None:
+    def unsuspend_cards(self, card_ids: list[int]) -> None:
         """Unsuspend cards."""
         # Mock implementation - mark as not suspended
         for card_id in card_ids:
             if card_id in self._cards:
                 self._cards[card_id]["suspended"] = False
 
-    def get_deck_stats(self, deck_name: str) -> Dict[str, Any]:
+    def get_deck_stats(self, deck_name: str) -> dict[str, Any]:
         """Get deck statistics."""
         return {
             "deck_id": 1,
@@ -171,19 +174,19 @@ class MockAnkiClient(IAnkiClient):
 
     # Helper methods for testing
 
-    def add_mock_note(self, note_id: int, data: Dict[str, Any]) -> None:
+    def add_mock_note(self, note_id: int, data: dict[str, Any]) -> None:
         """Add a mock note for testing."""
         self._notes[note_id] = data
 
-    def add_mock_card(self, card_id: int, data: Dict[str, Any]) -> None:
+    def add_mock_card(self, card_id: int, data: dict[str, Any]) -> None:
         """Add a mock card for testing."""
         self._cards[card_id] = data
 
-    def get_notes(self) -> Dict[int, Dict[str, Any]]:
+    def get_notes(self) -> dict[int, dict[str, Any]]:
         """Get all mock notes (for testing)."""
         return self._notes.copy()
 
-    def get_cards(self) -> Dict[int, Dict[str, Any]]:
+    def get_cards(self) -> dict[int, dict[str, Any]]:
         """Get all mock cards (for testing)."""
         return self._cards.copy()
 

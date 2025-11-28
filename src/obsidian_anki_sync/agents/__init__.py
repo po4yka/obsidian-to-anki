@@ -10,11 +10,7 @@ from .models import (
 from .orchestrator import AgentOrchestrator
 
 try:
-    from .pydantic import (
-        GeneratorAgentAI,
-        PostValidatorAgentAI,
-        PreValidatorAgentAI,
-    )
+    from .pydantic import GeneratorAgentAI, PostValidatorAgentAI, PreValidatorAgentAI
 
     _PYDANTIC_AGENTS_AVAILABLE = True
 except ModuleNotFoundError:

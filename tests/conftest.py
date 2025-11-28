@@ -1,7 +1,6 @@
 """Pytest configuration and fixtures for the test suite."""
 
 import pytest
-from pathlib import Path
 
 from obsidian_anki_sync.domain.entities.card import Card, CardManifest
 from obsidian_anki_sync.domain.entities.note import Note, NoteMetadata, QAPair
@@ -54,19 +53,22 @@ def mock_note_parser():
 def sample_note_metadata():
     """Provide sample note metadata for testing."""
     from datetime import datetime
+
     # Create with explicit kwargs to handle Pydantic version differences
-    return NoteMetadata(**{
-        "id": "test-001",
-        "title": "Test Question",
-        "topic": "Test Topic",
-        "language_tags": ["en", "ru"],
-        "difficulty": "medium",
-        "question_kind": "concept",
-        "tags": ["test", "sample"],
-        "status": "published",
-        "created": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
-        "updated": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
-    })
+    return NoteMetadata(
+        **{
+            "id": "test-001",
+            "title": "Test Question",
+            "topic": "Test Topic",
+            "language_tags": ["en", "ru"],
+            "difficulty": "medium",
+            "question_kind": "concept",
+            "tags": ["test", "sample"],
+            "status": "published",
+            "created": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+            "updated": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+        }
+    )
 
 
 @pytest.fixture
@@ -155,7 +157,7 @@ def sample_card(sample_note):
     return Card(
         slug="test-note-123-en",
         language="en",
-        apf_html='<!-- PROMPT_VERSION: apf-v2.1 -->\n<!-- BEGIN_CARDS -->\n# Question\nTest?\n# Answer\nAnswer\n<!-- END_CARDS -->',
+        apf_html="<!-- PROMPT_VERSION: apf-v2.1 -->\n<!-- BEGIN_CARDS -->\n# Question\nTest?\n# Answer\nAnswer\n<!-- END_CARDS -->",
         manifest=manifest,
         note_type="APF::Simple",
         tags=["test"],
@@ -170,7 +172,8 @@ def temp_vault_dir(tmp_path):
 
     # Create some sample note files
     note1 = vault_dir / "note1.md"
-    note1.write_text("""---
+    note1.write_text(
+        """---
 id: note1
 title: Note 1
 topic: Testing
@@ -188,10 +191,12 @@ Testing is verifying code behavior.
 
 # Answer (RU)
 Тестирование - это проверка поведения кода.
-""")
+"""
+    )
 
     note2 = vault_dir / "note2.md"
-    note2.write_text("""---
+    note2.write_text(
+        """---
 id: note2
 title: Note 2
 topic: Development
@@ -203,7 +208,8 @@ What is development?
 
 # Answer (EN)
 Development is writing code.
-""")
+"""
+    )
 
     return vault_dir
 
@@ -212,6 +218,7 @@ Development is writing code.
 def mock_config(temp_vault_dir):
     """Provide a mock Config instance with valid paths."""
     from unittest.mock import MagicMock
+
     from obsidian_anki_sync.config import Config
 
     # Create a mock config with valid vault path
@@ -225,21 +232,31 @@ def mock_config(temp_vault_dir):
     config.reflection_skip_content_length = 500
     config.reflection_skip_confidence_threshold = 0.8
     config.reflection_enabled = True
-    config.reflection_stages = ["pre_validation",
-                                "generation", "post_validation", "enrichment"]
+    config.reflection_stages = [
+        "pre_validation",
+        "generation",
+        "post_validation",
+        "enrichment",
+    ]
     config.reflection_domain_weights = {
         "medical": 1.5,
         "legal": 1.4,
         "technical": 1.3,
         "interview": 1.2,
-        "programming": 1.0
+        "programming": 1.0,
     }
 
     return config
 
 
 @pytest.fixture(autouse=True)
-def reset_mocks(mock_anki_client, mock_llm_provider, mock_state_repository, mock_card_generator, mock_note_parser):
+def reset_mocks(
+    mock_anki_client,
+    mock_llm_provider,
+    mock_state_repository,
+    mock_card_generator,
+    mock_note_parser,
+):
     """Automatically reset all mocks before each test."""
     mock_anki_client.reset()
     mock_llm_provider.reset()

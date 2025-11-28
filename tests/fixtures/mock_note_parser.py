@@ -1,7 +1,6 @@
 """Mock implementation of INoteParser for testing."""
 
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from obsidian_anki_sync.domain.entities.note import NoteMetadata, QAPair
 from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
@@ -20,7 +19,7 @@ class MockNoteParser(INoteParser):
         self.should_fail = False
         self.fail_message = "Mock note parser failure"
 
-    def parse_note(self, file_path: Path) -> Tuple[NoteMetadata, List[QAPair]]:
+    def parse_note(self, file_path: Path) -> tuple[NoteMetadata, list[QAPair]]:
         """Parse note file."""
         if self.should_fail:
             raise Exception(self.fail_message)
@@ -58,7 +57,9 @@ class MockNoteParser(INoteParser):
 
         return metadata, qa_pairs
 
-    def parse_frontmatter(self, content: str, file_path: Optional[Path] = None) -> NoteMetadata:
+    def parse_frontmatter(
+        self, content: str, file_path: Path | None = None
+    ) -> NoteMetadata:
         """Parse YAML frontmatter."""
         if self.should_fail:
             raise Exception(self.fail_message)
@@ -78,19 +79,19 @@ class MockNoteParser(INoteParser):
             language_tags=["en"],
         )
 
-    def extract_qa_pairs(self, content: str) -> List[QAPair]:
+    def extract_qa_pairs(self, content: str) -> list[QAPair]:
         """Extract Q&A pairs from content."""
         if self.should_fail:
             raise Exception(self.fail_message)
 
         # Simple mock extraction - look for question patterns
         pairs = []
-        lines = content.split('\n')
+        lines = content.split("\n")
         current_pair = None
 
         for line in lines:
             line = line.strip()
-            if line.startswith('# Question'):
+            if line.startswith("# Question"):
                 if current_pair:
                     pairs.append(current_pair)
                 current_pair = QAPair(
@@ -100,7 +101,7 @@ class MockNoteParser(INoteParser):
                     answer_en="Mock answer",
                     answer_ru="Мок ответ",
                 )
-            elif line.startswith('# Answer') and current_pair:
+            elif line.startswith("# Answer") and current_pair:
                 # Could parse answer here
                 pass
 
@@ -114,8 +115,8 @@ class MockNoteParser(INoteParser):
         metadata: NoteMetadata,
         content: str,
         enforce_bilingual: bool = True,
-        check_code_fences: bool = True
-    ) -> List[str]:
+        check_code_fences: bool = True,
+    ) -> list[str]:
         """Validate note structure."""
         errors = []
 
@@ -130,7 +131,7 @@ class MockNoteParser(INoteParser):
 
         if check_code_fences:
             # Check for balanced code fences
-            backticks = content.count('```')
+            backticks = content.count("```")
             if backticks % 2 != 0:
                 errors.append("Unbalanced code fences")
 
@@ -140,42 +141,39 @@ class MockNoteParser(INoteParser):
         """Check if language is supported."""
         return language in ["en", "ru", "es", "fr", "de"]
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Get supported languages."""
         return ["en", "ru", "es", "fr", "de"]
 
-    def extract_title_from_content(self, content: str) -> Optional[str]:
+    def extract_title_from_content(self, content: str) -> str | None:
         """Extract title from content."""
-        lines = content.split('\n')
+        lines = content.split("\n")
         for line in lines:
             line = line.strip()
-            if line.startswith('# ') and not line.startswith('##'):
+            if line.startswith("# ") and not line.startswith("##"):
                 return line[2:].strip()
         return None
 
-    def get_note_creation_date(self, file_path: Path) -> Optional[float]:
+    def get_note_creation_date(self, file_path: Path) -> float | None:
         """Get creation date."""
         try:
             stat = file_path.stat()
             return stat.st_ctime
-        except:
+        except OSError:
             return None
 
-    def get_note_modification_date(self, file_path: Path) -> Optional[float]:
+    def get_note_modification_date(self, file_path: Path) -> float | None:
         """Get modification date."""
         try:
             stat = file_path.stat()
             return stat.st_mtime
-        except:
+        except OSError:
             return None
 
     # Test helper methods
 
     def set_mock_note_data(
-        self,
-        file_path: str,
-        metadata: NoteMetadata,
-        qa_pairs: List[QAPair]
+        self, file_path: str, metadata: NoteMetadata, qa_pairs: list[QAPair]
     ) -> None:
         """Set mock data for a file path."""
         self.parsed_notes[file_path] = (metadata, qa_pairs)

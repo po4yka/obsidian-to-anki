@@ -40,8 +40,7 @@ class SplitValidatorAgentAI:
             system_prompt=SPLIT_VALIDATION_PROMPT,
         )
 
-        logger.info("pydantic_ai_split_validator_initialized",
-                    model=str(model))
+        logger.info("pydantic_ai_split_validator_initialized", model=str(model))
 
     async def validate(
         self,
@@ -108,8 +107,7 @@ Original Note Content:
             return output
 
         except ValueError as e:
-            logger.error(
-                "pydantic_ai_split_validation_parse_error", error=str(e))
+            logger.error("pydantic_ai_split_validation_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse split validation output",
                 details={"error": str(e), "title": metadata.title},

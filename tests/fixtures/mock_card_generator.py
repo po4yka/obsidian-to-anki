@@ -1,7 +1,5 @@
 """Mock implementation of ICardGenerator for testing."""
 
-from typing import Dict, List, Optional
-
 from obsidian_anki_sync.domain.entities.card import Card, CardManifest
 from obsidian_anki_sync.domain.entities.note import Note, QAPair
 from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
@@ -21,7 +19,7 @@ class MockCardGenerator(ICardGenerator):
         self.fail_message = "Mock card generator failure"
         self.card_templates = {}  # note_id -> card template
 
-    def generate_cards_from_note(self, note: Note) -> List[Card]:
+    def generate_cards_from_note(self, note: Note) -> list[Card]:
         """Generate cards from note."""
         if self.should_fail:
             raise Exception(self.fail_message)
@@ -51,32 +49,26 @@ class MockCardGenerator(ICardGenerator):
         return cards
 
     def generate_card_from_qa_pair(
-        self,
-        qa_pair: QAPair,
-        note: Note,
-        language: str
+        self, qa_pair: QAPair, note: Note, language: str
     ) -> Card:
         """Generate card from Q&A pair."""
         if self.should_fail:
             raise Exception(self.fail_message)
 
         card_data = {
-            "question": qa_pair.question_en if language == "en" else qa_pair.question_ru,
+            "question": (
+                qa_pair.question_en if language == "en" else qa_pair.question_ru
+            ),
             "answer": qa_pair.answer_en if language == "en" else qa_pair.answer_ru,
             "slug_suffix": f"qa-{qa_pair.card_index}",
         }
 
-        card = self._create_mock_card(
-            note, qa_pair.card_index, card_data, language)
+        card = self._create_mock_card(note, qa_pair.card_index, card_data, language)
         self.generated_cards.append(card)
         return card
 
     def generate_apf_html(
-        self,
-        qa_pair: QAPair,
-        language: str,
-        note_title: str,
-        card_index: int
+        self, qa_pair: QAPair, language: str, note_title: str, card_index: int
     ) -> str:
         """Generate APF HTML."""
         if self.should_fail:
@@ -94,7 +86,7 @@ class MockCardGenerator(ICardGenerator):
 {answer}
 <!-- END_CARDS -->"""
 
-    def validate_card_content(self, card: Card) -> List[str]:
+    def validate_card_content(self, card: Card) -> list[str]:
         """Validate card content."""
         errors = []
 
@@ -109,7 +101,7 @@ class MockCardGenerator(ICardGenerator):
 
         return errors
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Get supported languages."""
         return ["en", "ru", "es", "fr"]
 
@@ -118,12 +110,7 @@ class MockCardGenerator(ICardGenerator):
         return "APF::Simple"
 
     def create_manifest(
-        self,
-        note: Note,
-        card_index: int,
-        language: str,
-        slug: str,
-        slug_base: str
+        self, note: Note, card_index: int, language: str, slug: str, slug_base: str
     ) -> dict:
         """Create manifest."""
         return {
@@ -140,11 +127,7 @@ class MockCardGenerator(ICardGenerator):
         }
 
     def _create_mock_card(
-        self,
-        note: Note,
-        card_index: int,
-        card_data: Dict,
-        language: str = "en"
+        self, note: Note, card_index: int, card_data: dict, language: str = "en"
     ) -> Card:
         """Create a mock card."""
         slug_base = f"{note.id}-{card_index}"
@@ -165,14 +148,13 @@ class MockCardGenerator(ICardGenerator):
             QAPair(
                 card_index=card_index,
                 question_en=card_data["question"],
-                question_ru=card_data.get(
-                    "question_ru", card_data["question"]),
+                question_ru=card_data.get("question_ru", card_data["question"]),
                 answer_en=card_data["answer"],
                 answer_ru=card_data.get("answer_ru", card_data["answer"]),
             ),
             language,
             note.title,
-            card_index
+            card_index,
         )
 
         return Card(
@@ -186,7 +168,7 @@ class MockCardGenerator(ICardGenerator):
 
     # Test helper methods
 
-    def set_card_template(self, note_id: str, cards_data: List[Dict]) -> None:
+    def set_card_template(self, note_id: str, cards_data: list[dict]) -> None:
         """Set card template for a note."""
         self.card_templates[note_id] = cards_data
 
@@ -199,7 +181,7 @@ class MockCardGenerator(ICardGenerator):
         """Clear failure state."""
         self.should_fail = False
 
-    def get_generated_cards(self) -> List[Card]:
+    def get_generated_cards(self) -> list[Card]:
         """Get list of generated cards."""
         return self.generated_cards.copy()
 

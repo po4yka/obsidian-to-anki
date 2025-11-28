@@ -1,9 +1,7 @@
 """Integration tests for domain services."""
 
-import pytest
 from pathlib import Path
 
-from obsidian_anki_sync.domain.entities.note import NoteMetadata
 from obsidian_anki_sync.domain.services.content_hash_service import ContentHashService
 from obsidian_anki_sync.domain.services.slug_service import SlugService
 
@@ -19,8 +17,7 @@ class TestDomainServicesIntegration:
         card_index = 1
 
         # Generate slug
-        slug_base = SlugService.generate_slug_base(
-            file_path, source_dir, card_index)
+        slug_base = SlugService.generate_slug_base(file_path, source_dir, card_index)
         full_slug = SlugService.generate_full_slug(slug_base, "en")
 
         # Generate content hash
@@ -124,11 +121,9 @@ class TestDomainServicesIntegration:
         """Test extracting language from slug."""
         # Test valid slugs
         assert SlugService.extract_language_from_slug("test-note-en") == "en"
-        assert SlugService.extract_language_from_slug(
-            "complex-slug-ru-1") == "ru"
+        assert SlugService.extract_language_from_slug("complex-slug-ru-1") == "ru"
         assert SlugService.extract_language_from_slug("no-language") is None
-        assert SlugService.extract_language_from_slug(
-            "invalid-lang-xyz") is None
+        assert SlugService.extract_language_from_slug("invalid-lang-xyz") is None
 
     def test_slug_base_extraction(self):
         """Test extracting base slug without language."""

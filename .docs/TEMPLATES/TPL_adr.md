@@ -23,4 +23,3 @@
 
 ## Follow-Up
 - Tasks or verifications needed
-

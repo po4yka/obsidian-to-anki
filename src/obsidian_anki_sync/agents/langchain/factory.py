@@ -4,7 +4,7 @@ This module provides a factory pattern for creating LangChain agents
 based on configuration and task requirements.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -27,14 +27,14 @@ class LangChainAgentFactory:
             config: Service configuration
         """
         self.config = config
-        self._agent_cache: Dict[str, BaseLangChainAgent] = {}
+        self._agent_cache: dict[str, BaseLangChainAgent] = {}
 
     def create_agent(
         self,
         agent_type: str,
-        model: Optional[BaseLanguageModel] = None,
+        model: BaseLanguageModel | None = None,
         langchain_agent_type: str = "tool_calling",
-        tools: Optional[List[BaseTool]] = None,
+        tools: list[BaseTool] | None = None,
         **kwargs,
     ) -> BaseLangChainAgent:
         """Create a LangChain agent.
@@ -106,7 +106,7 @@ class LangChainAgentFactory:
 
     def _get_agent_config(
         self, agent_type: str, langchain_agent_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get configuration for a specific agent.
 
         Args:
@@ -172,8 +172,8 @@ class LangChainAgentFactory:
         agent_type: str,
         langchain_agent_type: str,
         model: BaseLanguageModel,
-        tools: List[BaseTool],
-        config: Dict[str, Any],
+        tools: list[BaseTool],
+        config: dict[str, Any],
         **kwargs,
     ) -> BaseLangChainAgent:
         """Create agent based on LangChain agent type.
@@ -220,7 +220,7 @@ class LangChainAgentFactory:
         else:
             raise ValueError(f"Unknown LangChain agent type: {langchain_agent_type}")
 
-    def get_available_agent_types(self) -> List[str]:
+    def get_available_agent_types(self) -> list[str]:
         """Get list of available LangChain agent types.
 
         Returns:
@@ -233,7 +233,7 @@ class LangChainAgentFactory:
         self._agent_cache.clear()
         logger.info("langchain_agent_cache_cleared")
 
-    def get_cache_info(self) -> Dict[str, Any]:
+    def get_cache_info(self) -> dict[str, Any]:
         """Get information about cached agents.
 
         Returns:

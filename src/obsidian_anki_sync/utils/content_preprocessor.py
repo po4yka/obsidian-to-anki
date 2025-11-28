@@ -117,11 +117,11 @@ class ContentPreprocessor:
         for i, line in enumerate(original_lines):
             # Check for trailing whitespace
             if line.rstrip() != line:
-                warnings.append(f"Line {i+1}: Trailing whitespace detected")
+                warnings.append(f"Line {i + 1}: Trailing whitespace detected")
 
             # Check for mixed tabs and spaces (common issue)
             if "\t" in line and " " in line[:4]:  # Mixed indentation
-                warnings.append(f"Line {i+1}: Mixed tabs and spaces detected")
+                warnings.append(f"Line {i + 1}: Mixed tabs and spaces detected")
 
             # Normalize line endings
             normalized_lines.append(line.rstrip())
@@ -164,7 +164,7 @@ class ContentPreprocessor:
                 else:
                     # Too many unbalanced fences, skip this one
                     warnings.append(
-                        f"Line {i+1}: Excessive unbalanced code fence ignored"
+                        f"Line {i + 1}: Excessive unbalanced code fence ignored"
                     )
             else:
                 sanitized_lines.append(line)

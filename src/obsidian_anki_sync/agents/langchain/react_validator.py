@@ -3,7 +3,7 @@
 Specialized ReAct agent for validation tasks with transparent reasoning chains.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -26,7 +26,7 @@ class ReActValidatorAgent:
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: Optional[List[BaseTool]] = None,
+        tools: list[BaseTool] | None = None,
         validator_type: str = "pre",  # "pre" or "post"
         max_iterations: int = 5,
     ):
@@ -59,8 +59,8 @@ class ReActValidatorAgent:
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> PreValidationResult:
         """Run pre-validation with ReAct reasoning.
 
@@ -87,8 +87,8 @@ class ReActValidatorAgent:
 
     async def validate_post(
         self,
-        cards: List[GeneratedCard],
-        metadata: Dict[str, Any],
+        cards: list[GeneratedCard],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> PostValidationResult:
         """Run post-validation with ReAct reasoning.
@@ -117,7 +117,7 @@ class ReActValidatorAgent:
         result = await self.agent.run(input_data)
         return self._process_post_validation_result(result, cards)
 
-    def _cards_to_apf(self, cards: List[GeneratedCard]) -> str:
+    def _cards_to_apf(self, cards: list[GeneratedCard]) -> str:
         """Convert cards to APF format for validation.
 
         Args:
@@ -244,7 +244,7 @@ class ReActValidatorAgent:
         )
 
     def _process_post_validation_result(
-        self, agent_result: LangChainAgentResult, original_cards: List[GeneratedCard]
+        self, agent_result: LangChainAgentResult, original_cards: list[GeneratedCard]
     ) -> PostValidationResult:
         """Process ReAct result into PostValidationResult.
 

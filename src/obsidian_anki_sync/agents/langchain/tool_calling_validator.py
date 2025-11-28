@@ -4,7 +4,7 @@ Specialized tool calling agent for validating APF cards and content
 with parallel validation tools.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -27,7 +27,7 @@ class ToolCallingValidatorAgent:
     def __init__(
         self,
         model: BaseLanguageModel,
-        tools: Optional[List[BaseTool]] = None,
+        tools: list[BaseTool] | None = None,
         enable_parallel_tools: bool = True,
         validator_type: str = "post",  # "pre" or "post"
     ):
@@ -60,8 +60,8 @@ class ToolCallingValidatorAgent:
     async def validate_pre(
         self,
         note_content: str,
-        metadata: Dict[str, Any],
-        qa_pairs: List[Dict[str, Any]],
+        metadata: dict[str, Any],
+        qa_pairs: list[dict[str, Any]],
     ) -> PreValidationResult:
         """Run pre-validation using tool calling agent.
 
@@ -88,8 +88,8 @@ class ToolCallingValidatorAgent:
 
     async def validate_post(
         self,
-        cards: List[GeneratedCard],
-        metadata: Dict[str, Any],
+        cards: list[GeneratedCard],
+        metadata: dict[str, Any],
         strict_mode: bool = True,
     ) -> PostValidationResult:
         """Run post-validation using tool calling agent.
@@ -118,7 +118,7 @@ class ToolCallingValidatorAgent:
         result = await self.agent.run(input_data)
         return self._process_post_validation_result(result, cards)
 
-    def _cards_to_apf(self, cards: List[GeneratedCard]) -> str:
+    def _cards_to_apf(self, cards: list[GeneratedCard]) -> str:
         """Convert cards to APF format for validation.
 
         Args:
@@ -209,7 +209,7 @@ class ToolCallingValidatorAgent:
         )
 
     def _process_post_validation_result(
-        self, agent_result: LangChainAgentResult, original_cards: List[GeneratedCard]
+        self, agent_result: LangChainAgentResult, original_cards: list[GeneratedCard]
     ) -> PostValidationResult:
         """Process agent result into PostValidationResult.
 

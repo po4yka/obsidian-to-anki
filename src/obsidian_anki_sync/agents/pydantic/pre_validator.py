@@ -10,11 +10,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata, QAPair
 from ...utils.logging import get_logger
-from ..exceptions import (
-    ModelError,
-    PreValidationError,
-    StructuredOutputError,
-)
+from ..exceptions import ModelError, PreValidationError, StructuredOutputError
 from ..improved_prompts import PRE_VALIDATION_SYSTEM_PROMPT
 from ..models import PreValidationResult
 from .models import PreValidationDeps, PreValidationOutput
@@ -85,8 +81,8 @@ class PreValidatorAgentAI:
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
-Language Tags: {', '.join(metadata.language_tags)}
+Tags: {", ".join(metadata.tags)}
+Language Tags: {", ".join(metadata.language_tags)}
 Q&A Pairs: {len(qa_pairs)}
 
 Note Content Preview:
@@ -118,8 +114,7 @@ Validate the structure, frontmatter, and content quality."""
             return validation_result
 
         except ValueError as e:
-            logger.error(
-                "pydantic_ai_pre_validation_parse_error", error=str(e))
+            logger.error("pydantic_ai_pre_validation_parse_error", error=str(e))
             raise StructuredOutputError(
                 "Failed to parse pre-validation output",
                 details={"error": str(e), "title": metadata.title},

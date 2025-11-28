@@ -18,6 +18,7 @@ from ...models import NoteMetadata, QAPair
 
 if TYPE_CHECKING:
     from ..models import Card
+
 from ...utils.logging import get_logger
 from ..models import (
     AgentPipelineResult,
@@ -152,8 +153,7 @@ class LangGraphOrchestrator:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
                 embedding_model = getattr(
                     config, "embedding_model", "text-embedding-3-small"
                 )
@@ -168,8 +168,7 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning(
-                    "langgraph_memory_store_init_failed", error=str(e))
+                logger.warning("langgraph_memory_store_init_failed", error=str(e))
 
         # NEW: Advanced MongoDB memory store (deferred connection)
         self.advanced_memory_store = None
@@ -190,8 +189,7 @@ class LangGraphOrchestrator:
                 )
                 logger.info("advanced_memory_store_deferred_connection")
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_init_failed", error=str(e))
+                logger.warning("advanced_memory_store_init_failed", error=str(e))
 
         # NEW: Enhanced observability system
         self.observability = None
@@ -203,8 +201,7 @@ class LangGraphOrchestrator:
                 self.observability = EnhancedObservabilitySystem(config)
                 logger.info("enhanced_observability_system_initialized")
             except Exception as e:
-                logger.warning(
-                    "enhanced_observability_init_failed", error=str(e))
+                logger.warning("enhanced_observability_init_failed", error=str(e))
 
         # RAG integration for context enrichment and duplicate detection
         self.rag_integration = None
@@ -260,7 +257,9 @@ class LangGraphOrchestrator:
     async def setup_async(self):
         """Async setup for components that need async initialization (e.g., MongoDB)."""
         # Connect to MongoDB if advanced memory is enabled
-        if self.advanced_memory_store and hasattr(self.advanced_memory_store, 'connect'):
+        if self.advanced_memory_store and hasattr(
+            self.advanced_memory_store, "connect"
+        ):
             try:
                 connected = await self.advanced_memory_store.connect()
                 if connected:
@@ -269,8 +268,7 @@ class LangGraphOrchestrator:
                     logger.warning("advanced_memory_store_connection_failed")
                     self.advanced_memory_store = None
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_async_setup_failed", error=str(e))
+                logger.warning("advanced_memory_store_async_setup_failed", error=str(e))
                 self.advanced_memory_store = None
 
     def convert_to_cards(
@@ -285,6 +283,7 @@ class LangGraphOrchestrator:
         This method replicates the legacy orchestrator's card conversion logic.
         """
         import hashlib
+
         from ..models import Card, Manifest
         from ..sync.slug_generator import compute_content_hash
 
@@ -313,8 +312,7 @@ class LangGraphOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(
-                    qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
@@ -355,11 +353,13 @@ class LangGraphOrchestrator:
 
                 async def generate(self, prompt: str, **kwargs) -> str:
                     raise NotImplementedError(
-                        "LangGraph orchestrator handles generation internally")
+                        "LangGraph orchestrator handles generation internally"
+                    )
 
                 def generate_sync(self, prompt: str, **kwargs) -> str:
                     raise NotImplementedError(
-                        "LangGraph orchestrator handles generation internally")
+                        "LangGraph orchestrator handles generation internally"
+                    )
 
             self._provider = LangGraphCompatibilityProvider()
 
@@ -459,8 +459,7 @@ class LangGraphOrchestrator:
                         )
 
             except Exception as e:
-                logger.warning(
-                    f"Memory-based routing failed, using default: {e}")
+                logger.warning(f"Memory-based routing failed, using default: {e}")
                 optimal_framework = self.agent_framework
 
         return optimal_framework
@@ -732,8 +731,7 @@ class LangGraphOrchestrator:
                 self.observability.record_metrics(metrics)
                 logger.info("observability_metrics_recorded")
             except Exception as e:
-                logger.warning(
-                    "observability_metrics_recording_failed", error=str(e))
+                logger.warning("observability_metrics_recording_failed", error=str(e))
 
         # NEW: Learn from execution if advanced memory is enabled
         if self.advanced_memory_store and self.advanced_memory_store.connected:

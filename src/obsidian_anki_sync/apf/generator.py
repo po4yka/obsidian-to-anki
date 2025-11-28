@@ -455,7 +455,7 @@ Requirements:
 - CardType: Simple (or Missing if {{{{c}}}} detected in answer, or Draw if diagram marker present)
 - Tags: EXACTLY 3-6 snake_case tags with underscores (e.g., by_keyword NOT by-keyword), include primary language/tech
 - Primary language tag: {lang}
-- Topic-based tags: {metadata.topic.lower().replace(' ', '_')}
+- Topic-based tags: {metadata.topic.lower().replace(" ", "_")}
 - Use EXACT slug "{manifest.slug}" in both card header AND manifest (do not create your own slug)
 - Add "Ref: {ref_link}" in Other notes section
 - Follow APF v2.1 format strictly

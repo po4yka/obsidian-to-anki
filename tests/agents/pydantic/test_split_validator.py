@@ -24,7 +24,9 @@ def mock_model():
 @pytest.fixture
 def split_validator(mock_model):
     """Create a split validator agent with mock model."""
-    with patch("obsidian_anki_sync.agents.pydantic.split_validator.Agent") as mock_agent_class:
+    with patch(
+        "obsidian_anki_sync.agents.pydantic.split_validator.Agent"
+    ) as mock_agent_class:
         mock_agent_instance = MagicMock()
         mock_agent_class.return_value = mock_agent_instance
         agent = SplitValidatorAgentAI(model=mock_model)

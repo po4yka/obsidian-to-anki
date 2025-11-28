@@ -238,9 +238,7 @@ class AgentCacheStrategy:
             "pre_validation": 3600,  # 1 hour
             "generation": 7200,  # 2 hours
             "post_validation": 1800,  # 30 minutes
-        }.get(
-            operation, 3600
-        )  # Default 1 hour
+        }.get(operation, 3600)  # Default 1 hour
 
         # Adjust based on quality
         if result_quality == "high":

@@ -144,8 +144,7 @@ class HTMLTemplateGenerator:
             final_errors = validate_card_html(html_content)
             if final_errors:
                 validation_errors.extend(final_errors)
-                warnings.append(
-                    "Some HTML validation issues could not be auto-fixed")
+                warnings.append("Some HTML validation issues could not be auto-fixed")
 
         return GenerationResult(
             html=html_content,
@@ -160,7 +159,7 @@ class HTMLTemplateGenerator:
 
         # Ensure required fields
         processed.setdefault("card_index", 1)
-        processed.setdefault("slug", f'card-{processed["card_index"]}')
+        processed.setdefault("slug", f"card-{processed['card_index']}")
         processed.setdefault("tags", "")
         processed.setdefault("title", "Untitled Card")
 
@@ -171,14 +170,12 @@ class HTMLTemplateGenerator:
             )
 
         if "key_points" in processed:
-            processed["key_points"] = self._generate_key_points(
-                processed["key_points"])
+            processed["key_points"] = self._generate_key_points(processed["key_points"])
 
         # Process text content
         for field in ["question", "answer", "title", "other_notes", "content"]:
             if field in processed and processed[field]:
-                processed[field] = self._escape_and_format_text(
-                    processed[field])
+                processed[field] = self._escape_and_format_text(processed[field])
 
         return processed
 
@@ -215,8 +212,7 @@ class HTMLTemplateGenerator:
             return f"<ul>\n<li>{escape(key_points)}</li>\n</ul>"
         elif isinstance(key_points, list):
             # List of points
-            points_html = "\n".join(
-                f"<li>{escape(point)}</li>" for point in key_points)
+            points_html = "\n".join(f"<li>{escape(point)}</li>" for point in key_points)
             return f"<ul>\n{points_html}\n</ul>"
         else:
             return "<ul><li>Key points data</li></ul>"
@@ -230,8 +226,7 @@ class HTMLTemplateGenerator:
         escaped = escape(text)
 
         # Convert basic markdown to HTML
-        escaped = re.sub(r"\*\*(.*?)\*\*",
-                         r"<strong>\1</strong>", escaped)  # Bold
+        escaped = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", escaped)  # Bold
         escaped = re.sub(r"\*(.*?)\*", r"<em>\1</em>", escaped)  # Italic
 
         # Convert line breaks
@@ -255,8 +250,7 @@ class HTMLTemplateGenerator:
                 warnings.extend(lang_warnings)
             elif "wrap in <pre><code>" in error:
                 # Wrap standalone code elements
-                fixed_html, wrap_warnings = self._wrap_standalone_code(
-                    fixed_html)
+                fixed_html, wrap_warnings = self._wrap_standalone_code(fixed_html)
                 warnings.extend(wrap_warnings)
             elif "Backtick code fences detected" in error:
                 # Remove markdown code fences from HTML
