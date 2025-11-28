@@ -39,7 +39,10 @@ class CacheManager:
         self._cache_hits = 0
         self._cache_misses = 0
         self._cache_stats: dict[str, Any] = {
-            "hits": 0, "misses": 0, "generation_times": []}
+            "hits": 0,
+            "misses": 0,
+            "generation_times": [],
+        }
 
         # Thread safety
         self._lock = threading.Lock()
@@ -90,8 +93,7 @@ class CacheManager:
                         else 0.0
                     ),
                     "avg_generation_time": (
-                        sum(stats["generation_times"]) /
-                        len(stats["generation_times"])
+                        sum(stats["generation_times"]) / len(stats["generation_times"])
                         if stats["generation_times"]
                         else 0.0
                     ),
@@ -131,8 +133,7 @@ class CacheManager:
         with self._lock:
             self._cache_hits = 0
             self._cache_misses = 0
-            self._cache_stats = {"hits": 0,
-                                 "misses": 0, "generation_times": []}
+            self._cache_stats = {"hits": 0, "misses": 0, "generation_times": []}
 
     def close_caches(self) -> None:
         """Close all cache instances."""
@@ -169,12 +170,10 @@ class CacheManager:
             apf_cache_dir = self.cache_dir / "apf_cards"
 
             if agent_cache_dir.exists():
-                info["agent_cache_size"] = self._get_directory_size(
-                    agent_cache_dir)
+                info["agent_cache_size"] = self._get_directory_size(agent_cache_dir)
 
             if apf_cache_dir.exists():
-                info["apf_cache_size"] = self._get_directory_size(
-                    apf_cache_dir)
+                info["apf_cache_size"] = self._get_directory_size(apf_cache_dir)
 
             info["total_size_mb"] = (
                 info["agent_cache_size"] + info["apf_cache_size"]

@@ -243,7 +243,9 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         except Exception as e:
             logger.error("fix_output_llm_failed", error=str(e))
             # Fallback: return original prompt with error context appended
-            return str(f"{prompt}\n\nIMPORTANT: Previous attempt failed with error: {error}. Please ensure output matches format exactly: {self._get_expected_format()}")
+            return str(
+                f"{prompt}\n\nIMPORTANT: Previous attempt failed with error: {error}. Please ensure output matches format exactly: {self._get_expected_format()}"
+            )
 
     def _get_expected_format(self) -> str:
         """Get description of expected output format."""

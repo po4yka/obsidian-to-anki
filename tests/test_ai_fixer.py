@@ -201,8 +201,7 @@ More text.
         # Should find fix for bilingual title
         assert len(validator.fixes) > 0
         fix_descriptions = [f.description for f in validator.fixes]
-        assert any("bilingual title" in desc.lower()
-                   for desc in fix_descriptions)
+        assert any("bilingual title" in desc.lower() for desc in fix_descriptions)
 
     def test_validate_list_formatting(self):
         """Test validation of list formatting."""
@@ -355,8 +354,7 @@ def foo():
 
         # Title fix should be unsafe
         unsafe_fixes = [f for f in validator.fixes if not f.safe]
-        assert any("bilingual title" in f.description.lower()
-                   for f in unsafe_fixes)
+        assert any("bilingual title" in f.description.lower() for f in unsafe_fixes)
 
     def test_disabled_ai_adds_issues_not_fixes(self):
         """Test that disabled AI adds issues instead of fixes."""
@@ -387,5 +385,4 @@ def foo():
 
         # Should still have non-AI fixes (like list spacing)
         fix_descriptions = [f.description for f in validator.fixes]
-        assert not any(
-            "AI-detect language" in desc for desc in fix_descriptions)
+        assert not any("AI-detect language" in desc for desc in fix_descriptions)

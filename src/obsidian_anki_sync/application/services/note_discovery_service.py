@@ -76,8 +76,7 @@ class NoteDiscoveryService:
         # Filter for incremental processing
         if incremental:
             processed_paths = self._get_processed_paths()
-            note_files = [f for f in note_files if str(
-                f) not in processed_paths]
+            note_files = [f for f in note_files if str(f) not in processed_paths]
             logger.debug("filtered_incremental", remaining=len(note_files))
 
         # Apply sampling
@@ -128,7 +127,10 @@ class NoteDiscoveryService:
                 # Apply exclude patterns
                 if exclude_patterns:
                     relative_path = str(md_file.relative_to(source_path))
-                    if any(pattern is not None and pattern in relative_path for pattern in exclude_patterns):
+                    if any(
+                        pattern is not None and pattern in relative_path
+                        for pattern in exclude_patterns
+                    ):
                         continue
 
                 note_files.append(md_file)
@@ -241,8 +243,7 @@ class NoteDiscoveryService:
             # Count by topic
             topic = note.metadata.topic
             topic_key = str(topic) if topic else "unknown"
-            stats["by_topic"][topic_key] = stats["by_topic"].get(
-                topic_key, 0) + 1
+            stats["by_topic"][topic_key] = stats["by_topic"].get(topic_key, 0) + 1
 
             # Count by primary language
             primary_lang = note.metadata.primary_language

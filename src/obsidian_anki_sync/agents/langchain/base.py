@@ -87,7 +87,9 @@ class BaseLangChainAgent(ABC):
         pass
 
     @abstractmethod
-    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
+    async def run(
+        self, input_data: dict[str, Any], **kwargs: Any
+    ) -> LangChainAgentResult:
         """Run the agent with given input data.
 
         Args:

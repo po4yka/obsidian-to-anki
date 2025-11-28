@@ -14,8 +14,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(
-            model=self.model)  # type: ignore[assignment]
+        self.agent = ContentRepairAgent(model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """General quality assurance and repair."""

@@ -108,8 +108,7 @@ def import_cards_from_csv(
                 # Parse manifest if it's a JSON string
                 if "manifest" in card_data and isinstance(card_data["manifest"], str):
                     try:
-                        card_data["manifest"] = json.loads(
-                            card_data["manifest"])
+                        card_data["manifest"] = json.loads(card_data["manifest"])
                     except json.JSONDecodeError:
                         card_data["manifest"] = {}
 
@@ -207,8 +206,7 @@ def _import_cards(
     for card_data in cards_data:
         try:
             # Extract fields (exclude metadata fields)
-            metadata_fields = {"noteId", "slug",
-                               "noteType", "tags", "manifest"}
+            metadata_fields = {"noteId", "slug", "noteType", "tags", "manifest"}
             fields = {
                 k: v for k, v in card_data.items() if k not in metadata_fields and v
             }

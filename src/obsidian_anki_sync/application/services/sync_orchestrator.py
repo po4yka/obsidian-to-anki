@@ -76,8 +76,7 @@ class SyncOrchestrator:
         )
         self.generate_cards_use_case = GenerateCardsUseCase(card_generator)
         self.determine_actions_use_case = DetermineSyncActionsUseCase()
-        self.apply_changes_use_case = ApplyChangesUseCase(
-            anki_client, state_repository)
+        self.apply_changes_use_case = ApplyChangesUseCase(anki_client, state_repository)
 
         logger.info("sync_orchestrator_initialized")
 
@@ -189,8 +188,7 @@ class SyncOrchestrator:
         status: dict[str, Any] = {}
 
         try:
-            status["anki_client"] = {
-                "connected": self.anki_client.check_connection()}
+            status["anki_client"] = {"connected": self.anki_client.check_connection()}
         except Exception as e:
             status["anki_client"] = {"error": str(e)}
 

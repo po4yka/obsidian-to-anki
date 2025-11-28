@@ -217,8 +217,7 @@ class AnkiClient(IAnkiClient):
 
         result = cast(int, self.invoke("addNote", {"note": note_payload}))
 
-        logger.info("note_added", note_id=result,
-                    deck=deck_name, note_type=model_name)
+        logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
         return result
 
     def add_notes(
@@ -243,8 +242,7 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
-        result = cast(list[int | None], self.invoke(
-            "addNotes", {"notes": notes}))
+        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -266,8 +264,7 @@ class AnkiClient(IAnkiClient):
             note_id: Note ID
             fields: New field values
         """
-        self.invoke("updateNoteFields", {
-                    "note": {"id": note_id, "fields": fields}})
+        self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
 
@@ -506,8 +503,7 @@ class AnkiClient(IAnkiClient):
             List of field names
         """
         return cast(
-            list[str], self.invoke("modelFieldNames", {
-                                   "modelName": model_name})
+            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
         )
 
     def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
@@ -540,8 +536,7 @@ class AnkiClient(IAnkiClient):
             The filename as stored in Anki (may be modified)
         """
         return cast(
-            str, self.invoke("storeMediaFile", {
-                             "filename": filename, "data": data})
+            str, self.invoke("storeMediaFile", {"filename": filename, "data": data})
         )
 
     def suspend_cards(self, card_ids: list[int]) -> None:
@@ -639,8 +634,7 @@ class AnkiClient(IAnkiClient):
                 self.session.close()
                 logger.debug("anki_client_closed", url=self.url)
             except Exception as e:
-                logger.warning("anki_client_cleanup_failed",
-                               url=self.url, error=str(e))
+                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""

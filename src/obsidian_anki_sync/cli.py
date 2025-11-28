@@ -11,8 +11,8 @@ from rich.table import Table
 
 from .cli_commands.rag_commands import rag_app
 from .cli_commands.shared import get_config_and_logger
-from .cli_commands.validate_commands import validate_app
 from .cli_commands.sync_handler import run_sync
+from .cli_commands.validate_commands import validate_app
 from .obsidian.note_validator import validate_note_structure
 from .obsidian.parser import parse_frontmatter
 from .utils.log_analyzer import LogAnalyzer

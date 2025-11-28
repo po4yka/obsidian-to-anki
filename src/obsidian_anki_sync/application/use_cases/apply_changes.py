@@ -132,7 +132,7 @@ class ApplyChangesUseCase:
                 failed_actions=failed_actions
                 + [
                     {"action": action, "error": str(e)}
-                    for action in request.sync_actions[len(applied_actions):]
+                    for action in request.sync_actions[len(applied_actions) :]
                 ],
                 success=False,
                 errors=errors,
@@ -183,15 +183,14 @@ class ApplyChangesUseCase:
         errors = []
 
         for i in range(0, len(actions), batch_size):
-            batch = actions[i: i + batch_size]
+            batch = actions[i : i + batch_size]
 
             try:
                 # Create cards in batch
                 for action in batch:
                     try:
                         # Simulate card creation
-                        created_card = action.card.with_guid(
-                            f"anki_{action.card.slug}")
+                        created_card = action.card.with_guid(f"anki_{action.card.slug}")
                         applied.append(
                             {
                                 "action": action,
@@ -205,13 +204,11 @@ class ApplyChangesUseCase:
                                 "error": str(e),
                             }
                         )
-                        errors.append(
-                            f"Failed to create card {action.card.slug}: {e}")
+                        errors.append(f"Failed to create card {action.card.slug}: {e}")
 
             except Exception as e:
                 # Batch failure
-                failed.extend([{"action": action, "error": str(e)}
-                              for action in batch])
+                failed.extend([{"action": action, "error": str(e)} for action in batch])
                 errors.append(f"Batch create failed: {e}")
 
         return {

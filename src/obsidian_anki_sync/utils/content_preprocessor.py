@@ -72,8 +72,7 @@ class ContentPreprocessor:
             warnings.extend(lang_warnings)
 
         if self.config.fix_malformed_frontmatter:
-            processed_content, fm_warnings = self._fix_frontmatter(
-                processed_content)
+            processed_content, fm_warnings = self._fix_frontmatter(processed_content)
             warnings.extend(fm_warnings)
 
         return processed_content, warnings
@@ -97,8 +96,7 @@ class ContentPreprocessor:
         warnings.extend(self._check_content_structure(content))
 
         # Generate suggestions
-        suggestions.extend(
-            self._generate_improvement_suggestions(content, warnings))
+        suggestions.extend(self._generate_improvement_suggestions(content, warnings))
 
         # Determine if content is valid (warnings are acceptable)
         is_valid = len([w for w in warnings if "critical" in w.lower()]) == 0
@@ -123,8 +121,7 @@ class ContentPreprocessor:
 
             # Check for mixed tabs and spaces (common issue)
             if "\t" in line and " " in line[:4]:  # Mixed indentation
-                warnings.append(
-                    f"Line {i + 1}: Mixed tabs and spaces detected")
+                warnings.append(f"Line {i + 1}: Mixed tabs and spaces detected")
 
             # Normalize line endings
             normalized_lines.append(line.rstrip())
@@ -206,8 +203,7 @@ class ContentPreprocessor:
 
         # Match code blocks: ```language\ncontent\n```
         pattern = r"(```[^\n]*)\n(.*?)\n```"
-        modified_content = re.sub(
-            pattern, replace_code_block, content, flags=re.DOTALL)
+        modified_content = re.sub(pattern, replace_code_block, content, flags=re.DOTALL)
 
         return modified_content, warnings
 
@@ -253,8 +249,7 @@ class ContentPreprocessor:
                 fence_count += 1
 
         if fence_count % 2 != 0:
-            warnings.append(
-                f"Unbalanced code fences detected ({fence_count} total)")
+            warnings.append(f"Unbalanced code fences detected ({fence_count} total)")
 
         return warnings
 
@@ -335,8 +330,7 @@ class ContentPreprocessor:
             )
 
         if any("whitespace" in w.lower() for w in warnings):
-            suggestions.append(
-                "Remove trailing whitespace and normalize indentation")
+            suggestions.append("Remove trailing whitespace and normalize indentation")
 
         return suggestions
 

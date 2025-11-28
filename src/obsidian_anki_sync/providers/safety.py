@@ -4,10 +4,9 @@ import re
 import time
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any
+from typing import Any, Union
 
 from limits import RateLimitItemPerMinute, RateLimitItemPerSecond
-from typing import Union
 from limits.storage import MemoryStorage
 from limits.strategies import FixedWindowRateLimiter
 
@@ -67,10 +66,12 @@ class RateLimiter:
         # Create rate limit items for limits library
         # Convert window_seconds to appropriate RateLimitItem
         if window_seconds == 60:
-            self.request_limit: Union[RateLimitItemPerMinute,
-                                      RateLimitItemPerSecond] = RateLimitItemPerMinute(max_requests)
-            self.token_limit: Union[RateLimitItemPerMinute,
-                                    RateLimitItemPerSecond] = RateLimitItemPerMinute(max_tokens)
+            self.request_limit: Union[
+                RateLimitItemPerMinute, RateLimitItemPerSecond
+            ] = RateLimitItemPerMinute(max_requests)
+            self.token_limit: Union[RateLimitItemPerMinute, RateLimitItemPerSecond] = (
+                RateLimitItemPerMinute(max_tokens)
+            )
         elif window_seconds == 1:
             self.request_limit = RateLimitItemPerSecond(max_requests)
             self.token_limit = RateLimitItemPerSecond(max_tokens)
@@ -247,8 +248,7 @@ class InputValidator:
 
         # Check length
         if len(prompt) > max_length:
-            warnings.append(
-                f"Prompt exceeds max length ({len(prompt)} > {max_length})")
+            warnings.append(f"Prompt exceeds max length ({len(prompt)} > {max_length})")
             logger.warning(
                 "prompt_too_long",
                 length=len(prompt),
@@ -262,24 +262,21 @@ class InputValidator:
             for pattern in cls.SENSITIVE_PATTERNS:
                 matches = re.findall(pattern, prompt, re.IGNORECASE)
                 if matches:
-                    warnings.append(
-                        f"Detected sensitive pattern: {pattern[:50]}...")
+                    warnings.append(f"Detected sensitive pattern: {pattern[:50]}...")
                     logger.warning(
                         "sensitive_pattern_detected",
                         pattern_preview=pattern[:50],
                         matches_count=len(matches),
                     )
                     # Redact matches
-                    prompt = re.sub(
-                        pattern, "[REDACTED]", prompt, flags=re.IGNORECASE)
+                    prompt = re.sub(pattern, "[REDACTED]", prompt, flags=re.IGNORECASE)
 
         # Check for excessive repetition (potential attack)
         if cls._detect_repetition(prompt):
             warnings.append(
                 "Excessive repetition detected (potential prompt injection)"
             )
-            logger.warning("excessive_repetition_detected",
-                           prompt_length=len(prompt))
+            logger.warning("excessive_repetition_detected", prompt_length=len(prompt))
 
         return prompt, warnings
 
@@ -350,8 +347,7 @@ class OutputValidator:
         # Format-specific validation
         if expected_format == "json":
             if not response.strip().startswith(("{", "[")):
-                warnings.append(
-                    "Expected JSON but response doesn't start with { or [")
+                warnings.append("Expected JSON but response doesn't start with { or [")
                 is_valid = False
 
         elif expected_format == "html":
@@ -372,8 +368,7 @@ class OutputValidator:
         for indicator in error_indicators:
             if indicator in response_lower:
                 warnings.append(f"Potential error in response: {indicator}")
-                logger.warning("error_indicator_in_response",
-                               indicator=indicator)
+                logger.warning("error_indicator_in_response", indicator=indicator)
 
         return is_valid, warnings
 
@@ -494,8 +489,7 @@ class OllamaSafetyWrapper:
 
         # Truncate if too long
         if len(text) > self.config.max_log_content_length:
-            text = text[: self.config.max_log_content_length] + \
-                "...[truncated]"
+            text = text[: self.config.max_log_content_length] + "...[truncated]"
 
         # Redact sensitive patterns
         for pattern in InputValidator.SENSITIVE_PATTERNS:

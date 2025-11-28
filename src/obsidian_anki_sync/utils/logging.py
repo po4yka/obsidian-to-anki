@@ -106,8 +106,7 @@ class ConsoleNoiseFilter:
         self,
         base_filter: Callable[[dict], bool],
         level_overrides: Mapping[str, str] | None = None,
-        high_volume_policies: Mapping[str,
-                                      HighVolumeEventPolicy] | None = None,
+        high_volume_policies: Mapping[str, HighVolumeEventPolicy] | None = None,
         time_func: Callable[[], float] | None = None,
     ) -> None:
         """
@@ -154,14 +153,14 @@ class ConsoleNoiseFilter:
 
         message = record.get("message")
         policy = (
-            self.high_volume_policies.get(
-                message) if isinstance(message, str) else None
+            self.high_volume_policies.get(message) if isinstance(message, str) else None
         )
         if policy:
             now = self._time_func()
             with self._lock:
                 window = self._event_windows.setdefault(
-                    str(message) if message else "", deque())
+                    str(message) if message else "", deque()
+                )
                 while window and now - window[0] > policy.window_seconds:
                     window.popleft()
                 if len(window) >= policy.max_occurrences:
@@ -263,8 +262,7 @@ def configure_logging(
     if project_log_dir is None:
         project_log_dir = Path("./logs")
     project_log_dir.mkdir(exist_ok=True, parents=True)
-    project_log_path = project_log_dir / \
-        "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
+    project_log_path = project_log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
 
     logger.add(
         project_log_path,
@@ -284,8 +282,7 @@ def configure_logging(
 
     def error_filter(record: Any) -> bool:
         """Filter to only include ERROR and CRITICAL level logs."""
-        level_no = getattr(record.get("level"), "no",
-                           0)  # type: ignore[union-attr]
+        level_no = getattr(record.get("level"), "no", 0)  # type: ignore[union-attr]
         error_level_no = logger.level("ERROR").no
         return bool(level_no >= error_level_no)  # type: ignore[no-any-return]
 
@@ -299,21 +296,23 @@ def configure_logging(
         backtrace=True,
         diagnose=True,
         enqueue=True,
-        filter=lambda record: error_filter(  # type: ignore[arg-type]
-            record) and _add_formatted_extra(record),  # type: ignore[arg-type]
+        filter=lambda record: error_filter(record)  # type: ignore[arg-type]
+        and _add_formatted_extra(record),  # type: ignore[arg-type]
     )
 
     if very_verbose:
         # Add a separate handler for very verbose LLM logging
         if log_file and log_path.parent is not None:
-            verbose_log_path: Path = log_path.parent / \
-                f"{log_path.stem}_verbose{log_path.suffix}"
+            verbose_log_path: Path = (
+                log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
+            )
         else:
             # Ensure log_dir is not None
             if log_dir is None:
                 log_dir = Path("./logs")
-            verbose_log_path = log_dir / \
-                "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
+            verbose_log_path = (
+                log_dir / "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
+            )
         logger.add(
             verbose_log_path,
             format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}\n{exception}",

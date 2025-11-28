@@ -67,12 +67,10 @@ class DetermineSyncActionsUseCase:
         common_slugs = set(obsidian_by_slug.keys()) & set(anki_by_slug.keys())
 
         # Find cards that only exist in Obsidian (need to be created)
-        obsidian_only_slugs = set(
-            obsidian_by_slug.keys()) - set(anki_by_slug.keys())
+        obsidian_only_slugs = set(obsidian_by_slug.keys()) - set(anki_by_slug.keys())
 
         # Find cards that only exist in Anki (may need to be deleted)
-        anki_only_slugs = set(anki_by_slug.keys()) - \
-            set(obsidian_by_slug.keys())
+        anki_only_slugs = set(anki_by_slug.keys()) - set(obsidian_by_slug.keys())
 
         # Process cards that exist in both systems
         for slug in common_slugs:

@@ -28,14 +28,10 @@ def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
         issues: List[Dict] = []
 
         # Check for missing sections
-        has_ru_question = bool(
-            re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
-        has_en_question = bool(
-            re.search(r"^# Question \(EN\)", body, re.MULTILINE))
-        has_ru_answer = bool(
-            re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
-        has_en_answer = bool(
-            re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
+        has_ru_question = bool(re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
+        has_en_question = bool(re.search(r"^# Question \(EN\)", body, re.MULTILINE))
+        has_ru_answer = bool(re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
+        has_en_answer = bool(re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
 
         missing_sections: List[str] = []
         if not has_ru_question:
@@ -285,8 +281,7 @@ def main() -> None:
             f"{agent['agent_id']:30} - {agent['count']:3} files - {agent['description']}"
         )
     print("=" * 80)
-    print(
-        f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
+    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
     print()
 
     # Save work packages

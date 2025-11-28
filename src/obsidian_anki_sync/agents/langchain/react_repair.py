@@ -187,8 +187,7 @@ class ReActRepairAgent:
         # Extract analysis components
         analysis = self._extract_analysis_summary(output)
         findings = self._extract_findings(output, reasoning_chain)
-        recommendations = self._extract_recommendations(
-            output, reasoning_chain)
+        recommendations = self._extract_recommendations(output, reasoning_chain)
 
         logger.info(
             "react_analysis_completed",

@@ -95,8 +95,7 @@ class SyncNotesUseCase:
                     cards = self.card_generator.generate_cards_from_note(note)
                     obsidian_cards.extend(cards)
                 except Exception as e:
-                    errors.append(
-                        f"Failed to generate cards for note {note.id}: {e}")
+                    errors.append(f"Failed to generate cards for note {note.id}: {e}")
                     stats["errors"] += 1
 
             stats["cards_generated"] = len(obsidian_cards)
@@ -105,8 +104,7 @@ class SyncNotesUseCase:
             anki_cards = self._get_anki_cards()
 
             # Step 4: Determine sync actions
-            sync_actions = self._determine_sync_actions(
-                obsidian_cards, anki_cards)
+            sync_actions = self._determine_sync_actions(obsidian_cards, anki_cards)
 
             # Step 5: Apply changes (unless dry run)
             if not request.dry_run:
