@@ -1,10 +1,22 @@
 """Pytest configuration and fixtures for the test suite."""
 
+import sys
+from pathlib import Path
+
 import pytest
 
-from obsidian_anki_sync.domain.entities.card import Card, CardManifest
-from obsidian_anki_sync.domain.entities.note import Note, NoteMetadata, QAPair
-from tests.fixtures import (
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = PROJECT_ROOT / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+from obsidian_anki_sync.domain.entities.card import Card, CardManifest  # noqa: E402
+from obsidian_anki_sync.domain.entities.note import (  # noqa: E402
+    Note,
+    NoteMetadata,
+    QAPair,
+)
+from tests.fixtures import (  # noqa: E402
     MockAnkiClient,
     MockCardGenerator,
     MockLLMProvider,
