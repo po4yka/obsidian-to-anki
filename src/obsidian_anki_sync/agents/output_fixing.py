@@ -104,7 +104,7 @@ class OutputFixingParser(Generic[T]):
                         result = await self.agent.run(
                             prompt, instructions=system, **kwargs
                         )
-                    return result.data  # type: ignore[no-any-return]
+                    return result.output  # type: ignore[no-any-return]
                 else:
                     # Retry with fixed prompt
                     if last_output is None:
@@ -133,7 +133,7 @@ class OutputFixingParser(Generic[T]):
                             type(last_error).__name__ if last_error else "unknown"
                         ),
                     )
-                    return result.data  # type: ignore[no-any-return]
+                    return result.output  # type: ignore[no-any-return]
 
             except (ValueError, StructuredOutputError) as e:
                 # PydanticAI raises ValueError for validation errors
@@ -231,7 +231,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
 
             fix_agent = FixAgent(self.fix_model, output_type=str)
             result = await fix_agent.run(fix_prompt, instructions=fix_system)
-            improved_prompt = result.data
+            improved_prompt = result.output
 
             logger.info(
                 "output_fixing_prompt_improved",
@@ -257,19 +257,21 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             # Try to get it from the agent if it has output_type attribute
             if hasattr(self.agent, "output_type"):
                 result_type = self.agent.output_type  # type: ignore
+                # Check if it's a Pydantic model
+                if isinstance(result_type, type) and issubclass(result_type, BaseModel):
+                    # Try to get schema
+                    try:
+                        schema = result_type.model_json_schema()
+                        return json.dumps(schema, indent=2)
+                    except Exception:
+                        return f"Pydantic model: {result_type.__name__}"
+                else:
+                    return "String output"
             else:
                 # Fallback for generic agents
-                result_type = str  # Default fallback
-        except AttributeError:
-            result_type = str  # Default fallback
-        if issubclass(result_type, BaseModel):
-            # Try to get schema
-            try:
-                schema = result_type.model_json_schema()
-                return json.dumps(schema, indent=2)
-            except Exception:
-                return f"Pydantic model: {result_type.__name__}"
-        return "Structured output matching agent's result_type"
+                return "Structured output"
+        except (AttributeError, TypeError):
+            return "Structured output"
 
     def _extract_output_from_error(self, error: Exception) -> str:
         """Extract output string from validation error.
