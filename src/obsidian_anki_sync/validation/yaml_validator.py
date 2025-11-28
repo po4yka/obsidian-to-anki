@@ -375,7 +375,9 @@ class YAMLValidator(BaseValidator):
                 "Consider limiting to 2-5 most relevant.",
             )
         else:
-            self.add_passed(f"Related field has appropriate count ({len(related)} items)")
+            self.add_passed(
+                f"Related field has appropriate count ({len(related)} items)"
+            )
 
     def _check_dates(self) -> None:
         """Check date formats."""

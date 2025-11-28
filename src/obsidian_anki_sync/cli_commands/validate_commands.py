@@ -25,15 +25,23 @@ def validate_all(
     ] = False,
     incremental: Annotated[
         bool,
-        typer.Option("--incremental", help="Only validate files changed since last run"),
+        typer.Option(
+            "--incremental", help="Only validate files changed since last run"
+        ),
     ] = False,
     parallel: Annotated[
         bool,
-        typer.Option("--parallel", "-p", help="Use parallel processing for faster validation"),
+        typer.Option(
+            "--parallel", "-p", help="Use parallel processing for faster validation"
+        ),
     ] = False,
     workers: Annotated[
         int | None,
-        typer.Option("--workers", "-w", help="Number of parallel workers (default: CPU count, max 8)"),
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of parallel workers (default: CPU count, max 8)",
+        ),
     ] = None,
     report: Annotated[
         Path | None,
@@ -61,7 +69,9 @@ def validate_all(
 
     from ..validation import NoteValidator, ReportGenerator, Severity
 
-    logger.info("validate_all_started", incremental=incremental, fix=fix, parallel=parallel)
+    logger.info(
+        "validate_all_started", incremental=incremental, fix=fix, parallel=parallel
+    )
 
     vault_path = config.vault_path / config.source_dir
     if not vault_path.exists():
@@ -142,9 +152,7 @@ def validate_all(
     console.print(f"[dim]Log written to: {log_path}[/dim]")
 
     # Exit with error code if critical issues
-    critical_count = sum(
-        len(r["issues"].get(Severity.CRITICAL, [])) for r in results
-    )
+    critical_count = sum(len(r["issues"].get(Severity.CRITICAL, [])) for r in results)
     if critical_count > 0:
         console.print(
             f"\n[bold red]Found {critical_count} critical issue(s) - "
@@ -257,11 +265,17 @@ def validate_dir(
     ] = False,
     parallel: Annotated[
         bool,
-        typer.Option("--parallel", "-p", help="Use parallel processing for faster validation"),
+        typer.Option(
+            "--parallel", "-p", help="Use parallel processing for faster validation"
+        ),
     ] = False,
     workers: Annotated[
         int | None,
-        typer.Option("--workers", "-w", help="Number of parallel workers (default: CPU count, max 8)"),
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of parallel workers (default: CPU count, max 8)",
+        ),
     ] = None,
     report: Annotated[
         Path | None,
@@ -356,9 +370,7 @@ def validate_dir(
         console.print(f"\n[green]Report written to:[/green] {report}")
 
     # Exit with error code if critical issues
-    critical_count = sum(
-        len(r["issues"].get(Severity.CRITICAL, [])) for r in results
-    )
+    critical_count = sum(len(r["issues"].get(Severity.CRITICAL, [])) for r in results)
     if critical_count > 0:
         console.print(
             f"\n[bold red]Found {critical_count} critical issue(s)[/bold red]"

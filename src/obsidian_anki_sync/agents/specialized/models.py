@@ -14,9 +14,9 @@ class RepairResult:
     confidence: float = 0.0
     reasoning: str = ""
     error_message: str | None = None
-    warnings: list[str] = None
+    warnings: list[str] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.warnings is None:
             self.warnings = []
 
@@ -39,12 +39,12 @@ class AgentResult:
 
     success: bool
     content: str | None = None
-    metadata: dict[str, Any | None] = None
-    qa_pairs: list[dict[str, Any | None]] = None
+    metadata: dict[str, Any | None] | None = None
+    qa_pairs: list[dict[str, Any | None]] | None = None
     confidence: float = 0.0
     reasoning: str = ""
-    warnings: list[str] = None
+    warnings: list[str] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.warnings is None:
             self.warnings = []

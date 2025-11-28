@@ -57,7 +57,7 @@ class Note:
 
     def has_valid_metadata(self) -> bool:
         """Check if metadata meets requirements."""
-        return (
+        return bool(
             self.metadata.topic
             and len(self.metadata.language_tags) > 0
             and self.metadata.status != "draft"  # Business rule: no draft notes

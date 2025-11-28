@@ -117,7 +117,8 @@ class CircuitBreaker:
                         timeout=self.config.timeout,
                     )
                 else:
-                    raise CircuitBreakerError(f"Circuit breaker '{self.name}' is OPEN")
+                    raise CircuitBreakerError(
+                        f"Circuit breaker '{self.name}' is OPEN")
 
             # Check half-open call limit
             if self.state == CircuitBreakerState.HALF_OPEN:
@@ -261,7 +262,8 @@ class RetryWithJitter:
                 # Add jitter if enabled
                 if self.jitter:
                     jitter_amount = delay * self.jitter_range
-                    delay = delay + random.uniform(-jitter_amount, jitter_amount)
+                    delay = delay + \
+                        random.uniform(-jitter_amount, jitter_amount)
                     delay = max(0.1, delay)  # Ensure positive delay
 
                 logger.warning(
@@ -458,7 +460,8 @@ class ConfidenceValidator:
                     )
 
         # Validation passed
-        self._record_validation(confidence=confidence, reason="Valid", is_valid=True)
+        self._record_validation(confidence=confidence,
+                                reason="Valid", is_valid=True)
         return ConfidenceValidationResult(is_valid=True, reason="Valid")
 
     def _detect_suspicious_patterns(self, content: str) -> list[str]:
@@ -473,7 +476,8 @@ class ConfidenceValidator:
         suspicious = []
 
         # Check for excessive placeholders
-        placeholder_count = content.count("[PLACEHOLDER]") + content.count("[TODO]")
+        placeholder_count = content.count(
+            "[PLACEHOLDER]") + content.count("[TODO]")
         if placeholder_count > len(content) / 100:  # More than 1% placeholders
             suspicious.append("excessive_placeholders")
 
@@ -511,7 +515,7 @@ class ConfidenceValidator:
         confidence: float,
         reason: str,
         is_valid: bool,
-        patterns: list[str | None] = None,
+        patterns: list[str] | None = None,
     ) -> None:
         """Record validation decision for audit trail."""
         self.validation_history.append(

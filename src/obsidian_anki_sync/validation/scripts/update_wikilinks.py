@@ -66,13 +66,12 @@ class WikilinkUpdater:
         """Update wikilinks in a file."""
         try:
             content = filepath.read_text(encoding="utf-8")
-            original_content = content
             updated = False
 
             # Find all wikilinks [[...]]
             wikilink_pattern = r"\[\[([^\]]+)\]\]"
 
-            def replace_link(match):
+            def replace_link(match: re.Match[str]) -> str:
                 nonlocal updated
                 link = match.group(1)
 
@@ -136,7 +135,8 @@ class WikilinkUpdater:
 
 def main() -> None:
     """Main entry point for wikilink updater."""
-    parser = argparse.ArgumentParser(description="Update wikilinks after file renames")
+    parser = argparse.ArgumentParser(
+        description="Update wikilinks after file renames")
     parser.add_argument(
         "--dry-run",
         action="store_true",

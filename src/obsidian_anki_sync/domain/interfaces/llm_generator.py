@@ -19,7 +19,7 @@ class IGenerator(ABC):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
-        json_schema: dict[str, Any | None] = None,
+        json_schema: dict[str, Any | None] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
@@ -47,7 +47,7 @@ class IGenerator(ABC):
         prompt: str,
         system: str = "",
         temperature: float = 0.7,
-        json_schema: dict[str, Any | None] = None,
+        json_schema: dict[str, Any | None] | None = None,
         reasoning_enabled: bool = False,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM.
@@ -73,7 +73,7 @@ class IGenerator(ABC):
         system: str = "",
         temperature: float = 0.7,
         format: str = "",
-        json_schema: dict[str, Any | None] = None,
+        json_schema: dict[str, Any | None] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
     ) -> dict[str, Any]:

@@ -179,7 +179,9 @@ class ParallelValidator:
         Returns:
             List of validation result dicts in same order as input files
         """
-        show_prog = show_progress if show_progress is not None else self.config.show_progress
+        show_prog = (
+            show_progress if show_progress is not None else self.config.show_progress
+        )
 
         if show_prog and len(files) > 1:
             pbar = tqdm(total=len(files), desc="Validating (parallel)", unit="file")
@@ -194,9 +196,7 @@ class ParallelValidator:
             finally:
                 pbar.close()
         else:
-            return asyncio.run(
-                self._validate_with_context(files, validate_fn, None)
-            )
+            return asyncio.run(self._validate_with_context(files, validate_fn, None))
 
     async def _validate_with_context(
         self,

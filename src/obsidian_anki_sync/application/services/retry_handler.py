@@ -58,10 +58,10 @@ class RetryResult:
         self,
         success: bool,
         result: Any = None,
-        error: Exception = None,
+        error: Exception | None = None,
         attempts: int = 0,
         total_time: float = 0.0,
-        retry_delays: list[float] = None,
+        retry_delays: list[float] | None = None,
     ):
         """Initialize retry result.
 
@@ -89,7 +89,7 @@ class RetryHandler:
     Principle.
     """
 
-    def __init__(self, config: RetryConfig = None):
+    def __init__(self, config: RetryConfig | None = None):
         """Initialize retry handler.
 
         Args:
@@ -108,7 +108,7 @@ class RetryHandler:
     def execute_with_retry(
         self,
         operation: Callable[[], Any],
-        context: dict[str, Any | None] = None,
+        context: dict[str, Any | None] | None = None,
     ) -> RetryResult:
         """Execute an operation with retry logic.
 
@@ -221,7 +221,7 @@ class RetryHandler:
     def get_adaptive_config(
         self,
         error_type: str,
-        base_config: dict[str, int | None] = None,
+        base_config: dict[str, int | None] | None = None,
     ) -> RetryConfig:
         """Get adaptive retry config based on error type.
 
@@ -244,7 +244,10 @@ class RetryHandler:
             "semantic": 2,  # Semantic errors are harder to fix
         }
 
-        max_retries = base_config.get(error_type, defaults.get(error_type, 3))
+        max_retries = base_config.get(
+            error_type) or defaults.get(error_type, 3)
+        if max_retries is None:
+            max_retries = 3
 
         return RetryConfig(
             max_retries=max_retries,
@@ -258,8 +261,8 @@ class RetryHandler:
         self,
         operation: Callable[[], Any],
         error_type_getter: Callable[[Exception], str],
-        context: dict[str, Any | None] = None,
-        base_retry_config: dict[str, int | None] = None,
+        context: dict[str, Any | None] | None = None,
+        base_retry_config: dict[str, int | None] | None = None,
     ) -> RetryResult:
         """Execute operation with adaptive retry based on error type.
 
@@ -288,7 +291,8 @@ class RetryHandler:
             error_type = error_type_getter(e)
 
             # Get adaptive config for this error type
-            adaptive_config = self.get_adaptive_config(error_type, base_retry_config)
+            adaptive_config = self.get_adaptive_config(
+                error_type, base_retry_config)
 
             logger.debug(
                 "adaptive_retry_start",

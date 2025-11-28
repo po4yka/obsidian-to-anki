@@ -17,7 +17,11 @@ from .format_validator import FormatValidator
 from .hash_tracker import HashTracker
 from .link_validator import LinkValidator
 from .orchestrator import NoteValidator
-from .parallel_validator import ParallelConfig, ParallelValidator, validate_directory_parallel
+from .parallel_validator import (
+    ParallelConfig,
+    ParallelValidator,
+    validate_directory_parallel,
+)
 from .report_generator import ReportGenerator
 from .taxonomy_loader import TaxonomyLoader
 from .yaml_validator import YAMLValidator

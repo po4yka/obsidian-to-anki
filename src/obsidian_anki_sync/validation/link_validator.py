@@ -154,9 +154,7 @@ class LinkValidator(BaseValidator):
         new_content = content
 
         # Replace [[broken-link]] with [[suggested-link]]
-        new_content = new_content.replace(
-            f"[[{broken_link}]]", f"[[{suggested_link}]]"
-        )
+        new_content = new_content.replace(f"[[{broken_link}]]", f"[[{suggested_link}]]")
 
         # Also replace with display text: [[broken-link|text]] with [[suggested-link|text]]
         new_content = re.sub(
@@ -222,7 +220,9 @@ class LinkValidator(BaseValidator):
     ) -> tuple[str, dict[str, Any]]:
         """Auto-fix: Replace broken link in YAML related field."""
         new_frontmatter = dict(frontmatter)
-        if "related" in new_frontmatter and isinstance(new_frontmatter["related"], list):
+        if "related" in new_frontmatter and isinstance(
+            new_frontmatter["related"], list
+        ):
             new_frontmatter["related"] = [
                 suggested_link if item == broken_link else item
                 for item in new_frontmatter["related"]

@@ -166,9 +166,7 @@ class AndroidValidator(BaseValidator):
         if not isinstance(subtopics, list):
             return
 
-        invalid_subtopics = [
-            st for st in subtopics if st not in self.ANDROID_SUBTOPICS
-        ]
+        invalid_subtopics = [st for st in subtopics if st not in self.ANDROID_SUBTOPICS]
 
         if invalid_subtopics:
             self.add_issue(

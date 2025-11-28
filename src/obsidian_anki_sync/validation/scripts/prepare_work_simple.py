@@ -213,7 +213,9 @@ def main() -> None:
                         work_packages[issue_type].append(
                             {
                                 "file_info": {
-                                    k: v for k, v in result.items() if k != "issues_found"
+                                    k: v
+                                    for k, v in result.items()
+                                    if k != "issues_found"
                                 },
                                 "issue": issue,
                             }
@@ -227,16 +229,12 @@ def main() -> None:
     print("=" * 80)
     print("ISSUES FOUND")
     print("=" * 80)
-    print(
-        f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files"
-    )
+    print(f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
     print(
         f"Missing concept links:     {len(work_packages['missing_concept_links'])} files"
     )
     print(f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
-    print(
-        f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files"
-    )
+    print(f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
     print("=" * 80)
     print()
 

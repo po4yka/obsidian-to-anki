@@ -92,8 +92,8 @@ class IAnkiClient(ABC):
         deck_name: str,
         model_name: str,
         fields: dict[str, str],
-        tags: list[str | None] = None,
-        options: dict[str, Any | None] = None,
+        tags: list[str | None] | None = None,
+        options: dict[str, Any | None] | None = None,
     ) -> int:
         """Add a new note to Anki.
 
