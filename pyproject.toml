@@ -51,6 +51,10 @@ dependencies = [
     "psutil>=6.0.0",
     "tenacity>=9.0.0",
     "tqdm>=4.67.0",
+    # Validation dependencies
+    "thefuzz>=0.22.0",
+    "python-Levenshtein>=0.26.0",
+    "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]

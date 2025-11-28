@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .cli_commands.rag_commands import rag_app
 from .cli_commands.shared import get_config_and_logger
+from .cli_commands.validate_commands import validate_app
 from .cli_commands.sync_handler import run_sync
 from .obsidian.note_validator import validate_note_structure
 from .obsidian.parser import parse_frontmatter
@@ -26,6 +27,9 @@ app = typer.Typer(
 
 # Add RAG subcommand group
 app.add_typer(rag_app, name="rag", help="RAG (Retrieval-Augmented Generation) commands")
+
+# Add validation subcommand group
+app.add_typer(validate_app, name="validate", help="Vault validation commands for Q&A notes")
 
 console = Console()
 
