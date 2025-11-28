@@ -48,14 +48,14 @@ def get_config_and_logger(
         _config = load_config(config_path)
         set_config(_config)
 
-        # Configure logging with vault-specific log directory
-        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
+        # Configure logging with data_dir log directory (not in vault)
+        log_dir = _config.get_log_dir() if _config.vault_path else None
         configure_logging(
             log_level or _config.log_level,
             log_dir=log_dir,
             log_file=log_file,
             very_verbose=very_verbose,
-            project_log_dir=_config.project_log_dir,
+            project_log_dir=_config.get_log_dir(),
             error_log_retention_days=_config.error_log_retention_days,
         )
         _logger = get_logger("cli")

@@ -35,6 +35,14 @@ class Config(BaseSettings):
         default=Path("."), description="Source directory within vault"
     )
 
+    # Data storage directory - all processing data stored here (not in vault)
+    # Default: repo root directory (where config.yaml lives)
+    data_dir: Path = Field(
+        default=Path("."),
+        description="Directory for all data files (chroma_db, logs, cache, sync_state). "
+        "Keeps vault clean of processing artifacts.",
+    )
+
     @field_validator("vault_path", mode="before")
     @classmethod
     def parse_vault_path(cls, v: Any) -> Path:
@@ -48,7 +56,7 @@ class Config(BaseSettings):
             return v.expanduser().resolve()
         return v
 
-    @field_validator("source_dir", "db_path", mode="before")
+    @field_validator("source_dir", "db_path", "data_dir", mode="before")
     @classmethod
     def parse_path(cls, v: Any) -> Path:
         """Convert string to Path."""
@@ -97,19 +105,21 @@ class Config(BaseSettings):
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
 
-    # Database
+    # Database (relative to data_dir)
     db_path: Path = Field(
-        default=Path(".sync_state.db"), description="Path to sync state database"
+        default=Path(".sync_state.db"),
+        description="Path to sync state database (relative to data_dir)",
     )
 
-    # Logging
+    # Logging (relative to data_dir)
     log_level: str = Field(default="INFO", description="Log level")
     project_log_dir: Path = Field(
-        default=Path("./logs"), description="Directory for project-level logs"
+        default=Path("logs"),
+        description="Directory for project-level logs (relative to data_dir)",
     )
     problematic_notes_dir: Path = Field(
-        default=Path("./problematic_notes"),
-        description="Directory for archiving problematic notes",
+        default=Path("problematic_notes"),
+        description="Directory for archiving problematic notes (relative to data_dir)",
     )
     enable_problematic_notes_archival: bool = Field(
         default=True, description="Enable automatic archival of problematic notes"
@@ -271,9 +281,10 @@ class Config(BaseSettings):
         default=True, description="Enable persistent agentic memory for learning"
     )
 
-    # Memory storage path
+    # Memory storage path (relative to data_dir)
     memory_storage_path: Path = Field(
-        default=Path(".agent_memory"), description="Path to store agent memory data"
+        default=Path(".agent_memory"),
+        description="Path to store agent memory data (relative to data_dir)",
     )
 
     # Memory backend
@@ -312,7 +323,7 @@ class Config(BaseSettings):
 
     rag_db_path: Path = Field(
         default=Path(".chroma_db"),
-        description="Path to ChromaDB persistence directory (relative to vault)",
+        description="Path to ChromaDB persistence directory (relative to data_dir)",
     )
 
     rag_embedding_model: str = Field(
@@ -898,6 +909,53 @@ class Config(BaseSettings):
 
         return self
 
+    def get_data_path(self, relative_path: Path | str | None = None) -> Path:
+        """Get absolute path within data_dir.
+
+        Args:
+            relative_path: Path relative to data_dir. If None, returns data_dir itself.
+
+        Returns:
+            Absolute path resolved against data_dir.
+        """
+        data_dir = self.data_dir
+        if not data_dir.is_absolute():
+            # Resolve relative to current working directory
+            data_dir = Path.cwd() / data_dir
+        data_dir = data_dir.resolve()
+
+        if relative_path is None:
+            return data_dir
+        return data_dir / relative_path
+
+    def get_chroma_db_path(self) -> Path:
+        """Get absolute path to ChromaDB directory."""
+        return self.get_data_path(self.rag_db_path)
+
+    def get_sync_db_path(self) -> Path:
+        """Get absolute path to sync state database."""
+        return self.get_data_path(self.db_path)
+
+    def get_log_dir(self) -> Path:
+        """Get absolute path to log directory."""
+        return self.get_data_path(self.project_log_dir)
+
+    def get_validation_log_dir(self) -> Path:
+        """Get absolute path to validation log directory."""
+        return self.get_data_path("validation_logs")
+
+    def get_validation_cache_path(self) -> Path:
+        """Get absolute path to validation cache file."""
+        return self.get_data_path(".validation_cache.json")
+
+    def get_memory_storage_path(self) -> Path:
+        """Get absolute path to agent memory storage."""
+        return self.get_data_path(self.memory_storage_path)
+
+    def get_cache_dir(self) -> Path:
+        """Get absolute path to cache directory."""
+        return self.get_data_path(".cache")
+
 
 _config: Config | None = None
 
@@ -1006,6 +1064,10 @@ def load_config(config_path: Path | None = None) -> Config:
             config_kwargs["source_dir"] = Path(str(yaml_data["source_dir"]))
         if "db_path" in yaml_data:
             config_kwargs["db_path"] = Path(str(yaml_data["db_path"]))
+        if "data_dir" in yaml_data:
+            config_kwargs["data_dir"] = (
+                Path(str(yaml_data["data_dir"])).expanduser().resolve()
+            )
 
         config = Config(**config_kwargs)
 

@@ -68,11 +68,11 @@ class VaultVectorStore:
         self.config = config
 
         # Set up persistence directory
+        # Use config.get_chroma_db_path() to store in data_dir (not vault)
         if persist_directory:
             self.persist_directory = persist_directory
         else:
-            vault_path = Path(config.vault_path)
-            self.persist_directory = vault_path / ".chroma_db"
+            self.persist_directory = config.get_chroma_db_path()
 
         # Ensure directory exists
         self.persist_directory.mkdir(parents=True, exist_ok=True)
