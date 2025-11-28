@@ -17,14 +17,16 @@ class HashTracker:
     This allows skipping unchanged files on subsequent validation runs.
     """
 
-    def __init__(self, vault_root: Path) -> None:
+    def __init__(self, vault_root: Path, cache_dir: Path | None = None) -> None:
         """Initialize hash tracker.
 
         Args:
             vault_root: Root path of the vault (used for relative paths)
+            cache_dir: Directory to store cache file (defaults to vault_root if None)
         """
         self.vault_root = vault_root
-        self.cache_file = vault_root / CACHE_FILE
+        cache_location = cache_dir if cache_dir is not None else vault_root
+        self.cache_file = cache_location / CACHE_FILE
         self.cache = self._load_cache()
 
     def _load_cache(self) -> dict[str, Any]:

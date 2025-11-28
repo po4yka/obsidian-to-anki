@@ -38,6 +38,7 @@ class NoteValidator:
         enable_ai_fix: bool = False,
         ai_model: str | None = None,
         ai_provider: str = "ollama",
+        cache_dir: Path | None = None,
     ) -> None:
         """Initialize the note validator.
 
@@ -49,6 +50,7 @@ class NoteValidator:
             enable_ai_fix: Enable AI-powered fixes
             ai_model: AI model to use
             ai_provider: AI provider (ollama, openrouter, etc.)
+            cache_dir: Directory to store validation cache (defaults to vault_root if None)
         """
         self.vault_root = vault_root
         self.incremental = incremental
@@ -57,6 +59,7 @@ class NoteValidator:
         self.enable_ai_fix = enable_ai_fix
         self.ai_model = ai_model
         self.ai_provider = ai_provider
+        self.cache_dir = cache_dir
 
         # Load taxonomy
         taxonomy_file = TaxonomyLoader.find_taxonomy_file(vault_root)
@@ -68,7 +71,7 @@ class NoteValidator:
         self.valid_topics = self.taxonomy.get_valid_topics()
 
         # Initialize hash tracker for incremental validation
-        self.hash_tracker = HashTracker(vault_root) if incremental else None
+        self.hash_tracker = HashTracker(vault_root, cache_dir) if incremental else None
 
         # AI components (initialized lazily)
         self._ai_fixer = None

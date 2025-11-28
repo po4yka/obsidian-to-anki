@@ -74,6 +74,7 @@ def validate_all(
     validator = NoteValidator(
         vault_root=vault_path,
         incremental=incremental,
+        cache_dir=config.get_data_path(),
     )
 
     if parallel:
@@ -135,8 +136,8 @@ def validate_all(
         report.write_text(md_report, encoding="utf-8")
         console.print(f"\n[green]Report written to:[/green] {report}")
 
-    # Write log file
-    log_dir = vault_path / ".logs"
+    # Write log file to data_dir (not vault)
+    log_dir = config.get_validation_log_dir()
     log_path = validator.write_log_file(results, log_dir, skipped_count)
     console.print(f"[dim]Log written to: {log_path}[/dim]")
 
@@ -297,6 +298,7 @@ def validate_dir(
     validator = NoteValidator(
         vault_root=vault_path,
         incremental=incremental,
+        cache_dir=config.get_data_path(),
     )
 
     if parallel:
@@ -383,7 +385,7 @@ def validate_stats(
     from ..validation import HashTracker
 
     vault_path = config.vault_path / config.source_dir
-    tracker = HashTracker(vault_path)
+    tracker = HashTracker(vault_path, cache_dir=config.get_data_path())
     stats = tracker.get_stats()
 
     console.print("\n[bold cyan]Validation Cache Statistics[/bold cyan]\n")
@@ -412,7 +414,7 @@ def validate_clear_cache(
     from ..validation import HashTracker
 
     vault_path = config.vault_path / config.source_dir
-    tracker = HashTracker(vault_path)
+    tracker = HashTracker(vault_path, cache_dir=config.get_data_path())
 
     # Get stats before clearing
     stats = tracker.get_stats()
