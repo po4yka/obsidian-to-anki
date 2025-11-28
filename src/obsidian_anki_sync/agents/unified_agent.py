@@ -170,9 +170,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                 reasoning=(
                     "Cards generated successfully"
                     if result.success
-                    else result.errors[0]
-                    if result.errors
-                    else "Generation failed"
+                    else result.errors[0] if result.errors else "Generation failed"
                 ),
                 data=result,
                 warnings=result.warnings,

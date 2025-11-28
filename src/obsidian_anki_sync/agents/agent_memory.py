@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+import numpy as np
 from chromadb.config import Settings
 from openai import OpenAI
 
@@ -179,7 +180,7 @@ class AgentMemoryStore:
             ids=[memory_id],
             documents=[content],
             metadatas=[metadata],
-            embeddings=[embedding] if embedding else None,
+            embeddings=[np.array(embedding)] if embedding else None,
         )
 
         logger.debug(
@@ -235,7 +236,7 @@ class AgentMemoryStore:
             ids=[memory_id],
             documents=[content],
             metadatas=[metadata],
-            embeddings=[embedding] if embedding else None,
+            embeddings=[np.array(embedding)] if embedding else None,
         )
 
         logger.debug(
@@ -273,7 +274,7 @@ class AgentMemoryStore:
                 # Semantic search using embeddings
                 query_embedding = self.embeddings.embed_query(query_text)
                 results = collection.query(
-                    query_embeddings=[query_embedding],
+                    query_embeddings=[np.array(query_embedding)],
                     n_results=limit,
                 )
             else:
@@ -285,10 +286,11 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            ids = results.get("ids", [[]])
-            metadatas = results.get("metadatas", [[]])
-            documents = results.get("documents", [[]])
-            distances = results.get("distances", [[]])
+            ids: list[list[str]] = results.get("ids", [[]])
+            metadatas: list[list[dict[str, Any]]
+                            ] = results.get("metadatas", [[]])
+            documents: list[list[str]] = results.get("documents", [[]])
+            distances: list[list[float]] = results.get("distances", [[]])
 
             # Validate all arrays have consistent structure
             if ids and len(ids[0]) > 0:
@@ -297,13 +299,16 @@ class AgentMemoryStore:
                     # Safe access with bounds checking
                     memory_id = ids[0][i] if i < len(ids[0]) else None
                     metadata = (
-                        metadatas[0][i] if metadatas and len(metadatas[0]) > i else {}
+                        metadatas[0][i] if metadatas and len(
+                            metadatas[0]) > i else {}
                     )
                     document = (
-                        documents[0][i] if documents and len(documents[0]) > i else ""
+                        documents[0][i] if documents and len(
+                            documents[0]) > i else ""
                     )
                     distance = (
-                        distances[0][i] if distances and len(distances[0]) > i else None
+                        distances[0][i] if distances and len(
+                            distances[0]) > i else None
                     )
 
                     if memory_id is None:
@@ -354,7 +359,7 @@ class AgentMemoryStore:
                 # Semantic search using embeddings
                 query_embedding = self.embeddings.embed_query(query_text)
                 results = collection.query(
-                    query_embeddings=[query_embedding],
+                    query_embeddings=[np.array(query_embedding)],
                     n_results=1,  # Get best match
                 )
             else:
@@ -365,8 +370,9 @@ class AgentMemoryStore:
                 )
 
             # Extract recommendation with safe access
-            ids = results.get("ids", [[]])
-            metadatas = results.get("metadatas", [[]])
+            ids: list[list[str]] = results.get("ids", [[]])
+            metadatas: list[list[dict[str, Any]]
+                            ] = results.get("metadatas", [[]])
             if ids and len(ids[0]) > 0 and metadatas and len(metadatas[0]) > 0:
                 metadata = metadatas[0][0]
                 successful_agent_str = (
@@ -436,7 +442,7 @@ class AgentMemoryStore:
             ids=[memory_id],
             documents=[content],
             metadatas=[memory_metadata],
-            embeddings=[embedding] if embedding else None,
+            embeddings=[np.array(embedding)] if embedding else None,
         )
 
         return memory_id
@@ -485,7 +491,7 @@ class AgentMemoryStore:
             ids=[memory_id],
             documents=[content],
             metadatas=[metadata],
-            embeddings=[embedding] if embedding else None,
+            embeddings=[np.array(embedding)] if embedding else None,
         )
 
         return memory_id
@@ -509,11 +515,22 @@ class AgentMemoryStore:
 
                 # Filter old memories
                 old_ids = []
-                if all_memories["ids"]:
-                    for i, metadata in enumerate(all_memories["metadatas"]):
-                        timestamp = float(metadata.get("timestamp", "0"))
-                        if timestamp < cutoff_time:
-                            old_ids.append(all_memories["ids"][i])
+                if all_memories["ids"] and all_memories.get("metadatas"):
+                    metadatas = all_memories["metadatas"]
+                    if metadatas:
+                        for i, metadata in enumerate(metadatas):
+                            if metadata:
+                                timestamp_str = metadata.get("timestamp", "0")
+                                try:
+                                    timestamp = (
+                                        float(
+                                            timestamp_str) if timestamp_str else 0.0
+                                    )
+                                    if timestamp < cutoff_time:
+                                        old_ids.append(all_memories["ids"][i])
+                                except (ValueError, TypeError):
+                                    # Skip invalid timestamp values
+                                    continue
 
                 # Delete old memories
                 if old_ids:
