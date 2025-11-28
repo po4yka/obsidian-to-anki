@@ -40,6 +40,158 @@ language: "en|ru|both"
 -   **Code Blocks**: Preserve syntax highlighting
 -   **Image References**: Convert to absolute paths or data URIs
 
+## Wikilinks Handling (@001_workspace)
+
+### Wikilink Syntax Patterns
+
+Obsidian supports multiple wikilink formats that must be correctly parsed and normalized:
+
+1. **Basic Wikilink**: `[[Page Title]]`
+
+    - Simplest form linking to a note
+    - Page title may contain spaces and special characters
+    - Must be normalized to extract the page title
+
+2. **Wikilink with Alias**: `[[Page Title|Display Text]]`
+
+    - Pipe separator (`|`) separates target from display text
+    - Display text is shown in rendered markdown
+    - Target page title must be extracted for link resolution
+
+3. **Wikilink with Anchor**: `[[Page Title#Heading]]`
+
+    - Hash (`#`) separates page title from heading anchor
+    - Links to specific section within a note
+    - Both page title and anchor must be preserved
+
+4. **Wikilink with Block Reference**: `[[Page Title#^block-id]]`
+
+    - Caret (`^`) indicates block-level reference
+    - Links to specific block within a note
+    - Block ID must be preserved for navigation
+
+5. **Embedded Wikilink**: `![[Page Title]]`
+
+    - Exclamation mark (`!`) indicates embed
+    - Embeds content from target note
+    - Must be distinguished from regular links
+
+6. **Embedded Image**: `![[image.png]]`
+    - Image embeds use same syntax as note embeds
+    - Must be converted to standard markdown image syntax for compatibility
+    - Path resolution required for image references
+
+### Parsing Best Practices
+
+-   **Regex Pattern**: Use robust regex to match all wikilink variants
+-   Pattern must handle nested brackets in edge cases
+-   Must correctly identify pipe, hash, and caret separators
+-   Should preserve all components (title, alias, anchor, block-id)
+
+-   **Normalization Rules**:
+-   Strip `[[` and `]]` brackets to extract inner content
+-   Handle YAML frontmatter where `[[link]]` may be parsed as nested list
+-   Preserve whitespace within link text (may be intentional)
+-   Extract page title from aliased links (text before `|`)
+
+-   **Component Extraction**:
+-   Page Title: Text before `|`, `#`, or end of link
+-   Display Text: Text after `|` and before `#` (if present)
+-   Anchor: Text after `#` and before `^` (if present)
+-   Block ID: Text after `^` (if present)
+
+### Validation Rules
+
+-   **File Name Compatibility**:
+-   Avoid special characters in filenames: `#`, `^`, `[`, `]`, `|`, `.`
+-   Use lowercase filenames with underscores or hyphens
+-   Validate resolved paths prevent directory traversal (@013_security)
+
+-   **Link Validation**:
+-   Check if target note exists in vault
+-   Validate heading anchors exist in target note
+-   Detect broken links and report warnings
+-   Handle case-insensitive matching for note names
+
+-   **Path Resolution**:
+-   Resolve relative paths to absolute paths safely
+-   Handle vault root and subdirectory references
+-   Prevent symlink traversal and path attacks
+-   Normalize path separators across platforms
+
+### Conversion and Compatibility
+
+-   **Markdown Conversion**:
+-   Convert wikilinks to standard markdown: `[Display Text](Page%20Title.md)`
+-   URL-encode spaces and special characters in file paths
+-   Preserve anchors: `[Display Text](Page%20Title.md#Heading)`
+-   Handle relative paths for portability
+
+-   **Anki Compatibility**:
+-   Remove wikilinks from card content (not supported in Anki)
+-   Extract referenced content when needed
+-   Convert embeds to appropriate Anki media format
+-   Preserve source references in card metadata
+
+### Implementation Guidelines
+
+-   **Parser Functions**:
+-   Use `_normalize_wikilink()` for single value normalization
+-   Use `_normalize_link_list()` for frontmatter list fields
+-   Handle both string and list representations (YAML parsing artifacts)
+-   Support nested list structures from YAML parsing
+
+-   **Content Preprocessing**:
+-   Extract wikilinks before markdown conversion
+-   Validate link targets exist in vault
+-   Convert embeds to appropriate format for target system
+-   Preserve link context for source attribution
+
+-   **Error Handling**:
+-   Gracefully handle malformed wikilinks
+-   Log warnings for broken links without failing
+-   Provide suggestions for fixing invalid links
+-   Support dry-run mode for link validation
+
+### Code Examples
+
+```python
+# Basic normalization
+def normalize_wikilink(value: str) -> str | None:
+    """Extract page title from wikilink syntax."""
+    if not value or not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if text.startswith("[[") and text.endswith("]]"):
+        text = text[2:-2].strip()
+
+    # Extract page title (before | or #)
+    if "|" in text:
+        text = text.split("|")[0].strip()
+    if "#" in text:
+        text = text.split("#")[0].strip()
+
+    return text or None
+
+# Link validation
+def validate_wikilink(link: str, vault: Vault) -> bool:
+    """Validate that wikilink target exists."""
+    page_title = normalize_wikilink(link)
+    if not page_title:
+        return False
+
+    # Check if note exists (case-insensitive)
+    return vault.has_note(page_title)
+```
+
+### Performance Considerations (@014_performance)
+
+-   **Caching**: Cache resolved link targets to avoid repeated file system lookups
+-   **Batch Processing**: Validate multiple links in single vault scan
+-   **Lazy Resolution**: Resolve links only when needed, not during parsing
+-   **Index Building**: Maintain link index for fast validation
+
 ## Note Discovery (@009_sync)
 
 -   **Vault Scanning**: Recursively find markdown files
