@@ -3,7 +3,8 @@
 Handles applying sync actions to Anki (create, update, delete operations).
 """
 
-from typing import TYPE_CHECKING, Any
+import asyncio
+from typing import TYPE_CHECKING, Any, cast
 
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
@@ -12,6 +13,7 @@ from obsidian_anki_sync.exceptions import AnkiConnectError
 from obsidian_anki_sync.models import Card, SyncAction
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.sync.transactions import CardOperationError, CardTransaction
+from obsidian_anki_sync.utils.async_runner import AsyncioRunner
 from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -30,6 +32,7 @@ class ChangeApplier:
         anki_client: AnkiClient,
         progress_tracker: "ProgressTracker | None" = None,
         stats: dict[str, Any] | None = None,
+        async_runner: AsyncioRunner | None = None,
     ):
         """Initialize change applier.
 
@@ -45,6 +48,7 @@ class ChangeApplier:
         self.anki = anki_client
         self.progress = progress_tracker
         self.stats = stats or {}
+        self._async_runner = async_runner or AsyncioRunner.get_global()
 
     def apply_changes(self, changes: list[SyncAction]) -> None:
         """Apply sync actions to Anki.
@@ -189,8 +193,8 @@ class ChangeApplier:
             with CardTransaction(self.anki, self.db) as txn:
                 # Step 1: Add to Anki
                 note_id = self.anki.add_note(
-                    deck=self.config.anki_deck_name,
-                    note_type=self._get_anki_model_name(card.note_type),
+                    deck_name=self.config.anki_deck_name,
+                    model_name=self._get_anki_model_name(card.note_type),
                     fields=fields,
                     tags=card.tags,
                     guid=card.guid,
@@ -309,6 +313,64 @@ class ChangeApplier:
 
         logger.info("creating_cards_batch", total=total, batch_size=batch_size)
 
+        async def _create_notes_async(
+            payloads: list[dict[str, Any]], limit: int
+        ) -> list[int | None]:
+            semaphore = asyncio.Semaphore(limit)
+
+            async def _create_one(payload: dict[str, Any]) -> int | None:
+                async with semaphore:
+                    return cast(
+                        "int | None",
+                        await self.anki.invoke_async("addNote", {"note": payload}),
+                    )
+
+            return await asyncio.gather(*(_create_one(payload) for payload in payloads))
+
+        async def _update_cards_async(
+            updates: list[dict[str, Any]],
+            tag_payloads: list[tuple[int, list[str]]],
+            limit: int,
+        ) -> list[tuple[bool, bool]]:
+            semaphore = asyncio.Semaphore(limit)
+
+            async def _update_one(
+                update_payload: dict[str, Any], tag_payload: tuple[int, list[str]]
+            ) -> tuple[bool, bool]:
+                async with semaphore:
+                    field_success = True
+                    tag_success = True
+                    try:
+                        await self.anki.update_note_fields_async(
+                            update_payload["id"], update_payload["fields"]
+                        )
+                    except Exception as exc:  # pragma: no cover - network
+                        field_success = False
+                        logger.error(
+                            "batch_field_update_failed_async",
+                            note_id=update_payload["id"],
+                            error=str(exc),
+                        )
+                    try:
+                        await self.anki.update_note_tags_async(
+                            tag_payload[0], tag_payload[1]
+                        )
+                    except Exception as exc:  # pragma: no cover - network
+                        tag_success = False
+                        logger.error(
+                            "batch_tag_update_failed_async",
+                            note_id=tag_payload[0],
+                            error=str(exc),
+                        )
+                    return field_success, tag_success
+
+            return await asyncio.gather(
+                *(
+                    _update_one(update_payload, tag_payload)
+                    for update_payload, tag_payload in zip(updates, tag_payloads)
+                )
+            )
+
         for batch_start in range(0, total, batch_size):
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -341,7 +403,17 @@ class ChangeApplier:
             # Batch create in Anki
             try:
                 with CardTransaction(self.anki, self.db) as txn:
-                    note_ids = self.anki.add_notes(note_payloads)
+                    concurrency = max(
+                        1,
+                        min(
+                            self.config.max_concurrent_generations,
+                            len(note_payloads),
+                        ),
+                    )
+
+                    note_ids = self._async_runner.run(
+                        _create_notes_async(note_payloads, concurrency)
+                    )
 
                     # Process results
                     successful_cards = []
@@ -461,6 +533,50 @@ class ChangeApplier:
 
         logger.info("updating_cards_batch", total=total, batch_size=batch_size)
 
+        async def _update_cards_async(
+            updates: list[dict[str, Any]],
+            tag_payloads: list[tuple[int, list[str]]],
+            limit: int,
+        ) -> list[tuple[bool, bool]]:
+            semaphore = asyncio.Semaphore(limit)
+
+            async def _update_one(
+                update_payload: dict[str, Any], tag_payload: tuple[int, list[str]]
+            ) -> tuple[bool, bool]:
+                async with semaphore:
+                    field_success = True
+                    tag_success = True
+                    try:
+                        await self.anki.update_note_fields_async(
+                            update_payload["id"], update_payload["fields"]
+                        )
+                    except Exception as exc:  # pragma: no cover - network
+                        field_success = False
+                        logger.error(
+                            "batch_field_update_failed_async",
+                            note_id=update_payload["id"],
+                            error=str(exc),
+                        )
+                    try:
+                        await self.anki.update_note_tags_async(
+                            tag_payload[0], tag_payload[1]
+                        )
+                    except Exception as exc:  # pragma: no cover - network
+                        tag_success = False
+                        logger.error(
+                            "batch_tag_update_failed_async",
+                            note_id=tag_payload[0],
+                            error=str(exc),
+                        )
+                    return field_success, tag_success
+
+            return await asyncio.gather(
+                *(
+                    _update_one(update_payload, tag_payload)
+                    for update_payload, tag_payload in zip(updates, tag_payloads)
+                )
+            )
+
         for batch_start in range(0, total, batch_size):
             # Check for interruption
             if self.progress and self.progress.is_interrupted():
@@ -504,11 +620,16 @@ class ChangeApplier:
                             ("restore_anki_note", note_id, old_fields, old_tags)
                         )
 
-                    # Batch update fields
-                    field_results = self.anki.update_notes_fields(field_updates)
+                    concurrency = max(
+                        1,
+                        min(self.config.max_concurrent_generations, len(field_updates)),
+                    )
 
-                    # Batch update tags
-                    tag_results = self.anki.update_notes_tags(tag_updates)
+                    update_results = self._async_runner.run(
+                        _update_cards_async(field_updates, tag_updates, concurrency)
+                    )
+                    field_results = [result[0] for result in update_results]
+                    tag_results = [result[1] for result in update_results]
 
                     # Process results
                     successful_cards = []
