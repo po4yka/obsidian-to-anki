@@ -1,0 +1,66 @@
+---
+description: Domain-Driven Design principles, entity patterns, and architectural rules
+globs: ["src/obsidian_anki_sync/domain/**"]
+alwaysApply: true
+---
+
+# Domain Architecture Patterns
+
+## Domain-Driven Design (@001_workspace)
+
+-   **Entities**: Business objects with identity (`domain/entities/`)
+-   **Value Objects**: Immutable objects without identity
+-   **Interfaces**: Contract definitions (`domain/interfaces/`)
+-   **Services**: Domain logic without state (`domain/services/`)
+
+## Entity Patterns
+
+```python
+@dataclass(frozen=True)
+class Entity:
+    """Base entity with identity."""
+    id: str
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, self.__class__) and self.id == other.id
+
+    def __hash__(self) -> int:
+        return hash(self.id)
+```
+
+## Interface Segregation
+
+-   **Single Responsibility**: One interface per concern
+-   **Dependency Inversion**: Depend on abstractions, not concretions
+-   **Factory Pattern**: Use factories for complex object creation
+
+## Service Layer Patterns
+
+-   **Application Services**: Orchestrate domain objects (`application/`)
+-   **Domain Services**: Pure business logic without external dependencies
+-   **Infrastructure Services**: External system integrations
+
+## Repository Pattern (@009_sync)
+
+-   **Interface**: Define contracts in `domain/interfaces/`
+-   **Implementation**: Concrete implementations in `infrastructure/`
+-   **Dependency Injection**: Inject repositories into services
+
+## Validation Patterns
+
+-   **Entity Validation**: Validate invariants in entity constructors
+-   **Service Validation**: Business rule validation in services
+-   **Input Validation**: Sanitize external inputs at boundaries (@013_security)
+
+## Error Handling
+
+-   **Domain Exceptions**: Custom exceptions for business rule violations
+-   **Result Pattern**: Use Result types for operations that can fail
+-   **Logging**: Structured logging with context (@012_anki_integration)
+
+## Key Principles
+
+-   **Rich Domain Model**: Business logic lives in domain objects
+-   **No External Dependencies**: Domain layer should not depend on infrastructure
+-   **Testable**: Domain objects should be easily unit testable
+-   **Immutable Where Possible**: Prefer immutable value objects

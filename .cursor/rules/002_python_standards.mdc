@@ -1,0 +1,48 @@
+---
+description: Python style, type hints, PEP 8, and tool configurations
+globs: ["*.py"]
+alwaysApply: true
+---
+
+# Python Standards and Style
+
+## Code Style
+
+-   **PEP 8**: Follow Python Enhancement Proposal 8
+-   **Line Length**: 88 characters (Black default)
+-   **Naming**:
+    -   `snake_case` for functions and variables
+    -   `PascalCase` for classes
+    -   `UPPER_CASE` for constants
+    -   Descriptive names over abbreviations
+
+## Type Hints (@001_workspace)
+
+-   **Required**: All public APIs must have type hints
+-   **Modern Syntax**: Use `list[str]` instead of `List[str]`
+-   **Optionals**: Use `Optional[T]` or `T | None` for nullable types
+-   **Unions**: Use `X | Y` syntax for Python 3.10+
+
+## Imports
+
+-   **Grouping**: stdlib → third-party → local (one blank line between groups)
+-   **Tool Config**: `isort` with Black profile, 88 char line length
+
+## Tool Configuration (@005_git_workflow)
+
+-   **Black**: Line length 88, target Python 3.13
+-   **Ruff**: Line length 88, target Python 3.13, enable all recommended rules
+-   **Mypy**: Python version 3.13, strict mode, no untyped definitions
+-   **isort**: Black profile, line length 88, src paths `["src", "tests"]`
+
+## Error Handling
+
+-   **Specific Exceptions**: Never use bare `except Exception`
+-   **Context**: Always provide context in error messages
+-   **Logging**: Use `logger.exception()` for full traceback
+
+## Code Organization
+
+-   **Functions**: Under 50 lines when possible
+-   **Classes**: One per file (with related helper functions)
+-   **Constants**: Use named constants instead of magic numbers

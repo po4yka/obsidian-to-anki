@@ -1,0 +1,82 @@
+---
+description: AnkiConnect API integration, retry logic, and validation patterns
+globs: ["src/obsidian_anki_sync/anki/**"]
+alwaysApply: true
+---
+
+# Anki Integration Standards
+
+## AnkiConnect API (@001_workspace)
+
+-   **API Version**: Use AnkiConnect v6 protocol
+-   **Connection Validation**: Test connectivity before operations
+-   **Error Handling**: Handle network failures gracefully
+-   **Rate Limiting**: Respect Anki's rate limits
+
+## Client Architecture (@006_domain_architecture)
+
+```python
+class IAnkiClient(Protocol):
+    """Anki client interface with standard operations."""
+
+    async def add_note(self, note: dict) -> int:
+        """Add note and return note ID."""
+        ...
+
+    async def update_note(self, note_id: int, note: dict) -> bool:
+        """Update existing note."""
+        ...
+
+    async def delete_notes(self, note_ids: list[int]) -> int:
+        """Delete notes and return count."""
+        ...
+```
+
+## Retry Logic (@009_sync)
+
+-   **Exponential Backoff**: 3 attempts with increasing delays
+-   **Jitter**: Add randomness to prevent thundering herd
+-   **Circuit Breaker**: Stop retrying after threshold failures
+-   **Timeout**: Configurable timeouts per operation
+
+## Batch Operations (@014_performance)
+
+-   **Bulk API Calls**: Use batch operations when available
+-   **Transaction Grouping**: Group related operations
+-   **Progress Tracking**: Report progress for long operations
+-   **Rollback Support**: Undo failed batch operations
+
+## Validation Patterns
+
+-   **Response Validation**: Check API responses before processing
+-   **ID Verification**: Validate returned note IDs
+-   **Content Integrity**: Verify card content after creation
+-   **Conflict Detection**: Handle concurrent modifications
+
+## Connection Management
+
+-   **Pooling**: Reuse HTTP connections for performance
+-   **Health Checks**: Monitor connection health
+-   **Reconnection**: Automatic reconnection on failures
+-   **Cleanup**: Proper connection cleanup on shutdown
+
+## Error Classification
+
+-   **Network Errors**: Retry with backoff
+-   **API Errors**: Check error codes and handle appropriately
+-   **Validation Errors**: Log and report validation failures
+-   **Permission Errors**: Clear error messages for user action
+
+## Logging Standards (@013_security)
+
+-   **Structured Logging**: Use `structlog` for consistent formatting
+-   **Context**: Include operation context in log messages
+-   **Levels**: DEBUG (dev), INFO (operations), ERROR (failures)
+-   **Security**: Never log sensitive data or API responses
+
+## Testing Integration
+
+-   **Mock Client**: Use mock Anki client for unit tests
+-   **Integration Tests**: Test against real Anki with test deck
+-   **Error Simulation**: Test error handling and retry logic
+-   **Performance Testing**: Benchmark API call performance

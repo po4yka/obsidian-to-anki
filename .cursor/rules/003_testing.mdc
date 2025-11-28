@@ -1,0 +1,66 @@
+---
+description: Test structure, coverage requirements, and testing patterns
+globs: ["**/test_*.py", "**/tests/**/*.py"]
+alwaysApply: true
+---
+
+# Testing Standards
+
+## Test Structure
+
+-   **File Naming**: `test_module.py` for each `module.py`
+-   **Function Names**: `test_feature_with_valid_input`
+-   **Class Grouping**: Use test classes for related functionality
+-   **Fixture Usage**: Import from `conftest.py`
+
+## Coverage Requirements
+
+-   **Minimum**: 90% coverage for new code
+-   **Critical Paths**: 100% coverage for critical paths
+-   **Edge Cases**: Test both success and failure cases
+-   **Boundaries**: Test edge cases and boundary conditions
+
+## Test Documentation
+
+-   **Docstrings**: Each test should have a docstring explaining what it tests
+-   **Assertion Messages**: Use descriptive assertion messages
+-   **Focus**: Keep tests focused (one concept per test)
+
+## Test Categories
+
+-   **Unit**: `tests/unit/` - individual components
+-   **Integration**: `tests/integration/` - component interactions
+-   **Slow**: Mark slow tests with `@pytest.mark.slow`
+
+## Test Configuration
+
+```python
+# pytest.ini_options
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src/obsidian_anki_sync --cov-report=term-missing"
+markers = ["unit: Unit tests", "integration: Integration tests", "slow: Slow running tests"]
+```
+
+## Coverage Configuration
+
+```python
+# .coveragerc
+[run]
+source = ["src/obsidian_anki_sync"]
+fail_under = 90
+
+[report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+```

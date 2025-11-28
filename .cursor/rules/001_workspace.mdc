@@ -1,0 +1,54 @@
+---
+description: Root project definition, architecture overview, and core constraints
+globs: []
+alwaysApply: true
+---
+
+# Obsidian to Anki APF Sync - Core Architecture
+
+## Project Overview
+
+This is a Python application that synchronizes Obsidian Q&A notes to Anki flashcards using LLM-powered generation with multi-agent validation.
+
+## Architecture Layers (@006_domain_architecture)
+
+-   **Domain**: Entities, interfaces, and core business logic (`src/obsidian_anki_sync/domain/`)
+-   **Application**: Use cases and services (`src/obsidian_anki_sync/application/`)
+-   **Infrastructure**: External integrations (`src/obsidian_anki_sync/infrastructure/`)
+-   **APF**: Card generation and HTML formatting (`src/obsidian_anki_sync/apf/`)
+-   **Agents**: Multi-agent validation system (`src/obsidian_anki_sync/agents/`)
+
+## Key Principles
+
+-   **Doc-Driven**: `.docs/` directory is our "Shared Brain" - consult it for all decisions
+-   **Test-Driven**: Write tests before implementation for logic-related changes
+-   **Template-Driven**: Use templates from `.docs/TEMPLATES/` for new documentation
+-   **Context-Aware**: Understand task scale (minor vs major) and adjust process accordingly
+
+## Core Constraints
+
+-   **Python 3.13+**: Modern Python with type hints and latest features
+-   **APF v2.1**: Strict compliance with Anki Prompts Format specifications (@010_apf)
+-   **Bilingual**: English/Russian content support (@011_obsidian_integration)
+-   **Security-First**: No hardcoded secrets, validate all inputs (@013_security)
+
+## Configuration Management
+
+-   Use Pydantic settings with YAML + environment variables
+-   Model presets: "cost_effective", "balanced", "high_quality", "fast"
+-   Provider factory pattern for LLM selection
+-   Path validation and symlink prevention
+
+## Multi-Agent System (@007_agents)
+
+-   Pre-Validator → Generator → Post-Validator pipeline
+-   LangGraph state machines for complex workflows
+-   Memory-enhanced learning for quality improvement
+-   Automatic agent routing per content type
+
+## References
+
+-   Requirements: `.docs/REQUIREMENTS.md`
+-   Architecture: `.docs/ADR/`
+-   APF Spec: `.docs/APF Cards/`
+-   Agent Docs: `.docs/AGENTS.md`

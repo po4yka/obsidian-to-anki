@@ -1,0 +1,72 @@
+---
+description: LLM provider interfaces, factory patterns, and integration standards
+globs: ["src/obsidian_anki_sync/providers/**"]
+alwaysApply: true
+---
+
+# LLM Provider Architecture
+
+## Provider Interface (@006_domain_architecture)
+
+```python
+class ILLMProvider(Protocol):
+    """Standard interface for all LLM providers."""
+
+    async def generate(self, prompt: str, **kwargs) -> str:
+        """Generate text from prompt."""
+        ...
+
+    async def validate_connection(self) -> bool:
+        """Validate provider connectivity."""
+        ...
+```
+
+## Factory Pattern (@001_workspace)
+
+-   **ProviderFactory**: Creates provider instances from configuration
+-   **Dynamic Loading**: Support for different provider types
+-   **Configuration Validation**: Validate provider settings at startup
+-   **Connection Pooling**: Reuse connections for performance
+
+## Supported Providers
+
+-   **OpenAI**: GPT models via API
+-   **Anthropic**: Claude models via API
+-   **OpenRouter**: Unified access to multiple providers
+-   **Ollama**: Local model serving
+-   **LM Studio**: Local model management
+
+## Model Configuration
+
+-   **Preset System**: "cost_effective", "balanced", "high_quality", "fast"
+-   **Task-Specific**: Override models per agent/task type
+-   **Fallback Chain**: Automatic fallback to simpler models on failure
+-   **Rate Limiting**: Respect provider rate limits
+
+## Error Handling
+
+-   **Retry Logic**: Exponential backoff for transient failures
+-   **Circuit Breaker**: Prevent cascading failures
+-   **Timeout Management**: Configurable timeouts per operation
+-   **Error Classification**: Distinguish retryable vs permanent errors
+
+## Token Management
+
+-   **Usage Tracking**: Monitor token consumption
+-   **Cost Optimization**: Choose efficient models for tasks
+-   **Caching**: Cache frequent prompts and responses
+-   **Limits**: Respect context window limitations
+
+## Security (@013_security)
+
+-   **API Keys**: Environment variables only, never hardcoded
+-   **Validation**: Validate all inputs before sending to providers
+-   **Logging**: Never log sensitive data or API keys
+-   **Encryption**: Encrypt sensitive configuration data
+
+## Testing
+
+-   **Mock Providers**: Implement mock providers for testing
+-   **Integration Tests**: Test against real providers with rate limiting
+-   **Provider Agnostic**: Write code that works with any provider
+-   **Configuration Testing**: Validate configuration loading and validation

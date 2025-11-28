@@ -1,0 +1,60 @@
+---
+description: Multi-agent system patterns, validation flows, and LLM integration rules
+globs: ["src/obsidian_anki_sync/agents/**"]
+alwaysApply: true
+---
+
+# Agent System Architecture
+
+## Multi-Agent Pipeline (@001_workspace)
+
+```
+Input → Pre-Validator → Generator → Post-Validator → Output
+```
+
+-   **Pre-Validator**: Early rejection of invalid inputs (15-20% faster)
+-   **Generator**: LLM-powered card generation with context
+-   **Post-Validator**: Quality assurance and error correction
+-   **Auto-Fix**: Retry with corrections on validation failures
+
+## Agent Patterns
+
+-   **LangGraph**: State machine workflows for complex agent interactions
+-   **LangChain**: Chain-of-thought reasoning and tool usage
+-   **PydanticAI**: Structured output validation and error handling
+-   **Router**: Dynamic agent selection based on content type
+
+## Memory Enhancement (@008_providers)
+
+-   **Pattern Learning**: Learn successful generation patterns per topic
+-   **Quality Feedback**: Use memorization assessments for optimization
+-   **User Preferences**: Adapt to individual user preferences
+-   **Context Enrichment**: Add relevant context from knowledge base
+
+## Validation Flows
+
+-   **Early Rejection**: Pre-validate inputs before expensive LLM calls
+-   **Structured Output**: Use Pydantic models for reliable parsing
+-   **Error Recovery**: Retry with different models/strategies on failure
+-   **Quality Gates**: Multiple validation layers for high reliability
+
+## LLM Integration Rules
+
+-   **Provider Factory**: Use factory pattern for LLM provider selection (@008_providers)
+-   **Model Presets**: "cost_effective", "balanced", "high_quality", "fast"
+-   **Temperature Control**: Low temperature (0.2) for consistency
+-   **Token Management**: Track and optimize token usage
+
+## Agent Routing
+
+-   **Content Analysis**: Route based on content type and complexity
+-   **Model Selection**: Choose appropriate model for task requirements
+-   **Fallback Strategies**: Graceful degradation when preferred models unavailable
+-   **Performance Optimization**: Cache results and avoid redundant calls
+
+## Testing Agent Systems
+
+-   **Mock Providers**: Use mock LLM providers for unit tests
+-   **Integration Tests**: End-to-end validation with real providers
+-   **Performance Benchmarks**: Track latency and success rates
+-   **A/B Testing**: Compare different agent configurations
