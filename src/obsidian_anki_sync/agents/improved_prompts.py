@@ -58,7 +58,7 @@ Return a structured JSON with:
 
 ## Examples
 
-### Example 1: Valid Note ✓
+### Example 1: Valid Note (VALID)
 Input:
 ```
 ---
@@ -89,7 +89,7 @@ Output:
 }
 ```
 
-### Example 2: Missing Required Field ✗
+### Example 2: Missing Required Field (INVALID)
 Input:
 ```
 ---
@@ -120,7 +120,7 @@ Output:
 }
 ```
 
-### Example 3: Empty Content ✗
+### Example 3: Empty Content (INVALID)
 Input:
 ```
 ---
@@ -371,26 +371,26 @@ Output:
 
 ## Common Mistakes to Avoid
 
-❌ **Don't**: Create cards with vague questions
-✓ **Do**: Make questions specific and answerable
+AVOID: Create cards with vague questions
+CORRECT: Make questions specific and answerable
 
-❌ **Don't**: Put answer hints in the question
-✓ **Do**: Keep Front field focused on the question only
+AVOID: Put answer hints in the question
+CORRECT: Keep Front field focused on the question only
 
-❌ **Don't**: Use broken HTML or forget to escape special characters
-✓ **Do**: Use proper HTML tags and escape &, <, >, quotes
+AVOID: Use broken HTML or forget to escape special characters
+CORRECT: Use proper HTML tags and escape &, <, >, quotes
 
-❌ **Don't**: Generate empty Extra sections
-✓ **Do**: Either omit Extra or add meaningful content
+AVOID: Generate empty Extra sections
+CORRECT: Either omit Extra or add meaningful content
 
-❌ **Don't**: Mix languages within a single card
-✓ **Do**: Create separate cards for each language
+AVOID: Mix languages within a single card
+CORRECT: Create separate cards for each language
 
-❌ **Don't**: Use `$` for MathJax
-✓ **Do**: Use `\\( ... \\)` and `\\[ ... \\]`
+AVOID: Use `$` for MathJax
+CORRECT: Use `\\( ... \\)` and `\\[ ... \\]`
 
-❌ **Don't**: Forget `CardType: Cloze` for cloze cards
-✓ **Do**: Update metadata when using `{{c1::...}}`
+AVOID: Forget `CardType: Cloze` for cloze cards
+CORRECT: Update metadata when using `{{c1::...}}`
 
 ## Instructions
 
@@ -455,7 +455,7 @@ Return structured JSON with:
 
 ## Examples
 
-### Example 1: Valid Card ✓
+### Example 1: Valid Card (VALID)
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
@@ -491,7 +491,7 @@ Output:
 }
 ```
 
-### Example 2: Missing Required Comment ✗
+### Example 2: Missing Required Comment (INVALID)
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
@@ -535,7 +535,7 @@ Output:
 }
 ```
 
-### Example 3: Factual Error ✗
+### Example 3: Factual Error (INVALID)
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
@@ -580,7 +580,7 @@ Output:
 }
 ```
 
-### Example 4: Broken HTML ✗
+### Example 4: Broken HTML (INVALID)
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->

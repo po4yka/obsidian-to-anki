@@ -135,14 +135,14 @@ def _map_simple(parsed: dict) -> dict[str, str]:
         sample += parsed["sample_code"]
 
     return {
-        "★ Title": parsed.get("title", ""),
-        "☆ Subtitle": parsed.get("subtitle", ""),
-        "☆ Syntax (inline code)": parsed.get("syntax", ""),
-        "★ Sample (code block)": sample.strip(),
-        "★ Key point (code block)": parsed.get("key_point", ""),
-        "★ Key point notes": parsed.get("key_point_notes", ""),
-        "✎ Other notes": parsed.get("other_notes", ""),
-        "✎ Markdown": parsed.get("markdown", ""),
+        "Primary Title": parsed.get("title", ""),
+        "Secondary Subtitle": parsed.get("subtitle", ""),
+        "Secondary Syntax (inline code)": parsed.get("syntax", ""),
+        "Primary Sample (code block)": sample.strip(),
+        "Primary Key point (code block)": parsed.get("key_point", ""),
+        "Primary Key point notes": parsed.get("key_point_notes", ""),
+        "Note Other notes": parsed.get("other_notes", ""),
+        "Note Markdown": parsed.get("markdown", ""),
     }
 
 
@@ -158,14 +158,14 @@ def _map_missing(parsed: dict) -> dict[str, str]:
         sample += parsed["sample_code"]
 
     return {
-        "★ Title": parsed.get("title", ""),
-        "☆ Subtitle": parsed.get("subtitle", ""),
-        "☆ Syntax (inline code)": parsed.get("syntax", ""),
-        "★ Sample (code block)": sample.strip(),
-        "★ Key point (code block)": parsed.get("key_point", ""),
-        "★ Key point notes": parsed.get("key_point_notes", ""),
-        "✎ Other notes": parsed.get("other_notes", ""),
-        "✎ Markdown": parsed.get("markdown", ""),
+        "Primary Title": parsed.get("title", ""),
+        "Secondary Subtitle": parsed.get("subtitle", ""),
+        "Secondary Syntax (inline code)": parsed.get("syntax", ""),
+        "Primary Sample (code block)": sample.strip(),
+        "Primary Key point (code block)": parsed.get("key_point", ""),
+        "Primary Key point notes": parsed.get("key_point_notes", ""),
+        "Note Other notes": parsed.get("other_notes", ""),
+        "Note Markdown": parsed.get("markdown", ""),
     }
 
 
@@ -181,12 +181,12 @@ def _map_draw(parsed: dict) -> dict[str, str]:
         sample += parsed["sample_code"]
 
     return {
-        "★ Title": parsed.get("title", ""),
-        "☆ Subtitle": parsed.get("subtitle", ""),
-        "☆ Syntax (inline code)": parsed.get("syntax", ""),
-        "★ Sample (code block)": sample.strip(),
-        "★ Key point (code block)": parsed.get("key_point", ""),
-        "★ Key point notes": parsed.get("key_point_notes", ""),
-        "✎ Other notes": parsed.get("other_notes", ""),
-        "✎ Markdown": parsed.get("markdown", ""),
+        "Primary Title": parsed.get("title", ""),
+        "Secondary Subtitle": parsed.get("subtitle", ""),
+        "Secondary Syntax (inline code)": parsed.get("syntax", ""),
+        "Primary Sample (code block)": sample.strip(),
+        "Primary Key point (code block)": parsed.get("key_point", ""),
+        "Primary Key point notes": parsed.get("key_point_notes", ""),
+        "Note Other notes": parsed.get("other_notes", ""),
+        "Note Markdown": parsed.get("markdown", ""),
     }

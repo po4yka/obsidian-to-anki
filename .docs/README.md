@@ -11,7 +11,7 @@ New to the project? Start here:
 
 ## Documentation Structure
 
-### 🏗️ Architecture
+### Architecture
 
 Core system design and implementation details.
 
@@ -21,7 +21,7 @@ Core system design and implementation details.
 -   **[Synchronization](ARCHITECTURE/sync.md)** - Bidirectional sync architecture
 -   **[APF Format](ARCHITECTURE/apf.md)** - Anki Prompts Format specification
 
-### 📋 Guides
+### Guides
 
 Practical guides for using and configuring the system.
 
@@ -30,7 +30,7 @@ Practical guides for using and configuring the system.
 -   **[AI Validation](GUIDES/validation.md)** - Automated validation and fixing
 -   **[Troubleshooting](GUIDES/troubleshooting.md)** - Common issues and solutions
 
-### 📚 Reference
+### Reference
 
 Detailed specifications and technical reference.
 
@@ -44,14 +44,14 @@ Detailed specifications and technical reference.
 -   **[Templates](REFERENCE/templates/)** - Documentation and code templates
 -   **[Interview Questions](REFERENCE/interview_questions/)** - Sample content and templates
 
-### 📝 Architecture Decisions
+### Architecture Decisions
 
 Historical context and design rationale.
 
 -   **[ADR Directory](ADR/)** - Architecture Decision Records
 -   **[README](ADR/README.md)** - ADR process and current decisions
 
-### 🛠️ Implementation Notes
+### Implementation Notes
 
 Technical analysis and optimization details.
 
@@ -82,10 +82,10 @@ Technical analysis and optimization details.
 
 ## Navigation Tips
 
--   **🔍 Search**: Use your editor's search to find specific topics
--   **📖 Cross-references**: Documents link to related content
--   **📋 Checklists**: Look for checklists in guides for step-by-step processes
--   **🔗 API Reference**: Technical details link to code when available
+-   **Search**: Use your editor's search to find specific topics
+-   **Cross-references**: Documents link to related content
+-   **Checklists**: Look for checklists in guides for step-by-step processes
+-   **API Reference**: Technical details link to code when available
 
 ## Contributing to Documentation
 

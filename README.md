@@ -10,19 +10,19 @@ Synchronize Obsidian Q&A notes to Anki flashcards using LLM-powered generation w
 
 ## Features
 
--   **🔄 Bidirectional Sync**: Full synchronization between Obsidian notes and Anki cards
--   **🤖 Multi-Agent LLM System**: Advanced agent orchestration with LangGraph and PydanticAI
--   **🌐 Multi-Provider Support**: Ollama, OpenAI, Anthropic, OpenRouter, LM Studio
--   **🧠 Memory-Enhanced Learning**: Continuous quality improvement through pattern learning
--   **🔒 Privacy-First Architecture**: 100% local processing option with Ollama
--   **🌍 Bilingual Support**: English/Russian content with automatic language detection
--   **📊 Progress Tracking**: Resumable syncs with detailed progress reporting
--   **🛡️ Security First**: Path validation, API key protection, input sanitization
--   **📈 Quality Assurance**: Multi-stage validation with auto-fix capabilities
--   **🔍 RAG Integration**: Retrieval-augmented generation for enhanced context
--   **📋 Batch Operations**: Efficient bulk processing with transaction rollback
--   **🎯 APF v2.1 Compliance**: Strict adherence to Anki Prompts Format specifications
--   **📊 Validation Suite**: Comprehensive note validation and repair tools
+-   **Bidirectional Sync**: Full synchronization between Obsidian notes and Anki cards
+-   **Multi-Agent LLM System**: Advanced agent orchestration with LangGraph and PydanticAI
+-   **Multi-Provider Support**: Ollama, OpenAI, Anthropic, OpenRouter, LM Studio
+-   **Memory-Enhanced Learning**: Continuous quality improvement through pattern learning
+-   **Privacy-First Architecture**: 100% local processing option with Ollama
+-   **Bilingual Support**: English/Russian content with automatic language detection
+-   **Progress Tracking**: Resumable syncs with detailed progress reporting
+-   **Security First**: Path validation, API key protection, input sanitization
+-   **Quality Assurance**: Multi-stage validation with auto-fix capabilities
+-   **RAG Integration**: Retrieval-augmented generation for enhanced context
+-   **Batch Operations**: Efficient bulk processing with transaction rollback
+-   **APF v2.1 Compliance**: Strict adherence to Anki Prompts Format specifications
+-   **Validation Suite**: Comprehensive note validation and repair tools
 
 ## Table of Contents
 
@@ -63,11 +63,11 @@ flowchart TD
 
 **Key Benefits**:
 
--   **🚀 Performance**: 15-20% faster through early rejection
--   **🎯 Quality**: Multi-stage validation with auto-correction
--   **🔄 Resilience**: Automatic retry with different strategies
--   **🧠 Learning**: Pattern recognition improves over time
--   **🔒 Privacy**: 100% local processing with Ollama
+-   **Performance**: 15-20% faster through early rejection
+-   **Quality**: Multi-stage validation with auto-correction
+-   **Resilience**: Automatic retry with different strategies
+-   **Learning**: Pattern recognition improves over time
+-   **Privacy**: 100% local processing with Ollama
 
 ## System Architecture
 
@@ -285,14 +285,14 @@ obsidian-anki-sync validate "path/to/note.md"
 ```mermaid
 graph TD
     subgraph "Local Providers"
-        A[Ollama<br/>🐧 Privacy-first<br/>📁 Offline capable<br/>⚡ Fast inference<br/>💾 High RAM usage]
-        B[LM Studio<br/>🖥️ GUI interface<br/>🎨 User-friendly<br/>🔧 Local models<br/>⚙️ Easy setup]
+        A[Ollama<br/>Privacy-first<br/>Offline capable<br/>Fast inference<br/>High RAM usage]
+        B[LM Studio<br/>GUI interface<br/>User-friendly<br/>Local models<br/>Easy setup]
     end
 
     subgraph "Cloud Providers"
-        C[OpenAI<br/>🤖 GPT-4 quality<br/>🌐 Always available<br/>💰 Token-based pricing<br/>🔒 Enterprise security]
-        D[Anthropic<br/>🧠 Claude excellence<br/>📊 Safety-focused<br/>💎 Premium quality<br/>🔑 API key required]
-        E[OpenRouter<br/>🔄 Multi-model access<br/>🛒 Model marketplace<br/>💵 Cost optimization<br/>🎯 Best value]
+        C[OpenAI<br/>GPT-4 quality<br/>Always available<br/>Token-based pricing<br/>Enterprise security]
+        D[Anthropic<br/>Claude excellence<br/>Safety-focused<br/>Premium quality<br/>API key required]
+        E[OpenRouter<br/>Multi-model access<br/>Model marketplace<br/>Cost optimization<br/>Best value]
     end
 
     A --> F{Choose Based On:}
@@ -497,15 +497,15 @@ uv sync --all-extras
 
 ## Documentation
 
--   **[📚 Full Documentation](.docs/README.md)** - Complete guides and reference
--   **[🚀 Getting Started](.docs/GETTING_STARTED.md)** - Quick setup guide
--   **[🔧 Configuration](.docs/GUIDES/configuration.md)** - Model and provider setup
--   **[🔄 Synchronization](.docs/GUIDES/synchronization.md)** - Change management guide
--   **[🏗️ Architecture](.docs/ARCHITECTURE/README.md)** - System design overview
--   **[🃏 APF Format](.docs/ARCHITECTURE/apf.md)** - Card format specification
--   **[🤖 Agent System](.docs/ARCHITECTURE/agents.md)** - Multi-agent architecture
--   **[⚙️ LLM Providers](.docs/ARCHITECTURE/providers.md)** - Provider integration
--   **[🔍 Security Best Practices](#security-features)** - Security guidelines
+-   **[Full Documentation](.docs/README.md)** - Complete guides and reference
+-   **[Getting Started](.docs/GETTING_STARTED.md)** - Quick setup guide
+-   **[Configuration](.docs/GUIDES/configuration.md)** - Model and provider setup
+-   **[Synchronization](.docs/GUIDES/synchronization.md)** - Change management guide
+-   **[Architecture](.docs/ARCHITECTURE/README.md)** - System design overview
+-   **[APF Format](.docs/ARCHITECTURE/apf.md)** - Card format specification
+-   **[Agent System](.docs/ARCHITECTURE/agents.md)** - Multi-agent architecture
+-   **[LLM Providers](.docs/ARCHITECTURE/providers.md)** - Provider integration
+-   **[Security Best Practices](#security-features)** - Security guidelines
 
 ## Contributing
 

@@ -65,11 +65,11 @@ def run_sync(
     # Display results
     for result in results:
         if result.passed:
-            icon = "[green]✓[/green]"
+            icon = "[green]PASS[/green]"
         elif result.severity == "warning":
-            icon = "[yellow]⚠[/yellow]"
+            icon = "[yellow]WARN[/yellow]"
         else:
-            icon = "[red]✗[/red]"
+            icon = "[red]FAIL[/red]"
 
         console.print(f"{icon} {result.name}: {result.message}")
 
@@ -97,11 +97,13 @@ def run_sync(
             "[dim]You may proceed, but some features may not work as expected.[/dim]\n"
         )
     else:
-        console.print("[bold green]All pre-flight checks passed![/bold green]\n")
+        console.print(
+            "[bold green]All pre-flight checks passed![/bold green]\n")
 
     try:
         with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
-            progress_tracker = _handle_progress_tracking(db, resume, no_resume, logger)
+            progress_tracker = _handle_progress_tracking(
+                db, resume, no_resume, logger)
 
             session_scope = (
                 session_context(progress_tracker.progress.session_id)
@@ -121,7 +123,8 @@ def run_sync(
                 progress_display = ProgressDisplay(show_reflections=True)
 
                 # Pass progress display to engine
-                engine = SyncEngine(config, db, anki, progress_tracker=progress_tracker)
+                engine = SyncEngine(
+                    config, db, anki, progress_tracker=progress_tracker)
                 engine.set_progress_display(progress_display)
 
                 # Show sample mode info
@@ -190,7 +193,8 @@ def _handle_progress_tracking(
     if session_id:
         try:
             progress_tracker = ProgressTracker(db, session_id=session_id)
-            console.print(f"\n[green]Resuming sync session: {session_id}[/green]\n")
+            console.print(
+                f"\n[green]Resuming sync session: {session_id}[/green]\n")
             return progress_tracker
         except ValueError as e:
             console.print(f"\n[red]Cannot resume: {e}[/red]\n")
@@ -222,13 +226,15 @@ def _display_sync_results(stats: dict[str, Any], no_index: bool) -> None:
         index_stats = stats["index"]
 
         # Note statistics
-        index_table.add_row("Notes", "Total", str(index_stats.get("total_notes", 0)))
+        index_table.add_row("Notes", "Total", str(
+            index_stats.get("total_notes", 0)))
         note_status = index_stats.get("note_status", {})
         for status, count in note_status.items():
             index_table.add_row("Notes", status.capitalize(), str(count))
 
         # Card statistics
-        index_table.add_row("Cards", "Total", str(index_stats.get("total_cards", 0)))
+        index_table.add_row("Cards", "Total", str(
+            index_stats.get("total_cards", 0)))
         index_table.add_row(
             "Cards",
             "In Obsidian",
@@ -247,7 +253,8 @@ def _display_sync_results(stats: dict[str, Any], no_index: bool) -> None:
         console.print()
 
     # Create a Rich table for sync results
-    table = Table(title="Sync Results", show_header=True, header_style="bold magenta")
+    table = Table(title="Sync Results", show_header=True,
+                  header_style="bold magenta")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
 

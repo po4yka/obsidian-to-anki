@@ -72,7 +72,7 @@ Q: What are the HTTP safe methods?
 A: GET, HEAD, OPTIONS
 
 Extra:
-💡 Mnemonic: "GHO" (like ghost)
+TIP: Mnemonic: "GHO" (like ghost)
 These methods are "safe" - they only read data, never modify it.
 Think: "ghosts can observe but can't touch"
 ```
@@ -167,14 +167,14 @@ Common use cases:
 - Subscriptions
 - DOM manipulation
 
-⚠️ Common mistake: Forgetting dependency array
-// Runs every render ❌
+WARNING: Common mistake: Forgetting dependency array
+// Runs every render (BAD)
 useEffect(() => { fetchData(); });
 
-// Runs once ✓
+// Runs once (GOOD)
 useEffect(() => { fetchData(); }, []);
 
-// Runs when id changes ✓
+// Runs when id changes (GOOD)
 useEffect(() => { fetchData(id); }, [id]);
 ```
 
@@ -217,38 +217,38 @@ Constraints:
 
 ### DO Enrich When:
 
-✅ **Answer is too abstract**
+ENRICH: Answer is too abstract
 - Add concrete example
 
-✅ **Concept has common misconceptions**
+ENRICH: Concept has common misconceptions
 - Add clarification and counter-example
 
-✅ **Information is list-heavy**
+ENRICH: Information is list-heavy
 - Add structure with bullet points
 
-✅ **Concept has practical applications**
+ENRICH: Concept has practical applications
 - Add real-world use case
 
-✅ **Term has helpful mnemonic**
+ENRICH: Term has helpful mnemonic
 - Add memory aid
 
-✅ **Concept is frequently confused**
+ENRICH: Concept is frequently confused
 - Add comparison table
 
 ---
 
 ### DON'T Enrich When:
 
-❌ **Card is already comprehensive**
+SKIP: Card is already comprehensive
 - Don't add redundant information
 
-❌ **Concept is self-explanatory**
+SKIP: Concept is self-explanatory
 - Don't over-explain simple facts
 
-❌ **Adding would cause information overload**
+SKIP: Adding would cause information overload
 - Keep cards focused and atomic
 
-❌ **Context is domain-specific jargon**
+SKIP: Context is domain-specific jargon
 - Don't add complexity
 
 ---
@@ -313,7 +313,7 @@ A: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregatio
   "should_enrich": true,
   "enrichment_type": ["mnemonic", "visual"],
   "enriched_answer": "Five object-oriented design principles:\n\n1. **S**ingle Responsibility - One class, one job\n2. **O**pen/Closed - Open for extension, closed for modification\n3. **L**iskov Substitution - Subtypes must be substitutable\n4. **I**nterface Segregation - Many specific interfaces > one general\n5. **D**ependency Inversion - Depend on abstractions, not concretions",
-  "enriched_extra": "💡 Mnemonic: \"**SOLID**\" - the acronym itself means \"well-built\"\n\nThink: \"A SOLID foundation makes code maintainable\"",
+  "enriched_extra": "TIP: Mnemonic: \"**SOLID**\" - the acronym itself means \"well-built\"\n\nThink: \"A SOLID foundation makes code maintainable\"",
   "additions_summary": "Added brief explanations for each principle, mnemonic device, and visual structure",
   "rationale": "Acronym mnemonic (SOLID) is memorable and meaningful. Brief explanations provide context. Structure makes five items easier to scan and remember."
 }
@@ -340,7 +340,7 @@ A: undefined means variable declared but not assigned. null is explicit absence 
   "should_enrich": true,
   "enrichment_type": ["visual", "example", "practical"],
   "enriched_answer": "**undefined**: Variable declared but not assigned (implicit)\n**null**: Explicit assignment to represent \"no value\" (intentional)",
-  "enriched_extra": "Comparison:\n| undefined | null |\n|-----------|------|\n| let x; // undefined | let x = null; |\n| Function param not passed | Intentional absence |\n| Object property doesn't exist | Property set to \"nothing\" |\n| typeof undefined // 'undefined' | typeof null // 'object' (JS quirk!) |\n\n⚠️ Common pitfall:\nif (x == null) // true for BOTH undefined and null\nif (x === null) // true only for null ✓",
+  "enriched_extra": "Comparison:\n| undefined | null |\n|-----------|------|\n| let x; // undefined | let x = null; |\n| Function param not passed | Intentional absence |\n| Object property doesn't exist | Property set to \"nothing\" |\n| typeof undefined // 'undefined' | typeof null // 'object' (JS quirk!) |\n\nWARNING: Common pitfall:\nif (x == null) // true for BOTH undefined and null\nif (x === null) // true only for null (GOOD)",
   "additions_summary": "Added comparison table, type quirk warning, and equality check gotcha",
   "rationale": "Side-by-side comparison clarifies subtle difference. Type quirk prevents confusion. Equality check is a common interview question and real-world bug source."
 }
@@ -367,7 +367,7 @@ A: Reapplies commits on top of another base commit.
   "should_enrich": true,
   "enrichment_type": ["example", "practical", "related"],
   "enriched_answer": "Reapplies commits on top of another base branch, creating a linear history.",
-  "enriched_extra": "Use case: Clean up feature branch before merge\n\ngit checkout feature\ngit rebase main\n# Replays feature commits on latest main\n\n**When to use**:\n- Clean up local commits before pushing\n- Keep feature branch up-to-date with main\n- Create linear history (vs merge's branching)\n\n⚠️ **Golden Rule**: Never rebase public/shared branches\n(rewrites history = breaks others' work)\n\n**Compare with**:\n- git merge: Preserves history, creates merge commit\n- git rebase: Rewrites history, linear commits",
+  "enriched_extra": "Use case: Clean up feature branch before merge\n\ngit checkout feature\ngit rebase main\n# Replays feature commits on latest main\n\n**When to use**:\n- Clean up local commits before pushing\n- Keep feature branch up-to-date with main\n- Create linear history (vs merge's branching)\n\nWARNING: Golden Rule - Never rebase public/shared branches\n(rewrites history = breaks others' work)\n\n**Compare with**:\n- git merge: Preserves history, creates merge commit\n- git rebase: Rewrites history, linear commits",
   "additions_summary": "Added usage example, when to use, critical warning about public branches, and comparison with merge",
   "rationale": "Practical example shows real workflow. Warning prevents dangerous mistake. Comparison clarifies when to use rebase vs merge. This addresses common confusion and real-world pitfalls."
 }

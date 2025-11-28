@@ -92,7 +92,7 @@ post_validator_model: "qwen3:14b"
 # pre_validator_model: "gpt-3.5-turbo"
 ```
 
-**💡 Tip**: Copy from `config.example.yaml` and modify for your setup.
+**TIP**: Copy from `config.example.yaml` and modify for your setup.
 
 ## 5. First Sync
 
@@ -115,7 +115,7 @@ obsidian-anki-sync sync --dry-run
 
 ## Next Steps
 
-🎉 **Congratulations!** Your first sync is complete.
+**Congratulations!** Your first sync is complete.
 
 ### Learn More
 
