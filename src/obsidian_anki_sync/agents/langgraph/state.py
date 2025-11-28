@@ -1,13 +1,17 @@
-"""State definition for LangGraph pipeline.
+"""State definition and helpers for the LangGraph pipeline.
 
 This module defines the TypedDict state structure used throughout the
-card generation pipeline workflow.
+card generation pipeline workflow and provides helpers for accessing
+runtime-only resources (Config, model factory, selectors) without putting
+non-serializable objects into the persisted state.
 """
 
 from typing import Annotated, Any, Literal, TypedDict
+from uuid import uuid4
 
 from langgraph.graph.message import add_messages
 
+from obsidian_anki_sync.agents.langgraph.model_factory import ModelFactory
 from obsidian_anki_sync.config import Config
 
 
@@ -29,19 +33,20 @@ class PipelineState(TypedDict):
     qa_pairs_dicts: list[dict]  # Serialized QAPair list
     file_path: str | None
     slug_base: str
-    config: Config  # Service configuration for model selection
+    runtime_key: str  # Lookup key for runtime resources (config, models, selectors)
+    config_snapshot: dict  # JSON-serializable config snapshot for reference
     existing_cards_dicts: (
         list[dict] | None
     )  # Serialized existing cards for duplicate check
 
-    # Cached models (for performance - created once during orchestrator init)
-    pre_validator_model: Any | None  # PydanticAI OpenAIChatModel instance
-    card_splitting_model: Any | None
-    generator_model: Any | None
-    post_validator_model: Any | None
-    context_enrichment_model: Any | None
-    memorization_quality_model: Any | None
-    duplicate_detection_model: Any | None
+    # Cached model names (models retrieved from runtime cache for execution)
+    pre_validator_model: str | None  # Model name for pre-validation
+    card_splitting_model: str | None
+    generator_model: str | None
+    post_validator_model: str | None
+    context_enrichment_model: str | None
+    memorization_quality_model: str | None
+    duplicate_detection_model: str | None
 
     # Pipeline stage results
     note_correction: dict | None  # Serialized NoteCorrectionResult
@@ -107,7 +112,7 @@ class PipelineState(TypedDict):
     cot_enabled_stages: list[str]  # Stages where CoT is applied
 
     # Reasoning Model (cached for performance)
-    reasoning_model: Any | None  # PydanticAI model for reasoning
+    reasoning_model: str | None  # Model name for reasoning
 
     # Reasoning Traces (per stage)
     # Structure: {stage_name: ReasoningTrace.model_dump()}
@@ -126,7 +131,7 @@ class PipelineState(TypedDict):
     reflection_enabled_stages: list[str]  # Stages where reflection is applied
 
     # Reflection Model (cached for performance)
-    reflection_model: Any | None  # PydanticAI model for reflection
+    reflection_model: str | None  # Model name for reflection
 
     # Reflection Traces (per stage)
     # Structure: {stage_name: ReflectionTrace.model_dump()}
@@ -157,8 +162,8 @@ class PipelineState(TypedDict):
     rag_duplicate_detection: bool  # Use RAG for duplicate detection
     rag_few_shot_examples: bool  # Use RAG for few-shot examples
 
-    # RAG Integration instance (cached for performance)
-    rag_integration: Any | None  # RAGIntegration instance
+    # RAG Integration (runtime cache key)
+    rag_integration: str | None  # RAGIntegration runtime key
 
     # RAG Results (per-stage outputs)
     rag_enrichment: dict | None  # RAG context enrichment data
@@ -167,5 +172,78 @@ class PipelineState(TypedDict):
 
     # Unified agent framework configuration
     agent_framework: str  # Agent framework to use ("pydantic_ai", "langchain", etc.)
-    agent_selector: Any | None  # UnifiedAgentSelector instance
-    split_validator_model: Any | None  # Model for split validation
+    agent_selector: str | None  # Runtime cache key for agent selector
+    split_validator_model: str | None  # Model name for split validation
+
+
+# =============================================================================
+# Runtime resource cache
+# =============================================================================
+
+_RUNTIME_RESOURCES: dict[str, dict[str, Any]] = {}
+
+
+def register_runtime_resources(
+    config: Config,
+    model_factory: ModelFactory,
+    agent_selector: Any | None = None,
+    rag_integration: Any | None = None,
+) -> str:
+    """Register runtime-only resources and return the lookup key.
+
+    These objects are intentionally kept out of the serialized PipelineState to
+    keep LangGraph checkpoints JSON-serializable. Nodes can retrieve them using
+    the runtime key stored in the state.
+    """
+
+    runtime_key = str(uuid4())
+    _RUNTIME_RESOURCES[runtime_key] = {
+        "config": config,
+        "model_factory": model_factory,
+        "agent_selector": agent_selector,
+        "rag_integration": rag_integration,
+    }
+    return runtime_key
+
+
+def _get_resource(state: PipelineState, name: str) -> Any:
+    runtime_key = state.get("runtime_key")
+    if not runtime_key:
+        return None
+
+    resources = _RUNTIME_RESOURCES.get(runtime_key)
+    if not resources:
+        return None
+
+    return resources.get(name)
+
+
+def get_config(state: PipelineState) -> Config:
+    """Return the Config object associated with the current state."""
+
+    config = _get_resource(state, "config")
+    if config is None:
+        error_message = "Config unavailable for runtime key"
+        raise KeyError(error_message)
+    return config
+
+
+def get_model(state: PipelineState, agent_type: str) -> Any:
+    """Fetch a model by agent type using the runtime model factory."""
+
+    factory: ModelFactory | None = _get_resource(state, "model_factory")
+    if factory is None:
+        return None
+    return factory.get_model(agent_type)
+
+
+def get_agent_selector(state: PipelineState) -> Any:
+    """Retrieve the agent selector from the runtime cache."""
+
+    return _get_resource(state, "agent_selector")
+
+
+def get_rag_integration(state: PipelineState) -> Any:
+    """Retrieve the RAG integration instance from the runtime cache."""
+
+    return _get_resource(state, "rag_integration")

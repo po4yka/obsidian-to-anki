@@ -35,6 +35,7 @@ from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .model_factory import ModelFactory
+from .state import PipelineState, register_runtime_resources
 from .workflow_builder import WorkflowBuilder
 
 # Optional agent memory and observability (requires chromadb, motor, langsmith)
@@ -513,6 +514,13 @@ class LangGraphOrchestrator:
             note_content, metadata
         )
 
+        runtime_key = register_runtime_resources(
+            config=self.config,
+            model_factory=self.model_factory,
+            agent_selector=self.agent_selector,
+            rag_integration=self.rag_integration,
+        )
+
         # Initialize state
         # Best practice: Initialize all state fields explicitly
         initial_state: PipelineState = {
@@ -522,7 +530,8 @@ class LangGraphOrchestrator:
             "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
             "file_path": str(file_path) if file_path else None,
             "slug_base": slug_base,
-            "config": self.config,  # Pass config for model selection
+            "runtime_key": runtime_key,
+            "config_snapshot": self.config.model_dump(mode="json"),
             "existing_cards_dicts": (
                 [card.model_dump() for card in existing_cards]
                 if existing_cards
@@ -530,22 +539,22 @@ class LangGraphOrchestrator:
             ),
             # NEW: Agent framework configuration (dynamically determined)
             "agent_framework": optimal_framework,
-            "agent_selector": self.agent_selector,
-            # Pass cached models through state for reuse (legacy support)
-            "pre_validator_model": self.model_factory.get_model("pre_validator"),
-            "card_splitting_model": self.model_factory.get_model("card_splitting"),
-            "generator_model": self.model_factory.get_model("generator"),
-            "post_validator_model": self.model_factory.get_model("post_validator"),
-            "context_enrichment_model": self.model_factory.get_model(
+            "agent_selector": runtime_key,  # Present for backward compatibility
+            # Cached model names (models fetched via runtime registry)
+            "pre_validator_model": self.config.get_model_for_agent("pre_validator"),
+            "card_splitting_model": self.config.get_model_for_agent("card_splitting"),
+            "generator_model": self.config.get_model_for_agent("generator"),
+            "post_validator_model": self.config.get_model_for_agent("post_validator"),
+            "context_enrichment_model": self.config.get_model_for_agent(
                 "context_enrichment"
             ),
-            "memorization_quality_model": self.model_factory.get_model(
+            "memorization_quality_model": self.config.get_model_for_agent(
                 "memorization_quality"
             ),
-            "duplicate_detection_model": self.model_factory.get_model(
+            "duplicate_detection_model": self.config.get_model_for_agent(
                 "duplicate_detection"
             ),
-            "split_validator_model": self.model_factory.get_model("split_validator"),
+            "split_validator_model": self.config.get_model_for_agent("split_validator"),
             # Chain of Thought (CoT) configuration
             "enable_cot_reasoning": getattr(self.config, "enable_cot_reasoning", False),
             "store_reasoning_traces": getattr(
@@ -557,7 +566,7 @@ class LangGraphOrchestrator:
                 "cot_enabled_stages",
                 ["pre_validation", "generation", "post_validation"],
             ),
-            "reasoning_model": self.model_factory.get_model("reasoning"),
+            "reasoning_model": self.config.get_model_for_agent("reasoning"),
             "reasoning_traces": {},
             "current_reasoning": None,
             # Self-Reflection configuration
@@ -575,7 +584,7 @@ class LangGraphOrchestrator:
                 "reflection_enabled_stages",
                 ["generation", "context_enrichment"],
             ),
-            "reflection_model": self.model_factory.get_model("reflection"),
+            "reflection_model": self.config.get_model_for_agent("reflection"),
             "reflection_traces": {},
             "current_reflection": None,
             "revision_count": 0,
@@ -597,7 +606,7 @@ class LangGraphOrchestrator:
             "rag_few_shot_examples": getattr(
                 self.config, "rag_few_shot_examples", True
             ),
-            "rag_integration": self.rag_integration,
+            "rag_integration": runtime_key,
             "rag_enrichment": None,
             "rag_examples": None,
             "rag_duplicate_results": None,
