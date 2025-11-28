@@ -91,8 +91,7 @@ class GenerateCardsUseCase:
                         request.note
                     )
                     # Filter cards by language if needed
-                    language_cards = [
-                        c for c in note_cards if c.language == language]
+                    language_cards = [c for c in note_cards if c.language == language]
 
                     # Validate generated cards
                     for card in language_cards:

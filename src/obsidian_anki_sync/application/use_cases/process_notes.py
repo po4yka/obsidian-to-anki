@@ -98,8 +98,7 @@ class ProcessNotesUseCase:
             # Step 2: Generate cards from notes
             for note in notes:
                 try:
-                    note_cards = self.card_generator.generate_cards_from_note(
-                        note)
+                    note_cards = self.card_generator.generate_cards_from_note(note)
 
                     # Filter by requested languages if specified
                     if request.languages:
@@ -132,14 +131,13 @@ class ProcessNotesUseCase:
 
             # Add discovery statistics
             if notes:
-                discovery_stats = self.note_discovery_service.get_note_statistics(
-                    notes)
+                discovery_stats = self.note_discovery_service.get_note_statistics(notes)
                 stats["discovery_stats"] = dict(
-                    discovery_stats)  # type: ignore[assignment]
+                    discovery_stats
+                )  # type: ignore[assignment]
 
             success = len(errors) == 0 or (
-                len(cards) > 0 and len(errors) < len(
-                    notes) // 2  # Allow some errors
+                len(cards) > 0 and len(errors) < len(notes) // 2  # Allow some errors
             )
 
             logger.info(

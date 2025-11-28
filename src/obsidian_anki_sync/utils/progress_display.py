@@ -81,7 +81,7 @@ class ProgressDisplay:
             return None
 
         # Show last N reflections
-        recent_reflections = self.reflections[-self.max_reflections:]
+        recent_reflections = self.reflections[-self.max_reflections :]
         reflection_text = "\n".join(
             [
                 (
@@ -127,7 +127,7 @@ class ProgressDisplay:
         self.reflections.append(cleaned)
         # Keep only last N reflections
         if len(self.reflections) > self.max_reflections * 2:
-            self.reflections = self.reflections[-self.max_reflections:]
+            self.reflections = self.reflections[-self.max_reflections :]
 
     def clear_reflections(self) -> None:
         """Clear all reflections."""
@@ -176,8 +176,7 @@ class ProgressDisplay:
             # Add stats table if provided
             if stats:
                 stats_table = self._create_stats_table(stats)
-                layout.split_row(Layout(name="main"),
-                                 Layout(stats_table, size=12))
+                layout.split_row(Layout(name="main"), Layout(stats_table, size=12))
                 layout["main"].update(status_layout)
             else:
                 layout["status"].update(status_layout)

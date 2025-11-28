@@ -83,8 +83,7 @@ class WorkPackagePreparator:
 
             # Check for invalid Android subtopics
             if frontmatter.get("topic") == "android":
-                validator = AndroidValidator(
-                    content, frontmatter, str(filepath))
+                validator = AndroidValidator(content, frontmatter, str(filepath))
                 android_issues = validator.validate()
 
                 for issue in android_issues:
@@ -180,7 +179,9 @@ class WorkPackagePreparator:
         }
         return folder_mapping.get(topic, "")
 
-    def analyze_directory(self, directory: Path, status_filter: Optional[str] = None) -> None:
+    def analyze_directory(
+        self, directory: Path, status_filter: Optional[str] = None
+    ) -> None:
         """Analyze all files in directory."""
         files = sorted(directory.glob("q-*.md"))
 
@@ -333,8 +334,7 @@ class WorkPackagePreparator:
 
 def main() -> None:
     """Main entry point for work package preparation."""
-    parser = argparse.ArgumentParser(
-        description="Prepare work packages for sub-agents")
+    parser = argparse.ArgumentParser(description="Prepare work packages for sub-agents")
     parser.add_argument(
         "path",
         nargs="?",
@@ -376,8 +376,7 @@ def main() -> None:
     agents = preparator.distribute_work()
 
     for agent in agents:
-        print(
-            f"  {agent['agent_id']}: {agent['count']} files - {agent['description']}")
+        print(f"  {agent['agent_id']}: {agent['count']} files - {agent['description']}")
 
     summary = preparator.save_work_packages(agents, args.output_dir)
 
@@ -385,8 +384,7 @@ def main() -> None:
     print("DISTRIBUTION SUMMARY")
     print("=" * 80)
     for task_type, stats in summary["by_task_type"].items():
-        print(
-            f"{task_type}: {stats['files']} files across {stats['agents']} agent(s)")
+        print(f"{task_type}: {stats['files']} files across {stats['agents']} agent(s)")
     print(
         f"\nTotal: {summary['total_files']} files across {summary['total_agents']} agents"
     )

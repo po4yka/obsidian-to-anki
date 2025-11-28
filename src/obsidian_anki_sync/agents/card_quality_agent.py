@@ -24,14 +24,12 @@ def _extract_qa_from_apf(apf_html: str) -> tuple[str, str]:
     answer = ""
 
     # Extract Front (question)
-    front_match = re.search(
-        r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+    front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
     if front_match:
         question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
     # Extract Back (answer)
-    back_match = re.search(
-        r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+    back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
     if back_match:
         answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 
@@ -89,8 +87,7 @@ class CardQualityAgent:
         elif "<img " in card.apf_html and "svg" in card.apf_html.lower():
             card_type = "Draw"
         question, answer = _extract_qa_from_apf(card.apf_html)
-        logger.debug("assessing_card_quality",
-                     slug=card.slug, card_type=card_type)
+        logger.debug("assessing_card_quality", slug=card.slug, card_type=card_type)
 
         # Assess each quality dimension
         dimensions = self._assess_all_dimensions(card, metadata, context_cards)
@@ -177,9 +174,11 @@ class CardQualityAgent:
 
         # Check for proper capitalization and punctuation
         question_stripped = question.strip()
-        if question_stripped and (not question_stripped[0].isupper() or not question_stripped.endswith(("?", ".", "!"))):
-            issues.append(
-                "Question lacks proper capitalization or punctuation")
+        if question_stripped and (
+            not question_stripped[0].isupper()
+            or not question_stripped.endswith(("?", ".", "!"))
+        ):
+            issues.append("Question lacks proper capitalization or punctuation")
             score -= 0.1
 
         # Check answer quality
@@ -190,8 +189,7 @@ class CardQualityAgent:
                 score -= 0.2
 
         # Verify content matches programming domain
-        tech_indicators = ["function", "class",
-                           "method", "api", "code", "programming"]
+        tech_indicators = ["function", "class", "method", "api", "code", "programming"]
         has_tech_content = any(
             indicator in question.lower() for indicator in tech_indicators
         )
@@ -234,11 +232,9 @@ class CardQualityAgent:
             score -= 0.2
 
         # Active recall: Question should require memory retrieval
-        passive_indicators = ["is", "are", "does",
-                              "do", "can", "should", "would"]
+        passive_indicators = ["is", "are", "does", "do", "can", "should", "would"]
         question_lower = question.lower()
-        passive_count = sum(
-            1 for word in passive_indicators if word in question_lower)
+        passive_count = sum(1 for word in passive_indicators if word in question_lower)
         if passive_count > 2:
             issues.append(
                 "Question may be passive recognition rather than active recall"
@@ -252,8 +248,7 @@ class CardQualityAgent:
 
         # Context sufficiency: Question should have enough context
         if len(question.split()) < 5:
-            issues.append(
-                "Question lacks sufficient context for unambiguous recall")
+            issues.append("Question lacks sufficient context for unambiguous recall")
             score -= 0.1
 
         # Cloze quality (if applicable)
@@ -302,8 +297,7 @@ class CardQualityAgent:
 
         # Check for proper slug format
         if not re.match(r"^[a-z0-9-]+$", card.slug):
-            issues.append(
-                "Invalid slug format (should be lowercase with hyphens only)")
+            issues.append("Invalid slug format (should be lowercase with hyphens only)")
             score -= 0.1
 
         # Note: GeneratedCard doesn't have tags attribute - tags are in APF HTML/manifest
@@ -342,8 +336,7 @@ class CardQualityAgent:
 
         # Check for semantic HTML structure
         if card.apf_html.count("<p>") > 10:
-            issues.append(
-                "Excessive paragraph breaks may indicate poor structure")
+            issues.append("Excessive paragraph breaks may indicate poor structure")
             score -= 0.1
 
         score = max(0.0, score)
@@ -379,8 +372,7 @@ class CardQualityAgent:
                 dimension.score < 0.8
             ):  # Only suggest improvements for low-scoring dimensions
                 suggestions.extend(
-                    self._get_dimension_improvements(
-                        dim_name, dimension.issues)
+                    self._get_dimension_improvements(dim_name, dimension.issues)
                 )
 
         # Remove duplicates while preserving order
@@ -405,30 +397,25 @@ class CardQualityAgent:
                     "Replace placeholder content with actual code examples"
                 )
             elif "incomplete" in issue.lower():
-                suggestions.append(
-                    "Complete partial code examples with runnable code")
+                suggestions.append("Complete partial code examples with runnable code")
             elif "too short" in issue.lower():
-                suggestions.append(
-                    "Add more context to make the question unambiguous")
+                suggestions.append("Add more context to make the question unambiguous")
             elif "punctuation" in issue.lower():
                 suggestions.append("Add proper punctuation and capitalization")
             elif "too brief" in issue.lower():
-                suggestions.append(
-                    "Expand answer with more complete explanation")
+                suggestions.append("Expand answer with more complete explanation")
             elif "doesn't match" in issue.lower():
                 suggestions.append(
                     "Ensure content aligns with the specified domain/tags"
                 )
             elif "too long" in issue.lower():
-                suggestions.append(
-                    "Split complex questions into multiple atomic cards")
+                suggestions.append("Split complex questions into multiple atomic cards")
             elif "passive" in issue.lower():
                 suggestions.append(
                     "Rewrite as active recall question (What/How/Why format)"
                 )
             elif "cognitive load" in issue.lower():
-                suggestions.append(
-                    "Break down complex answers into simpler components")
+                suggestions.append("Break down complex answers into simpler components")
             elif "clozes" in issue.lower():
                 suggestions.append(
                     "Review cloze deletions to ensure independent concepts"
@@ -448,8 +435,7 @@ class CardQualityAgent:
             elif "alt text" in issue.lower():
                 suggestions.append("Add descriptive alt text for all images")
             elif "color" in issue.lower():
-                suggestions.append(
-                    "Verify color contrast meets WCAG AA standards")
+                suggestions.append("Verify color contrast meets WCAG AA standards")
             elif "structure" in issue.lower():
                 suggestions.append("Improve semantic HTML structure")
 
@@ -540,9 +526,10 @@ class CardQualityAgent:
             card.apf_html,
             re.DOTALL,
         )
-        if code_blocks and all('class="language-' in str(block) for block in code_blocks):
-            strengths.append(
-                "Well-formatted code blocks with language specification")
+        if code_blocks and all(
+            'class="language-' in str(block) for block in code_blocks
+        ):
+            strengths.append("Well-formatted code blocks with language specification")
 
         return strengths
 

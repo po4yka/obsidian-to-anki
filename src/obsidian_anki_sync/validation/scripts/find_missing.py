@@ -45,14 +45,10 @@ class MissingSectionIdentifier:
                 return None
 
             # Check for sections
-            has_ru_question = bool(
-                re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
-            has_en_question = bool(
-                re.search(r"^# Question \(EN\)", body, re.MULTILINE))
-            has_ru_answer = bool(
-                re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
-            has_en_answer = bool(
-                re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
+            has_ru_question = bool(re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
+            has_en_question = bool(re.search(r"^# Question \(EN\)", body, re.MULTILINE))
+            has_ru_answer = bool(re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
+            has_en_answer = bool(re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
 
             missing: List[str] = []
             if not has_ru_question:
@@ -124,7 +120,9 @@ class MissingSectionIdentifier:
             print(f"Error analyzing {filepath.name}: {e}", file=sys.stderr)
             return None
 
-    def analyze_directory(self, directory: Path, status_filter: Optional[str] = None) -> None:
+    def analyze_directory(
+        self, directory: Path, status_filter: Optional[str] = None
+    ) -> None:
         """Analyze all Q&A files in directory."""
         files = sorted(directory.glob("q-*.md"))
 

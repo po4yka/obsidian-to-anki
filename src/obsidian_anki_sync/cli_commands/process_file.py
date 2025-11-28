@@ -85,7 +85,8 @@ def save_cards_to_file(
 
         with output_path.open("w", encoding="utf-8", newline="") as f:
             dict_writer: csv.DictWriter[str] = csv.DictWriter(
-                f, fieldnames=field_names, extrasaction="ignore")
+                f, fieldnames=field_names, extrasaction="ignore"
+            )
             dict_writer.writeheader()
             dict_writer.writerows(cards)
     else:
@@ -213,8 +214,7 @@ def process_card_with_llm(
                 card[first_key] = result_text
 
     except (ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
-        logger.error("llm_processing_failed",
-                     error=str(e), slug=card.get("slug"))
+        logger.error("llm_processing_failed", error=str(e), slug=card.get("slug"))
         card["_error"] = str(e)
 
     return card

@@ -118,10 +118,12 @@ class ProblemRouter:
         self._initialize_agents()
         # Convert None values to empty dicts and filter None values from configs
         cb_config = circuit_breaker_config or {}
-        rate_config: dict[str, int] = {k: v for k, v in (
-            rate_limit_config or {}).items() if v is not None}
-        bulkhead_config_clean: dict[str, int] = {k: v for k, v in (
-            bulkhead_config or {}).items() if v is not None}
+        rate_config: dict[str, int] = {
+            k: v for k, v in (rate_limit_config or {}).items() if v is not None
+        }
+        bulkhead_config_clean: dict[str, int] = {
+            k: v for k, v in (bulkhead_config or {}).items() if v is not None
+        }
         self._initialize_resilience_patterns(
             cb_config,
             rate_config,
@@ -189,18 +191,20 @@ class ProblemRouter:
 
             # Rate limiter
             rate_limit_raw = rate_limit_config.get(
-                domain.value, rate_limit_config.get(
-                    "default", default_rate_limit)
+                domain.value, rate_limit_config.get("default", default_rate_limit)
             )
-            rate_limit = rate_limit_raw if rate_limit_raw is not None else default_rate_limit
-            self.rate_limiters[domain] = RateLimiter(
-                max_calls_per_minute=rate_limit)
+            rate_limit = (
+                rate_limit_raw if rate_limit_raw is not None else default_rate_limit
+            )
+            self.rate_limiters[domain] = RateLimiter(max_calls_per_minute=rate_limit)
 
             # Bulkhead
             bulkhead_max_raw = bulkhead_config.get(
                 domain.value, bulkhead_config.get("default", default_bulkhead)
             )
-            bulkhead_max = bulkhead_max_raw if bulkhead_max_raw is not None else default_bulkhead
+            bulkhead_max = (
+                bulkhead_max_raw if bulkhead_max_raw is not None else default_bulkhead
+            )
             self.bulkheads[domain] = Bulkhead(max_concurrent=bulkhead_max)
 
     def diagnose_and_route(
@@ -357,8 +361,7 @@ class ProblemRouter:
             return result
 
         except CircuitBreakerError as e:
-            logger.warning("circuit_breaker_open",
-                           domain=domain.value, error=str(e))
+            logger.warning("circuit_breaker_open", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Circuit breaker is open: {e}",
@@ -366,8 +369,7 @@ class ProblemRouter:
             )
 
         except RateLimitExceededError as e:
-            logger.warning("rate_limit_exceeded",
-                           domain=domain.value, error=str(e))
+            logger.warning("rate_limit_exceeded", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Rate limit exceeded: {e}",
@@ -375,8 +377,7 @@ class ProblemRouter:
             )
 
         except ResourceExhaustedError as e:
-            logger.warning("bulkhead_exhausted",
-                           domain=domain.value, error=str(e))
+            logger.warning("bulkhead_exhausted", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Resources exhausted: {e}",
@@ -384,8 +385,7 @@ class ProblemRouter:
             )
 
         except LowConfidenceError as e:
-            logger.warning("low_confidence_rejected",
-                           domain=domain.value, error=str(e))
+            logger.warning("low_confidence_rejected", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Low confidence rejected: {e}",
@@ -393,8 +393,7 @@ class ProblemRouter:
             )
 
         except Exception as e:
-            logger.error("specialized_agent_failed",
-                         domain=domain.value, error=str(e))
+            logger.error("specialized_agent_failed", domain=domain.value, error=str(e))
 
             return AgentResult(
                 success=False,
@@ -492,8 +491,7 @@ class YAMLFrontmatterAgent(BaseSpecializedAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(
-            model=self.model)  # type: ignore[assignment]
+        self.agent = ContentRepairAgent(model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair YAML frontmatter issues."""
@@ -577,8 +575,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(
-            model=self.model)  # type: ignore[assignment]
+        self.agent = ContentRepairAgent(model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content structure issues like missing sections."""
@@ -677,8 +674,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                         repaired_lines.insert(insert_pos + 1, answer_marker)
                         repaired_lines.insert(insert_pos + 2, "")
                         repaired_lines.insert(
-                            insert_pos +
-                            3, f"[Answer content in {lang.upper()}]"
+                            insert_pos + 3, f"[Answer content in {lang.upper()}]"
                         )
 
             repaired_content = "\n".join(repaired_lines)
@@ -757,8 +753,7 @@ class ContentCorruptionAgent(BaseSpecializedAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(
-            model=self.model)  # type: ignore[assignment]
+        self.agent = ContentRepairAgent(model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair content corruption like repetitive patterns."""
@@ -982,8 +977,7 @@ class QualityAssuranceAgent(BaseSpecializedAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self.agent = ContentRepairAgent(
-            model=self.model)  # type: ignore[assignment]
+        self.agent = ContentRepairAgent(model=self.model)  # type: ignore[assignment]
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """General quality assurance and repair."""

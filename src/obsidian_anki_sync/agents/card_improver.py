@@ -22,14 +22,12 @@ def _extract_qa_from_apf(apf_html: str) -> tuple[str, str]:
     answer = ""
 
     # Extract Front (question)
-    front_match = re.search(
-        r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+    front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
     if front_match:
         question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
     # Extract Back (answer)
-    back_match = re.search(
-        r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+    back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
     if back_match:
         answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 
@@ -63,8 +61,7 @@ class CardImprover:
         self.model = model
         self.temperature = temperature
 
-        logger.info("card_improver_initialized",
-                    has_llm=llm_provider is not None)
+        logger.info("card_improver_initialized", has_llm=llm_provider is not None)
 
     def improve_card(
         self,
@@ -103,8 +100,7 @@ class CardImprover:
         )
 
         # Apply rule-based fixes first (deterministic, fast)
-        improved_card = self._apply_rule_based_fixes(
-            improved_card, quality_report)
+        improved_card = self._apply_rule_based_fixes(improved_card, quality_report)
 
         # Apply LLM-powered improvements for complex issues
         if self.llm_provider and quality_report.overall_score < 0.6:
@@ -140,7 +136,7 @@ class CardImprover:
                 improved.apf_html = improved.apf_html.replace(
                     f'<div class="front">{question}</div>',
                     f'<div class="front">{fixed_question}</div>',
-                    1
+                    1,
                 )
                 question = fixed_question
             elif "capitalization" in suggestion.lower():
@@ -148,14 +144,13 @@ class CardImprover:
                 improved.apf_html = improved.apf_html.replace(
                     f'<div class="front">{question}</div>',
                     f'<div class="front">{fixed_question}</div>',
-                    1
+                    1,
                 )
                 question = fixed_question
             elif "unclosed" in suggestion.lower() and "tag" in suggestion.lower():
                 improved.apf_html = self._fix_html_tags(improved.apf_html)
             elif "language class" in suggestion.lower():
-                improved.apf_html = self._add_code_language_classes(
-                    improved.apf_html)
+                improved.apf_html = self._add_code_language_classes(improved.apf_html)
             elif "slug format" in suggestion.lower():
                 improved.slug = self._fix_slug_format(improved.slug)
             elif "insufficient tags" in suggestion.lower():
@@ -203,8 +198,7 @@ class CardImprover:
             return card
 
         try:
-            prompt = self._build_improvement_prompt(
-                card, complex_issues, metadata)
+            prompt = self._build_improvement_prompt(card, complex_issues, metadata)
 
             response = self.llm_provider.generate(
                 model=self.model,
@@ -213,8 +207,11 @@ class CardImprover:
             )
 
             # Extract response text from dict
-            response_text = response.get("response", "") if isinstance(
-                response, dict) else str(response)
+            response_text = (
+                response.get("response", "")
+                if isinstance(response, dict)
+                else str(response)
+            )
             improved_content = self._parse_improvement_response(response_text)
             if improved_content:
                 improved_card = card.model_copy()
@@ -227,19 +224,18 @@ class CardImprover:
                     improved_card.apf_html = improved_card.apf_html.replace(
                         f'<div class="front">{question}</div>',
                         f'<div class="front">{new_question}</div>',
-                        1
+                        1,
                     )
                 if new_answer != answer:
                     improved_card.apf_html = improved_card.apf_html.replace(
                         f'<div class="back">{answer}</div>',
                         f'<div class="back">{new_answer}</div>',
-                        1
+                        1,
                     )
                 return improved_card
 
         except Exception as e:
-            logger.warning("llm_improvement_failed",
-                           error=str(e), slug=card.slug)
+            logger.warning("llm_improvement_failed", error=str(e), slug=card.slug)
 
         return card
 
@@ -250,8 +246,7 @@ class CardImprover:
             return text
 
         # Add question mark if missing and text looks like a question
-        question_starters = ["what", "how", "why",
-                             "when", "where", "which", "who"]
+        question_starters = ["what", "how", "why", "when", "where", "which", "who"]
         if any(text.lower().startswith(word) for word in question_starters):
             if not text.endswith("?"):
                 text += "?"
@@ -467,7 +462,9 @@ Return the improved card in this exact JSON format:
 
 Only return the JSON, no other text or explanations."""
 
-    def _parse_improvement_response(self, response: str) -> dict[str, str | None] | None:
+    def _parse_improvement_response(
+        self, response: str
+    ) -> dict[str, str | None] | None:
         """Parse LLM improvement response."""
         try:
             import json

@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 try:
     from .agent_memory import AgentMemoryStore
 except ImportError:
-    AgentMemoryStore = None
+    AgentMemoryStore = None  # type: ignore[assignment,misc]
 
 
 class HealthStatus(str, Enum):
@@ -85,7 +85,7 @@ class MetricsStorage:
 class InMemoryMetricsStorage(MetricsStorage):
     """In-memory metrics storage."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.metrics: list[dict[str, Any]] = []
         self.lock = threading.Lock()
 
@@ -281,7 +281,7 @@ class DatabaseMetricsStorage(MetricsStorage):
 class AgentHealthMonitor:
     """Monitor health of specialized agents."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize health monitor."""
         self.health_status: dict[str, HealthStatus] = {}
         self.last_check_time: dict[str, float] = {}

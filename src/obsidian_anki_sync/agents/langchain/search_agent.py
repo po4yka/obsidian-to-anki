@@ -116,7 +116,9 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
+    async def run(
+        self, input_data: dict[str, Any], **kwargs: Any
+    ) -> LangChainAgentResult:
         """Run the Search Agent.
 
         Args:
@@ -136,10 +138,8 @@ Thought: {agent_scratchpad}"""
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 4),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
-                return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
+                return_intermediate_steps=kwargs.get("return_intermediate_steps", True),
             )
 
             # Prepare input

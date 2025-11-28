@@ -135,8 +135,7 @@ class WikilinkUpdater:
 
 def main() -> None:
     """Main entry point for wikilink updater."""
-    parser = argparse.ArgumentParser(
-        description="Update wikilinks after file renames")
+    parser = argparse.ArgumentParser(description="Update wikilinks after file renames")
     parser.add_argument(
         "--dry-run",
         action="store_true",

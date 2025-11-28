@@ -52,7 +52,7 @@ class CardRecovery:
             - 'orphaned_in_db': Card slugs in DB but not in Anki
             - 'inconsistent': Card slugs with different content (future use)
         """
-        results = {
+        results: dict[str, list[str]] = {
             "orphaned_in_anki": [],  # In Anki but not in DB
             "orphaned_in_db": [],  # In DB but not in Anki
             "inconsistent": [],  # Different content in Anki vs DB
@@ -60,7 +60,8 @@ class CardRecovery:
 
         # Get all cards from database
         db_cards = self.db.get_all_cards()
-        db_by_guid = {c["anki_guid"]: c for c in db_cards if c.get("anki_guid")}
+        db_by_guid = {c["anki_guid"]
+            : c for c in db_cards if c.get("anki_guid")}
 
         logger.info("checking_for_orphaned_cards", db_cards=len(db_cards))
 
@@ -136,7 +137,8 @@ class CardRecovery:
             List of card records with 'failed' status
         """
         all_cards = self.db.get_all_cards()
-        failed_cards = [c for c in all_cards if c.get("creation_status") == "failed"]
+        failed_cards = [c for c in all_cards if c.get(
+            "creation_status") == "failed"]
 
         logger.info("found_failed_cards", count=len(failed_cards))
         return failed_cards
@@ -151,7 +153,8 @@ class CardRecovery:
             List of card records eligible for retry
         """
         failed_cards = self.get_failed_cards()
-        retry_cards = [c for c in failed_cards if c.get("retry_count", 0) < max_retries]
+        retry_cards = [c for c in failed_cards if c.get(
+            "retry_count", 0) < max_retries]
 
         logger.info("found_cards_needing_retry", count=len(retry_cards))
         return retry_cards

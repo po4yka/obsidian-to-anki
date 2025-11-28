@@ -100,8 +100,7 @@ class PerformanceTracker:
                 self.get_card_performance(note_ids)
 
                 for card in cards:
-                    card_issues = self._analyze_single_card_performance(
-                        card, {})
+                    card_issues = self._analyze_single_card_performance(card, {})
                     for issue_type, affected_cards in card_issues.items():
                         issues[issue_type].extend(affected_cards)
 
@@ -238,10 +237,8 @@ class PerformanceTracker:
             avg_retention = insights["average_retention"]
             avg_ease = insights["average_ease_factor"]
 
-            quality_score = (avg_retention * 0.7) + \
-                ((avg_ease - 1.3) / 1.7 * 0.3)
-            insights["overall_quality_score"] = max(
-                0.0, min(1.0, quality_score))
+            quality_score = (avg_retention * 0.7) + ((avg_ease - 1.3) / 1.7 * 0.3)
+            insights["overall_quality_score"] = max(0.0, min(1.0, quality_score))
 
         insights["total_cards_analyzed"] = total_cards
 

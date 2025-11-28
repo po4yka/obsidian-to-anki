@@ -70,14 +70,12 @@ class FailureAnalyzer:
         # Store in persistent memory if available
         if self.memory_store:
             try:
-                self.memory_store.store_failure_pattern(
-                    error_context, attempted_agents)
+                self.memory_store.store_failure_pattern(error_context, attempted_agents)
             except Exception as e:
                 logger.warning("memory_store_failure", error=str(e))
 
         # Also store in-memory for backward compatibility
-        pattern = self._create_pattern_signature(
-            error_context, attempted_agents)
+        pattern = self._create_pattern_signature(error_context, attempted_agents)
         self.failure_patterns[pattern] += 1
 
         logger.debug(
@@ -100,14 +98,12 @@ class FailureAnalyzer:
         # Store in persistent memory if available
         if self.memory_store:
             try:
-                self.memory_store.store_success_pattern(
-                    error_context, successful_agent)
+                self.memory_store.store_success_pattern(error_context, successful_agent)
             except Exception as e:
                 logger.warning("memory_store_success", error=str(e))
 
         # Also store in-memory for backward compatibility
-        pattern = self._create_pattern_signature(
-            error_context, [successful_agent])
+        pattern = self._create_pattern_signature(error_context, [successful_agent])
         self.success_patterns[pattern] += 1
         self.pattern_to_agent[pattern] = successful_agent
 
@@ -323,8 +319,7 @@ class AdaptiveRouter(ProblemRouter):
 
         # Try to get recommendation from learning system
         if self.learning_enabled:
-            recommended_agent = self.failure_analyzer.get_recommendation(
-                error_context)
+            recommended_agent = self.failure_analyzer.get_recommendation(error_context)
             if recommended_agent:
                 # Boost confidence for recommended agent
                 adjusted_diagnoses = []
@@ -334,8 +329,7 @@ class AdaptiveRouter(ProblemRouter):
                     if domain == recommended_agent:
                         # Boost confidence significantly
                         adjusted_confidence = min(base_confidence * 1.3, 0.95)
-                        adjusted_diagnoses.append(
-                            (domain, adjusted_confidence))
+                        adjusted_diagnoses.append((domain, adjusted_confidence))
                         found_recommended = True
                     else:
                         adjusted_diagnoses.append((domain, base_confidence))
@@ -350,8 +344,7 @@ class AdaptiveRouter(ProblemRouter):
         if self.performance_tracker:
             adjusted_diagnoses = []
             for domain, base_confidence in base_diagnoses:
-                success_rate = self.performance_tracker.get_success_rate(
-                    domain.value)
+                success_rate = self.performance_tracker.get_success_rate(domain.value)
 
                 # Adjust confidence based on success rate
                 # High success rate boosts confidence, low success rate reduces it
@@ -408,8 +401,7 @@ class AdaptiveRouter(ProblemRouter):
                         confidence=result.confidence,
                     )
                 except Exception as e:
-                    logger.warning(
-                        "routing_decision_store_failed", error=str(e))
+                    logger.warning("routing_decision_store_failed", error=str(e))
 
             if result.success:
                 # Record successful pattern
@@ -442,8 +434,7 @@ class AdaptiveRouter(ProblemRouter):
                         confidence=0.0,
                     )
                 except Exception as e:
-                    logger.warning(
-                        "routing_decision_store_failed", error=str(e))
+                    logger.warning("routing_decision_store_failed", error=str(e))
 
             # Record failure pattern
             self.failure_analyzer.analyze_failure(context, [domain])
@@ -523,8 +514,7 @@ class PerformanceLearner:
 
                 # Weighted combination
                 score = (
-                    (success_rate * 0.5) +
-                    (avg_confidence * 0.3) + (speed_score * 0.2)
+                    (success_rate * 0.5) + (avg_confidence * 0.3) + (speed_score * 0.2)
                 )
 
             agent_scores.append((agent, score))

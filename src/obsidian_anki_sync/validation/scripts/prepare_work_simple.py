@@ -32,8 +32,7 @@ def analyze_file(
         # Check for invalid Android subtopics
         if frontmatter.get("topic") == "android":
             subtopics = frontmatter.get("subtopics", [])
-            invalid = [
-                st for st in subtopics if st not in android_valid_subtopics]
+            invalid = [st for st in subtopics if st not in android_valid_subtopics]
 
             if invalid:
                 issues_found.append(
@@ -60,8 +59,7 @@ def analyze_file(
             en_preview = ""
             if en_match:
                 answer = en_match.group(1).strip()
-                en_preview = answer[:300] + \
-                    "..." if len(answer) > 300 else answer
+                en_preview = answer[:300] + "..." if len(answer) > 300 else answer
 
             issues_found.append(
                 {
@@ -231,15 +229,12 @@ def main() -> None:
     print("=" * 80)
     print("ISSUES FOUND")
     print("=" * 80)
-    print(
-        f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
+    print(f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
     print(
         f"Missing concept links:     {len(work_packages['missing_concept_links'])} files"
     )
-    print(
-        f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
-    print(
-        f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
+    print(f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
+    print(f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
     print("=" * 80)
     print()
 
@@ -309,8 +304,7 @@ def main() -> None:
             f"{agent['agent_id']:20} - {agent['count']:3} files - {agent['description']}"
         )
     print("=" * 80)
-    print(
-        f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
+    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
     print()
 
     # Save work packages
