@@ -4,7 +4,7 @@ Evaluates whether generated cards are effective for spaced repetition.
 """
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata
 from ...utils.logging import get_logger
@@ -23,7 +23,7 @@ class MemorizationQualityAgentAI:
     and long-term memory retention.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize memorization quality agent.
 
         Args:
@@ -36,7 +36,7 @@ class MemorizationQualityAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[PostValidationDeps, MemorizationQualityOutput] = Agent(
             model=self.model,
-            result_type=MemorizationQualityOutput,
+            output_type=MemorizationQualityOutput,
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
         )
 

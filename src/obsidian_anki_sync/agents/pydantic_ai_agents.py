@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ..models import NoteMetadata, QAPair
 from ..utils.content_hash import compute_content_hash
@@ -85,8 +85,7 @@ class CardGenerationOutput(BaseModel):
         default="", description="Notes about the generation process"
     )
     confidence: float = Field(
-        default=0.5, description="Overall generation confidence"
-    )
+        default=0.5, description="Overall generation confidence")
 
 
 class PostValidationOutput(BaseModel):
@@ -225,7 +224,7 @@ class PreValidatorAgentAI:
     Uses structured outputs for type-safe validation results.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize pre-validator agent.
 
         Args:
@@ -238,7 +237,7 @@ class PreValidatorAgentAI:
         # Create PydanticAI agent with structured output
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
-            result_type=PreValidationOutput,
+            output_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
         )
 
@@ -341,7 +340,7 @@ class GeneratorAgentAI:
     Ensures type-safe card generation with validation.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.3):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.3):
         """Initialize generator agent.
 
         Args:
@@ -357,7 +356,7 @@ class GeneratorAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
             model=self.model,
-            result_type=CardGenerationOutput,
+            output_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
         )
 
@@ -498,7 +497,7 @@ class PostValidatorAgentAI:
     Uses structured outputs to identify and suggest corrections.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize post-validator agent.
 
         Args:
@@ -511,7 +510,7 @@ class PostValidatorAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
-            result_type=PostValidationOutput,
+            output_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
         )
 
@@ -623,7 +622,7 @@ class MemorizationQualityAgentAI:
     and long-term memory retention.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize memorization quality agent.
 
         Args:
@@ -636,7 +635,7 @@ class MemorizationQualityAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[PostValidationDeps, MemorizationQualityOutput] = Agent(
             model=self.model,
-            result_type=MemorizationQualityOutput,
+            output_type=MemorizationQualityOutput,
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
         )
 
@@ -747,7 +746,7 @@ class CardSplittingAgentAI:
     and provides a splitting plan if needed.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize card splitting agent.
 
         Args:
@@ -760,7 +759,7 @@ class CardSplittingAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(
             model=self.model,
-            result_type=CardSplittingOutput,
+            output_type=CardSplittingOutput,
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
         )
 
@@ -954,7 +953,7 @@ class DuplicateDetectionAgentAI:
     Analyzes cards to identify duplicates and overlapping content.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize duplicate detection agent.
 
         Args:
@@ -967,7 +966,7 @@ class DuplicateDetectionAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[DuplicateDetectionDeps, DuplicateDetectionOutput] = Agent(
             model=self.model,
-            result_type=DuplicateDetectionOutput,
+            output_type=DuplicateDetectionOutput,
             system_prompt=DUPLICATE_DETECTION_PROMPT,
         )
 
@@ -1222,7 +1221,7 @@ class ContextEnrichmentAgentAI:
     Enhances cards with examples, mnemonics, and helpful context.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.3):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.3):
         """Initialize context enrichment agent.
 
         Args:
@@ -1235,7 +1234,7 @@ class ContextEnrichmentAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[ContextEnrichmentDeps, ContextEnrichmentOutput] = Agent(
             model=self.model,
-            result_type=ContextEnrichmentOutput,
+            output_type=ContextEnrichmentOutput,
             system_prompt=CONTEXT_ENRICHMENT_PROMPT,
         )
 

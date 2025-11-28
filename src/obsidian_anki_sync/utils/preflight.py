@@ -1,9 +1,9 @@
 """Pre-flight checks for validating environment before sync operations."""
 
-from pathlib import Path
 import shutil
-import psutil
+from pathlib import Path
 
+import psutil
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import Config
@@ -20,12 +20,11 @@ class CheckResult(BaseModel):
     name: str = Field(min_length=1, description="Check name")
     passed: bool = Field(description="Whether the check passed")
     message: str = Field(min_length=1, description="Result message")
-    severity: str = Field(
-        description="Severity level: 'error', 'warning', 'info'")
-    fixable: bool = Field(
-        default=False, description="Whether the issue is fixable")
+    severity: str = Field(description="Severity level: 'error', 'warning', 'info'")
+    fixable: bool = Field(default=False, description="Whether the issue is fixable")
     fix_suggestion: str | None = Field(
-        default=None, description="Suggestion for fixing the issue")
+        default=None, description="Suggestion for fixing the issue"
+    )
 
 
 class PreflightChecker:
@@ -85,8 +84,7 @@ class PreflightChecker:
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [
-            r for r in self.results if not r.passed and r.severity == "warning"]
+        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
 
         all_passed = len(errors) == 0
 
@@ -127,7 +125,7 @@ class PreflightChecker:
                     message=f"Vault path does not exist: {vault_path}",
                     severity="error",
                     fixable=False,
-                    fix_suggestion=f"Create the directory or update VAULT_PATH to a valid location",
+                    fix_suggestion="Create the directory or update VAULT_PATH to a valid location",
                 )
             )
             return
@@ -586,7 +584,6 @@ class PreflightChecker:
             # Anki connectivity already failed, skip this check
             pass
 
-
     def _check_git_repo(self) -> None:
         """Check if vault is a git repository."""
         vault_path = self.config.vault_path
@@ -741,12 +738,13 @@ class PreflightChecker:
             try:
                 start = time.time()
                 from ..anki.client import AnkiClient
+
                 with AnkiClient(self.config.anki_connect_url) as anki:
                     anki.invoke("version")
                 latency = (time.time() - start) * 1000
 
                 if latency > 200:
-                     self.results.append(
+                    self.results.append(
                         CheckResult(
                             name="Anki Latency",
                             passed=False,
@@ -765,7 +763,7 @@ class PreflightChecker:
                         )
                     )
             except Exception:
-                pass # Already handled by connectivity check
+                pass  # Already handled by connectivity check
 
 
 def run_preflight_checks(

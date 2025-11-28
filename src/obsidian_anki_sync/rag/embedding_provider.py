@@ -112,6 +112,7 @@ class EmbeddingProvider:
             # Use OllamaEmbeddings from langchain-community
             try:
                 from langchain_community.embeddings import OllamaEmbeddings
+
                 return OllamaEmbeddings(
                     model=self.model_name,
                     base_url=self.config.ollama_base_url,
@@ -319,5 +320,6 @@ def get_embedding_provider(
         EmbeddingProvider instance
     """
     from ..config import get_config
+
     config = get_config()
     return EmbeddingProvider(config, model_name)

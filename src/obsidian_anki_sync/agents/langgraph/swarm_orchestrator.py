@@ -10,10 +10,10 @@ import time
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from langchain.agents import create_agent
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 from langgraph_swarm import Swarm
-from langchain.agents import create_agent
 
 from ...config import Config
 from ...utils.logging import get_logger
@@ -94,24 +94,22 @@ class LangGraphSwarmOrchestrator:
         # Create models once for efficiency
         try:
             pre_val_model = PydanticAIModelFactory.create_from_config(
-                self.config, model_name=self.config.get_model_for_agent(
-                    "pre_validator")
+                self.config, model_name=self.config.get_model_for_agent("pre_validator")
             )
             gen_model = PydanticAIModelFactory.create_from_config(
-                self.config, model_name=self.config.get_model_for_agent(
-                    "generator")
+                self.config, model_name=self.config.get_model_for_agent("generator")
             )
             post_val_model = PydanticAIModelFactory.create_from_config(
-                self.config, model_name=self.config.get_model_for_agent(
-                    "post_validator")
+                self.config,
+                model_name=self.config.get_model_for_agent("post_validator"),
             )
             context_model = PydanticAIModelFactory.create_from_config(
-                self.config, model_name=self.config.get_model_for_agent(
-                    "context_enrichment")
+                self.config,
+                model_name=self.config.get_model_for_agent("context_enrichment"),
             )
             quality_model = PydanticAIModelFactory.create_from_config(
-                self.config, model_name=self.config.get_model_for_agent(
-                    "memorization_quality")
+                self.config,
+                model_name=self.config.get_model_for_agent("memorization_quality"),
             )
         except Exception as e:
             logger.warning("failed_to_create_swarm_models", error=str(e))
@@ -120,40 +118,35 @@ class LangGraphSwarmOrchestrator:
         return {
             "pre_validator": AgentExpertise(
                 name="pre_validator",
-                expertise=["structure validation",
-                           "format checking", "note parsing"],
+                expertise=["structure validation", "format checking", "note parsing"],
                 handoff_agents=["generator"],
                 model=pre_val_model,
                 description="Validates note structure and format before processing",
             ),
             "generator": AgentExpertise(
                 name="generator",
-                expertise=["card generation",
-                           "APF format", "content creation"],
+                expertise=["card generation", "APF format", "content creation"],
                 handoff_agents=["post_validator", "context_enrichment"],
                 model=gen_model,
                 description="Creates Anki cards from note content",
             ),
             "post_validator": AgentExpertise(
                 name="post_validator",
-                expertise=["quality validation",
-                           "error detection", "correction"],
+                expertise=["quality validation", "error detection", "correction"],
                 handoff_agents=["generator", "context_enrichment"],
                 model=post_val_model,
                 description="Validates card quality and suggests improvements",
             ),
             "context_enrichment": AgentExpertise(
                 name="context_enrichment",
-                expertise=["examples", "mnemonics",
-                           "explanations", "enhancement"],
+                expertise=["examples", "mnemonics", "explanations", "enhancement"],
                 handoff_agents=["memorization_quality"],
                 model=context_model,
                 description="Enhances cards with examples and learning aids",
             ),
             "memorization_quality": AgentExpertise(
                 name="memorization_quality",
-                expertise=["SRS effectiveness",
-                           "learning theory", "cognitive load"],
+                expertise=["SRS effectiveness", "learning theory", "cognitive load"],
                 handoff_agents=[],  # Terminal agent
                 model=quality_model,
                 description="Evaluates cards for spaced repetition effectiveness",
@@ -188,6 +181,7 @@ class LangGraphSwarmOrchestrator:
 
     def _create_handoff_tool(self, target_agent: str):
         """Create a tool for handing off to another agent."""
+
         def handoff_tool(state: PipelineState, reason: str) -> Command:
             """Hand off control to another agent."""
             return Command(
@@ -196,7 +190,7 @@ class LangGraphSwarmOrchestrator:
                     "current_agent": target_agent,
                     "handoff_reason": reason,
                     "handoff_count": state.get("handoff_count", 0) + 1,
-                }
+                },
             )
 
         handoff_tool.__name__ = f"handoff_to_{target_agent}"
@@ -338,8 +332,9 @@ Always focus on your core competencies and hand off when appropriate.
         traditional_orchestrator = LangGraphOrchestrator(self.config)
 
         # Convert to proper types for traditional processing
-        from ...models import NoteMetadata, QAPair
         from pathlib import Path
+
+        from ...models import NoteMetadata, QAPair
 
         note_metadata = NoteMetadata(**metadata)
         qa_objects = [QAPair(**qa) for qa in qa_pairs]
@@ -373,7 +368,6 @@ Always focus on your core competencies and hand off when appropriate.
             "handoff_strategy": self.handoff_strategy,
             "agents": list(self.agent_expertise.keys()),
             "expertise_areas": {
-                name: agent.expertise
-                for name, agent in self.agent_expertise.items()
+                name: agent.expertise for name, agent in self.agent_expertise.items()
             },
         }

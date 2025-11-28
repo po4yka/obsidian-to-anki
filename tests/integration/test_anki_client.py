@@ -38,7 +38,7 @@ class TestAnkiClient:
             )
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, enable_health_checks=False)
 
         with pytest.raises(AnkiConnectError, match="Test error"):
             client.invoke("testAction")
@@ -184,7 +184,7 @@ class TestAnkiClient:
         """Test HTTP error handling."""
         respx.post(mock_anki_url).mock(return_value=httpx.Response(500))
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, enable_health_checks=False)
 
         with pytest.raises(AnkiConnectError, match="HTTP 500 from AnkiConnect"):
             client.invoke("testAction")

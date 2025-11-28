@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 
-
 class IAnkiClient(ABC):
     """Interface for Anki connectivity and card operations.
 
@@ -94,7 +93,7 @@ class IAnkiClient(ABC):
         model_name: str,
         fields: dict[str, str],
         tags: list[str | None] = None,
-        options: dict[str, Any | None] = None
+        options: dict[str, Any | None] = None,
     ) -> int:
         """Add a new note to Anki.
 
@@ -111,11 +110,7 @@ class IAnkiClient(ABC):
         pass
 
     @abstractmethod
-    def update_note_fields(
-        self,
-        note_id: int,
-        fields: dict[str, str]
-    ) -> None:
+    def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         """Update fields of an existing note.
 
         Args:

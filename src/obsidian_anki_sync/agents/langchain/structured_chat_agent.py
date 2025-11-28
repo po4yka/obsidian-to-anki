@@ -79,7 +79,6 @@ Focus on:
 - Ensuring content completeness and effectiveness
 
 Use your tools systematically to create enriched, comprehensive content.""",
-
             "complex_generator": """You are an advanced content generation specialist.
 
 Your role is to generate complex content that requires multiple inputs and tools.
@@ -92,7 +91,6 @@ Capabilities:
 - Handle complex multi-step generation workflows
 
 Generate content that meets the highest quality standards.""",
-
             "analyzer": """You are a comprehensive content analyzer.
 
 Your task is to analyze complex content using multiple tools and perspectives.
@@ -107,7 +105,9 @@ Analysis capabilities:
 Provide thorough, well-structured analysis results.""",
         }
 
-        return prompts.get(agent_type, """You are a structured chat agent with access to multiple tools.
+        return prompts.get(
+            agent_type,
+            """You are a structured chat agent with access to multiple tools.
 
 You excel at handling complex tasks that require:
 - Multiple inputs and data sources
@@ -115,7 +115,8 @@ You excel at handling complex tasks that require:
 - Structured processing and output
 - Systematic problem-solving approaches
 
-Use your tools effectively to accomplish complex objectives.""")
+Use your tools effectively to accomplish complex objectives.""",
+        )
 
     def _create_agent(self) -> StructuredChatAgent:
         """Create the underlying LangChain Structured Chat Agent.
@@ -124,11 +125,13 @@ Use your tools effectively to accomplish complex objectives.""")
             LangChain StructuredChatAgent instance
         """
         # Create structured chat prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                ("human", "{input}"),
+                ("placeholder", "{agent_scratchpad}"),
+            ]
+        )
 
         # Create the agent
         agent = create_structured_chat_agent(
@@ -139,11 +142,7 @@ Use your tools effectively to accomplish complex objectives.""")
 
         return agent
 
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the Structured Chat Agent.
 
         Args:
@@ -163,10 +162,10 @@ Use your tools effectively to accomplish complex objectives.""")
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 5),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
                 return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", False),
+                    "return_intermediate_steps", False
+                ),
             )
 
             # Prepare structured input
@@ -297,11 +296,13 @@ Provide comprehensive analysis covering all specified dimensions."""
         tool_calls = []
         for step in intermediate_steps:
             action, observation = step
-            tool_calls.append({
-                "tool": action.tool,
-                "input": action.tool_input,
-                "output": observation,
-            })
+            tool_calls.append(
+                {
+                    "tool": action.tool,
+                    "input": action.tool_input,
+                    "output": observation,
+                }
+            )
 
         # Extract confidence and warnings
         confidence = self._extract_confidence(output)
@@ -309,10 +310,17 @@ Provide comprehensive analysis covering all specified dimensions."""
 
         # Determine success based on output characteristics
         success = True
-        if any(phrase in output.lower() for phrase in [
-            "failed", "error", "unable to", "cannot complete",
-            "insufficient", "incomplete"
-        ]):
+        if any(
+            phrase in output.lower()
+            for phrase in [
+                "failed",
+                "error",
+                "unable to",
+                "cannot complete",
+                "insufficient",
+                "incomplete",
+            ]
+        ):
             success = False
 
         # Adjust confidence based on tool usage complexity

@@ -83,11 +83,13 @@ Always work with structured data and provide clear, parseable results."""
             LangChain JSONChatAgent instance
         """
         # Create JSON chat prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                ("human", "{input}"),
+                ("placeholder", "{agent_scratchpad}"),
+            ]
+        )
 
         # Create the agent
         agent = create_json_chat_agent(
@@ -98,11 +100,7 @@ Always work with structured data and provide clear, parseable results."""
 
         return agent
 
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the JSON Chat Agent.
 
         Args:
@@ -122,10 +120,10 @@ Always work with structured data and provide clear, parseable results."""
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 3),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
                 return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", False),
+                    "return_intermediate_steps", False
+                ),
             )
 
             # Prepare input
@@ -213,10 +211,13 @@ Return a JSON object with validation results, including any errors found."""
         try:
             # Try to parse output as JSON to validate
             import json
+
             json.loads(output)
             confidence = min(confidence + 0.2, 1.0)  # Bonus for valid JSON
         except json.JSONDecodeError:
-            if "json" in output.lower() and ("error" in output.lower() or "invalid" in output.lower()):
+            if "json" in output.lower() and (
+                "error" in output.lower() or "invalid" in output.lower()
+            ):
                 success = False
 
         logger.info(

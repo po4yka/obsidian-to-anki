@@ -47,7 +47,7 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
         obj: dict[str, Any],
         depth: int = 0,
         max_depth: int = 10,
-        visited: set | None = None
+        visited: set | None = None,
     ) -> int:
         """Count nested complexity in schema with recursion protection."""
         # Protect against infinite recursion
@@ -82,25 +82,30 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
         if items and isinstance(items, dict) and items.get("type"):
             if items.get("type") == "object" and items.get("properties"):
                 complexity += 2
-            complexity += _count_nested_complexity(
-                items, depth + 1, max_depth, visited)
+            complexity += _count_nested_complexity(items, depth + 1, max_depth, visited)
 
         # Check for nested objects in properties
         if props and isinstance(props, dict):
             for prop_schema in props.values():
                 if isinstance(prop_schema, dict) and prop_schema.get("type"):
-                    if prop_schema.get("type") == "object" and prop_schema.get("properties"):
+                    if prop_schema.get("type") == "object" and prop_schema.get(
+                        "properties"
+                    ):
                         complexity += _count_nested_complexity(
-                            prop_schema, depth + 1, max_depth, visited)
+                            prop_schema, depth + 1, max_depth, visited
+                        )
                     elif prop_schema.get("type") == "array":
                         complexity += 1
                         # Also check items of array properties
                         array_items = prop_schema.get("items")
                         if array_items and isinstance(array_items, dict):
-                            if array_items.get("type") == "object" and array_items.get("properties"):
+                            if array_items.get("type") == "object" and array_items.get(
+                                "properties"
+                            ):
                                 complexity += 2  # Array of objects is complex
                             complexity += _count_nested_complexity(
-                                array_items, depth + 1, max_depth, visited)
+                                array_items, depth + 1, max_depth, visited
+                            )
 
         return complexity
 
@@ -214,11 +219,9 @@ def build_payload(
     if "grok" in model.lower():
         # Grok 4.1 Fast excels at reasoning even with structured outputs
         # Enable reasoning for complex reasoning tasks or when explicitly requested
-        should_enable_reasoning = (
-            reasoning_enabled or  # Explicitly requested
-            (json_schema and _should_use_reasoning_with_schema(
-                json_schema))  # Complex schema tasks
-        )
+        should_enable_reasoning = reasoning_enabled or (  # Explicitly requested
+            json_schema and _should_use_reasoning_with_schema(json_schema)
+        )  # Complex schema tasks
         payload["reasoning"] = {"enabled": bool(should_enable_reasoning)}
     elif reasoning_enabled and not json_schema:
         payload["reasoning_enabled"] = True

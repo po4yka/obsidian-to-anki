@@ -35,6 +35,7 @@ logger = get_logger(__name__)
 
 class ParsedCardStructure(NamedTuple):
     """Parsed structure of an English APF card for translation."""
+
     title: str
     key_point_code: str | None
     key_point_notes: list[str]
@@ -125,7 +126,8 @@ class GeneratorAgent:
 
                 # Parse and cache the English structure for translation
                 english_structures[qa_pair.card_index] = self._parse_card_structure(
-                    card_en.apf_html)
+                    card_en.apf_html
+                )
 
         # Generate cards in other languages using English structure as template
         for qa_pair in qa_pairs:
@@ -740,45 +742,45 @@ Now generate the card following this structure:
         """
         # Extract title
         title_match = re.search(
-            r'<!-- Title -->\s*\n(.*?)\n\s*\n', apf_html, re.DOTALL)
+            r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
 
         # Extract key point code block (preserve exactly)
         key_point_code = None
         key_point_match = re.search(
-            r'<!-- Key point \(code block / image\) -->\s*\n(.*?)\n\s*\n<!-- Key point notes -->',
+            r"<!-- Key point \(code block / image\) -->\s*\n(.*?)\n\s*\n<!-- Key point notes -->",
             apf_html,
-            re.DOTALL
+            re.DOTALL,
         )
         if key_point_match:
             code_block = key_point_match.group(1).strip()
             # Only extract if it's actually a code block
-            if code_block.startswith('<pre><code') and code_block.endswith('</code></pre>'):
+            if code_block.startswith("<pre><code") and code_block.endswith(
+                "</code></pre>"
+            ):
                 key_point_code = code_block
 
         # Extract key point notes
         notes_match = re.search(
-            r'<!-- Key point notes -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
+            r"<!-- Key point notes -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>",
             apf_html,
-            re.DOTALL
+            re.DOTALL,
         )
         key_point_notes = []
         if notes_match:
             ul_content = notes_match.group(1)
             # Extract individual list items
-            li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+            li_matches = re.findall(r"<li>(.*?)</li>", ul_content, re.DOTALL)
             key_point_notes = [li.strip() for li in li_matches]
 
         # Extract other notes (optional)
         other_notes = None
         other_match = re.search(
-            r'<!-- Other notes.*? -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
-            apf_html,
-            re.DOTALL
+            r"<!-- Other notes.*? -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>", apf_html, re.DOTALL
         )
         if other_match:
             ul_content = other_match.group(1)
-            li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+            li_matches = re.findall(r"<li>(.*?)</li>", ul_content, re.DOTALL)
             other_notes = [li.strip() for li in li_matches]
 
         return ParsedCardStructure(
@@ -817,10 +819,12 @@ Now generate the card following this structure:
         # Validate content exists
         if not question or not question.strip():
             raise ValueError(
-                f"Empty question for language '{lang}' in card {qa_pair.card_index}")
+                f"Empty question for language '{lang}' in card {qa_pair.card_index}"
+            )
         if not answer or not answer.strip():
             raise ValueError(
-                f"Empty answer for language '{lang}' in card {qa_pair.card_index}")
+                f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
+            )
 
         # Build translation prompt using English structure
         user_prompt = self._build_translation_prompt(
@@ -906,7 +910,8 @@ Now generate the card following this structure:
                 # Post-process the assembled HTML
                 post_process_start = time.time()
                 final_apf_html = self._post_process_apf(
-                    final_apf_html, metadata, manifest)
+                    final_apf_html, metadata, manifest
+                )
                 post_process_duration = time.time() - post_process_start
 
                 confidence = 0.9
@@ -975,7 +980,8 @@ Now generate the card following this structure:
 
         # Should never reach here
         raise RuntimeError(
-            f"Failed to generate translated card after {max_retries} attempts")
+            f"Failed to generate translated card after {max_retries} attempts"
+        )
 
     def _build_translation_prompt(
         self,
@@ -998,18 +1004,6 @@ Now generate the card following this structure:
         Returns:
             Translation prompt
         """
-        ref_link = f"[[{manifest.source_path}#{manifest.source_anchor}]]"
-
-        # Detect code language
-        detected_lang = self._detect_code_language(answer)
-        code_lang = (
-            detected_lang
-            if detected_lang != "text"
-            else self._code_language_hint(metadata)
-        )
-
-        # Use same tags as English card
-        suggested_tags = self._generate_tags(metadata, "en")
 
         prompt = f"""Translate the TEXT CONTENT of an English APF card to {lang.upper()}, preserving the EXACT structure and code blocks.
 
@@ -1064,9 +1058,11 @@ Translated content:"""
 
             title = translated_data.get("title", english_structure.title)
             key_point_notes = translated_data.get(
-                "key_point_notes", english_structure.key_point_notes)
+                "key_point_notes", english_structure.key_point_notes
+            )
             other_notes = translated_data.get(
-                "other_notes", english_structure.other_notes)
+                "other_notes", english_structure.other_notes
+            )
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.warning(
@@ -1098,29 +1094,37 @@ Translated content:"""
         html_parts.append("")
 
         # Key point notes
-        html_parts.extend([
-            "<!-- Key point notes -->",
-            "<ul>",
-        ])
+        html_parts.extend(
+            [
+                "<!-- Key point notes -->",
+                "<ul>",
+            ]
+        )
         for note in key_point_notes:
             html_parts.append(f"  <li>{note}</li>")
-        html_parts.extend([
-            "</ul>",
-            "",
-        ])
+        html_parts.extend(
+            [
+                "</ul>",
+                "",
+            ]
+        )
 
         # Other notes (if present)
         if other_notes:
-            html_parts.extend([
-                "<!-- Other notes -->",
-                "<ul>",
-            ])
+            html_parts.extend(
+                [
+                    "<!-- Other notes -->",
+                    "<ul>",
+                ]
+            )
             for note in other_notes:
                 html_parts.append(f"  <li>{note}</li>")
-            html_parts.extend([
-                "</ul>",
-                "",
-            ])
+            html_parts.extend(
+                [
+                    "</ul>",
+                    "",
+                ]
+            )
 
         # Manifest
         manifest_dict = {
@@ -1154,26 +1158,30 @@ Translated content:"""
         code_closes = html.count("</code>")
         if code_opens > code_closes:
             indicators.append(
-                f"unclosed_code_tags ({code_opens} opens, {code_closes} closes)")
+                f"unclosed_code_tags ({code_opens} opens, {code_closes} closes)"
+            )
 
         pre_opens = html.count("<pre")
         pre_closes = html.count("</pre>")
         if pre_opens > pre_closes:
             indicators.append(
-                f"unclosed_pre_tags ({pre_opens} opens, {pre_closes} closes)")
+                f"unclosed_pre_tags ({pre_opens} opens, {pre_closes} closes)"
+            )
 
         # Check for unclosed lists
         ul_opens = html.count("<ul")
         ul_closes = html.count("</ul>")
         if ul_opens > ul_closes:
             indicators.append(
-                f"unclosed_ul_tags ({ul_opens} opens, {ul_closes} closes)")
+                f"unclosed_ul_tags ({ul_opens} opens, {ul_closes} closes)"
+            )
 
         li_opens = html.count("<li")
         li_closes = html.count("</li>")
         if li_opens > li_closes:
             indicators.append(
-                f"unclosed_li_tags ({li_opens} opens, {li_closes} closes)")
+                f"unclosed_li_tags ({li_opens} opens, {li_closes} closes)"
+            )
 
         # Check for truncated SVG (common issue)
         if "<svg" in html.lower() and "</svg>" not in html.lower():
@@ -1183,7 +1191,9 @@ Translated content:"""
         stripped = html.rstrip()
         if stripped:
             # Ends with incomplete HTML tag
-            if stripped.endswith("<") or re.search(r"<[a-z]+[^>]*$", stripped, re.IGNORECASE):
+            if stripped.endswith("<") or re.search(
+                r"<[a-z]+[^>]*$", stripped, re.IGNORECASE
+            ):
                 indicators.append("ends_with_incomplete_tag")
 
             # Ends with incomplete attribute
@@ -1379,7 +1389,7 @@ Translated content:"""
         end_of_cards_pos = apf_html.find("END_OF_CARDS")
         if end_of_cards_pos != -1:
             # Keep only up to and including END_OF_CARDS
-            apf_html = apf_html[:end_of_cards_pos + len("END_OF_CARDS")]
+            apf_html = apf_html[: end_of_cards_pos + len("END_OF_CARDS")]
             logger.debug(
                 "post_generation_cleanup_stripped_after_end_of_cards",
                 slug=manifest.slug,
@@ -1387,34 +1397,35 @@ Translated content:"""
 
         # 2. Normalize CardType format in headers (ensure CardType: not type:)
         import re
+
         # Replace any "type:" with "CardType:" in card headers
         apf_html = re.sub(
-            r'(<!--\s*Card\s+\d+\s*\|\s*slug:\s*[^\|]+\s*\|\s*)type:(\s*[^\|]+\s*\|\s*Tags:)',
-            r'\1CardType:\2',
+            r"(<!--\s*Card\s+\d+\s*\|\s*slug:\s*[^\|]+\s*\|\s*)type:(\s*[^\|]+\s*\|\s*Tags:)",
+            r"\1CardType:\2",
             apf_html,
-            flags=re.IGNORECASE
+            flags=re.IGNORECASE,
         )
 
         # 3. Ensure END_OF_CARDS is the last line
-        lines = apf_html.split('\n')
+        lines = apf_html.split("\n")
         # Remove empty lines at the end
-        while lines and lines[-1].strip() == '':
+        while lines and lines[-1].strip() == "":
             lines.pop()
 
         # Ensure last line is END_OF_CARDS
-        if lines and lines[-1].strip() == 'END_OF_CARDS':
+        if lines and lines[-1].strip() == "END_OF_CARDS":
             # Good, END_OF_CARDS is already the last line
             pass
         else:
             # Add END_OF_CARDS as the last line if missing
-            if lines and not lines[-1].strip().endswith('END_OF_CARDS'):
-                lines.append('END_OF_CARDS')
+            if lines and not lines[-1].strip().endswith("END_OF_CARDS"):
+                lines.append("END_OF_CARDS")
                 logger.debug(
                     "post_generation_cleanup_added_end_of_cards",
                     slug=manifest.slug,
                 )
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _fix_card_headers(self, html: str, manifest: Manifest) -> str:
         """Fix card headers to ensure correct format.

@@ -11,7 +11,7 @@ NEW in 2025: MongoDB Store integration, structured memory, agent learning patter
 
 import json
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -181,7 +181,7 @@ class AdvancedMemoryStore:
             self.feedback_collection = self.db.memorization_feedback
 
             # Test connection
-            await self.client.admin.command('ping')
+            await self.client.admin.command("ping")
             self.connected = True
 
             # Create indexes for performance
@@ -208,49 +208,36 @@ class AdvancedMemoryStore:
             return
 
         # Index for experience queries
-        await self.experiences_collection.create_index([
-            ("agent_name", 1),
-            ("task_type", 1),
-            ("success", 1)
-        ])
+        await self.experiences_collection.create_index(
+            [("agent_name", 1), ("task_type", 1), ("success", 1)]
+        )
 
-        await self.experiences_collection.create_index([
-            ("input_hash", 1),
-            ("timestamp", -1)
-        ])
+        await self.experiences_collection.create_index(
+            [("input_hash", 1), ("timestamp", -1)]
+        )
 
         # Index for knowledge queries
-        await self.knowledge_collection.create_index([
-            ("topic", 1),
-            ("confidence", -1)
-        ])
+        await self.knowledge_collection.create_index([("topic", 1), ("confidence", -1)])
 
         # Index for pattern queries
-        await self.patterns_collection.create_index([
-            ("user_id", 1),
-            ("preference_type", 1)
-        ])
+        await self.patterns_collection.create_index(
+            [("user_id", 1), ("preference_type", 1)]
+        )
 
         # Index for card pattern queries
-        await self.card_patterns_collection.create_index([
-            ("topic", 1),
-            ("quality_score", -1),
-            ("success_count", -1)
-        ])
+        await self.card_patterns_collection.create_index(
+            [("topic", 1), ("quality_score", -1), ("success_count", -1)]
+        )
 
         # Index for user preference queries
-        await self.user_preferences_collection.create_index([
-            ("user_id", 1),
-            ("topic", 1),
-            ("confidence", -1)
-        ])
+        await self.user_preferences_collection.create_index(
+            [("user_id", 1), ("topic", 1), ("confidence", -1)]
+        )
 
         # Index for feedback queries
-        await self.feedback_collection.create_index([
-            ("topic", 1),
-            ("quality_score", -1),
-            ("timestamp", -1)
-        ])
+        await self.feedback_collection.create_index(
+            [("topic", 1), ("quality_score", -1), ("timestamp", -1)]
+        )
 
         logger.info("mongodb_indexes_created")
 
@@ -270,7 +257,9 @@ class AdvancedMemoryStore:
         try:
             # Convert to dict for MongoDB
             exp_dict = asdict(experience)
-            exp_dict["_id"] = f"{experience.agent_name}_{experience.input_hash}_{int(experience.timestamp)}"
+            exp_dict["_id"] = (
+                f"{experience.agent_name}_{experience.input_hash}_{int(experience.timestamp)}"
+            )
 
             result = await self.experiences_collection.insert_one(exp_dict)
 
@@ -288,10 +277,7 @@ class AdvancedMemoryStore:
             return ""
 
     async def get_similar_experiences(
-        self,
-        agent_name: str,
-        task_type: str,
-        limit: int = 5
+        self, agent_name: str, task_type: str, limit: int = 5
     ) -> list[AgentExperience]:
         """Retrieve similar past experiences for an agent.
 
@@ -308,13 +294,13 @@ class AdvancedMemoryStore:
 
         try:
             # Query for successful experiences of same agent and task type
-            cursor = self.experiences_collection.find(
-                {
-                    "agent_name": agent_name,
-                    "task_type": task_type,
-                    "success": True
-                }
-            ).sort("timestamp", -1).limit(limit)
+            cursor = (
+                self.experiences_collection.find(
+                    {"agent_name": agent_name, "task_type": task_type, "success": True}
+                )
+                .sort("timestamp", -1)
+                .limit(limit)
+            )
 
             experiences = []
             async for doc in cursor:
@@ -349,7 +335,9 @@ class AdvancedMemoryStore:
 
         try:
             # Check if knowledge already exists
-            existing = await self.knowledge_collection.find_one({"topic": knowledge.topic})
+            existing = await self.knowledge_collection.find_one(
+                {"topic": knowledge.topic}
+            )
 
             if existing:
                 # Update existing knowledge
@@ -358,11 +346,11 @@ class AdvancedMemoryStore:
                     "source_experiences": knowledge.source_experiences,
                     "learned_rules": knowledge.learned_rules,
                     "last_updated": knowledge.last_updated,
-                    "usage_count": existing.get("usage_count", 0) + knowledge.usage_count,
+                    "usage_count": existing.get("usage_count", 0)
+                    + knowledge.usage_count,
                 }
                 await self.knowledge_collection.update_one(
-                    {"topic": knowledge.topic},
-                    {"$set": update_data}
+                    {"topic": knowledge.topic}, {"$set": update_data}
                 )
             else:
                 # Insert new knowledge
@@ -412,10 +400,9 @@ class AdvancedMemoryStore:
 
         try:
             # Check if pattern exists
-            existing = await self.patterns_collection.find_one({
-                "user_id": pattern.user_id,
-                "preference_type": pattern.preference_type
-            })
+            existing = await self.patterns_collection.find_one(
+                {"user_id": pattern.user_id, "preference_type": pattern.preference_type}
+            )
 
             if existing:
                 # Update existing pattern
@@ -423,12 +410,15 @@ class AdvancedMemoryStore:
                     "pattern_data": pattern.pattern_data,
                     "confidence": pattern.confidence,
                     "last_observed": pattern.last_observed,
-                    "observation_count": existing.get("observation_count", 0) + pattern.observation_count,
+                    "observation_count": existing.get("observation_count", 0)
+                    + pattern.observation_count,
                 }
                 await self.patterns_collection.update_one(
-                    {"user_id": pattern.user_id,
-                        "preference_type": pattern.preference_type},
-                    {"$set": update_data}
+                    {
+                        "user_id": pattern.user_id,
+                        "preference_type": pattern.preference_type,
+                    },
+                    {"$set": update_data},
                 )
             else:
                 # Insert new pattern
@@ -520,7 +510,7 @@ class AdvancedMemoryStore:
                     "step_count": pipeline_result.get("step_count", 0),
                     "retry_count": pipeline_result.get("retry_count", 0),
                     "has_enhancements": bool(pipeline_result.get("context_enrichment")),
-                }
+                },
             )
 
             # Store experience
@@ -558,14 +548,15 @@ class AdvancedMemoryStore:
         # Success patterns
         if pipeline_result.get("success"):
             patterns["successful_strategies"] = [
-                "validation_first", "iterative_improvement"]
+                "validation_first",
+                "iterative_improvement",
+            ]
 
             # Quality patterns
             if pipeline_result.get("memorization_quality"):
                 quality = pipeline_result["memorization_quality"]
                 if quality.get("is_memorizable"):
-                    patterns["quality_factors"] = [
-                        "clear_questions", "self_contained"]
+                    patterns["quality_factors"] = ["clear_questions", "self_contained"]
 
         # Error patterns
         if not pipeline_result.get("success"):
@@ -575,9 +566,7 @@ class AdvancedMemoryStore:
         return patterns
 
     def _extract_knowledge(
-        self,
-        experience: AgentExperience,
-        pipeline_result: dict[str, Any]
+        self, experience: AgentExperience, pipeline_result: dict[str, Any]
     ) -> AgentKnowledge | None:
         """Extract structured knowledge from experience."""
         if not experience.success:
@@ -590,9 +579,11 @@ class AdvancedMemoryStore:
             topic=topic,
             confidence=min(1.0, experience.quality_score or 0.5),
             source_experiences=[
-                f"{experience.agent_name}_{experience.input_hash}_{int(experience.timestamp)}"],
+                f"{experience.agent_name}_{experience.input_hash}_{int(experience.timestamp)}"
+            ],
             learned_rules={
-                "execution_time_threshold": experience.execution_time * 1.2,  # 20% buffer
+                "execution_time_threshold": experience.execution_time
+                * 1.2,  # 20% buffer
                 "quality_expectation": experience.quality_score or 0.5,
                 "success_patterns": experience.learned_patterns,
             },
@@ -600,36 +591,44 @@ class AdvancedMemoryStore:
             usage_count=1,
         )
 
-    def _extract_user_patterns(self, pipeline_result: dict[str, Any]) -> list[UserPattern]:
+    def _extract_user_patterns(
+        self, pipeline_result: dict[str, Any]
+    ) -> list[UserPattern]:
         """Extract user behavior patterns from pipeline result."""
         patterns = []
 
         # Note structure preferences
         if "note_content" in pipeline_result:
             content_length = len(pipeline_result["note_content"])
-            patterns.append(UserPattern(
-                user_id="default",  # Could be extracted from metadata
-                preference_type="content_length_preference",
-                pattern_data={"average_length": content_length},
-                confidence=0.6,
-                last_observed=time.time(),
-                observation_count=1,
-            ))
+            patterns.append(
+                UserPattern(
+                    user_id="default",  # Could be extracted from metadata
+                    preference_type="content_length_preference",
+                    pattern_data={"average_length": content_length},
+                    confidence=0.6,
+                    last_observed=time.time(),
+                    observation_count=1,
+                )
+            )
 
         # Enhancement preferences
         if pipeline_result.get("context_enrichment"):
-            patterns.append(UserPattern(
-                user_id="default",
-                preference_type="enhancement_preference",
-                pattern_data={"prefers_enhancements": True},
-                confidence=0.8,
-                last_observed=time.time(),
-                observation_count=1,
-            ))
+            patterns.append(
+                UserPattern(
+                    user_id="default",
+                    preference_type="enhancement_preference",
+                    pattern_data={"prefers_enhancements": True},
+                    confidence=0.8,
+                    last_observed=time.time(),
+                    observation_count=1,
+                )
+            )
 
         return patterns
 
-    async def store_card_generation_pattern(self, pattern: CardGenerationPattern) -> bool:
+    async def store_card_generation_pattern(
+        self, pattern: CardGenerationPattern
+    ) -> bool:
         """Store a successful card generation pattern for learning.
 
         Args:
@@ -643,11 +642,13 @@ class AdvancedMemoryStore:
 
         try:
             # Check if pattern already exists for this topic/complexity/card_type
-            existing = await self.card_patterns_collection.find_one({
-                "topic": pattern.topic,
-                "complexity": pattern.complexity,
-                "card_type": pattern.card_type
-            })
+            existing = await self.card_patterns_collection.find_one(
+                {
+                    "topic": pattern.topic,
+                    "complexity": pattern.complexity,
+                    "card_type": pattern.card_type,
+                }
+            )
 
             if existing:
                 # Update existing pattern
@@ -655,7 +656,8 @@ class AdvancedMemoryStore:
                     "question_structure": pattern.question_structure,
                     "answer_format": pattern.answer_format,
                     "quality_score": pattern.quality_score,
-                    "success_count": existing.get("success_count", 0) + pattern.success_count,
+                    "success_count": existing.get("success_count", 0)
+                    + pattern.success_count,
                     "last_used": pattern.last_used,
                     "metadata": pattern.metadata,
                 }
@@ -663,9 +665,9 @@ class AdvancedMemoryStore:
                     {
                         "topic": pattern.topic,
                         "complexity": pattern.complexity,
-                        "card_type": pattern.card_type
+                        "card_type": pattern.card_type,
                     },
-                    {"$set": update_data}
+                    {"$set": update_data},
                 )
             else:
                 # Insert new pattern
@@ -689,7 +691,7 @@ class AdvancedMemoryStore:
         topic: str,
         complexity: str | None = None,
         min_quality_score: float = 0.7,
-        limit: int = 5
+        limit: int = 5,
     ) -> list[CardGenerationPattern]:
         """Retrieve successful card generation patterns for a topic.
 
@@ -707,18 +709,16 @@ class AdvancedMemoryStore:
 
         try:
             # Build query
-            query = {
-                "topic": topic,
-                "quality_score": {"$gte": min_quality_score}
-            }
+            query = {"topic": topic, "quality_score": {"$gte": min_quality_score}}
             if complexity:
                 query["complexity"] = complexity
 
             # Get patterns sorted by quality score and success count
-            cursor = self.card_patterns_collection.find(query).sort([
-                ("quality_score", -1),
-                ("success_count", -1)
-            ]).limit(limit)
+            cursor = (
+                self.card_patterns_collection.find(query)
+                .sort([("quality_score", -1), ("success_count", -1)])
+                .limit(limit)
+            )
 
             patterns = []
             async for doc in cursor:
@@ -739,7 +739,9 @@ class AdvancedMemoryStore:
             logger.error("failed_to_retrieve_card_patterns", error=str(e))
             return []
 
-    async def store_user_card_preferences(self, preferences: UserCardPreferences) -> bool:
+    async def store_user_card_preferences(
+        self, preferences: UserCardPreferences
+    ) -> bool:
         """Store learned user card generation preferences.
 
         Args:
@@ -753,10 +755,9 @@ class AdvancedMemoryStore:
 
         try:
             # Check if preferences exist for this user/topic
-            existing = await self.user_preferences_collection.find_one({
-                "user_id": preferences.user_id,
-                "topic": preferences.topic
-            })
+            existing = await self.user_preferences_collection.find_one(
+                {"user_id": preferences.user_id, "topic": preferences.topic}
+            )
 
             if existing:
                 # Update existing preferences
@@ -767,14 +768,12 @@ class AdvancedMemoryStore:
                     "rejection_patterns": preferences.rejection_patterns,
                     "confidence": preferences.confidence,
                     "last_updated": preferences.last_updated,
-                    "observation_count": existing.get("observation_count", 0) + preferences.observation_count,
+                    "observation_count": existing.get("observation_count", 0)
+                    + preferences.observation_count,
                 }
                 await self.user_preferences_collection.update_one(
-                    {
-                        "user_id": preferences.user_id,
-                        "topic": preferences.topic
-                    },
-                    {"$set": update_data}
+                    {"user_id": preferences.user_id, "topic": preferences.topic},
+                    {"$set": update_data},
                 )
             else:
                 # Insert new preferences
@@ -792,7 +791,9 @@ class AdvancedMemoryStore:
             logger.error("failed_to_store_user_preferences", error=str(e))
             return False
 
-    async def get_user_card_preferences(self, user_id: str, topic: str) -> UserCardPreferences | None:
+    async def get_user_card_preferences(
+        self, user_id: str, topic: str
+    ) -> UserCardPreferences | None:
         """Retrieve user card generation preferences.
 
         Args:
@@ -806,10 +807,9 @@ class AdvancedMemoryStore:
             return None
 
         try:
-            doc = await self.user_preferences_collection.find_one({
-                "user_id": user_id,
-                "topic": topic
-            })
+            doc = await self.user_preferences_collection.find_one(
+                {"user_id": user_id, "topic": topic}
+            )
 
             if doc:
                 doc.pop("_id", None)
@@ -853,7 +853,9 @@ class AdvancedMemoryStore:
             logger.error("failed_to_store_memorization_feedback", error=str(e))
             return False
 
-    async def get_topic_feedback_stats(self, topic: str, days: int = 30) -> dict[str, Any]:
+    async def get_topic_feedback_stats(
+        self, topic: str, days: int = 30
+    ) -> dict[str, Any]:
         """Get memorization feedback statistics for a topic.
 
         Args:
@@ -871,12 +873,7 @@ class AdvancedMemoryStore:
 
             # Aggregate statistics
             pipeline = [
-                {
-                    "$match": {
-                        "topic": topic,
-                        "timestamp": {"$gte": cutoff_time}
-                    }
-                },
+                {"$match": {"topic": topic, "timestamp": {"$gte": cutoff_time}}},
                 {
                     "$group": {
                         "_id": None,
@@ -887,9 +884,9 @@ class AdvancedMemoryStore:
                         },
                         "low_quality_count": {
                             "$sum": {"$cond": [{"$lt": ["$quality_score", 0.6]}, 1, 0]}
-                        }
+                        },
                     }
-                }
+                },
             ]
 
             result = await self.feedback_collection.aggregate(pipeline).to_list(1)
@@ -901,7 +898,9 @@ class AdvancedMemoryStore:
                 # Calculate percentages
                 total = stats["total_feedback"]
                 if total > 0:
-                    stats["high_quality_percentage"] = stats["high_quality_count"] / total
+                    stats["high_quality_percentage"] = (
+                        stats["high_quality_count"] / total
+                    )
                     stats["low_quality_percentage"] = stats["low_quality_count"] / total
 
                 logger.info(
@@ -928,11 +927,17 @@ class AdvancedMemoryStore:
         try:
             stats = {
                 "connected": True,
-                "experiences_count": await self.experiences_collection.count_documents({}),
+                "experiences_count": await self.experiences_collection.count_documents(
+                    {}
+                ),
                 "knowledge_count": await self.knowledge_collection.count_documents({}),
                 "patterns_count": await self.patterns_collection.count_documents({}),
-                "card_patterns_count": await self.card_patterns_collection.count_documents({}),
-                "user_preferences_count": await self.user_preferences_collection.count_documents({}),
+                "card_patterns_count": await self.card_patterns_collection.count_documents(
+                    {}
+                ),
+                "user_preferences_count": await self.user_preferences_collection.count_documents(
+                    {}
+                ),
                 "feedback_count": await self.feedback_collection.count_documents({}),
             }
 
@@ -967,34 +972,31 @@ class AdvancedMemoryStore:
             )
 
             # Remove old patterns with low confidence
-            pattern_result = await self.patterns_collection.delete_many({
-                "timestamp": {"$lt": cutoff_time},
-                "confidence": {"$lt": 0.3}
-            })
+            pattern_result = await self.patterns_collection.delete_many(
+                {"timestamp": {"$lt": cutoff_time}, "confidence": {"$lt": 0.3}}
+            )
 
             # Remove old card patterns with low quality scores
-            card_pattern_result = await self.card_patterns_collection.delete_many({
-                "last_used": {"$lt": cutoff_time},
-                "quality_score": {"$lt": 0.5}
-            })
+            card_pattern_result = await self.card_patterns_collection.delete_many(
+                {"last_used": {"$lt": cutoff_time}, "quality_score": {"$lt": 0.5}}
+            )
 
             # Remove old user preferences with low confidence
-            user_pref_result = await self.user_preferences_collection.delete_many({
-                "last_updated": {"$lt": cutoff_time},
-                "confidence": {"$lt": 0.3}
-            })
+            user_pref_result = await self.user_preferences_collection.delete_many(
+                {"last_updated": {"$lt": cutoff_time}, "confidence": {"$lt": 0.3}}
+            )
 
             # Remove old feedback (keep only last 90 days)
-            feedback_result = await self.feedback_collection.delete_many({
-                "timestamp": {"$lt": cutoff_time}
-            })
+            feedback_result = await self.feedback_collection.delete_many(
+                {"timestamp": {"$lt": cutoff_time}}
+            )
 
             total_cleaned = (
-                exp_result.deleted_count +
-                pattern_result.deleted_count +
-                card_pattern_result.deleted_count +
-                user_pref_result.deleted_count +
-                feedback_result.deleted_count
+                exp_result.deleted_count
+                + pattern_result.deleted_count
+                + card_pattern_result.deleted_count
+                + user_pref_result.deleted_count
+                + feedback_result.deleted_count
             )
 
             logger.info(

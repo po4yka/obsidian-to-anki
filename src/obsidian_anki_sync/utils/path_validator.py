@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 from ..exceptions import ConfigurationError
 
 

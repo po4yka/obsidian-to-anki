@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import threading
 
-
 from ..models import NoteMetadata, QAPair
 
 # Thread-safe LRU cache for content hashes

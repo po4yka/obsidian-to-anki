@@ -11,8 +11,8 @@ from langchain_core.tools import BaseTool
 
 from ...models import GeneratedCard, PostValidationResult, PreValidationResult
 from ...utils.logging import get_logger
-from .tool_calling_agent import ToolCallingAgent
 from .base import LangChainAgentResult
+from .tool_calling_agent import ToolCallingAgent
 
 logger = get_logger(__name__)
 
@@ -41,6 +41,7 @@ class ToolCallingValidatorAgent:
         """
         if tools is None:
             from .tools import get_tools_for_agent
+
             agent_type = f"{validator_type}_validator"
             tools = get_tools_for_agent(agent_type)
 
@@ -101,8 +102,7 @@ class ToolCallingValidatorAgent:
         Returns:
             Post-validation result
         """
-        logger.info("tool_calling_post_validation_start",
-                    card_count=len(cards))
+        logger.info("tool_calling_post_validation_start", card_count=len(cards))
 
         # Convert cards to APF format for validation
         apf_content = self._cards_to_apf(cards)
@@ -135,29 +135,32 @@ class ToolCallingValidatorAgent:
 
         for i, card in enumerate(cards, 1):
             tags_str = " ".join(card.tags)
-            apf_lines.extend([
-                f"<!-- Card {i} | slug: {card.slug} | CardType: {card.card_type} | Tags: {tags_str} -->",
-                "",
-                "<!-- Title -->",
-                card.front,
-                "",
-                "<!-- Key point -->",
-                card.back,
-                "",
-                f"<!-- manifest: {{\"slug\":\"{card.slug}\",\"lang\":\"en\",\"type\":\"{card.card_type}\",\"tags\":{card.tags}}} -->",
-                "",
-            ])
+            apf_lines.extend(
+                [
+                    f"<!-- Card {i} | slug: {card.slug} | CardType: {card.card_type} | Tags: {tags_str} -->",
+                    "",
+                    "<!-- Title -->",
+                    card.front,
+                    "",
+                    "<!-- Key point -->",
+                    card.back,
+                    "",
+                    f'<!-- manifest: {{"slug":"{card.slug}","lang":"en","type":"{card.card_type}","tags":{card.tags}}} -->',
+                    "",
+                ]
+            )
 
-        apf_lines.extend([
-            "<!-- END_CARDS -->",
-            "END_OF_CARDS",
-        ])
+        apf_lines.extend(
+            [
+                "<!-- END_CARDS -->",
+                "END_OF_CARDS",
+            ]
+        )
 
         return "\n".join(apf_lines)
 
     def _process_pre_validation_result(
-        self,
-        agent_result: LangChainAgentResult
+        self, agent_result: LangChainAgentResult
     ) -> PreValidationResult:
         """Process agent result into PreValidationResult.
 
@@ -192,7 +195,9 @@ class ToolCallingValidatorAgent:
             # Simple extraction - could be more sophisticated
             lines = output.split("\n")
             for line in lines:
-                if any(word in line.lower() for word in ["suggest", "fix", "recommend"]):
+                if any(
+                    word in line.lower() for word in ["suggest", "fix", "recommend"]
+                ):
                     suggested_fixes.append(line.strip())
 
         return PreValidationResult(
@@ -204,9 +209,7 @@ class ToolCallingValidatorAgent:
         )
 
     def _process_post_validation_result(
-        self,
-        agent_result: LangChainAgentResult,
-        original_cards: List[GeneratedCard]
+        self, agent_result: LangChainAgentResult, original_cards: List[GeneratedCard]
     ) -> PostValidationResult:
         """Process agent result into PostValidationResult.
 
@@ -230,7 +233,10 @@ class ToolCallingValidatorAgent:
 
         # Determine validity
         is_valid = True
-        if any(word in output.lower() for word in ["failed", "error", "invalid", "incorrect"]):
+        if any(
+            word in output.lower()
+            for word in ["failed", "error", "invalid", "incorrect"]
+        ):
             is_valid = False
 
         # Extract warnings
@@ -240,7 +246,10 @@ class ToolCallingValidatorAgent:
         auto_fix_suggestions = []
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["fix:", "correct:", "change:", "update:"]):
+            if any(
+                word in line.lower()
+                for word in ["fix:", "correct:", "change:", "update:"]
+            ):
                 auto_fix_suggestions.append(line.strip())
 
         logger.info(

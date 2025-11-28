@@ -15,15 +15,15 @@ from ..models import NoteMetadata, QAPair
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .json_schemas import get_parser_repair_schema
+from .langgraph.retry_policies import classify_error_category, select_repair_strategy
 from .models import (
     NoteCorrectionResult,
     PartialRepairResult,
     RepairDiagnosis,
     RepairQualityScore,
 )
-from .repair_metrics import get_repair_metrics_collector
 from .repair_learning import get_repair_learning_system
-from .langgraph.retry_policies import classify_error_category, select_repair_strategy
+from .repair_metrics import get_repair_metrics_collector
 
 logger = get_logger(__name__)
 
@@ -420,6 +420,7 @@ DO NOT repair (mark as unrepairable):
         # Use suggested strategy if available, otherwise use default selection
         if suggested_strategy:
             from .models import RepairStrategy
+
             repair_strategy = RepairStrategy(
                 strategy_type=suggested_strategy,
                 priority=1,  # Learned strategies get high priority
@@ -448,8 +449,7 @@ DO NOT repair (mark as unrepairable):
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error("parser_repair_read_failed",
-                         file=str(file_path), error=str(e))
+            logger.error("parser_repair_read_failed", file=str(file_path), error=str(e))
             raise ParserError(f"Cannot read file for repair: {e}")
 
         # Build repair prompt
@@ -523,8 +523,7 @@ ALWAYS:
             )
             return None
         except Exception as e:
-            logger.error("parser_repair_llm_failed",
-                         file=str(file_path), error=str(e))
+            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
             return None
 
         # Check if repairable
@@ -653,8 +652,7 @@ ALWAYS:
                 metadata = parse_frontmatter(temp_content_for_parse, file_path)
 
                 # Parse Q/A pairs from repaired content
-                qa_pairs = parse_qa_pairs(
-                    temp_content_for_parse, metadata, file_path)
+                qa_pairs = parse_qa_pairs(temp_content_for_parse, metadata, file_path)
 
                 if not qa_pairs:
                     logger.warning(
@@ -683,8 +681,12 @@ ALWAYS:
                     error_type=type(original_error).__name__,
                     strategy_used=strategy_type,
                     success=True,
-                    quality_before=quality_before.overall_score if quality_before else None,
-                    quality_after=quality_after.overall_score if quality_after else None,
+                    quality_before=(
+                        quality_before.overall_score if quality_before else None
+                    ),
+                    quality_after=(
+                        quality_after.overall_score if quality_after else None
+                    ),
                     repair_time=repair_time,
                 )
 
@@ -700,8 +702,7 @@ ALWAYS:
                     error_message=str(original_error),
                     strategy_used=strategy_type,
                     quality_improvement=quality_improvement,
-                    repair_steps=[repair.get("type", "")
-                                  for repair in repairs],
+                    repair_steps=[repair.get("type", "") for repair in repairs],
                 )
 
                 return metadata, qa_pairs
@@ -814,10 +815,18 @@ You are a proactive quality analysis agent for Obsidian educational notes. Your 
                     "quality_score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                     "issues_found": {"type": "array", "items": {"type": "string"}},
                     "needs_correction": {"type": "boolean"},
-                    "suggested_corrections": {"type": "array", "items": {"type": "string"}},
+                    "suggested_corrections": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
                     "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                 },
-                "required": ["quality_score", "issues_found", "needs_correction", "confidence"],
+                "required": [
+                    "quality_score",
+                    "issues_found",
+                    "needs_correction",
+                    "confidence",
+                ],
             }
 
             analysis_result = self.ollama_client.generate_json(
@@ -831,8 +840,7 @@ You are a proactive quality analysis agent for Obsidian educational notes. Your 
             quality_score = analysis_result.get("quality_score", 0.5)
             issues_found = analysis_result.get("issues_found", [])
             needs_correction = analysis_result.get("needs_correction", False)
-            suggested_corrections = analysis_result.get(
-                "suggested_corrections", [])
+            suggested_corrections = analysis_result.get("suggested_corrections", [])
             confidence = analysis_result.get("confidence", 0.5)
 
             corrected_content = None
@@ -852,7 +860,9 @@ You are a proactive quality analysis agent for Obsidian educational notes. Your 
 
                 # Attempt repair using existing repair logic
                 repair_prompt = self._build_repair_prompt(
-                    content, synthetic_error, enable_content_gen=self.enable_content_generation
+                    content,
+                    synthetic_error,
+                    enable_content_gen=self.enable_content_generation,
                 )
 
                 repair_system_prompt = """<role>
@@ -871,8 +881,7 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
                     )
 
                     if repair_result.get("is_repairable", False):
-                        corrected_content = repair_result.get(
-                            "repaired_content")
+                        corrected_content = repair_result.get("repaired_content")
                         repairs = repair_result.get("repairs", [])
                         corrections_applied = [
                             repair.get("description", "") for repair in repairs
@@ -882,8 +891,7 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
                         quality_after_data = repair_result.get("quality_after")
                         if quality_after_data:
                             try:
-                                quality_after = RepairQualityScore(
-                                    **quality_after_data)
+                                quality_after = RepairQualityScore(**quality_after_data)
                             except Exception:
                                 pass
 
@@ -1025,17 +1033,16 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         lang_tags_match = re.search(r"language_tags:\s*\[(.*?)\]", content)
         if lang_tags_match:
             lang_tags_str = lang_tags_match.group(1)
-            lang_tags = [tag.strip().strip('"').strip("'")
-                         for tag in lang_tags_str.split(",")]
+            lang_tags = [
+                tag.strip().strip('"').strip("'") for tag in lang_tags_str.split(",")
+            ]
 
             # Check consistency
             if "en" in lang_tags and not (has_en_question and has_en_answer):
-                errors.append(
-                    "Language tag 'en' present but EN content missing")
+                errors.append("Language tag 'en' present but EN content missing")
 
             if "ru" in lang_tags and not (has_ru_question and has_ru_answer):
-                errors.append(
-                    "Language tag 'ru' present but RU content missing")
+                errors.append("Language tag 'ru' present but RU content missing")
 
         return errors
 
@@ -1061,8 +1068,14 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         frontmatter = frontmatter_match.group(1)
 
         # Check required fields
-        required_fields = ["id", "title", "topic",
-                           "language_tags", "created", "updated"]
+        required_fields = [
+            "id",
+            "title",
+            "topic",
+            "language_tags",
+            "created",
+            "updated",
+        ]
         for field in required_fields:
             if f"{field}:" not in frontmatter:
                 errors.append(f"Missing required frontmatter field: {field}")
@@ -1071,13 +1084,13 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         lang_tags_match = re.search(r"language_tags:\s*\[(.*?)\]", frontmatter)
         if lang_tags_match:
             lang_tags_str = lang_tags_match.group(1)
-            lang_tags = [tag.strip().strip('"').strip("'")
-                         for tag in lang_tags_str.split(",")]
+            lang_tags = [
+                tag.strip().strip('"').strip("'") for tag in lang_tags_str.split(",")
+            ]
             valid_langs = {"en", "ru"}
             for tag in lang_tags:
                 if tag not in valid_langs:
-                    errors.append(
-                        f"Invalid language tag: {tag} (must be 'en' or 'ru')")
+                    errors.append(f"Invalid language tag: {tag} (must be 'en' or 'ru')")
 
         return errors
 
@@ -1106,8 +1119,9 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
-            logger.error("parser_partial_repair_read_failed",
-                         file=str(file_path), error=str(e))
+            logger.error(
+                "parser_partial_repair_read_failed", file=str(file_path), error=str(e)
+            )
             return None
 
         # Identify sections
@@ -1178,7 +1192,8 @@ If the section cannot be fixed, mark it as unrepairable.
                 sections_failed.append(section_name)
                 section_confidence[section_name] = 0.0
                 repair_report_parts.append(
-                    f"Section '{section_name}': Error - {str(e)}")
+                    f"Section '{section_name}': Error - {str(e)}"
+                )
 
         is_complete = len(sections_failed) == 0
         repair_report = "\n".join(repair_report_parts)
@@ -1228,27 +1243,31 @@ If the section cannot be fixed, mark it as unrepairable.
 
         if frontmatter_start is not None and frontmatter_end is not None:
             sections["frontmatter"] = "\n".join(
-                lines[frontmatter_start: frontmatter_end + 1])
+                lines[frontmatter_start : frontmatter_end + 1]
+            )
 
         # Extract question/answer sections
         current_section = None
         current_section_lines = []
 
         for i, line in enumerate(lines):
-            if line.strip().startswith("# Question") or line.strip().startswith("# Вопрос"):
+            if line.strip().startswith("# Question") or line.strip().startswith(
+                "# Вопрос"
+            ):
                 if current_section:
-                    sections[current_section] = "\n".join(
-                        current_section_lines)
-                current_section = "question_" + \
-                    str(len([k for k in sections.keys()
-                        if k.startswith("question")]))
+                    sections[current_section] = "\n".join(current_section_lines)
+                current_section = "question_" + str(
+                    len([k for k in sections.keys() if k.startswith("question")])
+                )
                 current_section_lines = [line]
-            elif line.strip().startswith("## Answer") or line.strip().startswith("## Ответ"):
+            elif line.strip().startswith("## Answer") or line.strip().startswith(
+                "## Ответ"
+            ):
                 if current_section:
-                    sections[current_section] = "\n".join(
-                        current_section_lines)
-                current_section = "answer_" + \
-                    str(len([k for k in sections.keys() if k.startswith("answer")]))
+                    sections[current_section] = "\n".join(current_section_lines)
+                current_section = "answer_" + str(
+                    len([k for k in sections.keys() if k.startswith("answer")])
+                )
                 current_section_lines = [line]
             elif current_section:
                 current_section_lines.append(line)

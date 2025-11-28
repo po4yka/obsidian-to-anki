@@ -8,8 +8,8 @@ from langchain_core.tools import BaseTool
 
 from ...apf.html_validator import validate_card_html
 from ...apf.linter import validate_apf
+from ...domain.services.content_hash_service import ContentHashService
 from ...sync.slug_generator import generate_slug
-from ...utils.content_hash import compute_content_hash
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -19,7 +19,9 @@ class APFValidatorTool(BaseTool):
     """Tool for validating APF card format."""
 
     name: str = "apf_validator"
-    description: str = "Validate APF card format and structure. Returns validation results with any errors found."
+    description: str = (
+        "Validate APF card format and structure. Returns validation results with any errors found."
+    )
 
     def _run(self, apf_content: str) -> str:
         """Validate APF content.
@@ -32,7 +34,7 @@ class APFValidatorTool(BaseTool):
         """
         try:
             result = validate_apf(apf_content)
-            if result.valid:
+            if result.is_valid:
                 return "APF validation passed: All cards are valid."
             else:
                 errors = [f"- {error}" for error in result.errors]
@@ -60,12 +62,12 @@ class HTMLFormatterTool(BaseTool):
             Formatted HTML or validation errors
         """
         try:
-            result = validate_card_html(html_content)
-            if result.valid:
-                return f"HTML validation passed. Formatted content:\n{result.formatted_html}"
+            errors = validate_card_html(html_content)
+            if not errors:
+                return "HTML validation passed: No validation errors found."
             else:
-                errors = [f"- {error}" for error in result.errors]
-                return "HTML validation failed:\n" + "\n".join(errors)
+                error_list = [f"- {error}" for error in errors]
+                return "HTML validation failed:\n" + "\n".join(error_list)
         except Exception as e:
             logger.error("html_formatter_tool_error", error=str(e))
             return f"HTML formatting error: {e}"
@@ -75,7 +77,9 @@ class SlugGeneratorTool(BaseTool):
     """Tool for generating slugs for cards."""
 
     name: str = "slug_generator"
-    description: str = "Generate unique slugs for cards based on title and base slug. Returns generated slug."
+    description: str = (
+        "Generate unique slugs for cards based on title and base slug. Returns generated slug."
+    )
 
     def _run(
         self, title: str, base_slug: str, existing_slugs: list[str] | None = None
@@ -117,7 +121,7 @@ class ContentHashTool(BaseTool):
             Hex hash string
         """
         try:
-            hash_value = compute_content_hash(content)
+            hash_value = ContentHashService.compute_hash(content)
             return f"Content hash: {hash_value}"
         except Exception as e:
             logger.error("content_hash_tool_error", error=str(e))
@@ -128,7 +132,9 @@ class MetadataExtractorTool(BaseTool):
     """Tool for extracting metadata from note content."""
 
     name: str = "metadata_extractor"
-    description: str = "Extract metadata from note content including YAML frontmatter. Returns structured metadata."
+    description: str = (
+        "Extract metadata from note content including YAML frontmatter. Returns structured metadata."
+    )
 
     def _run(self, note_content: str) -> str:
         """Extract metadata from note content.
@@ -163,7 +169,9 @@ class CardTemplateTool(BaseTool):
     """Tool for generating card templates."""
 
     name: str = "card_template"
-    description: str = "Generate APF card templates for different card types (Simple, Missing, Draw, Cloze)."
+    description: str = (
+        "Generate APF card templates for different card types (Simple, Missing, Draw, Cloze)."
+    )
 
     def _run(
         self,

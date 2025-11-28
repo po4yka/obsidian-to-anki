@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.entities.card import Card
 from ...domain.entities.note import Note
 from ...domain.interfaces.card_generator import ICardGenerator
@@ -81,6 +80,7 @@ class ProcessNotesUseCase:
         }
 
         import time
+
         start_time = time.time()
 
         try:
@@ -97,13 +97,13 @@ class ProcessNotesUseCase:
             # Step 2: Generate cards from notes
             for note in notes:
                 try:
-                    note_cards = self.card_generator.generate_cards_from_note(
-                        note)
+                    note_cards = self.card_generator.generate_cards_from_note(note)
 
                     # Filter by requested languages if specified
                     if request.languages:
                         note_cards = [
-                            card for card in note_cards
+                            card
+                            for card in note_cards
                             if card.language in request.languages
                         ]
 
@@ -118,8 +118,9 @@ class ProcessNotesUseCase:
 
                 except Exception as e:
                     error_msg = f"Failed to generate cards for note {note.id}: {e}"
-                    logger.warning("card_generation_failed",
-                                   note_id=note.id, error=str(e))
+                    logger.warning(
+                        "card_generation_failed", note_id=note.id, error=str(e)
+                    )
                     errors.append(error_msg)
                     stats["notes_with_errors"] += 1
 
@@ -129,13 +130,11 @@ class ProcessNotesUseCase:
 
             # Add discovery statistics
             if notes:
-                discovery_stats = self.note_discovery_service.get_note_statistics(
-                    notes)
+                discovery_stats = self.note_discovery_service.get_note_statistics(notes)
                 stats["discovery_stats"] = discovery_stats
 
             success = len(errors) == 0 or (
-                len(cards) > 0 and len(errors) < len(
-                    notes) // 2  # Allow some errors
+                len(cards) > 0 and len(errors) < len(notes) // 2  # Allow some errors
             )
 
             logger.info(

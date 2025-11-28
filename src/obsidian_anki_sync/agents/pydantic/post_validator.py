@@ -4,7 +4,7 @@ Validates generated cards for quality, syntax, and accuracy.
 """
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata
 from ...utils.logging import get_logger
@@ -27,7 +27,7 @@ class PostValidatorAgentAI:
     Uses structured outputs to identify and suggest corrections.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize post-validator agent.
 
         Args:
@@ -40,7 +40,7 @@ class PostValidatorAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
-            result_type=PostValidationOutput,
+            output_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
         )
 

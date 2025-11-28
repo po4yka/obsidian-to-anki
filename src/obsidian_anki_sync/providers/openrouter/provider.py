@@ -128,8 +128,7 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5,
-                                max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -156,8 +155,7 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(
-                    max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
         return self._async_client
@@ -260,8 +258,7 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success",
-                        model_count=len(models))
+            logger.info("openrouter_list_models_success", model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
@@ -304,8 +301,7 @@ class OpenRouterProvider(BaseLLMProvider):
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
-            prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -599,8 +595,7 @@ class OpenRouterProvider(BaseLLMProvider):
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
-            completion = self._extract_completion(
-                message, model, result, json_schema)
+            completion = self._extract_completion(message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -614,8 +609,7 @@ class OpenRouterProvider(BaseLLMProvider):
             finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(
-                model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -708,8 +702,7 @@ class OpenRouterProvider(BaseLLMProvider):
             elif "refusal" in message and message["refusal"]:
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get(
-                    "finish_reason", "unknown")
+                finish_reason = result["choices"][0].get("finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -829,7 +822,8 @@ class OpenRouterProvider(BaseLLMProvider):
         # Enhanced fallback for Grok models: try with reasoning enabled first
         if (
             should_fallback_to_basic_json(
-                model, error.response.status_code, json_schema)
+                model, error.response.status_code, json_schema
+            )
             and "grok" in model.lower()
             and json_schema
             and not reasoning_enabled
@@ -1030,14 +1024,12 @@ class OpenRouterProvider(BaseLLMProvider):
             Response dictionary
         """
         if stream:
-            raise NotImplementedError(
-                "Streaming is not yet supported in async mode")
+            raise NotImplementedError("Streaming is not yet supported in async mode")
 
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
-            prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,

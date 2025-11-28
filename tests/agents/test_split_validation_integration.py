@@ -29,10 +29,13 @@ def pipeline_state(mock_config):
     return PipelineState(
         note_content="Test content",
         metadata_dict=NoteMetadata(
+            id="test-note-123",
             title="Test Note",
             topic="Test Topic",
             tags=["test"],
             file_path="/path/to/note.md",
+            created="2024-01-01T00:00:00Z",
+            updated="2024-01-01T00:00:00Z",
         ).model_dump(),
         qa_pairs_dicts=[],
         config=mock_config,

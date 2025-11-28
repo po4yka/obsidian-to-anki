@@ -45,10 +45,11 @@ def sample_qa_pairs():
 @pytest.fixture
 def card_splitting_agent():
     """Create a CardSplittingAgentAI instance with mocked PydanticAI Agent."""
-    with patch("obsidian_anki_sync.agents.pydantic_ai_agents.Agent") as mock_agent_class:
+    mock_model = MagicMock()
+    with patch("obsidian_anki_sync.agents.pydantic.card_splitting.Agent") as mock_agent_class:
         mock_agent_instance = MagicMock()
         mock_agent_class.return_value = mock_agent_instance
-        agent = CardSplittingAgentAI(model="test-model", temperature=0.0)
+        agent = CardSplittingAgentAI(model=mock_model, temperature=0.0)
         agent.agent = mock_agent_instance
         return agent
 

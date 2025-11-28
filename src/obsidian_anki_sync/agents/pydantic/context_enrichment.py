@@ -7,7 +7,7 @@ import re
 import time
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata
 from ...utils.logging import get_logger
@@ -28,7 +28,7 @@ class ContextEnrichmentAgentAI:
     Enhances cards with examples, mnemonics, and helpful context.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.3):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.3):
         """Initialize context enrichment agent.
 
         Args:
@@ -41,7 +41,7 @@ class ContextEnrichmentAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[ContextEnrichmentDeps, ContextEnrichmentOutput] = Agent(
             model=self.model,
-            result_type=ContextEnrichmentOutput,
+            output_type=ContextEnrichmentOutput,
             system_prompt=CONTEXT_ENRICHMENT_PROMPT,
         )
 

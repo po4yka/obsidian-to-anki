@@ -10,8 +10,8 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
 from ...utils.logging import get_logger
-from .react_agent import ReActAgent
 from .base import LangChainAgentResult
+from .react_agent import ReActAgent
 
 logger = get_logger(__name__)
 
@@ -38,6 +38,7 @@ class ReActRepairAgent:
         """
         if tools is None:
             from .tools import get_tools_for_agent
+
             # Use validation tools for repair (APF validator, HTML formatter, etc.)
             tools = get_tools_for_agent("validator")
 
@@ -108,9 +109,7 @@ class ReActRepairAgent:
         return self._process_analysis_result(result, content)
 
     def _process_repair_result(
-        self,
-        agent_result: LangChainAgentResult,
-        original_content: str
+        self, agent_result: LangChainAgentResult, original_content: str
     ) -> Dict[str, Any]:
         """Process ReAct result for repair tasks.
 
@@ -161,9 +160,7 @@ class ReActRepairAgent:
         }
 
     def _process_analysis_result(
-        self,
-        agent_result: LangChainAgentResult,
-        original_content: str
+        self, agent_result: LangChainAgentResult, original_content: str
     ) -> Dict[str, Any]:
         """Process ReAct result for analysis tasks.
 
@@ -190,8 +187,7 @@ class ReActRepairAgent:
         # Extract analysis components
         analysis = self._extract_analysis_summary(output)
         findings = self._extract_findings(output, reasoning_chain)
-        recommendations = self._extract_recommendations(
-            output, reasoning_chain)
+        recommendations = self._extract_recommendations(output, reasoning_chain)
 
         logger.info(
             "react_analysis_completed",
@@ -223,7 +219,9 @@ class ReActRepairAgent:
         # Look for diagnosis patterns
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["diagnosis:", "issue:", "problem:"]):
+            if any(
+                word in line.lower() for word in ["diagnosis:", "issue:", "problem:"]
+            ):
                 return line.strip()
 
         # Fallback: first meaningful line
@@ -247,7 +245,10 @@ class ReActRepairAgent:
         # Look for root cause in output
         lines = output.split("\n")
         for line in lines:
-            if any(phrase in line.lower() for phrase in ["root cause:", "cause:", "reason:"]):
+            if any(
+                phrase in line.lower()
+                for phrase in ["root cause:", "cause:", "reason:"]
+            ):
                 return line.strip()
 
         # Look in reasoning chain observations
@@ -273,13 +274,19 @@ class ReActRepairAgent:
         # Extract from output
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["fix:", "repair:", "solution:", "suggest:"]):
+            if any(
+                word in line.lower()
+                for word in ["fix:", "repair:", "solution:", "suggest:"]
+            ):
                 fixes.append(line.strip())
 
         # Extract from reasoning observations
         for step in reasoning_chain:
             observation = step.get("observation", "")
-            if any(word in observation.lower() for word in ["fix", "repair", "correct", "update"]):
+            if any(
+                word in observation.lower()
+                for word in ["fix", "repair", "correct", "update"]
+            ):
                 fixes.append(observation.strip())
 
         return list(set(fixes))  # Remove duplicates
@@ -295,7 +302,9 @@ class ReActRepairAgent:
         """
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["analysis:", "summary:", "overview:"]):
+            if any(
+                word in line.lower() for word in ["analysis:", "summary:", "overview:"]
+            ):
                 return line.strip()
 
         # First substantial line
@@ -320,18 +329,25 @@ class ReActRepairAgent:
 
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["finding:", "found:", "identified:"]):
+            if any(
+                word in line.lower() for word in ["finding:", "found:", "identified:"]
+            ):
                 findings.append(line.strip())
 
         # From reasoning chain
         for step in reasoning_chain:
             observation = step.get("observation", "")
-            if any(word in observation.lower() for word in ["found", "identified", "discovered"]):
+            if any(
+                word in observation.lower()
+                for word in ["found", "identified", "discovered"]
+            ):
                 findings.append(observation.strip())
 
         return list(set(findings))
 
-    def _extract_recommendations(self, output: str, reasoning_chain: List[Dict]) -> List[str]:
+    def _extract_recommendations(
+        self, output: str, reasoning_chain: List[Dict]
+    ) -> List[str]:
         """Extract recommendations from analysis.
 
         Args:
@@ -345,13 +361,19 @@ class ReActRepairAgent:
 
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["recommend:", "suggest:", "improve:", "should:"]):
+            if any(
+                word in line.lower()
+                for word in ["recommend:", "suggest:", "improve:", "should:"]
+            ):
                 recommendations.append(line.strip())
 
         # From reasoning chain
         for step in reasoning_chain:
             observation = step.get("observation", "")
-            if any(word in observation.lower() for word in ["recommend", "suggest", "improve"]):
+            if any(
+                word in observation.lower()
+                for word in ["recommend", "suggest", "improve"]
+            ):
                 recommendations.append(observation.strip())
 
         return list(set(recommendations))

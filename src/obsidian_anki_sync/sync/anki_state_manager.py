@@ -48,8 +48,7 @@ class AnkiStateManager:
         try:
             from ..exceptions import AnkiConnectError
 
-            note_ids = self.anki.find_notes(
-                f"deck:{self.config.anki_deck_name}")
+            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
         except AnkiConnectError as e:
             elapsed = time.time() - start_time
             logger.error(
@@ -100,8 +99,7 @@ class AnkiStateManager:
                 notes_info = self.anki.notes_info(batch_note_ids)
 
                 for note_info in notes_info:
-                    manifest_field = note_info.get(
-                        "fields", {}).get("Manifest", {})
+                    manifest_field = note_info.get("fields", {}).get("Manifest", {})
                     if isinstance(manifest_field, dict):
                         manifest_field = manifest_field.get("value", "")
 
@@ -195,8 +193,7 @@ class AnkiStateManager:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get(
-                            "anki_guid") if db_card else None,
+                        anki_guid=db_card.get("anki_guid") if db_card else None,
                         reason="No changes detected",
                     )
                 )

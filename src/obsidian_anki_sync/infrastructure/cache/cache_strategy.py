@@ -157,12 +157,14 @@ class AgentCacheStrategy:
                 agent_cache.clear()
                 invalidated += 1
 
-            logger.info("note_cache_invalidated", note_id=note_id,
-                        entries_invalidated=invalidated)
+            logger.info(
+                "note_cache_invalidated",
+                note_id=note_id,
+                entries_invalidated=invalidated,
+            )
 
         except Exception as e:
-            logger.warning("cache_invalidation_error",
-                           note_id=note_id, error=str(e))
+            logger.warning("cache_invalidation_error", note_id=note_id, error=str(e))
 
         return invalidated
 
@@ -233,10 +235,12 @@ class AgentCacheStrategy:
         """
         # Base TTL by operation
         base_ttl = {
-            "pre_validation": 3600,    # 1 hour
-            "generation": 7200,       # 2 hours
+            "pre_validation": 3600,  # 1 hour
+            "generation": 7200,  # 2 hours
             "post_validation": 1800,  # 30 minutes
-        }.get(operation, 3600)  # Default 1 hour
+        }.get(
+            operation, 3600
+        )  # Default 1 hour
 
         # Adjust based on quality
         if result_quality == "high":

@@ -22,5 +22,6 @@ class QAExtractionAgent(BaseSpecializedAgent):
             success=False,
             reasoning="QA extraction requires LLM provider integration. Use the main QAExtractorAgent from qa_extractor.py instead.",
             warnings=[
-                "QA extraction agent not available in specialized agents context"],
+                "QA extraction agent not available in specialized agents context"
+            ],
         )

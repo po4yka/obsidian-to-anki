@@ -124,11 +124,9 @@ class ProblemRouter:
 
             # Rate limiter
             rate_limit = rate_limit_config.get(
-                domain.value, rate_limit_config.get(
-                    "default", default_rate_limit)
+                domain.value, rate_limit_config.get("default", default_rate_limit)
             )
-            self.rate_limiters[domain] = RateLimiter(
-                max_calls_per_minute=rate_limit)
+            self.rate_limiters[domain] = RateLimiter(max_calls_per_minute=rate_limit)
 
             # Bulkhead
             bulkhead_max = bulkhead_config.get(
@@ -285,8 +283,7 @@ class ProblemRouter:
             return result
 
         except CircuitBreakerError as e:
-            logger.warning("circuit_breaker_open",
-                           domain=domain.value, error=str(e))
+            logger.warning("circuit_breaker_open", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Circuit breaker is open: {e}",
@@ -294,8 +291,7 @@ class ProblemRouter:
             )
 
         except RateLimitExceededError as e:
-            logger.warning("rate_limit_exceeded",
-                           domain=domain.value, error=str(e))
+            logger.warning("rate_limit_exceeded", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Rate limit exceeded: {e}",
@@ -303,8 +299,7 @@ class ProblemRouter:
             )
 
         except ResourceExhaustedError as e:
-            logger.warning("bulkhead_exhausted",
-                           domain=domain.value, error=str(e))
+            logger.warning("bulkhead_exhausted", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Resources exhausted: {e}",
@@ -312,8 +307,7 @@ class ProblemRouter:
             )
 
         except LowConfidenceError as e:
-            logger.warning("low_confidence_rejected",
-                           domain=domain.value, error=str(e))
+            logger.warning("low_confidence_rejected", domain=domain.value, error=str(e))
             return AgentResult(
                 success=False,
                 reasoning=f"Low confidence rejected: {e}",
@@ -321,8 +315,7 @@ class ProblemRouter:
             )
 
         except Exception as e:
-            logger.error("specialized_agent_failed",
-                         domain=domain.value, error=str(e))
+            logger.error("specialized_agent_failed", domain=domain.value, error=str(e))
 
             return AgentResult(
                 success=False,

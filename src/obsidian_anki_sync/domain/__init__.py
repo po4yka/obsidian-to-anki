@@ -23,14 +23,12 @@ __all__ = [
     "Note",
     "NoteMetadata",
     "QAPair",
-
     # Interfaces
     "IAnkiClient",
     "ICardGenerator",
     "ILLMProvider",
     "INoteParser",
     "IStateRepository",
-
     # Services
     "ContentHashService",
     "SlugService",

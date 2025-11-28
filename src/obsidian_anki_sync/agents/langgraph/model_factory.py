@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from ...config import Config
 from ...providers.pydantic_ai_models import PydanticAIModelFactory
@@ -39,9 +39,7 @@ class ModelFactory:
             return model
         except Exception as e:
             logger.warning(
-                "failed_to_create_model",
-                agent_type=agent_type,
-                error=str(e)
+                "failed_to_create_model", agent_type=agent_type, error=str(e)
             )
             return None
 

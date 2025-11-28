@@ -116,11 +116,7 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the Search Agent.
 
         Args:
@@ -140,10 +136,8 @@ Thought: {agent_scratchpad}"""
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 4),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
-                return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
+                return_intermediate_steps=kwargs.get("return_intermediate_steps", True),
             )
 
             # Prepare input
@@ -221,10 +215,12 @@ Gather relevant information and provide detailed findings."""
         for step in intermediate_steps:
             action, observation = step
             if hasattr(action, "tool") and "search" in action.tool.lower():
-                search_actions.append({
-                    "query": action.tool_input,
-                    "results": observation,
-                })
+                search_actions.append(
+                    {
+                        "query": action.tool_input,
+                        "results": observation,
+                    }
+                )
 
         # Extract confidence based on search thoroughness
         confidence = self._extract_confidence(output)
@@ -238,7 +234,10 @@ Gather relevant information and provide detailed findings."""
 
         # Determine success
         success = True
-        if "no information found" in output.lower() or "unable to find" in output.lower():
+        if (
+            "no information found" in output.lower()
+            or "unable to find" in output.lower()
+        ):
             success = False
             confidence = max(confidence - 0.3, 0.0)
 

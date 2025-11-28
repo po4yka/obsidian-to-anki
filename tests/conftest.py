@@ -47,14 +47,58 @@ def mock_note_parser():
 @pytest.fixture
 def sample_note_metadata():
     """Provide sample note metadata for testing."""
-    return NoteMetadata(
-        topic="Test Topic",
-        language_tags=["en", "ru"],
-        difficulty="medium",
-        question_kind="concept",
-        tags=["test", "sample"],
-        status="published",
-    )
+    from datetime import datetime
+    # Create with explicit kwargs to handle Pydantic version differences
+    return NoteMetadata(**{
+        "id": "test-001",
+        "title": "Test Question",
+        "topic": "Test Topic",
+        "language_tags": ["en", "ru"],
+        "difficulty": "medium",
+        "question_kind": "concept",
+        "tags": ["test", "sample"],
+        "status": "published",
+        "created": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+        "updated": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+    })
+
+
+@pytest.fixture
+def sample_note_content():
+    """Provide sample note content with Q&A pairs."""
+    return """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01T00:00:00Z
+updated: 2024-01-01T00:00:00Z
+---
+
+# Question (EN)
+What is unit testing?
+
+# Answer (EN)
+Unit testing is testing individual components in isolation.
+
+# Question (RU)
+Что такое юнит-тестирование?
+
+# Answer (RU)
+Юнит-тестирование - это тестирование отдельных компонентов в изоляции.
+
+## Follow-ups
+- How to write good tests?
+- What are testing frameworks?
+
+## References
+- pytest.org
+- unittest documentation
+
+## Related
+- Integration testing
+- TDD (Test-Driven Development)
+"""
 
 
 @pytest.fixture
@@ -156,6 +200,36 @@ Development is writing code.
 """)
 
     return vault_dir
+
+
+@pytest.fixture
+def mock_config(temp_vault_dir):
+    """Provide a mock Config instance with valid paths."""
+    from unittest.mock import MagicMock
+    from obsidian_anki_sync.config import Config
+
+    # Create a mock config with valid vault path
+    config = MagicMock(spec=Config)
+    config.vault_path = temp_vault_dir
+    config.source_dir = temp_vault_dir
+    config.db_path = temp_vault_dir / "test.db"
+
+    # Set default reflection settings
+    config.reflection_skip_qa_threshold = 2
+    config.reflection_skip_content_length = 500
+    config.reflection_skip_confidence_threshold = 0.8
+    config.reflection_enabled = True
+    config.reflection_stages = ["pre_validation",
+                                "generation", "post_validation", "enrichment"]
+    config.reflection_domain_weights = {
+        "medical": 1.5,
+        "legal": 1.4,
+        "technical": 1.3,
+        "interview": 1.2,
+        "programming": 1.0
+    }
+
+    return config
 
 
 @pytest.fixture(autouse=True)

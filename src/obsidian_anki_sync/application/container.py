@@ -12,7 +12,7 @@ from ..domain.interfaces.state_repository import IStateRepository
 from ..domain.interfaces.vault_config import IVaultConfig
 from ..utils.logging import get_logger
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
@@ -41,7 +41,8 @@ class DependencyContainer:
         """
         self._services[interface] = implementation
         logger.debug(
-            f"service_registered: {interface.__name__} -> {type(implementation).__name__}")
+            f"service_registered: {interface.__name__} -> {type(implementation).__name__}"
+        )
 
     def register_factory(self, interface: type[T], factory: callable) -> None:
         """Register a factory function for creating services.
@@ -85,10 +86,7 @@ class DependencyContainer:
 
         # Check factories
         if interface in self._factories:
-            implementation = self._factories[interface]()
-            # Cache as singleton after first creation
-            self._singletons[interface] = implementation
-            return implementation
+            return self._factories[interface]()
 
         raise ValueError(
             f"No implementation registered for {interface.__name__}")
@@ -103,9 +101,9 @@ class DependencyContainer:
             True if registered, False otherwise
         """
         return (
-            interface in self._services or
-            interface in self._factories or
-            interface in self._singletons
+            interface in self._services
+            or interface in self._factories
+            or interface in self._singletons
         )
 
     def clear(self) -> None:
@@ -121,7 +119,11 @@ class DependencyContainer:
         Returns:
             List of registered interface types
         """
-        return list(set(self._services.keys()) | set(self._factories.keys()) | set(self._singletons.keys()))
+        return list(
+            set(self._services.keys())
+            | set(self._factories.keys())
+            | set(self._singletons.keys())
+        )
 
 
 # Global container instance
@@ -148,12 +150,12 @@ def setup_container(container: DependencyContainer) -> None:
         container: The container to setup
     """
     # Import here to avoid circular imports
-    from ..config import Config
-    from ..providers.factory import ProviderFactory
     from ..anki.client import AnkiClient
-    from ..sync.state_db import StateDB
     from ..apf.generator import APFGenerator
+    from ..config import Config
     from ..obsidian.parser import create_note_parser
+    from ..providers.factory import ProviderFactory
+    from ..sync.state_db import StateDB
 
     # Load configuration
     config = Config()
@@ -164,17 +166,21 @@ def setup_container(container: DependencyContainer) -> None:
     container.register(IAnkiConfig, config)
 
     # Register service implementations
-    container.register_factory(IAnkiClient, lambda: AnkiClient(
-        url=config.anki_connect_url,
-        timeout=config.llm_timeout,
-        enable_health_checks=True,
-    ))
+    container.register_factory(
+        IAnkiClient,
+        lambda: AnkiClient(
+            url=config.anki_connect_url,
+            timeout=config.llm_timeout,
+            enable_health_checks=True,
+        ),
+    )
 
     container.register_factory(
         IStateRepository, lambda: StateDB(config.db_path))
 
     container.register_factory(
-        ILLMProvider, lambda: ProviderFactory.create_from_config(config))
+        ILLMProvider, lambda: ProviderFactory.create_from_config(config)
+    )
 
     container.register_factory(ICardGenerator, lambda: APFGenerator(config))
 
@@ -183,7 +189,7 @@ def setup_container(container: DependencyContainer) -> None:
     logger.info("container_setup_completed")
 
 
-def inject[T](interface: type[T]) -> T:
+def inject(interface: type[T]) -> T:
     """Dependency injection decorator/helper.
 
     Args:

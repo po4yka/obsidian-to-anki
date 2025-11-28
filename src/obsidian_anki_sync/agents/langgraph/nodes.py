@@ -29,7 +29,6 @@ from ..models import (
     MemorizationQualityResult,
     PostValidationResult,
     PreValidationResult,
-    SplitValidationResult,
 )
 from ..pydantic import (
     CardSplittingAgentAI,
@@ -129,14 +128,12 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
             enable_content_generation=getattr(
                 config, "parser_repair_generate_content", True
             ),
-            repair_missing_sections=getattr(
-                config, "repair_missing_sections", True),
+            repair_missing_sections=getattr(config, "repair_missing_sections", True),
         )
 
         # Perform proactive analysis and correction
         note_content = state.get("note_content", "")
-        file_path = Path(state["file_path"]) if state.get(
-            "file_path") else None
+        file_path = Path(state["file_path"]) if state.get("file_path") else None
 
         correction_result = correction_agent.analyze_and_correct_proactively(
             content=note_content, file_path=file_path
@@ -146,10 +143,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         state["note_correction"] = correction_result.model_dump()
 
         # If correction was applied, update note content
-        if (
-            correction_result.needs_correction
-            and correction_result.corrected_content
-        ):
+        if correction_result.needs_correction and correction_result.corrected_content:
             state["note_content"] = correction_result.corrected_content
             logger.info(
                 "note_correction_applied",
@@ -239,8 +233,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             state["pre_validation"] = pre_result.model_dump()
             state["stage_times"]["pre_validation"] = pre_result.validation_time
             state["current_stage"] = "generation"
-            state["messages"].append(
-                f"Pre-validation: {pre_result.error_type}")
+            state["messages"].append(f"Pre-validation: {pre_result.error_type}")
             return state
 
     # Create pre-validator agent
@@ -256,8 +249,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         )
         pre_result.validation_time = time.time() - start_time
     except PreValidationError as e:
-        logger.error("langgraph_pre_validation_error",
-                     error=str(e), details=e.details)
+        logger.error("langgraph_pre_validation_error", error=str(e), details=e.details)
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -279,8 +271,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
     except Exception as e:
-        logger.exception(
-            "langgraph_pre_validation_unexpected_error", error=str(e))
+        logger.exception("langgraph_pre_validation_unexpected_error", error=str(e))
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -343,14 +334,12 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("card_splitting")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
-            logger.warning(
-                "failed_to_create_card_splitting_model", error=str(e))
+            logger.warning("failed_to_create_card_splitting_model", error=str(e))
             # Fallback: skip card splitting analysis
             state["card_splitting"] = None
             state["current_stage"] = "generation"
             state["stage_times"]["card_splitting"] = time.time() - start_time
-            state["messages"].append(
-                "Card splitting skipped (model unavailable)")
+            state["messages"].append("Card splitting skipped (model unavailable)")
             return state
 
     # Create card splitting agent
@@ -414,8 +403,7 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
         # Apply preferred size bias
         if preferred_size == "small" and not splitting_result.should_split:
             # Prefer smaller cards - encourage splitting
-            logger.debug(
-                "card_splitting_preferred_size_small_encouraging_split")
+            logger.debug("card_splitting_preferred_size_small_encouraging_split")
         elif preferred_size == "large" and splitting_result.should_split:
             # Prefer larger cards - might want to discourage splitting
             # But respect the agent's decision unless confidence is low
@@ -491,8 +479,7 @@ async def split_validation_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("split_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning(
-                "failed_to_create_split_validator_model", error=str(e))
+            logger.warning("failed_to_create_split_validator_model", error=str(e))
             # Skip validation if model unavailable
             state["current_stage"] = "generation"
             return state
@@ -623,12 +610,9 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
     if agent_selector:
         # Use unified agent interface
-        generator_agent = agent_selector.get_agent(
-            agent_framework, "generator")
+        generator_agent = agent_selector.get_agent(agent_framework, "generator")
         logger.info(
-            "using_unified_agent",
-            framework=agent_framework,
-            agent_type="generator"
+            "using_unified_agent", framework=agent_framework, agent_type="generator"
         )
     else:
         # Fallback to direct PydanticAI agent (legacy behavior)
@@ -646,12 +630,14 @@ async def generation_node(state: PipelineState) -> PipelineState:
             logger.info(
                 "langgraph_generation_parallel",
                 total_pairs=len(qa_pairs),
-                batch_size=BATCH_SIZE
+                batch_size=BATCH_SIZE,
             )
 
             # Split Q&A pairs into chunks
-            chunks = [qa_pairs[i:i + BATCH_SIZE]
-                      for i in range(0, len(qa_pairs), BATCH_SIZE)]
+            chunks = [
+                qa_pairs[i : i + BATCH_SIZE]
+                for i in range(0, len(qa_pairs), BATCH_SIZE)
+            ]
 
             # Create tasks for each chunk
             tasks = []
@@ -659,20 +645,24 @@ async def generation_node(state: PipelineState) -> PipelineState:
                 if agent_selector:
                     # Use unified agent interface
                     qa_dicts = [qa.model_dump() for qa in chunk]
-                    tasks.append(generator_agent.generate_cards(
-                        note_content=state["note_content"],
-                        metadata=metadata.model_dump(),
-                        qa_pairs=qa_dicts,
-                        slug_base=state["slug_base"],
-                    ))
+                    tasks.append(
+                        generator_agent.generate_cards(
+                            note_content=state["note_content"],
+                            metadata=metadata.model_dump(),
+                            qa_pairs=qa_dicts,
+                            slug_base=state["slug_base"],
+                        )
+                    )
                 else:
                     # Legacy PydanticAI agent
-                    tasks.append(generator.generate_cards(
-                        note_content=state["note_content"],
-                        metadata=metadata,
-                        qa_pairs=chunk,
-                        slug_base=state["slug_base"],
-                    ))
+                    tasks.append(
+                        generator.generate_cards(
+                            note_content=state["note_content"],
+                            metadata=metadata,
+                            qa_pairs=chunk,
+                            slug_base=state["slug_base"],
+                        )
+                    )
 
             # Run tasks in parallel
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -687,24 +677,24 @@ async def generation_node(state: PipelineState) -> PipelineState:
                     logger.error(
                         "langgraph_generation_chunk_failed",
                         chunk_index=i,
-                        error=str(res)
+                        error=str(res),
                     )
                     # We continue with partial results if some chunks fail
                 else:
                     # Handle different result types
-                    if hasattr(res, 'data') and hasattr(res.data, 'cards'):
+                    if hasattr(res, "data") and hasattr(res.data, "cards"):
                         # UnifiedAgentResult with GenerationResult data
                         all_cards.extend(res.data.cards)
-                        total_gen_time = max(total_gen_time, getattr(
-                            res.data, 'generation_time', 0))
-                        if hasattr(res, 'warnings') and res.warnings:
+                        total_gen_time = max(
+                            total_gen_time, getattr(res.data, "generation_time", 0)
+                        )
+                        if hasattr(res, "warnings") and res.warnings:
                             all_warnings.extend(res.warnings)
                     else:
                         # Legacy GenerationResult
                         all_cards.extend(res.cards)
-                        total_gen_time = max(
-                            total_gen_time, res.generation_time)
-                        if hasattr(res, 'warnings') and res.warnings:
+                        total_gen_time = max(total_gen_time, res.generation_time)
+                        if hasattr(res, "warnings") and res.warnings:
                             all_warnings.extend(res.warnings)
 
             # Create merged result
@@ -729,8 +719,11 @@ async def generation_node(state: PipelineState) -> PipelineState:
                 # Convert unified result to GenerationResult
                 gen_result = unified_result.data
                 # Add warnings from unified result
-                if hasattr(gen_result, 'warnings') and unified_result.warnings:
-                    if not hasattr(gen_result, 'warnings') or gen_result.warnings is None:
+                if hasattr(gen_result, "warnings") and unified_result.warnings:
+                    if (
+                        not hasattr(gen_result, "warnings")
+                        or gen_result.warnings is None
+                    ):
                         gen_result.warnings = []
                     gen_result.warnings.extend(unified_result.warnings)
             else:
@@ -887,12 +880,14 @@ async def linter_validation_node(state: PipelineState) -> PipelineState:
                 error=str(e),
             )
             # On exception, mark as invalid
-            linter_results.append({
-                "slug": card.slug,
-                "is_valid": False,
-                "errors": [f"Linter exception: {str(e)}"],
-                "warnings": [],
-            })
+            linter_results.append(
+                {
+                    "slug": card.slug,
+                    "is_valid": False,
+                    "errors": [f"Linter exception: {str(e)}"],
+                    "warnings": [],
+                }
+            )
             all_valid = False
             total_errors += 1
 
@@ -938,8 +933,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     if not increment_step_count(state, "post_validation"):
         return state
 
-    logger.info("langgraph_post_validation_start",
-                retry_count=state["retry_count"])
+    logger.info("langgraph_post_validation_start", retry_count=state["retry_count"])
     start_time = time.time()
 
     # Deserialize data
@@ -961,8 +955,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             model_name = state["config"].get_model_for_agent("post_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning(
-                "failed_to_create_post_validator_model", error=str(e))
+            logger.warning("failed_to_create_post_validator_model", error=str(e))
             # Assume valid if validator unavailable
             post_result = PostValidationResult(
                 is_valid=True,
@@ -1016,8 +1009,9 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             logger.warning(
                 "llm_template_error_overridden_by_linter",
                 error_type=post_result.error_type,
-                error_details=post_result.error_details[:
-                                                        200] if post_result.error_details else "",
+                error_details=(
+                    post_result.error_details[:200] if post_result.error_details else ""
+                ),
                 reason="linter_passed_template_checks",
                 linter_results_summary={
                     "total_cards": len(state.get("linter_results", [])),
@@ -1054,8 +1048,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
 
     state["post_validation"] = post_result.model_dump()
     state["stage_times"]["post_validation"] = (
-        state["stage_times"].get("post_validation", 0.0) +
-        post_result.validation_time
+        state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
     )
 
     # Determine next stage based on validation result
@@ -1066,7 +1059,9 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
         else:
             state["current_stage"] = "complete"
         state["messages"].append("Post-validation passed")
-    elif (state.get("retry_count") or 0) < (state.get("max_retries") or 3) and state.get("auto_fix_enabled", False):
+    elif (state.get("retry_count") or 0) < (
+        state.get("max_retries") or 3
+    ) and state.get("auto_fix_enabled", False):
         # Apply corrections if available
         if post_result.corrected_cards and state["generation"] is not None:
             # Update generation with corrected cards
@@ -1134,13 +1129,11 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
         model = state.get("context_enrichment_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "context_enrichment")
+            model_name = state["config"].get_model_for_agent("context_enrichment")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create enrichment agent
-        enrichment_agent = ContextEnrichmentAgentAI(
-            model=model, temperature=0.3)
+        enrichment_agent = ContextEnrichmentAgentAI(model=model, temperature=0.3)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -1174,8 +1167,7 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
                 enriched_cards.append(card)  # Keep original
 
         # Update generation with enriched cards
-        state["generation"]["cards"] = [card.model_dump()
-                                        for card in enriched_cards]
+        state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
 
         # Create enrichment result summary
         enrichment_result = ContextEnrichmentResult(
@@ -1252,13 +1244,11 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
         model = state.get("memorization_quality_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "memorization_quality")
+            model_name = state["config"].get_model_for_agent("memorization_quality")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create memorization quality agent
-        quality_agent = MemorizationQualityAgentAI(
-            model=model, temperature=0.0)
+        quality_agent = MemorizationQualityAgentAI(model=model, temperature=0.0)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -1314,9 +1304,7 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
     if mem_quality is not None and isinstance(mem_quality, dict):
         mem_score = mem_quality.get("memorization_score")
         if mem_score is not None:
-            state["messages"].append(
-                f"Memorization quality: score={mem_score:.2f}"
-            )
+            state["messages"].append(f"Memorization quality: score={mem_score:.2f}")
 
     return state
 
@@ -1365,13 +1353,11 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         model = state.get("duplicate_detection_model")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent(
-                "duplicate_detection")
+            model_name = state["config"].get_model_for_agent("duplicate_detection")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create duplicate detection agent
-        detection_agent = DuplicateDetectionAgentAI(
-            model=model, temperature=0.0)
+        detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
 
         # Deserialize cards
         new_cards = [

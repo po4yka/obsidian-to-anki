@@ -13,9 +13,7 @@ class ReasoningTraceOutput(BaseModel):
     All stage-specific reasoning outputs inherit from this base class.
     """
 
-    reasoning: str = Field(
-        description="Full chain of thought reasoning process"
-    )
+    reasoning: str = Field(description="Full chain of thought reasoning process")
     key_observations: list[str] = Field(
         default_factory=list,
         description="Key insights from analyzing the current state",

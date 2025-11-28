@@ -13,11 +13,11 @@ Components:
 - RAGIntegration: Helper for integrating RAG into agent pipeline
 """
 
-from .document_chunker import DocumentChunker, DocumentChunk
+from .document_chunker import DocumentChunk, DocumentChunker
 from .embedding_provider import EmbeddingProvider
-from .vector_store import VaultVectorStore
-from .rag_service import RAGService, get_rag_service
 from .integration import RAGIntegration, get_rag_integration
+from .rag_service import RAGService, get_rag_service
+from .vector_store import VaultVectorStore
 
 __all__ = [
     "DocumentChunker",

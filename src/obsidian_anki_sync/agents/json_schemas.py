@@ -125,33 +125,73 @@ def get_quality_assessment_schema() -> dict[str, Any]:
                         "content": {
                             "type": "object",
                             "properties": {
-                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                                "issues": {"type": "array", "items": {"type": "string"}},
-                                "strengths": {"type": "array", "items": {"type": "string"}},
+                                "score": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0,
+                                },
+                                "issues": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "strengths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
                             },
                         },
                         "learning_science": {
                             "type": "object",
                             "properties": {
-                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                                "issues": {"type": "array", "items": {"type": "string"}},
-                                "strengths": {"type": "array", "items": {"type": "string"}},
+                                "score": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0,
+                                },
+                                "issues": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "strengths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
                             },
                         },
                         "technical": {
                             "type": "object",
                             "properties": {
-                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                                "issues": {"type": "array", "items": {"type": "string"}},
-                                "strengths": {"type": "array", "items": {"type": "string"}},
+                                "score": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0,
+                                },
+                                "issues": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "strengths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
                             },
                         },
                         "accessibility": {
                             "type": "object",
                             "properties": {
-                                "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                                "issues": {"type": "array", "items": {"type": "string"}},
-                                "strengths": {"type": "array", "items": {"type": "string"}},
+                                "score": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0,
+                                },
+                                "issues": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "strengths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
                             },
                         },
                     },
@@ -408,7 +448,14 @@ def get_parser_repair_schema() -> dict[str, Any]:
                     "properties": {
                         "error_category": {
                             "type": "string",
-                            "enum": ["syntax", "structure", "content", "quality", "frontmatter", "unknown"],
+                            "enum": [
+                                "syntax",
+                                "structure",
+                                "content",
+                                "quality",
+                                "frontmatter",
+                                "unknown",
+                            ],
                             "description": "Category of the error",
                         },
                         "severity": {

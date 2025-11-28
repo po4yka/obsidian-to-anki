@@ -2,15 +2,13 @@
 
 import time
 
-
 from ..anki.client import AnkiClient
 from ..models import NoteMetadata
-from .models import GeneratedCard
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
 from .card_improver import CardImprover
 from .card_quality_agent import CardQualityAgent
-from .models import QualityReport
+from .models import GeneratedCard, QualityReport
 from .performance_tracker import PerformanceTracker
 
 logger = get_logger(__name__)
@@ -86,10 +84,12 @@ class QualityValidator:
         """
         self.llm_provider = llm_provider
         self.quality_agent = CardQualityAgent(llm_provider)
-        self.improver = CardImprover(
-            llm_provider) if enable_auto_improvement else None
-        self.performance_tracker = PerformanceTracker(anki_client) if (
-            anki_client and enable_performance_tracking) else None
+        self.improver = CardImprover(llm_provider) if enable_auto_improvement else None
+        self.performance_tracker = (
+            PerformanceTracker(anki_client)
+            if (anki_client and enable_performance_tracking)
+            else None
+        )
 
         self.quality_threshold = quality_threshold
         self.critical_threshold = critical_threshold
@@ -133,8 +133,9 @@ class QualityValidator:
         performance_data = None
         if self.performance_tracker and note_id:
             try:
-                performance_data = self.performance_tracker.get_card_performance([
-                                                                                 note_id])
+                performance_data = self.performance_tracker.get_card_performance(
+                    [note_id]
+                )
                 performance_data = performance_data.get(note_id, {})
             except Exception as e:
                 logger.debug("performance_data_unavailable", error=str(e))
@@ -155,8 +156,7 @@ class QualityValidator:
                     quality_report = improved_quality
 
             except Exception as e:
-                logger.warning("auto_improvement_failed",
-                               slug=card.slug, error=str(e))
+                logger.warning("auto_improvement_failed", slug=card.slug, error=str(e))
 
         validation_time = time.time() - start_time
 
@@ -191,8 +191,7 @@ class QualityValidator:
         """
         start_time = time.time()
 
-        logger.info("batch_validating_cards",
-                    count=len(cards), note=metadata.title)
+        logger.info("batch_validating_cards", count=len(cards), note=metadata.title)
 
         results = []
 
@@ -211,8 +210,7 @@ class QualityValidator:
         total_cards = len(results)
         improved_cards = sum(1 for r in results if r.improved_card is not None)
         critical_issues = sum(1 for r in results if r.is_critical_issue)
-        avg_quality = sum(
-            r.quality_report.overall_score for r in results) / total_cards
+        avg_quality = sum(r.quality_report.overall_score for r in results) / total_cards
 
         logger.info(
             "batch_validation_complete",
@@ -239,7 +237,8 @@ class QualityValidator:
 
         stats = {
             "total_cards": len(results),
-            "average_quality": sum(r.quality_report.overall_score for r in results) / len(results),
+            "average_quality": sum(r.quality_report.overall_score for r in results)
+            / len(results),
             "cards_improved": sum(1 for r in results if r.improved_card is not None),
             "critical_issues": sum(1 for r in results if r.is_critical_issue),
             "quality_distribution": self._calculate_quality_distribution(results),
@@ -248,14 +247,16 @@ class QualityValidator:
 
         return stats
 
-    def _calculate_quality_distribution(self, results: list[QualityValidationResult]) -> dict[str, int]:
+    def _calculate_quality_distribution(
+        self, results: list[QualityValidationResult]
+    ) -> dict[str, int]:
         """Calculate distribution of quality scores."""
         distribution = {
             "excellent": 0,  # 0.9-1.0
-            "good": 0,       # 0.8-0.9
-            "fair": 0,       # 0.6-0.8
-            "poor": 0,       # 0.4-0.6
-            "critical": 0,   # 0.0-0.4
+            "good": 0,  # 0.8-0.9
+            "fair": 0,  # 0.6-0.8
+            "poor": 0,  # 0.4-0.6
+            "critical": 0,  # 0.0-0.4
         }
 
         for result in results:
@@ -273,7 +274,9 @@ class QualityValidator:
 
         return distribution
 
-    def _identify_common_issues(self, results: list[QualityValidationResult]) -> list[dict]:
+    def _identify_common_issues(
+        self, results: list[QualityValidationResult]
+    ) -> list[dict]:
         """Identify most common quality issues."""
         issue_counts = {}
 
@@ -284,11 +287,9 @@ class QualityValidator:
                     issue_counts[key] = issue_counts.get(key, 0) + 1
 
         # Return top 10 most common issues
-        sorted_issues = sorted(issue_counts.items(),
-                               key=lambda x: x[1], reverse=True)
+        sorted_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)
         return [
-            {"issue": issue, "count": count,
-                "percentage": count / len(results) * 100}
+            {"issue": issue, "count": count, "percentage": count / len(results) * 100}
             for issue, count in sorted_issues[:10]
         ]
 
@@ -329,7 +330,9 @@ class QualityValidator:
         performance_insights = {}
         if self.performance_tracker:
             try:
-                performance_insights = self.performance_tracker.export_performance_report()
+                performance_insights = (
+                    self.performance_tracker.export_performance_report()
+                )
             except Exception as e:
                 logger.debug("performance_insights_unavailable", error=str(e))
 
@@ -343,7 +346,11 @@ class QualityValidator:
                     "quality_score": r.quality_report.overall_score,
                     "critical_issues": r.is_critical_issue,
                     "improved": r.improved_card is not None,
-                    "top_issues": [issue for dim in r.quality_report.dimensions.values() for issue in dim.issues[:2]],
+                    "top_issues": [
+                        issue
+                        for dim in r.quality_report.dimensions.values()
+                        for issue in dim.issues[:2]
+                    ],
                 }
                 for r in results
             ],
@@ -369,23 +376,26 @@ class QualityValidator:
 
         if avg_quality < 0.7:
             recommendations.append(
-                "Overall card quality is low. Consider reviewing generation prompts and templates.")
+                "Overall card quality is low. Consider reviewing generation prompts and templates."
+            )
 
         if critical_issues > total_cards * 0.1:  # More than 10% critical issues
             recommendations.append(
-                "High number of critical quality issues. Manual review recommended for problematic cards.")
+                "High number of critical quality issues. Manual review recommended for problematic cards."
+            )
 
         distribution = stats.get("quality_distribution", {})
-        poor_count = distribution.get(
-            "poor", 0) + distribution.get("critical", 0)
+        poor_count = distribution.get("poor", 0) + distribution.get("critical", 0)
         if poor_count > total_cards * 0.2:  # More than 20% poor/critical
             recommendations.append(
-                "Significant portion of cards need improvement. Consider adjusting quality thresholds.")
+                "Significant portion of cards need improvement. Consider adjusting quality thresholds."
+            )
 
         common_issues = stats.get("common_issues", [])
         if common_issues:
             top_issue = common_issues[0]["issue"]
             recommendations.append(
-                f"Most common issue: {top_issue}. Focus improvement efforts here.")
+                f"Most common issue: {top_issue}. Focus improvement efforts here."
+            )
 
         return recommendations

@@ -35,7 +35,7 @@ class PipelineState(TypedDict):
     )  # Serialized existing cards for duplicate check
 
     # Cached models (for performance - created once during orchestrator init)
-    pre_validator_model: Any | None  # PydanticAI OpenAIModel instance
+    pre_validator_model: Any | None  # PydanticAI OpenAIChatModel instance
     card_splitting_model: Any | None
     generator_model: Any | None
     post_validator_model: Any | None

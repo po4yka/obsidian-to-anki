@@ -127,7 +127,9 @@ class APFGenerator:
 
             if not validation_errors:
                 # Validation passed
-                logger.debug("validation_passed", slug=manifest.slug, attempt=attempt + 1)
+                logger.debug(
+                    "validation_passed", slug=manifest.slug, attempt=attempt + 1
+                )
                 break
 
             # If this was the last attempt, log warning but continue
@@ -150,10 +152,12 @@ class APFGenerator:
 
             # Add the assistant's response and error feedback to messages
             messages.append({"role": "assistant", "content": apf_html})
-            messages.append({
-                "role": "user",
-                "content": self._build_fix_prompt(validation_errors),
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": self._build_fix_prompt(validation_errors),
+                }
+            )
 
         # Compute content hash
         content_hash = compute_content_hash(qa_pair, metadata, lang)

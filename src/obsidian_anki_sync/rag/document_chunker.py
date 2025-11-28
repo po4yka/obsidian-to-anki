@@ -50,9 +50,7 @@ class DocumentChunk:
     def __post_init__(self) -> None:
         """Compute content hash if not provided."""
         if not self.content_hash:
-            self.content_hash = hashlib.sha256(
-                self.content.encode()
-            ).hexdigest()[:16]
+            self.content_hash = hashlib.sha256(self.content.encode()).hexdigest()[:16]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -83,43 +81,37 @@ class DocumentChunker:
     SECTION_PATTERNS = {
         "summary_en": re.compile(
             r"^##\s+(?:Summary\s*\(EN\)|Summary \(EN\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            re.IGNORECASE | re.MULTILINE,
         ),
         "summary_ru": re.compile(
             r"^##\s+(?:Краткое Описание\s*\(RU\)|Краткое Описание \(RU\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            re.IGNORECASE | re.MULTILINE,
         ),
         "key_points_en": re.compile(
             r"^##\s+(?:Key Points\s*\(EN\)|Key Points \(EN\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            re.IGNORECASE | re.MULTILINE,
         ),
         "key_points_ru": re.compile(
             r"^##\s+(?:Ключевые Моменты\s*\(RU\)|Ключевые Моменты \(RU\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            re.IGNORECASE | re.MULTILINE,
         ),
         "question_en": re.compile(
             r"^#\s+(?:Question\s*\(EN\)|Question \(EN\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            re.IGNORECASE | re.MULTILINE,
         ),
         "question_ru": re.compile(
-            r"^#\s+(?:Вопрос\s*\(RU\)|Вопрос \(RU\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            r"^#\s+(?:Вопрос\s*\(RU\)|Вопрос \(RU\))\s*$", re.IGNORECASE | re.MULTILINE
         ),
         "answer_en": re.compile(
-            r"^##\s+(?:Answer\s*\(EN\)|Answer \(EN\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            r"^##\s+(?:Answer\s*\(EN\)|Answer \(EN\))\s*$", re.IGNORECASE | re.MULTILINE
         ),
         "answer_ru": re.compile(
-            r"^##\s+(?:Ответ\s*\(RU\)|Ответ \(RU\))\s*$",
-            re.IGNORECASE | re.MULTILINE
+            r"^##\s+(?:Ответ\s*\(RU\)|Ответ \(RU\))\s*$", re.IGNORECASE | re.MULTILINE
         ),
     }
 
     # Code block pattern
-    CODE_BLOCK_PATTERN = re.compile(
-        r"```(\w+)?\n(.*?)```",
-        re.DOTALL
-    )
+    CODE_BLOCK_PATTERN = re.compile(r"```(\w+)?\n(.*?)```", re.DOTALL)
 
     def __init__(
         self,
@@ -197,22 +189,27 @@ class DocumentChunker:
 
         # Create chunks for each section
         for section_type, section_content in sections.items():
-            if not section_content or len(section_content.strip()) < self.min_chunk_size:
+            if (
+                not section_content
+                or len(section_content.strip()) < self.min_chunk_size
+            ):
                 continue
 
             chunk_type = self._get_chunk_type(section_type)
             chunk_id = self._generate_chunk_id(source_file, section_type)
 
-            chunks.append(DocumentChunk(
-                chunk_id=chunk_id,
-                content=section_content.strip(),
-                chunk_type=chunk_type,
-                source_file=source_file,
-                metadata={
-                    **base_metadata,
-                    "section": section_type,
-                },
-            ))
+            chunks.append(
+                DocumentChunk(
+                    chunk_id=chunk_id,
+                    content=section_content.strip(),
+                    chunk_type=chunk_type,
+                    source_file=source_file,
+                    metadata={
+                        **base_metadata,
+                        "section": section_type,
+                    },
+                )
+            )
 
         # Extract code blocks if enabled
         if self.include_code_blocks:
@@ -221,13 +218,15 @@ class DocumentChunker:
 
         # If no structured chunks found, create full content chunk
         if not chunks and body.strip():
-            chunks.append(DocumentChunk(
-                chunk_id=self._generate_chunk_id(source_file, "full"),
-                content=self._truncate_content(body.strip()),
-                chunk_type=ChunkType.FULL_CONTENT,
-                source_file=source_file,
-                metadata=base_metadata,
-            ))
+            chunks.append(
+                DocumentChunk(
+                    chunk_id=self._generate_chunk_id(source_file, "full"),
+                    content=self._truncate_content(body.strip()),
+                    chunk_type=ChunkType.FULL_CONTENT,
+                    source_file=source_file,
+                    metadata=base_metadata,
+                )
+            )
 
         logger.debug(
             "content_chunked",
@@ -258,9 +257,18 @@ class DocumentChunker:
 
         # Extract key metadata fields
         key_fields = [
-            "id", "title", "topic", "subtopics", "difficulty",
-            "language_tags", "moc", "related", "question_kind",
-            "original_language", "tags", "status",
+            "id",
+            "title",
+            "topic",
+            "subtopics",
+            "difficulty",
+            "language_tags",
+            "moc",
+            "related",
+            "question_kind",
+            "original_language",
+            "tags",
+            "status",
         ]
 
         for field_name in key_fields:
@@ -290,11 +298,13 @@ class DocumentChunker:
 
         for section_name, pattern in self.SECTION_PATTERNS.items():
             for match in pattern.finditer(body):
-                header_positions.append((
-                    section_name,
-                    match.start(),
-                    match.end(),
-                ))
+                header_positions.append(
+                    (
+                        section_name,
+                        match.start(),
+                        match.end(),
+                    )
+                )
 
         # Sort by position
         header_positions.sort(key=lambda x: x[1])
@@ -366,17 +376,19 @@ class DocumentChunker:
 
             chunk_id = self._generate_chunk_id(source_file, f"code_{i}")
 
-            chunks.append(DocumentChunk(
-                chunk_id=chunk_id,
-                content=code,
-                chunk_type=ChunkType.CODE_EXAMPLE,
-                source_file=source_file,
-                metadata={
-                    **base_metadata,
-                    "code_language": language,
-                    "code_index": i,
-                },
-            ))
+            chunks.append(
+                DocumentChunk(
+                    chunk_id=chunk_id,
+                    content=code,
+                    chunk_type=ChunkType.CODE_EXAMPLE,
+                    source_file=source_file,
+                    metadata={
+                        **base_metadata,
+                        "code_language": language,
+                        "code_index": i,
+                    },
+                )
+            )
 
         return chunks
 
@@ -428,7 +440,7 @@ class DocumentChunker:
             return content
 
         # Truncate at word boundary
-        truncated = content[:self.chunk_size]
+        truncated = content[: self.chunk_size]
         last_space = truncated.rfind(" ")
 
         if last_space > self.chunk_size // 2:

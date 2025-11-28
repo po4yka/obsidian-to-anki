@@ -151,9 +151,7 @@ class IStateRepository(ABC):
 
     @abstractmethod
     def update_sync_progress(
-        self,
-        session_id: str,
-        progress_data: dict[str, Any]
+        self, session_id: str, progress_data: dict[str, Any]
     ) -> None:
         """Update sync progress for a session.
 

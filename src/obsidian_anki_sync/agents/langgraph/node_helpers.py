@@ -44,8 +44,7 @@ def increment_step_count(state: PipelineState, stage_name: str) -> bool:
         state["current_stage"] = "failed"
         state["last_error"] = f"Max steps ({max_steps}) exceeded at stage {stage_name}"
         state["last_error_severity"] = ErrorSeverity.CRITICAL
-        record_error(state, stage_name,
-                     state["last_error"], ErrorSeverity.CRITICAL)
+        record_error(state, stage_name, state["last_error"], ErrorSeverity.CRITICAL)
         return False
 
     logger.debug(

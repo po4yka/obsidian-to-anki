@@ -1,9 +1,9 @@
 """Domain entity for Anki cards."""
 
 from __future__ import annotations
-from enum import Enum
 
 from dataclasses import dataclass, field
+from enum import Enum
 
 from ..services.slug_service import SlugService
 
@@ -44,9 +44,9 @@ class Card:
     def is_valid(self) -> bool:
         """Check if card meets business requirements."""
         return (
-            self.has_valid_apf_format() and
-            self.has_valid_manifest() and
-            self.has_required_fields()
+            self.has_valid_apf_format()
+            and self.has_valid_manifest()
+            and self.has_required_fields()
         )
 
     def has_valid_apf_format(self) -> bool:
@@ -54,18 +54,18 @@ class Card:
         # Basic APF validation - look for required markers
         html = self.apf_html
         return (
-            "<!-- PROMPT_VERSION: apf-v" in html and
-            "<!-- BEGIN_CARDS -->" in html and
-            "<!-- END_CARDS -->" in html
+            "<!-- PROMPT_VERSION: apf-v" in html
+            and "<!-- BEGIN_CARDS -->" in html
+            and "<!-- END_CARDS -->" in html
         )
 
     def has_valid_manifest(self) -> bool:
         """Check if manifest is valid."""
         return (
-            self.manifest.slug == self.slug and
-            self.manifest.lang == self.language and
-            self.manifest.note_id and
-            self.manifest.card_index >= 0
+            self.manifest.slug == self.slug
+            and self.manifest.lang == self.language
+            and self.manifest.note_id
+            and self.manifest.card_index >= 0
         )
 
     def has_required_fields(self) -> bool:

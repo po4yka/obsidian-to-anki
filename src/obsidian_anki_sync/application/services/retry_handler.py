@@ -1,8 +1,8 @@
 """Application service for handling retry logic with exponential backoff."""
 
 import time
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 from ...utils.logging import get_logger
 
@@ -134,7 +134,7 @@ class RetryHandler:
                 "retry_operation_success_first_attempt",
                 attempts=1,
                 total_time=total_time,
-                **context
+                **context,
             )
 
             return RetryResult(
@@ -147,22 +147,23 @@ class RetryHandler:
         except self.config.retry_on_exceptions as e:
             last_error = e
             logger.debug(
-                "retry_operation_failed_first_attempt",
-                error=str(e),
-                **context
+                "retry_operation_failed_first_attempt", error=str(e), **context
             )
 
         # Retry attempts
         for attempt in range(self.config.max_retries):
-            delay = self._retry_delays[attempt] if attempt < len(
-                self._retry_delays) else self.config.max_delay
+            delay = (
+                self._retry_delays[attempt]
+                if attempt < len(self._retry_delays)
+                else self.config.max_delay
+            )
 
             logger.debug(
                 "retry_attempt",
                 attempt=attempt + 1,
                 max_attempts=self.config.max_retries,
                 delay=delay,
-                **context
+                **context,
             )
 
             # Wait before retry
@@ -177,7 +178,7 @@ class RetryHandler:
                     "retry_operation_success_after_retries",
                     attempts=attempt + 2,  # +1 for initial attempt, +1 for 0-indexing
                     total_time=total_time,
-                    **context
+                    **context,
                 )
 
                 return RetryResult(
@@ -185,7 +186,7 @@ class RetryHandler:
                     result=result,
                     attempts=attempt + 2,
                     total_time=total_time,
-                    retry_delays=self._retry_delays[:attempt + 1],
+                    retry_delays=self._retry_delays[: attempt + 1],
                 )
 
             except self.config.retry_on_exceptions as e:
@@ -195,7 +196,7 @@ class RetryHandler:
                     attempt=attempt + 1,
                     max_attempts=self.config.max_retries,
                     error=str(e),
-                    **context
+                    **context,
                 )
 
         # All attempts failed
@@ -206,7 +207,7 @@ class RetryHandler:
             attempts=self.config.max_retries + 1,
             total_time=total_time,
             final_error=str(last_error),
-            **context
+            **context,
         )
 
         return RetryResult(
@@ -235,12 +236,12 @@ class RetryHandler:
 
         # Default retry counts by error type
         defaults = {
-            "syntax": 5,      # More retries for fixable syntax errors
-            "template": 4,    # Template errors are fairly fixable
-            "html": 4,        # HTML errors are fixable
-            "manifest": 3,    # Manifest errors are moderate
-            "factual": 2,     # Factual errors are harder to fix
-            "semantic": 2,    # Semantic errors are harder to fix
+            "syntax": 5,  # More retries for fixable syntax errors
+            "template": 4,  # Template errors are fairly fixable
+            "html": 4,  # HTML errors are fixable
+            "manifest": 3,  # Manifest errors are moderate
+            "factual": 2,  # Factual errors are harder to fix
+            "semantic": 2,  # Semantic errors are harder to fix
         }
 
         max_retries = base_config.get(error_type, defaults.get(error_type, 3))
@@ -287,14 +288,13 @@ class RetryHandler:
             error_type = error_type_getter(e)
 
             # Get adaptive config for this error type
-            adaptive_config = self.get_adaptive_config(
-                error_type, base_retry_config)
+            adaptive_config = self.get_adaptive_config(error_type, base_retry_config)
 
             logger.debug(
                 "adaptive_retry_start",
                 error_type=error_type,
                 adaptive_max_retries=adaptive_config.max_retries,
-                **context
+                **context,
             )
 
             # Create temporary handler with adaptive config

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.entities.card import Card
 from ...domain.entities.note import Note
 from ...domain.interfaces.anki_client import IAnkiClient
@@ -95,8 +94,7 @@ class SyncNotesUseCase:
                     cards = self.card_generator.generate_cards_from_note(note)
                     obsidian_cards.extend(cards)
                 except Exception as e:
-                    errors.append(
-                        f"Failed to generate cards for note {note.id}: {e}")
+                    errors.append(f"Failed to generate cards for note {note.id}: {e}")
                     stats["errors"] += 1
 
             stats["cards_generated"] = len(obsidian_cards)
@@ -105,8 +103,7 @@ class SyncNotesUseCase:
             anki_cards = self._get_anki_cards()
 
             # Step 4: Determine sync actions
-            sync_actions = self._determine_sync_actions(
-                obsidian_cards, anki_cards)
+            sync_actions = self._determine_sync_actions(obsidian_cards, anki_cards)
 
             # Step 5: Apply changes (unless dry run)
             if not request.dry_run:
@@ -115,11 +112,14 @@ class SyncNotesUseCase:
 
             # Step 6: Update statistics
             stats["cards_created"] = len(
-                [a for a in sync_actions if a.get("type") == "create"])
+                [a for a in sync_actions if a.get("type") == "create"]
+            )
             stats["cards_updated"] = len(
-                [a for a in sync_actions if a.get("type") == "update"])
+                [a for a in sync_actions if a.get("type") == "update"]
+            )
             stats["cards_deleted"] = len(
-                [a for a in sync_actions if a.get("type") == "delete"])
+                [a for a in sync_actions if a.get("type") == "delete"]
+            )
 
             return SyncNotesResponse(
                 obsidian_cards=obsidian_cards,
@@ -161,9 +161,7 @@ class SyncNotesUseCase:
         return []
 
     def _determine_sync_actions(
-        self,
-        obsidian_cards: list[Card],
-        anki_cards: list[Card]
+        self, obsidian_cards: list[Card], anki_cards: list[Card]
     ) -> list[dict[str, any]]:
         """Determine what sync actions need to be performed.
 
@@ -176,11 +174,13 @@ class SyncNotesUseCase:
         """
         actions = []
         for card in obsidian_cards:
-            actions.append({
-                "type": "create",
-                "card": card,
-                "reason": "New card from Obsidian",
-            })
+            actions.append(
+                {
+                    "type": "create",
+                    "card": card,
+                    "reason": "New card from Obsidian",
+                }
+            )
 
         return actions
 

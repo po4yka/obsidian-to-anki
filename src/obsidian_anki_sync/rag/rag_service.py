@@ -8,13 +8,11 @@ Provides unified interface for:
 """
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from ..config import Config
 from ..utils.logging import get_logger
-from .document_chunker import ChunkType, DocumentChunk, DocumentChunker
-from .embedding_provider import EmbeddingProvider
+from .document_chunker import ChunkType
 from .vector_store import SearchResult, VaultVectorStore
 
 logger = get_logger(__name__)
@@ -193,14 +191,16 @@ class RAGService:
                 continue
             seen_files.add(source)
 
-            concepts.append(RelatedConcept(
-                title=result.metadata.get("title", ""),
-                content=result.content,
-                topic=result.metadata.get("topic", ""),
-                similarity=result.similarity,
-                source_file=source,
-                chunk_type=result.metadata.get("chunk_type", ""),
-            ))
+            concepts.append(
+                RelatedConcept(
+                    title=result.metadata.get("title", ""),
+                    content=result.content,
+                    topic=result.metadata.get("topic", ""),
+                    similarity=result.similarity,
+                    source_file=source,
+                    chunk_type=result.metadata.get("chunk_type", ""),
+                )
+            )
 
             if len(concepts) >= k:
                 break
@@ -246,10 +246,7 @@ class RAGService:
             ChunkType.ANSWER_RU.value,
         }
 
-        similar_qa = [
-            r for r in results
-            if r.metadata.get("chunk_type") in qa_types
-        ]
+        similar_qa = [r for r in results if r.metadata.get("chunk_type") in qa_types]
 
         # Determine if duplicate
         is_duplicate = len(similar_qa) > 0
@@ -261,7 +258,9 @@ class RAGService:
         elif confidence >= 0.85:
             recommendation = "Probable duplicate - review before creating"
         elif confidence >= 0.70:
-            recommendation = "Similar content exists - consider merging or differentiating"
+            recommendation = (
+                "Similar content exists - consider merging or differentiating"
+            )
         else:
             recommendation = "No significant duplicates found"
 
@@ -340,13 +339,15 @@ class RAGService:
                 q_result = chunks["question"]
                 a_result = chunks["answer"]
 
-                examples.append(FewShotExample(
-                    question=q_result.content,
-                    answer=a_result.content,
-                    topic=q_result.metadata.get("topic", topic),
-                    difficulty=q_result.metadata.get("difficulty", "medium"),
-                    source_file=source,
-                ))
+                examples.append(
+                    FewShotExample(
+                        question=q_result.content,
+                        answer=a_result.content,
+                        topic=q_result.metadata.get("topic", topic),
+                        difficulty=q_result.metadata.get("difficulty", "medium"),
+                        source_file=source,
+                    )
+                )
 
                 if len(examples) >= k:
                     break
@@ -429,7 +430,9 @@ class RAGService:
         return {
             "initialized": self._initialized,
             "indexed": self.is_indexed(),
-            "vector_store_stats": self.vector_store.get_stats() if self._vector_store else None,
+            "vector_store_stats": (
+                self.vector_store.get_stats() if self._vector_store else None
+            ),
         }
 
 
@@ -451,6 +454,7 @@ def get_rag_service(config: Config | None = None) -> RAGService:
     if _rag_service is None:
         if config is None:
             from ..config import get_config
+
             config = get_config()
         _rag_service = RAGService(config)
 

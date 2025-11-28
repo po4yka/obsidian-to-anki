@@ -149,7 +149,7 @@ async def think_before_pre_validation_node(state: PipelineState) -> PipelineStat
         # Create reasoning agent
         agent: Agent[None, PreValidationReasoningOutput] = Agent(
             model=model,
-            result_type=PreValidationReasoningOutput,
+            output_type=PreValidationReasoningOutput,
             system_prompt=PRE_VALIDATION_REASONING_PROMPT,
         )
 
@@ -194,7 +194,8 @@ What should the pre-validator focus on?"""
             },
         )
 
-        state["stage_times"]["think_before_pre_validation"] = time.time() - start_time
+        state["stage_times"]["think_before_pre_validation"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT pre-validation reasoning: confidence={output.confidence:.2f}"
         )
@@ -238,7 +239,7 @@ async def think_before_generation_node(state: PipelineState) -> PipelineState:
     try:
         agent: Agent[None, GenerationReasoningOutput] = Agent(
             model=model,
-            result_type=GenerationReasoningOutput,
+            output_type=GenerationReasoningOutput,
             system_prompt=GENERATION_REASONING_PROMPT,
         )
 
@@ -281,7 +282,8 @@ What formatting considerations are needed?"""
             },
         )
 
-        state["stage_times"]["think_before_generation"] = time.time() - start_time
+        state["stage_times"]["think_before_generation"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT generation reasoning: confidence={output.confidence:.2f}"
         )
@@ -324,7 +326,7 @@ async def think_before_post_validation_node(state: PipelineState) -> PipelineSta
     try:
         agent: Agent[None, PostValidationReasoningOutput] = Agent(
             model=model,
-            result_type=PostValidationReasoningOutput,
+            output_type=PostValidationReasoningOutput,
             system_prompt=POST_VALIDATION_REASONING_PROMPT,
         )
 
@@ -369,7 +371,8 @@ What issues are expected based on linting?"""
             },
         )
 
-        state["stage_times"]["think_before_post_validation"] = time.time() - start_time
+        state["stage_times"]["think_before_post_validation"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT post-validation reasoning: confidence={output.confidence:.2f}"
         )
@@ -411,7 +414,7 @@ async def think_before_card_splitting_node(state: PipelineState) -> PipelineStat
     try:
         agent: Agent[None, CardSplittingReasoningOutput] = Agent(
             model=model,
-            result_type=CardSplittingReasoningOutput,
+            output_type=CardSplittingReasoningOutput,
             system_prompt=CARD_SPLITTING_REASONING_PROMPT,
         )
 
@@ -447,7 +450,8 @@ What are the concept boundaries? What are the trade-offs?"""
             },
         )
 
-        state["stage_times"]["think_before_card_splitting"] = time.time() - start_time
+        state["stage_times"]["think_before_card_splitting"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT card-splitting reasoning: confidence={output.confidence:.2f}"
         )
@@ -489,7 +493,7 @@ async def think_before_enrichment_node(state: PipelineState) -> PipelineState:
     try:
         agent: Agent[None, EnrichmentReasoningOutput] = Agent(
             model=model,
-            result_type=EnrichmentReasoningOutput,
+            output_type=EnrichmentReasoningOutput,
             system_prompt=ENRICHMENT_REASONING_PROMPT,
         )
 
@@ -522,7 +526,8 @@ What examples, mnemonics, or context would help learning?"""
             },
         )
 
-        state["stage_times"]["think_before_enrichment"] = time.time() - start_time
+        state["stage_times"]["think_before_enrichment"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT enrichment reasoning: confidence={output.confidence:.2f}"
         )
@@ -564,7 +569,7 @@ async def think_before_memorization_node(state: PipelineState) -> PipelineState:
     try:
         agent: Agent[None, MemorizationReasoningOutput] = Agent(
             model=model,
-            result_type=MemorizationReasoningOutput,
+            output_type=MemorizationReasoningOutput,
             system_prompt=MEMORIZATION_REASONING_PROMPT,
         )
 
@@ -595,7 +600,8 @@ What is the cognitive load? Will these cards work with SRS?"""
             },
         )
 
-        state["stage_times"]["think_before_memorization"] = time.time() - start_time
+        state["stage_times"]["think_before_memorization"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT memorization reasoning: confidence={output.confidence:.2f}"
         )
@@ -637,7 +643,7 @@ async def think_before_duplicate_node(state: PipelineState) -> PipelineState:
     try:
         agent: Agent[None, DuplicateReasoningOutput] = Agent(
             model=model,
-            result_type=DuplicateReasoningOutput,
+            output_type=DuplicateReasoningOutput,
             system_prompt=DUPLICATE_REASONING_PROMPT,
         )
 
@@ -671,7 +677,8 @@ What comparison strategy should be used?"""
             },
         )
 
-        state["stage_times"]["think_before_duplicate"] = time.time() - start_time
+        state["stage_times"]["think_before_duplicate"] = time.time() - \
+            start_time
         state["messages"].append(
             f"CoT duplicate reasoning: confidence={output.confidence:.2f}"
         )

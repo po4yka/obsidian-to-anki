@@ -81,16 +81,14 @@ class ChangeApplier:
                 elif action.type == "update":
                     if action.anki_guid:
                         self.update_card(action.card, action.anki_guid)
-                        self.stats["updated"] = self.stats.get(
-                            "updated", 0) + 1
+                        self.stats["updated"] = self.stats.get("updated", 0) + 1
                         if self.progress:
                             self.progress.increment_stat("updated")
 
                 elif action.type == "delete":
                     if action.anki_guid:
                         self.delete_card(action.card, action.anki_guid)
-                        self.stats["deleted"] = self.stats.get(
-                            "deleted", 0) + 1
+                        self.stats["deleted"] = self.stats.get("deleted", 0) + 1
                         if self.progress:
                             self.progress.increment_stat("deleted")
 
@@ -349,8 +347,7 @@ class ChangeApplier:
                         zip(note_ids, card_data)
                     ):
                         if note_id is not None:
-                            txn.rollback_actions.append(
-                                ("delete_anki_note", note_id))
+                            txn.rollback_actions.append(("delete_anki_note", note_id))
                             successful_cards.append(
                                 (card, note_id, fields, tags, apf_html)
                             )
@@ -360,8 +357,7 @@ class ChangeApplier:
                                 slug=card.slug,
                                 index=i,
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
                             self.db.update_card_status(
@@ -378,8 +374,7 @@ class ChangeApplier:
 
                     # Update stats
                     created_count = len(successful_cards)
-                    self.stats["created"] = self.stats.get(
-                        "created", 0) + created_count
+                    self.stats["created"] = self.stats.get("created", 0) + created_count
                     if self.progress:
                         for _ in range(created_count):
                             self.progress.increment_stat("created")
@@ -408,13 +403,11 @@ class ChangeApplier:
                     try:
                         self.create_card(action.card)
                         if action.type == "restore":
-                            self.stats["restored"] = self.stats.get(
-                                "restored", 0) + 1
+                            self.stats["restored"] = self.stats.get("restored", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("restored")
                         else:
-                            self.stats["created"] = self.stats.get(
-                                "created", 0) + 1
+                            self.stats["created"] = self.stats.get("created", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("created")
                     except Exception as card_error:
@@ -438,13 +431,11 @@ class ChangeApplier:
                     try:
                         self.create_card(action.card)
                         if action.type == "restore":
-                            self.stats["restored"] = self.stats.get(
-                                "restored", 0) + 1
+                            self.stats["restored"] = self.stats.get("restored", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("restored")
                         else:
-                            self.stats["created"] = self.stats.get(
-                                "created", 0) + 1
+                            self.stats["created"] = self.stats.get("created", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("created")
                     except Exception as card_error:
@@ -488,8 +479,7 @@ class ChangeApplier:
                 card = action.card
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
-                field_updates.append(
-                    {"id": action.anki_guid, "fields": fields})
+                field_updates.append({"id": action.anki_guid, "fields": fields})
                 tag_updates.append((action.anki_guid, card.tags))
                 card_data.append((card, fields, card.tags))
 
@@ -513,17 +503,18 @@ class ChangeApplier:
                         )
 
                     # Batch update fields
-                    field_results = self.anki.update_notes_fields(
-                        field_updates)
+                    field_results = self.anki.update_notes_fields(field_updates)
 
                     # Batch update tags
                     tag_results = self.anki.update_notes_tags(tag_updates)
 
                     # Process results
                     successful_cards = []
-                    for i, (field_success, tag_success, (card, fields, tags)) in enumerate(
-                        zip(field_results, tag_results, card_data)
-                    ):
+                    for i, (
+                        field_success,
+                        tag_success,
+                        (card, fields, tags),
+                    ) in enumerate(zip(field_results, tag_results, card_data)):
                         if field_success and tag_success:
                             successful_cards.append((card, fields, tags))
                         else:
@@ -533,8 +524,7 @@ class ChangeApplier:
                                 field_success=field_success,
                                 tag_success=tag_success,
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
                             self.db.update_card_status(
@@ -551,8 +541,7 @@ class ChangeApplier:
 
                     # Update stats
                     updated_count = len(successful_cards)
-                    self.stats["updated"] = self.stats.get(
-                        "updated", 0) + updated_count
+                    self.stats["updated"] = self.stats.get("updated", 0) + updated_count
                     if self.progress:
                         for _ in range(updated_count):
                             self.progress.increment_stat("updated")
@@ -576,8 +565,7 @@ class ChangeApplier:
                     if action.anki_guid:
                         try:
                             self.update_card(action.card, action.anki_guid)
-                            self.stats["updated"] = self.stats.get(
-                                "updated", 0) + 1
+                            self.stats["updated"] = self.stats.get("updated", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("updated")
                         except Exception as card_error:
@@ -586,8 +574,7 @@ class ChangeApplier:
                                 slug=action.card.slug,
                                 error=str(card_error),
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
             except Exception as e:
@@ -602,8 +589,7 @@ class ChangeApplier:
                     if action.anki_guid:
                         try:
                             self.update_card(action.card, action.anki_guid)
-                            self.stats["updated"] = self.stats.get(
-                                "updated", 0) + 1
+                            self.stats["updated"] = self.stats.get("updated", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("updated")
                         except Exception as card_error:
@@ -612,8 +598,7 @@ class ChangeApplier:
                                 slug=action.card.slug,
                                 error=str(card_error),
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
 
@@ -640,18 +625,15 @@ class ChangeApplier:
         if anki_guids_to_delete:
             try:
                 self.anki.delete_notes(anki_guids_to_delete)
-                logger.info("batch_delete_anki",
-                            count=len(anki_guids_to_delete))
+                logger.info("batch_delete_anki", count=len(anki_guids_to_delete))
             except AnkiConnectError as e:
-                logger.error(
-                    "batch_delete_anki_failed_connect_error", error=str(e))
+                logger.error("batch_delete_anki_failed_connect_error", error=str(e))
                 # Fall back to individual deletes
                 for action in actions:
                     if action.anki_guid:
                         try:
                             self.delete_card(action.card, action.anki_guid)
-                            self.stats["deleted"] = self.stats.get(
-                                "deleted", 0) + 1
+                            self.stats["deleted"] = self.stats.get("deleted", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("deleted")
                         except Exception as del_error:
@@ -660,8 +642,7 @@ class ChangeApplier:
                                 slug=action.card.slug,
                                 error=str(del_error),
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
                 return
@@ -674,8 +655,7 @@ class ChangeApplier:
                     if action.anki_guid:
                         try:
                             self.delete_card(action.card, action.anki_guid)
-                            self.stats["deleted"] = self.stats.get(
-                                "deleted", 0) + 1
+                            self.stats["deleted"] = self.stats.get("deleted", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("deleted")
                         except Exception as del_error:
@@ -684,8 +664,7 @@ class ChangeApplier:
                                 slug=action.card.slug,
                                 error=str(del_error),
                             )
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if self.progress:
                                 self.progress.increment_stat("errors")
                 return
@@ -695,15 +674,13 @@ class ChangeApplier:
             try:
                 self.db.delete_cards_batch(slugs_to_delete)
                 deleted_count = len(slugs_to_delete)
-                self.stats["deleted"] = self.stats.get(
-                    "deleted", 0) + deleted_count
+                self.stats["deleted"] = self.stats.get("deleted", 0) + deleted_count
                 if self.progress:
                     for _ in range(deleted_count):
                         self.progress.increment_stat("deleted")
                 logger.info("batch_delete_db", count=deleted_count)
             except Exception as e:
-                logger.error("batch_delete_db_failed",
-                             error=str(e), exc_info=True)
+                logger.error("batch_delete_db_failed", error=str(e), exc_info=True)
                 # Fall back to individual deletes
                 for slug in slugs_to_delete:
                     try:
@@ -786,8 +763,7 @@ class ChangeApplier:
             actual_fields = note_info.get("fields", {})
             field_mismatches = []
             for field_name, expected_value in expected_fields.items():
-                actual_value = actual_fields.get(
-                    field_name, {}).get("value", "")
+                actual_value = actual_fields.get(field_name, {}).get("value", "")
                 # Normalize whitespace for comparison
                 expected_normalized = " ".join(expected_value.split())
                 actual_normalized = " ".join(actual_value.split())

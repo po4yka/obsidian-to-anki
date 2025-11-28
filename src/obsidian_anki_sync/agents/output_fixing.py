@@ -5,7 +5,7 @@ providing automatic retry with fixing for structured outputs that fail validatio
 """
 
 import json
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-class OutputFixingParser[T]:
+class OutputFixingParser(Generic[T]):
     """Wrapper for PydanticAI agents that automatically fixes validation errors.
 
     Implements LangChain's OutputFixingParser pattern:
@@ -31,10 +31,10 @@ class OutputFixingParser[T]:
     Example:
         ```python
         from pydantic_ai import Agent
-        from pydantic_ai.models.openai import OpenAIModel
+        from pydantic_ai.models.openai import OpenAIChatModel
 
-        model = OpenAIModel("gpt-4o-mini")
-        agent = Agent(model, result_type=MyModel)
+        model = OpenAIChatModel("gpt-4o-mini")
+        agent = Agent(model, output_type=MyModel)
 
         fixing_parser = OutputFixingParser(agent, fix_model=model)
         result = await fixing_parser.run("Generate structured output")
@@ -120,13 +120,16 @@ class OutputFixingParser[T]:
                     if deps is not None:
                         result = await self.agent.run(fixed_prompt, deps=deps, **kwargs)
                     else:
-                        result = await self.agent.run(fixed_prompt, system=system, **kwargs)
+                        result = await self.agent.run(
+                            fixed_prompt, system=system, **kwargs
+                        )
                     self.repair_successes += 1
                     logger.info(
                         "output_fixing_success",
                         attempt=attempt,
-                        error_type=type(
-                            last_error).__name__ if last_error else "unknown",
+                        error_type=(
+                            type(last_error).__name__ if last_error else "unknown"
+                        ),
                     )
                     return result.data
 
@@ -222,7 +225,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             # Use fix model to generate improved prompt
             from pydantic_ai import Agent as FixAgent
 
-            fix_agent = FixAgent(self.fix_model, result_type=str)
+            fix_agent = FixAgent(self.fix_model, output_type=str)
             result = await fix_agent.run(fix_prompt, system=fix_system)
             improved_prompt = result.data
 
@@ -298,7 +301,8 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
                 # Remove markdown code fences
                 lines = invalid_output.split("\n")
                 filtered = [
-                    line for line in lines if not line.strip().startswith("```")]
+                    line for line in lines if not line.strip().startswith("```")
+                ]
                 invalid_output = "\n".join(filtered)
 
             # Try to parse and re-stringify
@@ -316,9 +320,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             Dictionary with repair statistics
         """
         total = self.repair_attempts
-        success_rate = (
-            self.repair_successes / total if total > 0 else 0.0
-        )
+        success_rate = self.repair_successes / total if total > 0 else 0.0
 
         return {
             "repair_attempts": self.repair_attempts,
@@ -328,7 +330,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         }
 
 
-def wrap_agent_with_fixing[T](
+def wrap_agent_with_fixing(
     agent: Agent[T],
     fix_model: Model | None = None,
     max_fix_attempts: int = 2,

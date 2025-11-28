@@ -84,7 +84,6 @@ For each validation task:
 5. Continue until you have a complete assessment
 
 Be thorough and methodical in your validation process.""",
-
             "repair": """You are a content repair specialist using ReAct methodology.
 
 Your role is to diagnose issues and suggest fixes. You have access to various tools for analysis and repair.
@@ -98,7 +97,6 @@ For each repair task:
 6. Continue until the issue is resolved
 
 Always explain your reasoning clearly.""",
-
             "analyzer": """You are a content analyzer using ReAct methodology.
 
 Your task is to analyze content and provide insights. You have access to various analysis tools.
@@ -113,7 +111,9 @@ For each analysis task:
 Be systematic and thorough in your analysis.""",
         }
 
-        return prompts.get(agent_type, """You are a helpful AI assistant using ReAct methodology.
+        return prompts.get(
+            agent_type,
+            """You are a helpful AI assistant using ReAct methodology.
 
 For each task:
 1. REASON about the problem
@@ -122,7 +122,8 @@ For each task:
 4. REASON about what you learned
 5. Continue until the task is complete
 
-Always explain your reasoning clearly.""")
+Always explain your reasoning clearly.""",
+        )
 
     def _create_agent(self) -> ReActAgent:
         """Create the underlying LangChain ReAct agent.
@@ -164,11 +165,7 @@ Thought: {agent_scratchpad}"""
 
         return agent
 
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the ReAct agent.
 
         Args:
@@ -188,10 +185,8 @@ Thought: {agent_scratchpad}"""
                 verbose=kwargs.get("verbose", False),
                 max_iterations=self.max_iterations,
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
-                return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
+                return_intermediate_steps=kwargs.get("return_intermediate_steps", True),
             )
 
             # Prepare input
@@ -294,12 +289,14 @@ Provide a systematic analysis of what you find."""
         reasoning_steps = []
         for step in intermediate_steps:
             action, observation = step
-            reasoning_steps.append({
-                "thought": getattr(action, "log", ""),
-                "action": action.tool,
-                "action_input": action.tool_input,
-                "observation": observation,
-            })
+            reasoning_steps.append(
+                {
+                    "thought": getattr(action, "log", ""),
+                    "action": action.tool,
+                    "action_input": action.tool_input,
+                    "observation": observation,
+                }
+            )
 
         # Extract final answer and confidence
         confidence = self._extract_confidence(output)

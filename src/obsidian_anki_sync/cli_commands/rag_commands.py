@@ -53,7 +53,7 @@ def index_vault(
 
         # Display results
         console.print()
-        console.print(f"[green]Indexing complete![/green]")
+        console.print("[green]Indexing complete![/green]")
         console.print(f"  Chunks indexed: {result['chunks_indexed']}")
 
         stats = result.get("stats", {})
@@ -117,7 +117,9 @@ def search(
         rag_service = RAGService(config)
 
         if not rag_service.is_indexed():
-            console.print("[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]")
+            console.print(
+                "[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]"
+            )
             raise typer.Exit(1)
 
         # Build filters
@@ -146,7 +148,11 @@ def search(
 
         for result in results:
             # Truncate content for display
-            content = result.content[:100] + "..." if len(result.content) > 100 else result.content
+            content = (
+                result.content[:100] + "..."
+                if len(result.content) > 100
+                else result.content
+            )
             content = content.replace("\n", " ")
 
             source_name = Path(result.source_file).stem
@@ -196,7 +202,9 @@ def stats(
         console.print()
 
         if not stats_data.get("indexed"):
-            console.print("[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]")
+            console.print(
+                "[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]"
+            )
             return
 
         vs_stats = stats_data.get("vector_store_stats", {})
@@ -264,7 +272,9 @@ def find_similar(
         rag_service = RAGService(config)
 
         if not rag_service.is_indexed():
-            console.print("[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]")
+            console.print(
+                "[yellow]Vault is not indexed. Run 'rag index' first.[/yellow]"
+            )
             raise typer.Exit(1)
 
         # Run duplicate check
@@ -280,9 +290,9 @@ def find_similar(
         console.print()
 
         if result.is_duplicate:
-            console.print(f"[red]Potential duplicate found![/red]")
+            console.print("[red]Potential duplicate found![/red]")
         else:
-            console.print(f"[green]No duplicates found.[/green]")
+            console.print("[green]No duplicates found.[/green]")
 
         console.print(f"Confidence: {result.confidence:.2%}")
         console.print(f"Recommendation: {result.recommendation}")

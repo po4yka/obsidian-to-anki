@@ -63,6 +63,7 @@ from .state import PipelineState
 # Optional: Swarm pattern (requires langgraph-swarm package)
 try:
     from .swarm_orchestrator import LangGraphSwarmOrchestrator, SwarmResult
+
     _SWARM_AVAILABLE = True
 except ImportError:
     LangGraphSwarmOrchestrator = None  # type: ignore[assignment, misc]

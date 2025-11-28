@@ -80,20 +80,21 @@ class CacheManager:
         """Get current cache statistics."""
         with self._lock:
             stats = self._cache_stats.copy()
-            stats.update({
-                "total_requests": stats["hits"] + stats["misses"],
-                "hit_ratio": (
-                    stats["hits"] / (stats["hits"] + stats["misses"])
-                    if stats["hits"] + stats["misses"] > 0
-                    else 0.0
-                ),
-                "avg_generation_time": (
-                    sum(stats["generation_times"]) /
-                    len(stats["generation_times"])
-                    if stats["generation_times"]
-                    else 0.0
-                ),
-            })
+            stats.update(
+                {
+                    "total_requests": stats["hits"] + stats["misses"],
+                    "hit_ratio": (
+                        stats["hits"] / (stats["hits"] + stats["misses"])
+                        if stats["hits"] + stats["misses"] > 0
+                        else 0.0
+                    ),
+                    "avg_generation_time": (
+                        sum(stats["generation_times"]) / len(stats["generation_times"])
+                        if stats["generation_times"]
+                        else 0.0
+                    ),
+                }
+            )
         return stats
 
     def record_cache_hit(self) -> None:
@@ -119,15 +120,16 @@ class CacheManager:
 
             # Keep only last 1000 generation times to prevent unbounded growth
             if len(self._cache_stats["generation_times"]) > 1000:
-                self._cache_stats["generation_times"] = self._cache_stats["generation_times"][-1000:]
+                self._cache_stats["generation_times"] = self._cache_stats[
+                    "generation_times"
+                ][-1000:]
 
     def clear_cache_stats(self) -> None:
         """Clear cache statistics (for testing or reset)."""
         with self._lock:
             self._cache_hits = 0
             self._cache_misses = 0
-            self._cache_stats = {"hits": 0,
-                                 "misses": 0, "generation_times": []}
+            self._cache_stats = {"hits": 0, "misses": 0, "generation_times": []}
 
     def close_caches(self) -> None:
         """Close all cache instances."""
@@ -164,15 +166,14 @@ class CacheManager:
             apf_cache_dir = self.cache_dir / "apf_cards"
 
             if agent_cache_dir.exists():
-                info["agent_cache_size"] = self._get_directory_size(
-                    agent_cache_dir)
+                info["agent_cache_size"] = self._get_directory_size(agent_cache_dir)
 
             if apf_cache_dir.exists():
-                info["apf_cache_size"] = self._get_directory_size(
-                    apf_cache_dir)
+                info["apf_cache_size"] = self._get_directory_size(apf_cache_dir)
 
             info["total_size_mb"] = (
-                info["agent_cache_size"] + info["apf_cache_size"]) / (1024 * 1024)
+                info["agent_cache_size"] + info["apf_cache_size"]
+            ) / (1024 * 1024)
 
         except Exception as e:
             logger.warning("error_calculating_cache_sizes", error=str(e))
@@ -212,15 +213,17 @@ class CacheManager:
             try:
                 # DiskCache handles expiration automatically, but we can clear if needed
                 # For now, just log that cleanup would happen
-                logger.debug("agent_cache_cleanup_requested",
-                             max_age_seconds=max_age_seconds)
+                logger.debug(
+                    "agent_cache_cleanup_requested", max_age_seconds=max_age_seconds
+                )
             except Exception as e:
                 logger.warning("error_cleaning_agent_cache", error=str(e))
 
         if self._apf_card_cache:
             try:
-                logger.debug("apf_cache_cleanup_requested",
-                             max_age_seconds=max_age_seconds)
+                logger.debug(
+                    "apf_cache_cleanup_requested", max_age_seconds=max_age_seconds
+                )
             except Exception as e:
                 logger.warning("error_cleaning_apf_cache", error=str(e))
 

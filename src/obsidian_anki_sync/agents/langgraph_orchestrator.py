@@ -36,6 +36,13 @@ from .langgraph import (
     is_transient_error,
 )
 
+# Re-export node helpers for backward compatibility (though these were private)
+from .langgraph.node_helpers import (
+    handle_node_error,
+    increment_step_count,
+    record_error,
+)
+
 # Re-export node functions for backward compatibility (though these were private)
 from .langgraph.nodes import (
     card_splitting_node,
@@ -47,13 +54,6 @@ from .langgraph.nodes import (
     note_correction_node,
     post_validation_node,
     pre_validation_node,
-)
-
-# Re-export node helpers for backward compatibility (though these were private)
-from .langgraph.node_helpers import (
-    handle_node_error,
-    increment_step_count,
-    record_error,
 )
 
 # Re-export routing functions for backward compatibility (though these were private)

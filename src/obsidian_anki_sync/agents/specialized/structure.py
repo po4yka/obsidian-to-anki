@@ -103,8 +103,7 @@ class ContentStructureAgent(BaseSpecializedAgent):
                         repaired_lines.insert(insert_pos + 1, answer_marker)
                         repaired_lines.insert(insert_pos + 2, "")
                         repaired_lines.insert(
-                            insert_pos +
-                            3, f"[Answer content in {lang.upper()}]"
+                            insert_pos + 3, f"[Answer content in {lang.upper()}]"
                         )
 
             repaired_content = "\n".join(repaired_lines)

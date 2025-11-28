@@ -297,11 +297,3 @@ class LogAnalyzer:
             "operations": dict(operations),
             "errors": error_analysis,
         }
-
-
-
-
-
-
-
-

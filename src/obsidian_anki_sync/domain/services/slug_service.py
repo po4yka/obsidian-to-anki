@@ -6,7 +6,6 @@ import threading
 from pathlib import Path
 
 
-
 class SlugService:
     """Domain service handling slug generation and collision resolution.
 
@@ -18,11 +17,7 @@ class SlugService:
     _counters: dict[str, int] = {}
 
     @staticmethod
-    def generate_slug_base(
-        file_path: Path,
-        source_dir: str,
-        card_index: int
-    ) -> str:
+    def generate_slug_base(file_path: Path, source_dir: str, card_index: int) -> str:
         """Generate base slug from file path and card index.
 
         Args:
@@ -44,14 +39,14 @@ class SlugService:
         stem = relative_path.stem
 
         # Remove common prefixes (q-, c-, moc-)
-        stem = re.sub(r'^(q|c|moc)-', '', stem, flags=re.IGNORECASE)
+        stem = re.sub(r"^(q|c|moc)-", "", stem, flags=re.IGNORECASE)
 
         # Replace path separators with hyphens
-        slug_base = str(stem).replace('/', '-').replace('\\', '-')
+        slug_base = str(stem).replace("/", "-").replace("\\", "-")
 
         # Normalize: lowercase, remove special chars, collapse hyphens
-        slug_base = re.sub(r'[^a-z0-9\-]', '-', slug_base.lower())
-        slug_base = re.sub(r'-+', '-', slug_base).strip('-')
+        slug_base = re.sub(r"[^a-z0-9\-]", "-", slug_base.lower())
+        slug_base = re.sub(r"-+", "-", slug_base).strip("-")
 
         # Add card index (1-based)
         if card_index > 0:
@@ -61,9 +56,7 @@ class SlugService:
 
     @staticmethod
     def generate_full_slug(
-        base_slug: str,
-        language: str,
-        existing_slugs: set[str | None] = None
+        base_slug: str, language: str, existing_slugs: set[str | None] = None
     ) -> str:
         """Generate full slug with language and collision resolution.
 
@@ -92,10 +85,7 @@ class SlugService:
         return f"{initial_slug}-{counter}"
 
     @staticmethod
-    def generate_thread_safe_slug(
-        base_slug: str,
-        language: str
-    ) -> str:
+    def generate_thread_safe_slug(base_slug: str, language: str) -> str:
         """Generate slug with thread-safe collision resolution.
 
         Uses an in-memory counter to handle concurrent slug generation
@@ -130,7 +120,7 @@ class SlugService:
         Returns:
             Hexadecimal hash string
         """
-        hash_obj = hashlib.sha256(content.encode('utf-8'))
+        hash_obj = hashlib.sha256(content.encode("utf-8"))
         return hash_obj.hexdigest()[:length]
 
     @staticmethod
@@ -147,16 +137,16 @@ class SlugService:
         normalized = slug.lower()
 
         # Replace spaces and underscores with hyphens
-        normalized = re.sub(r'[_\s]+', '-', normalized)
+        normalized = re.sub(r"[_\s]+", "-", normalized)
 
         # Remove invalid characters (keep alphanumeric, hyphens)
-        normalized = re.sub(r'[^a-z0-9\-]', '', normalized)
+        normalized = re.sub(r"[^a-z0-9\-]", "", normalized)
 
         # Collapse multiple hyphens
-        normalized = re.sub(r'-+', '-', normalized)
+        normalized = re.sub(r"-+", "-", normalized)
 
         # Remove leading/trailing hyphens
-        normalized = normalized.strip('-')
+        normalized = normalized.strip("-")
 
         return normalized
 
@@ -174,15 +164,15 @@ class SlugService:
             return False
 
         # Must contain only lowercase letters, numbers, and hyphens
-        if not re.match(r'^[a-z0-9\-]+$', slug):
+        if not re.match(r"^[a-z0-9\-]+$", slug):
             return False
 
         # Cannot start or end with hyphen
-        if slug.startswith('-') or slug.endswith('-'):
+        if slug.startswith("-") or slug.endswith("-"):
             return False
 
         # Cannot have consecutive hyphens
-        if '--' in slug:
+        if "--" in slug:
             return False
 
         return True
@@ -198,7 +188,7 @@ class SlugService:
             Language code if found, None otherwise
         """
         # Look for language pattern at the end (e.g., -en, -ru)
-        match = re.search(r'-([a-z]{2})(?:-\d+)?$', slug)
+        match = re.search(r"-([a-z]{2})(?:-\d+)?$", slug)
         return match.group(1) if match else None
 
     @staticmethod
@@ -212,7 +202,7 @@ class SlugService:
             Base slug
         """
         # Remove language suffix and collision counter
-        base = re.sub(r'-([a-z]{2})(?:-\d+)?$', '', slug)
+        base = re.sub(r"-([a-z]{2})(?:-\d+)?$", "", slug)
         return base
 
     @staticmethod

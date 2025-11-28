@@ -332,8 +332,7 @@ class StateDB(IStateRepository):
         # Add missing columns
         for col_name, col_type in columns_to_add.items():
             if col_name not in existing_columns:
-                cursor.execute(
-                    f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
 
         # Add index for creation_status (after column is created)
@@ -416,8 +415,7 @@ class StateDB(IStateRepository):
         """Get all cards from a source note."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM cards WHERE source_path = ?", (source_path,))
+        cursor.execute("SELECT * FROM cards WHERE source_path = ?", (source_path,))
         return [dict(row) for row in cursor.fetchall()]
 
     def get_all_cards(self) -> list[dict]:
@@ -905,8 +903,7 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
+        cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
         conn.commit()
 
     # Note Index Methods
@@ -1000,8 +997,7 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM note_index WHERE source_path = ?", (source_path,))
+        cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
@@ -1167,8 +1163,7 @@ class StateDB(IStateRepository):
         cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_database = 1")
         cards_in_database = cursor.fetchone()[0]
 
-        cursor.execute(
-            "SELECT status, COUNT(*) FROM card_index GROUP BY status")
+        cursor.execute("SELECT status, COUNT(*) FROM card_index GROUP BY status")
         card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
@@ -1248,7 +1243,9 @@ class StateDB(IStateRepository):
             return {}  # Convert to dict
         return None
 
-    def update_sync_progress(self, session_id: str, progress_data: dict[str, Any]) -> None:
+    def update_sync_progress(
+        self, session_id: str, progress_data: dict[str, Any]
+    ) -> None:
         """Update sync progress for a session."""
         pass
 

@@ -49,8 +49,7 @@ def get_config_and_logger(
         set_config(_config)
 
         # Configure logging with vault-specific log directory
-        log_dir = Path(_config.vault_path) / \
-            ".logs" if _config.vault_path else None
+        log_dir = Path(_config.vault_path) / ".logs" if _config.vault_path else None
         configure_logging(
             log_level or _config.log_level,
             log_dir=log_dir,
