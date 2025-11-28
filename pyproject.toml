@@ -67,7 +67,7 @@ dev = [
     "pytest-xdist>=3.6.0",
     "respx>=0.22.0",
     "isort>=7.0.0",
-    "ruff>=0.14.5",
+    "ruff>=0.14.6",
     "mypy>=1.18.2",
     "pre-commit>=4.4.0",
 ]
@@ -92,7 +92,7 @@ line-length = 88
 target-version = "py313"
 
 [tool.ruff.lint]
-# Comprehensive rule selection for complex Python applications (Ruff 0.13.0 compatible)
+# Comprehensive rule selection for complex Python applications (Ruff 0.14.6+)
 # Core rules: errors, warnings, pyflakes
 select = [
     "E",   # pycodestyle errors
@@ -128,20 +128,24 @@ select = [
     "RSE", # flake8-raise
     "RET", # flake8-return
     "SLF", # flake8-self
+    "SLOT",# flake8-slots
     "SIM", # flake8-simplify
     "TID", # flake8-tidy-imports
     "TC",  # flake8-type-checking
+    "INT", # flake8-gettext
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
     "ERA", # eradicate (commented code)
     "PD",  # pandas-vet
     "PGH", # pygrep-hooks
+    "PL",  # pylint
     "TRY", # tryceratops
     "FLY", # flynt (string formatting)
     "NPY", # numpy-specific
     "AIR", # airflow
     "PERF",# perflint (performance)
     "FURB",# refurb
+    "LOG", # flake8-logging
     "RUF", # ruff-specific rules
 ]
 
@@ -164,6 +168,8 @@ ignore = [
     "FBT001",    # boolean positional arg in function definition
     "FBT002",    # boolean default positional argument
     "FBT003",    # boolean positional value in function call
+    "PLR0913",   # too many arguments
+    "PLR2004",   # magic value comparison
     "SIM108",    # use ternary operator (sometimes less readable)
     "RET504",    # unnecessary variable assignment before return
     "RET505",    # unnecessary else after return
@@ -172,6 +178,7 @@ ignore = [
     "RET508",    # unnecessary else after break
     "BLE001",    # do not catch blind exception: Exception
     "TRY003",    # avoid specifying long messages outside exception class
+    "TRY400",    # use logging.exception instead of logging.error
     "RUF012",    # mutable class attributes should be annotated with ClassVar
 ]
 
@@ -179,9 +186,9 @@ ignore = [
 fixable = [
     "E", "F", "W", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "A", "COM",
     "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP",
-    "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM",
-    "TID", "ARG", "PTH", "ERA", "PD", "PGH", "TRY",
-    "FLY", "NPY", "AIR", "PERF", "FURB", "RUF"
+    "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM",
+    "TID", "TC", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY",
+    "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"
 ]
 
 # Unfixable rules (require manual intervention)
