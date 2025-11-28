@@ -11,14 +11,14 @@ anki_deck_name: "Interview Questions"
 anki_note_type: "APF::Simple"
 
 # Runtime Settings
-run_mode: "apply"  # Options: apply, dry-run
-delete_mode: "delete"  # Options: delete, archive
+run_mode: "apply" # Options: apply, dry-run
+delete_mode: "delete" # Options: delete, archive
 
 # Database
 db_path: ".sync_state.db"
 
 # Logging
-log_level: "INFO"  # Options: DEBUG, INFO, WARN, ERROR
+log_level: "INFO" # Options: DEBUG, INFO, WARN, ERROR
 
 # =============================================================================
 # AGENT SYSTEM CONFIGURATION (New!)
@@ -41,22 +41,22 @@ ollama_base_url: "http://localhost:11434"
 
 # Pre-Validator Agent Configuration
 # Performs fast structural checks before expensive card generation
-pre_validator_model: "qwen3:8b"  # Lightweight model for validation
-pre_validator_temperature: 0.0  # Deterministic validation
-pre_validation_enabled: true  # Enable/disable pre-validation
+pre_validator_model: "qwen3:8b" # Lightweight model for validation
+pre_validator_temperature: 0.0 # Deterministic validation
+pre_validation_enabled: true # Enable/disable pre-validation
 
 # Generator Agent Configuration
 # Generates APF cards using powerful local LLM
-generator_model: "qwen3:32b"  # Powerful model for generation
-generator_temperature: 0.3  # Some creativity for card generation
+generator_model: "qwen3:32b" # Powerful model for generation
+generator_temperature: 0.3 # Some creativity for card generation
 
 # Post-Validator Agent Configuration
 # Validates generated cards for quality and correctness
-post_validator_model: "qwen3:14b"  # Medium model with reasoning
-post_validator_temperature: 0.0  # Deterministic validation
-post_validation_max_retries: 3  # Retry with auto-fix if validation fails
-post_validation_auto_fix: true  # Attempt automatic corrections
-post_validation_strict_mode: true  # Strict quality requirements
+post_validator_model: "qwen3:14b" # Medium model with reasoning
+post_validator_temperature: 0.0 # Deterministic validation
+post_validation_max_retries: 3 # Retry with auto-fix if validation fails
+post_validation_auto_fix: true # Attempt automatic corrections
+post_validation_strict_mode: true # Strict quality requirements
 
 # =============================================================================
 # LEGACY OPENROUTER CONFIGURATION (Fallback)
@@ -67,7 +67,6 @@ post_validation_strict_mode: true  # Strict quality requirements
 openrouter_model: "openai/gpt-4"
 llm_temperature: 0.2
 llm_top_p: 0.3
-
 # =============================================================================
 # USAGE NOTES
 # =============================================================================
@@ -98,4 +97,4 @@ llm_top_p: 0.3
 #    - Total processing: ~1200 cards/hour with tri-agent validation
 #    - Memory usage: ~30-34GB RAM (all agents parallel)
 #
-# For more information, see .docs/AGENT_INTEGRATION_PLAN.md
+# For more information, see .docs/ARCHITECTURE/agents.md
