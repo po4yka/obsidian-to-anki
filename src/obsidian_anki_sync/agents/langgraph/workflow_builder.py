@@ -117,7 +117,7 @@ class WorkflowBuilder:
             workflow.add_node(
                 "note_correction",
                 note_correction_node,
-                retry=TRANSIENT_RETRY_POLICY,
+                retry_policy=TRANSIENT_RETRY_POLICY,
             )
 
         # ====================================================================
@@ -129,62 +129,62 @@ class WorkflowBuilder:
             workflow.add_node(
                 "think_before_pre_validation",
                 think_before_pre_validation_node,
-                retry=None,  # Advisory only - no retry
+                retry_policy=None,  # Advisory only - no retry
             )
             workflow.add_node(
                 "think_before_card_splitting",
                 think_before_card_splitting_node,
-                retry=None,
+                retry_policy=None,
             )
             workflow.add_node(
                 "think_before_generation",
                 think_before_generation_node,
-                retry=None,
+                retry_policy=None,
             )
             workflow.add_node(
                 "think_before_post_validation",
                 think_before_post_validation_node,
-                retry=None,
+                retry_policy=None,
             )
             workflow.add_node(
                 "think_before_enrichment",
                 think_before_enrichment_node,
-                retry=None,
+                retry_policy=None,
             )
             workflow.add_node(
                 "think_before_memorization",
                 think_before_memorization_node,
-                retry=None,
+                retry_policy=None,
             )
             workflow.add_node(
                 "think_before_duplicate",
                 think_before_duplicate_node,
-                retry=None,
+                retry_policy=None,
             )
 
         # Add core action nodes with appropriate retry policies
         workflow.add_node(
             "pre_validation",
             pre_validation_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
 
         workflow.add_node(
             "card_splitting",
             card_splitting_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
 
         workflow.add_node(
             "split_validation",
             split_validation_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
 
         workflow.add_node(
             "generation",
             generation_node,
-            retry=TRANSIENT_RETRY_POLICY,
+            retry_policy=TRANSIENT_RETRY_POLICY,
         )
 
         # Linter validation - deterministic APF template compliance check
@@ -193,30 +193,30 @@ class WorkflowBuilder:
         workflow.add_node(
             "linter_validation",
             linter_validation_node,
-            retry=None,  # Deterministic - no retry needed
+            retry_policy=None,  # Deterministic - no retry needed
         )
 
         workflow.add_node(
             "post_validation",
             post_validation_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
 
         # Add enhancement nodes
         workflow.add_node(
             "context_enrichment",
             context_enrichment_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
         workflow.add_node(
             "memorization_quality",
             memorization_quality_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
         workflow.add_node(
             "duplicate_detection",
             duplicate_detection_node,
-            retry=VALIDATION_RETRY_POLICY,
+            retry_policy=VALIDATION_RETRY_POLICY,
         )
 
         # ====================================================================
@@ -231,24 +231,24 @@ class WorkflowBuilder:
             workflow.add_node(
                 "reflect_after_generation",
                 reflect_after_generation_node,
-                retry=None,  # Advisory only - no retry
+                retry_policy=None,  # Advisory only - no retry
             )
             workflow.add_node(
                 "reflect_after_enrichment",
                 reflect_after_enrichment_node,
-                retry=None,
+                retry_policy=None,
             )
 
             # Add revision nodes (run when reflection determines revision needed)
             workflow.add_node(
                 "revise_generation",
                 revise_generation_node,
-                retry=TRANSIENT_RETRY_POLICY,
+                retry_policy=TRANSIENT_RETRY_POLICY,
             )
             workflow.add_node(
                 "revise_enrichment",
                 revise_enrichment_node,
-                retry=TRANSIENT_RETRY_POLICY,
+                retry_policy=TRANSIENT_RETRY_POLICY,
             )
 
         # ====================================================================
