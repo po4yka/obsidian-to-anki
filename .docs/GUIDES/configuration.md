@@ -24,7 +24,7 @@ use_langgraph: true
 use_pydantic_ai: true
 ```
 
-**📋 Tip**: Start with `config.example.yaml` and modify for your needs.
+**TIP**: Start with `config.example.yaml` and modify for your needs.
 
 ## Configuration Files
 

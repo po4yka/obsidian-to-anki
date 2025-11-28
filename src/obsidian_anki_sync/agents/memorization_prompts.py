@@ -71,7 +71,7 @@ Return structured JSON with:
 
 ## Examples
 
-### Example 1: Excellent Card ✓
+### Example 1: Excellent Card (GOOD)
 
 **Card**:
 ```
@@ -85,14 +85,14 @@ Extra:
 ```
 
 **Reasoning**:
-- ✓ Atomic: Tests ONE concept (binary search complexity)
-- ✓ Clear Q-A: Unambiguous question, specific answer
-- ✓ Active recall: Must retrieve from memory
-- ✓ Self-contained: Includes helpful context in Extra
-- ✓ Appropriate difficulty: Standard CS knowledge
-- ✓ No leakage: Front doesn't hint at answer
-- ✓ Memorable: Has concrete example
-- ✓ Practical: Useful for algorithm interviews
+- GOOD: Atomic - Tests ONE concept (binary search complexity)
+- GOOD: Clear Q-A - Unambiguous question, specific answer
+- GOOD: Active recall - Must retrieve from memory
+- GOOD: Self-contained - Includes helpful context in Extra
+- GOOD: Appropriate difficulty - Standard CS knowledge
+- GOOD: No leakage - Front doesn't hint at answer
+- GOOD: Memorable - Has concrete example
+- GOOD: Practical - Useful for algorithm interviews
 
 **Output**:
 ```json
@@ -112,7 +112,7 @@ Extra:
 }
 ```
 
-### Example 2: Multiple Concepts (Poor) ✗
+### Example 2: Multiple Concepts (POOR)
 
 **Card**:
 ```
@@ -121,10 +121,10 @@ Back: Bubble sort is O(n²), merge sort is O(n log n), and quicksort is O(n log 
 ```
 
 **Reasoning**:
-- ✗ NOT atomic: Tests THREE different sorting algorithms
-- ✗ Overwhelming: Too much information at once
-- ✓ Clear Q-A: Question is clear (but too broad)
-- ✗ Review burden: Must recall multiple facts correctly
+- POOR: NOT atomic - Tests THREE different sorting algorithms
+- POOR: Overwhelming - Too much information at once
+- GOOD: Clear Q-A - Question is clear (but too broad)
+- POOR: Review burden - Must recall multiple facts correctly
 - Difficulty: Too hard due to multiple concepts
 
 **Output**:
@@ -157,7 +157,7 @@ Back: Bubble sort is O(n²), merge sort is O(n log n), and quicksort is O(n log 
 }
 ```
 
-### Example 3: Information Leakage ✗
+### Example 3: Information Leakage (POOR)
 
 **Card**:
 ```
@@ -166,10 +166,10 @@ Back: List comprehension
 ```
 
 **Reasoning**:
-- ✗ Leakage: "square brackets []" heavily hints at lists
-- ✗ Poor active recall: Answer is partially in the question
-- ✓ Atomic: Tests one concept
-- ✓ Clear Q-A: Question leads to specific answer
+- POOR: Leakage - "square brackets []" heavily hints at lists
+- POOR: Poor active recall - Answer is partially in the question
+- GOOD: Atomic - Tests one concept
+- GOOD: Clear Q-A - Question leads to specific answer
 - Improvement needed: Rephrase to remove hint
 
 **Output**:
@@ -202,7 +202,7 @@ Back: List comprehension
 }
 ```
 
-### Example 4: Lacks Context ✗
+### Example 4: Lacks Context (POOR)
 
 **Card**:
 ```
@@ -211,10 +211,10 @@ Back: A promise
 ```
 
 **Reasoning**:
-- ✗ Missing context: "it" is undefined - what function/method?
-- ✗ Not self-contained: Requires remembering previous cards
-- ✗ Vague answer: Which promise? Of what type?
-- ✓ Short and simple (but too much so)
+- POOR: Missing context - "it" is undefined - what function/method?
+- POOR: Not self-contained - Requires remembering previous cards
+- POOR: Vague answer - Which promise? Of what type?
+- GOOD: Short and simple (but too much so)
 - Critical flaw: Cannot be reviewed independently
 
 **Output**:
@@ -251,7 +251,7 @@ Back: A promise
 }
 ```
 
-### Example 5: Good with Minor Issues ✓
+### Example 5: Good with Minor Issues (GOOD)
 
 **Card**:
 ```
@@ -266,12 +266,12 @@ Common options:
 ```
 
 **Reasoning**:
-- ✓ Atomic: Tests ONE git command
-- ✓ Clear Q-A: Unambiguous question and answer
-- ✓ Self-contained: Includes helpful options
-- ✓ Active recall: Must retrieve command from memory
-- ✓ Practical: Commonly used in development
-- ⚠ Minor: Could add example output for visual learners
+- GOOD: Atomic - Tests ONE git command
+- GOOD: Clear Q-A - Unambiguous question and answer
+- GOOD: Self-contained - Includes helpful options
+- GOOD: Active recall - Must retrieve command from memory
+- GOOD: Practical - Commonly used in development
+- WARNING: Minor - Could add example output for visual learners
 
 **Output**:
 ```json
@@ -300,7 +300,7 @@ Common options:
 }
 ```
 
-### Example 6: Too Trivial ✗
+### Example 6: Too Trivial (POOR)
 
 **Card**:
 ```
@@ -309,10 +309,10 @@ Back: Many languages including C, C++, Java, JavaScript, C#, etc.
 ```
 
 **Reasoning**:
-- ✗ Too broad: Question is not specific enough
-- ✗ Ambiguous answer: "Many languages" is not a precise answer
-- ✗ Low value: Not useful practical knowledge
-- ✓ Atomic: Tests one concept
+- POOR: Too broad - Question is not specific enough
+- POOR: Ambiguous answer - "Many languages" is not a precise answer
+- POOR: Low value - Not useful practical knowledge
+- GOOD: Atomic - Tests one concept
 - Problem: Question design is fundamentally flawed
 
 **Output**:
@@ -366,24 +366,24 @@ Back: Many languages including C, C++, Java, JavaScript, C#, etc.
 
 ## Common Anti-Patterns to Flag
 
-❌ **List Cards**: "List 5 principles of..." → Split into 5 cards
-❌ **Yes/No Questions**: Too easy, no active recall → Rephrase as "What/How/Why"
-❌ **Definition Vomiting**: Copying textbook definitions → Use simpler, memorable language
-❌ **Orphan Cards**: Cards that reference "previous card" → Make self-contained
-❌ **Trivia Cards**: Testing irrelevant details → Focus on practical knowledge
-❌ **Hint Cards**: Front gives away answer → Remove hints
-❌ **Hint Cards**: Front gives away answer → Remove hints
-❌ **Wall of Text**: No structure or examples → Add formatting and examples
-❌ **Bad Cloze**: `{{c1::The}} capital of France is Paris` → Delete key term instead
+AVOID: List Cards - "List 5 principles of..." → Split into 5 cards
+AVOID: Yes/No Questions - Too easy, no active recall → Rephrase as "What/How/Why"
+AVOID: Definition Vomiting - Copying textbook definitions → Use simpler, memorable language
+AVOID: Orphan Cards - Cards that reference "previous card" → Make self-contained
+AVOID: Trivia Cards - Testing irrelevant details → Focus on practical knowledge
+AVOID: Hint Cards - Front gives away answer → Remove hints
+AVOID: Hint Cards - Front gives away answer → Remove hints
+AVOID: Wall of Text - No structure or examples → Add formatting and examples
+AVOID: Bad Cloze - `{{c1::The}} capital of France is Paris` → Delete key term instead
 
 ## Best Practices to Reward
 
-✓ **One Fact per Card**: Atomic principle
-✓ **Concrete Examples**: Aids encoding
-✓ **Mnemonic Devices**: Memory aids
-✓ **Visual Structure**: Lists, formatting
-✓ **Practical Context**: Real-world usage
-✓ **Self-Contained**: No dependencies
-✓ **Progressive Difficulty**: Builds knowledge
-✓ **Clear Triggers**: Unambiguous questions
+GOOD: One Fact per Card - Atomic principle
+GOOD: Concrete Examples - Aids encoding
+GOOD: Mnemonic Devices - Memory aids
+GOOD: Visual Structure - Lists, formatting
+GOOD: Practical Context - Real-world usage
+GOOD: Self-Contained - No dependencies
+GOOD: Progressive Difficulty - Builds knowledge
+GOOD: Clear Triggers - Unambiguous questions
 """

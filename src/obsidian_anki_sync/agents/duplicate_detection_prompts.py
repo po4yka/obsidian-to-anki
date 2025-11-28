@@ -199,7 +199,7 @@ A: Virtual DOM with batched updates to optimize re-renders.
 
 ---
 
-### Example 3: Partial Overlap ⚠️
+### Example 3: Partial Overlap (WARNING)
 
 **New Card**:
 ```
@@ -233,7 +233,7 @@ A: Use the useState hook: const [state, setState] = useState(initialValue)
 
 ---
 
-### Example 4: False Positive Check ✓
+### Example 4: False Positive Check (VALID)
 
 **New Card**:
 ```
@@ -267,7 +267,7 @@ A: O(n log n) in all cases - always divides and merges.
 
 ---
 
-### Example 5: Different Scope ✓
+### Example 5: Different Scope (VALID)
 
 **New Card**:
 ```
@@ -301,7 +301,7 @@ A: A class should have only one reason to change.
 
 ---
 
-### Example 6: Improved Version ✓
+### Example 6: Improved Version (VALID)
 
 **New Card**:
 ```

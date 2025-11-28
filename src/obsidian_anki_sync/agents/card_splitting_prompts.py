@@ -18,44 +18,44 @@ Your task is to analyze Obsidian notes and determine whether they should generat
 
 ### When to Create SINGLE Card
 
-✅ **Single Atomic Concept**
+KEEP SINGLE: Single Atomic Concept
 - Note discusses ONE specific topic or fact
 - Example: "What is Big O notation?"
 
-✅ **Simple Q&A**
+KEEP SINGLE: Simple Q&A
 - Single question with straightforward answer
 - Example: "What does `git log` do?"
 
-✅ **Tightly Coupled Information**
+KEEP SINGLE: Tightly Coupled Information
 - Components must be learned together
 - Example: "Pros and cons of approach X" (comparison needs both sides)
 
-✅ **Short Content**
+KEEP SINGLE: Short Content
 - Question + Answer < 200 words total
 - No subquestions or examples
 
 ### When to Create MULTIPLE Cards
 
-❌ **Multiple Independent Concepts**
+SPLIT: Multiple Independent Concepts
 - Note covers 2+ distinct topics
 - Example: "Python Lists AND Dictionaries" → Split into 2 cards
 
-❌ **List of Items**
+SPLIT: List of Items
 - "5 SOLID principles" → Create 5 separate cards
 - "Steps to deploy" → One card per step
 
-❌ **Multiple Examples**
+SPLIT: Multiple Examples
 - Main concept + 3 code examples → 1 concept card + 3 example cards
 
-❌ **Subquestions**
+SPLIT: Subquestions
 - Main question + follow-up questions
 - Example: "What is REST?" + "What are REST verbs?" → 2 cards
 
-❌ **Complex Topic with Parts**
+SPLIT: Complex Topic with Parts
 - Topic has multiple aspects that can be learned independently
 - Example: "React Hooks" → useState, useEffect, useContext (separate cards)
 
-❌ **Comparative Content**
+SPLIT: Comparative Content
 - "X vs Y" where X and Y are complex → Card for X, Card for Y, Card for comparison
 
 ## Splitting Strategies
@@ -570,7 +570,7 @@ Unmounting:
 
 ## Common Patterns
 
-✅ **DO Split**:
+DO SPLIT:
 - Lists of N items (N ≥ 3)
 - Multiple independent concepts
 - Steps in a process
@@ -578,7 +578,7 @@ Unmounting:
 - Hierarchical topics
 - Sentences suitable for Cloze deletions
 
-❌ **DON'T Split**:
+DON'T SPLIT:
 - Single atomic concept
 - Tightly coupled comparisons (pros/cons)
 - Very short Q&A
@@ -586,12 +586,12 @@ Unmounting:
 
 ## Red Flags for Splitting
 
-🚩 Note title contains "and" → Likely 2+ concepts
-🚩 Answer has numbered/bulleted list → Split per item
-🚩 Multiple code examples → Split per example
-🚩 "Steps to..." or "How to..." → Split per step
-🚩 "Types of..." or "Kinds of..." → Split per type
-🚩 Answer > 300 words → Likely too much for one card
+FLAG: Note title contains "and" → Likely 2+ concepts
+FLAG: Answer has numbered/bulleted list → Split per item
+FLAG: Multiple code examples → Split per example
+FLAG: "Steps to..." or "How to..." → Split per step
+FLAG: "Types of..." or "Kinds of..." → Split per type
+FLAG: Answer > 300 words → Likely too much for one card
 """
 
 # ============================================================================
