@@ -45,7 +45,7 @@ The system includes advanced memory capabilities that continuously improve card 
 
 **Memory Benefits**: 20-30% quality improvement, personalized generation, continuous learning.
 
-See [Memory-Enhanced Generation](.docs/MEMORY_ENHANCED_GENERATION.md) for detailed documentation.
+See [Agent System](.docs/ARCHITECTURE/agents.md) for detailed documentation.
 
 ## Quick Start
 
@@ -207,11 +207,15 @@ uv sync --all-extras
 
 ## Documentation
 
--   [Agent Integration Plan](.docs/AGENT_INTEGRATION_PLAN.md)
--   [Security Best Practices](#security-features)
--   [Provider Guide](.docs/LLM_PROVIDERS.md)
--   [APF Format](.docs/APF_FORMAT.md)
--   [Refactoring Guide](REFACTORING_GUIDE.md)
+-   **[📚 Full Documentation](.docs/README.md)** - Complete guides and reference
+-   **[🚀 Getting Started](.docs/GETTING_STARTED.md)** - Quick setup guide
+-   **[🔧 Configuration](.docs/GUIDES/configuration.md)** - Model and provider setup
+-   **[🔄 Synchronization](.docs/GUIDES/synchronization.md)** - Change management guide
+-   **[🏗️ Architecture](.docs/ARCHITECTURE/README.md)** - System design overview
+-   **[🃏 APF Format](.docs/ARCHITECTURE/apf.md)** - Card format specification
+-   **[🤖 Agent System](.docs/ARCHITECTURE/agents.md)** - Multi-agent architecture
+-   **[⚙️ LLM Providers](.docs/ARCHITECTURE/providers.md)** - Provider integration
+-   **[🔍 Security Best Practices](#security-features)** - Security guidelines
 
 ## Contributing
 

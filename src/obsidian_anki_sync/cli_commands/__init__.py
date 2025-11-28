@@ -5,7 +5,7 @@ Currently implemented:
 - shared.py: Common utilities (config/logger loading, console)
 - sync_handler.py: Sync command implementation
 
-Future modules (see REFACTORING_GUIDE.md):
+Future modules (see .docs/ARCHITECTURE/README.md):
 - validate_handler.py: Note validation command
 - init_handler.py: Initialization command
 - anki_handler.py: Anki-related commands (decks, models, fields)
