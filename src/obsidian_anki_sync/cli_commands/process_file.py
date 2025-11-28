@@ -97,9 +97,7 @@ def save_cards_to_file(
             )
 
 
-def get_processed_slugs(
-    output_path: Path, file_format: str
-) -> set[str]:  # noqa: ARG001
+def get_processed_slugs(output_path: Path, file_format: str) -> set[str]:  # noqa: ARG001
     """
     Get set of already processed card slugs from output file.
 

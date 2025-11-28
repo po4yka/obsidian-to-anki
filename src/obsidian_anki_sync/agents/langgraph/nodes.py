@@ -1530,9 +1530,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
 
             # Get existing cards for LLM comparison
             existing_cards_dicts = state.get("existing_cards_dicts")
-            assert (
-                existing_cards_dicts is not None
-            ), "existing_cards_dicts should not be None"
+            assert existing_cards_dicts is not None, (
+                "existing_cards_dicts should not be None"
+            )
             existing_cards = [
                 GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
             ]

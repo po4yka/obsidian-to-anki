@@ -80,8 +80,8 @@ test-cov:  ## Run tests with coverage report
 test-fast:  ## Run tests excluding slow ones
 	uv run pytest -m "not slow"
 
-format:  ## Format code with black and isort
-	uv run black . && uv run isort .
+format:  ## Format code with ruff and isort
+	uv run ruff format . && uv run isort .
 
 lint:  ## Run ruff linter
 	uv run ruff check .

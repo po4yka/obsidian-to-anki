@@ -5,7 +5,7 @@ Synchronize Obsidian Q&A notes to Anki flashcards using LLM-powered generation w
 [![Tests](https://img.shields.io/badge/tests-539%20passed-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-35%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)]()
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -432,7 +432,7 @@ obsidian-anki-sync list-problematic-notes # List archived issues
 
 ```bash
 # Run all quality checks
-uv run black . && uv run isort . && uv run ruff check . && uv run mypy src/
+uv run ruff format . && uv run isort . && uv run ruff check . && uv run mypy src/
 
 # Or use the built-in format command
 obsidian-anki-sync format
