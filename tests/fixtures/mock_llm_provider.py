@@ -18,6 +18,7 @@ class MockLLMProvider(ILLMProvider):
         self.call_history = []  # List of (method, args) tuples
         self.should_fail = False
         self.fail_message = "Mock LLM provider failure"
+        self.default_response = None  # Default response when prompt not found
 
     def generate(
         self,
@@ -67,9 +68,12 @@ class MockLLMProvider(ILLMProvider):
         if self.should_fail:
             raise Exception(self.fail_message)
 
-        # Return mock JSON response
-        mock_json = self.responses.get(
-            prompt, '{"mock": "response", "status": "success"}')
+        # Return mock JSON response - check for exact match first, then default
+        mock_json = self.responses.get(prompt)
+        if mock_json is None and self.default_response is not None:
+            mock_json = self.default_response
+        if mock_json is None:
+            mock_json = '{"mock": "response", "status": "success"}'
 
         # Try to parse as JSON, fallback to dict
         try:
@@ -186,9 +190,15 @@ class MockLLMProvider(ILLMProvider):
         """Clear call history."""
         self.call_history.clear()
 
+    def set_default_response(self, response_data: Dict[str, Any]) -> None:
+        """Set default JSON response for any prompt."""
+        import json
+        self.default_response = json.dumps(response_data)
+
     def reset(self) -> None:
         """Reset mock state."""
         self.responses.clear()
         self.call_history.clear()
         self.should_fail = False
         self.fail_message = "Mock LLM provider failure"
+        self.default_response = None

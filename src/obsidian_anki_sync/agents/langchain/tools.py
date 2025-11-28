@@ -82,21 +82,22 @@ class SlugGeneratorTool(BaseTool):
     )
 
     def _run(
-        self, title: str, base_slug: str, existing_slugs: list[str] | None = None
+        self, source_path: str, card_index: int, lang: str, existing_slugs: list[str] | None = None
     ) -> str:
         """Generate a unique slug.
 
         Args:
-            title: Card title
-            base_slug: Base slug for the note
+            source_path: Relative path to source note
+            card_index: Card index (1-based)
+            lang: Language code (en, ru)
             existing_slugs: List of existing slugs to avoid collisions
 
         Returns:
             Generated unique slug
         """
         try:
-            existing_slugs = existing_slugs or []
-            slug = generate_slug(title, base_slug, existing_slugs)
+            existing_slugs_set = set(existing_slugs or [])
+            slug, _, _ = generate_slug(source_path, card_index, lang, existing_slugs_set)
             return f"Generated slug: {slug}"
         except Exception as e:
             logger.error("slug_generator_tool_error", error=str(e))
@@ -229,21 +230,25 @@ class QAExtractorTool(BaseTool):
         "Extract Q&A pairs from note content. Returns structured Q&A data."
     )
 
-    def _run(self, note_content: str, language_tags: list[str] | None = None) -> str:
+    def _run(self, note_content: str, file_path: str = "temp.md") -> str:
         """Extract Q&A pairs from note content.
 
         Args:
             note_content: Note content to parse
-            language_tags: List of language tags
+            file_path: Optional file path (used for logging)
 
         Returns:
             Extracted Q&A pairs
         """
         try:
-            from ...obsidian.parser import parse_note_content
+            from pathlib import Path
+            from ...obsidian.parser import parse_note
 
-            language_tags = language_tags or ["en"]
-            qa_pairs = parse_note_content(note_content, language_tags)
+            # Create a temporary file path for parsing
+            temp_path = Path(file_path)
+
+            # Parse the note with the content
+            _, qa_pairs = parse_note(temp_path, qa_extractor=None, tolerant_parsing=True, content=note_content)
 
             if qa_pairs:
                 result = f"Extracted {len(qa_pairs)} Q&A pairs:\n"

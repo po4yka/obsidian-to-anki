@@ -1,12 +1,61 @@
 """Tests for note structure validator."""
 
-from obsidian_anki_sync.obsidian.parser import parse_frontmatter
-from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
+from datetime import datetime, timezone
+
 import pytest
 
-# Skip these tests as they test complex note validation
-pytestmark = pytest.mark.skip(
-    reason="Note validator tests require complex setup")
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
+from obsidian_anki_sync.obsidian.parser import parse_frontmatter
+
+
+@pytest.fixture
+def sample_note_content():
+    """Sample note content for validator tests."""
+    return """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+---
+
+# Question (EN)
+
+> What is unit testing?
+
+# Вопрос (RU)
+
+> Что такое юнит-тестирование?
+
+---
+
+## Answer (EN)
+
+Unit testing is testing individual components.
+
+- Tests small units of code
+- Runs in isolation
+- Fast and reliable
+
+## Ответ (RU)
+
+Юнит-тестирование - это тестирование отдельных компонентов.
+"""
+
+
+@pytest.fixture
+def sample_metadata():
+    """Sample metadata for validator tests."""
+    return NoteMetadata(
+        id="test-001",
+        title="Test Question",
+        topic="Testing",
+        language_tags=["en", "ru"],
+        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        updated=datetime(2024, 1, 2, tzinfo=timezone.utc),
+    )
 
 
 class TestNoteValidator:

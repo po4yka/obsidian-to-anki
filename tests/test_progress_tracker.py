@@ -1,20 +1,18 @@
 """Tests for progress tracking functionality."""
 
-from obsidian_anki_sync.sync.state_db import StateDB
-from obsidian_anki_sync.sync.progress import (
-    NoteProgress,
-    ProgressTracker,
-    SyncPhase,
-    SyncProgress,
-)
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skip(
-    reason="Progress tracker tests require threading setup")
+from obsidian_anki_sync.sync.progress import (
+    NoteProgress,
+    ProgressTracker,
+    SyncPhase,
+    SyncProgress,
+)
+from obsidian_anki_sync.sync.state_db import StateDB
 
 
 class TestSyncProgress:
@@ -208,7 +206,7 @@ class TestProgressTracker:
 
         assert not tracker.is_interrupted()
 
-        tracker._interrupted = True
+        tracker._interrupt_event.set()
         assert tracker.is_interrupted()
 
     def test_signal_handler_installation(self, temp_db) -> None:

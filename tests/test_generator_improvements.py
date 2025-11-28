@@ -7,10 +7,6 @@ import re
 
 import pytest
 
-# Skip these tests as they test complex code detection functionality
-pytestmark = pytest.mark.skip(
-    reason="Code detection tests require complex language analysis setup")
-
 
 @pytest.fixture
 def generator_agent(mock_ollama_provider):
