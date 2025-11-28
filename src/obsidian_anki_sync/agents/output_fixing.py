@@ -101,7 +101,9 @@ class OutputFixingParser(Generic[T]):
                     if deps is not None:
                         result = await self.agent.run(prompt, deps=deps, **kwargs)
                     else:
-                        result = await self.agent.run(prompt, system=system, **kwargs)
+                        result = await self.agent.run(
+                            prompt, instructions=system, **kwargs
+                        )
                     return result.data  # type: ignore[no-any-return]
                 else:
                     # Retry with fixed prompt
@@ -121,7 +123,7 @@ class OutputFixingParser(Generic[T]):
                         result = await self.agent.run(fixed_prompt, deps=deps, **kwargs)
                     else:
                         result = await self.agent.run(
-                            fixed_prompt, system=system, **kwargs
+                            fixed_prompt, instructions=system, **kwargs
                         )
                     self.repair_successes += 1
                     logger.info(
@@ -228,7 +230,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             from pydantic_ai import Agent as FixAgent
 
             fix_agent = FixAgent(self.fix_model, output_type=str)
-            result = await fix_agent.run(fix_prompt, system=fix_system)
+            result = await fix_agent.run(fix_prompt, instructions=fix_system)
             improved_prompt = result.data
 
             logger.info(
@@ -249,7 +251,17 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
 
     def _get_expected_format(self) -> str:
         """Get description of expected output format."""
-        result_type = self.agent.result_type
+        # Get the output type from agent - this is a generic type parameter
+        # We need to introspect it from the agent's configuration
+        try:
+            # Try to get it from the agent if it has output_type attribute
+            if hasattr(self.agent, "output_type"):
+                result_type = self.agent.output_type  # type: ignore
+            else:
+                # Fallback for generic agents
+                result_type = str  # Default fallback
+        except AttributeError:
+            result_type = str  # Default fallback
         if issubclass(result_type, BaseModel):
             # Try to get schema
             try:

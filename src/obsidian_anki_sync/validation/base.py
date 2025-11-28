@@ -1,9 +1,9 @@
 """Base validator classes and types for vault validation."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
-from collections.abc import Callable
 
 
 class Severity(Enum):

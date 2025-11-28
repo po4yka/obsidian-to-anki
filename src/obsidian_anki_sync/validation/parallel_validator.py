@@ -6,11 +6,11 @@ on large vaults with many notes.
 
 import asyncio
 import os
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from collections.abc import Callable
 
 from tqdm import tqdm
 
