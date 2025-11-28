@@ -9,6 +9,7 @@ import httpx
 
 from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
 from obsidian_anki_sync.exceptions import AnkiConnectError
+from obsidian_anki_sync.utils.async_runner import AsyncioRunner
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.retry import retry
 
@@ -25,7 +26,11 @@ class AnkiClient(IAnkiClient):
     """
 
     def __init__(
-        self, url: str, timeout: float = 30.0, enable_health_checks: bool = True
+        self,
+        url: str,
+        timeout: float = 30.0,
+        enable_health_checks: bool = True,
+        async_runner: AsyncioRunner | None = None,
     ):
         """
         Initialize client.
@@ -45,10 +50,17 @@ class AnkiClient(IAnkiClient):
         self._last_health_check = 0.0
         self._health_check_interval = 60.0  # Check health every 60 seconds
         self._is_healthy = True
+        self._async_runner = async_runner or AsyncioRunner.get_global()
 
         # Configure connection pooling for better performance
         # Using sync client for compatibility with existing sync code paths
         self.session = httpx.Client(
+            timeout=timeout,
+            limits=httpx.Limits(
+                max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
+            ),
+        )
+        self._async_client = httpx.AsyncClient(
             timeout=timeout,
             limits=httpx.Limits(
                 max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
@@ -116,12 +128,15 @@ class AnkiClient(IAnkiClient):
             msg = "AnkiConnect is not responding - check if Anki is running"
             raise AnkiConnectError(msg)
 
+        return self._async_runner.run(self.invoke_async(action, params))
+
+    async def invoke_async(self, action: str, params: dict | None = None) -> Any:
         payload = {"action": action, "version": 6, "params": params or {}}
 
         logger.debug("anki_invoke", action=action)
 
         try:
-            response = self.session.post(self.url, json=payload)
+            response = await self._async_client.post(self.url, json=payload)
             response.raise_for_status()
         except (httpx.TimeoutException, httpx.ConnectError) as e:
             self._is_healthy = False  # Mark as unhealthy on connection errors
@@ -158,6 +173,29 @@ class AnkiClient(IAnkiClient):
         """
         return cast("list[int]", self.invoke("findNotes", {"query": query}))
 
+    def _build_note_payload(
+        self,
+        deck_name: str,
+        model_name: str,
+        fields: dict[str, str],
+        tags: list[str | None] | None = None,
+        options: dict[str, Any | None] | None = None,
+        guid: str | None = None,
+    ) -> dict[str, Any]:
+        note_payload: dict[str, Any] = {
+            "deckName": deck_name,
+            "modelName": model_name,
+            "fields": fields,
+            "options": options or {"allowDuplicate": False},
+        }
+        if tags:
+            clean_tags = [t for t in tags if t is not None]
+            if clean_tags:
+                note_payload["tags"] = clean_tags
+        if guid:
+            note_payload["guid"] = guid
+        return note_payload
+
     def notes_info(self, note_ids: list[int]) -> list[dict]:
         """
         Get information about notes.
@@ -172,6 +210,14 @@ class AnkiClient(IAnkiClient):
             return []
         return cast(
             "list[dict[Any, Any]]", self.invoke("notesInfo", {"notes": note_ids})
+        )
+
+    async def notes_info_async(self, note_ids: list[int]) -> list[dict]:
+        if not note_ids:
+            return []
+        return cast(
+            "list[dict[Any, Any]]",
+            await self.invoke_async("notesInfo", {"notes": note_ids}),
         )
 
     def cards_info(self, card_ids: list[int]) -> list[dict]:
@@ -197,6 +243,7 @@ class AnkiClient(IAnkiClient):
         fields: dict[str, str],
         tags: list[str | None] | None = None,
         options: dict[str, Any | None] | None = None,
+        guid: str | None = None,
     ) -> int:
         """
         Add a new note.
@@ -211,20 +258,39 @@ class AnkiClient(IAnkiClient):
         Returns:
             Note ID
         """
-        note_payload: dict[str, Any] = {
-            "deckName": deck_name,
-            "modelName": model_name,
-            "fields": fields,
-            "options": options or {"allowDuplicate": False},
-        }
-        if tags:
-            # Filter out None values from tags
-            clean_tags = [t for t in tags if t is not None]
-            if clean_tags:
-                note_payload["tags"] = clean_tags
+        note_payload = self._build_note_payload(
+            deck_name=deck_name,
+            model_name=model_name,
+            fields=fields,
+            tags=tags,
+            options=options,
+            guid=guid,
+        )
 
         result = cast("int", self.invoke("addNote", {"note": note_payload}))
 
+        logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
+        return result
+
+    async def add_note_async(
+        self,
+        deck_name: str,
+        model_name: str,
+        fields: dict[str, str],
+        tags: list[str | None] | None = None,
+        options: dict[str, Any | None] | None = None,
+        guid: str | None = None,
+    ) -> int:
+        note_payload = self._build_note_payload(
+            deck_name=deck_name,
+            model_name=model_name,
+            fields=fields,
+            tags=tags,
+            options=options,
+            guid=guid,
+        )
+
+        result = cast("int", await self.invoke_async("addNote", {"note": note_payload}))
         logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
         return result
 
@@ -264,6 +330,16 @@ class AnkiClient(IAnkiClient):
 
         return result
 
+    async def add_notes_async(self, notes: list[dict[str, Any]]) -> list[int | None]:
+        if not notes:
+            return []
+
+        result = cast(
+            "list[int | None]", await self.invoke_async("addNotes", {"notes": notes})
+        )
+
+        return result
+
     def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         """
         Update note fields.
@@ -275,6 +351,13 @@ class AnkiClient(IAnkiClient):
         self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
+
+    async def update_note_fields_async(
+        self, note_id: int, fields: dict[str, str]
+    ) -> None:
+        await self.invoke_async(
+            "updateNoteFields", {"note": {"id": note_id, "fields": fields}}
+        )
 
     def update_notes_fields(self, updates: list[dict[str, Any]]) -> list[bool]:
         """
@@ -349,6 +432,26 @@ class AnkiClient(IAnkiClient):
 
             return fallback_results
 
+    async def update_notes_fields_async(
+        self, updates: list[dict[str, Any]]
+    ) -> list[bool]:
+        if not updates:
+            return []
+
+        actions = [
+            {"action": "updateNoteFields", "params": {"note": update}}
+            for update in updates
+        ]
+
+        try:
+            results = cast(
+                "list[dict[str, Any]]",
+                await self.invoke_async("multi", {"actions": actions}),
+            )
+            return [result.get("error") is None for result in results]
+        except Exception:
+            return [False] * len(updates)
+
     def update_note_tags(self, note_id: int, tags: list[str]) -> None:
         """
         Synchronize tags for a single note by applying minimal add/remove operations.
@@ -380,6 +483,12 @@ class AnkiClient(IAnkiClient):
             note_id=note_id,
             added=to_add,
             removed=to_remove,
+        )
+
+    async def update_note_tags_async(self, note_id: int, tags: list[str]) -> None:
+        desired_tags = sorted({tag for tag in tags if tag})
+        await self.invoke_async(
+            "replaceTags", {"notes": [note_id], "tags": " ".join(desired_tags)}
         )
 
     def add_tags(self, note_ids: list[int], tags: str) -> None:
@@ -480,6 +589,35 @@ class AnkiClient(IAnkiClient):
 
             return fallback_results
 
+    async def update_notes_tags_async(
+        self, note_tag_pairs: list[tuple[int, list[str]]]
+    ) -> list[bool]:
+        if not note_tag_pairs:
+            return []
+
+        actions = []
+        for note_id, tags in note_tag_pairs:
+            desired_tags = sorted({tag for tag in tags if tag})
+            if desired_tags:
+                actions.append(
+                    {
+                        "action": "replaceTags",
+                        "params": {"notes": [note_id], "tags": " ".join(desired_tags)},
+                    }
+                )
+
+        if not actions:
+            return [True] * len(note_tag_pairs)
+
+        try:
+            results = cast(
+                "list[dict[str, Any]]",
+                await self.invoke_async("multi", {"actions": actions}),
+            )
+            return [result.get("error") is None for result in results]
+        except Exception:
+            return [False] * len(note_tag_pairs)
+
     def delete_notes(self, note_ids: list[int]) -> None:
         """
         Delete notes.
@@ -492,6 +630,11 @@ class AnkiClient(IAnkiClient):
 
         self.invoke("deleteNotes", {"notes": note_ids})
         logger.info("notes_deleted", count=len(note_ids))
+
+    async def delete_notes_async(self, note_ids: list[int]) -> None:
+        if not note_ids:
+            return
+        await self.invoke_async("deleteNotes", {"notes": note_ids})
 
     def get_deck_names(self) -> list[str]:
         """Get all deck names."""

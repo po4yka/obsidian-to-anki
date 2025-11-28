@@ -24,7 +24,7 @@ import yaml  # type: ignore
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ParserError
-from obsidian_anki_sync.models import Card
+from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.utils.logging import get_logger
@@ -235,17 +235,34 @@ class NoteScanner:
 
                 logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
-                # Generate cards for each Q/A pair and language
-                for qa_pair in qa_pairs:
-                    for lang in metadata.language_tags:
-                        # Check if already processed
-                        if self.progress and self.progress.is_note_completed(
+                tasks = [
+                    (qa_pair, lang)
+                    for qa_pair in qa_pairs
+                    for lang in metadata.language_tags
+                    if not (
+                        self.progress
+                        and self.progress.is_note_completed(
                             relative_path, qa_pair.card_index, lang
-                        ):
-                            continue
+                        )
+                    )
+                ]
 
-                        # Skip previously failed notes on resume
-                        if self.progress and self.progress.is_note_failed(
+                max_workers_note = max(
+                    1, min(self.config.max_concurrent_generations, len(tasks))
+                )
+
+                def _generate_single(
+                    qa_pair: QAPair,
+                    lang: str,
+                    relative_path: str = relative_path,
+                    metadata: Any = metadata,
+                    note_content: str = note_content,
+                    qa_pairs: list[QAPair] = qa_pairs,
+                    existing_slugs: set[str] = existing_slugs,
+                    file_path: Any = file_path,
+                ):
+                    if self.progress:
+                        if self.progress.is_note_failed(
                             relative_path, qa_pair.card_index, lang
                         ):
                             logger.info(
@@ -254,67 +271,79 @@ class NoteScanner:
                                 card_index=qa_pair.card_index,
                                 lang=lang,
                             )
-                            continue
-
-                        # Track progress
+                            return None, None, None
+                        self.progress.start_note(
+                            relative_path, qa_pair.card_index, lang
+                        )
+                    try:
+                        card = self.card_generator.generate_card(
+                            qa_pair=qa_pair,
+                            metadata=metadata,
+                            relative_path=relative_path,
+                            lang=lang,
+                            existing_slugs=existing_slugs,
+                            note_content=note_content,
+                            all_qa_pairs=qa_pairs,
+                        )
                         if self.progress:
-                            self.progress.start_note(
-                                relative_path, qa_pair.card_index, lang
+                            self.progress.complete_note(
+                                relative_path, qa_pair.card_index, lang, 1
+                            )
+                        return card, None, None
+                    except Exception as e:  # pragma: no cover - network/LLM
+                        error_type_name = type(e).__name__
+                        error_message = str(e)
+
+                        self._archive_note_safely(
+                            file_path=file_path,
+                            relative_path=relative_path,
+                            error=e,
+                            processing_stage="card_generation",
+                            note_content=note_content if note_content else None,
+                            card_index=qa_pair.card_index,
+                            language=lang,
+                        )
+
+                        if self.progress:
+                            self.progress.fail_note(
+                                relative_path,
+                                qa_pair.card_index,
+                                lang,
+                                error_message,
                             )
 
-                        try:
-                            card = self.card_generator.generate_card(
-                                qa_pair=qa_pair,
-                                metadata=metadata,
-                                relative_path=relative_path,
-                                lang=lang,
-                                existing_slugs=existing_slugs,
-                                note_content=note_content,
-                                all_qa_pairs=qa_pairs,
+                        return None, error_message, error_type_name
+
+                if max_workers_note == 1:
+                    results = [
+                        _generate_single(qa_pair, lang) for qa_pair, lang in tasks
+                    ]
+                else:
+                    with ThreadPoolExecutor(max_workers=max_workers_note) as executor:
+                        futures = [
+                            executor.submit(_generate_single, qa_pair, lang)
+                            for qa_pair, lang in tasks
+                        ]
+                        results = [future.result() for future in futures]
+
+                failures_this_note = 0
+                for (qa_pair, lang), (card, error_message, error_type) in zip(
+                    tasks, results
+                ):
+                    if card:
+                        obsidian_cards[card.slug] = card
+                        existing_slugs.add(card.slug)
+                        consecutive_errors = 0
+                    elif error_message and error_type:
+                        error_by_type[error_type] += 1
+                        if len(error_samples[error_type]) < 3:
+                            error_samples[error_type].append(
+                                f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
                             )
-                            obsidian_cards[card.slug] = card
-                            existing_slugs.add(card.slug)
+                        self.stats["errors"] = self.stats.get("errors", 0) + 1
+                        failures_this_note += 1
 
-                            # Reset consecutive errors on success
-                            consecutive_errors = 0
-
-                            # Mark as completed
-                            if self.progress:
-                                self.progress.complete_note(
-                                    relative_path, qa_pair.card_index, lang, 1
-                                )
-
-                        except Exception as e:
-                            error_type_name = type(e).__name__
-                            error_message = str(e)
-
-                            # Archive problematic note
-                            self._archive_note_safely(
-                                file_path=file_path,
-                                relative_path=relative_path,
-                                error=e,
-                                processing_stage="card_generation",
-                                note_content=note_content if note_content else None,
-                                card_index=qa_pair.card_index,
-                                language=lang,
-                            )
-
-                            error_by_type[error_type_name] += 1
-                            if len(error_samples[error_type_name]) < 3:
-                                error_samples[error_type_name].append(
-                                    f"{relative_path} (pair {qa_pair.card_index}, {lang}): {error_message}"
-                                )
-
-                            self.stats["errors"] = self.stats.get("errors", 0) + 1
-                            consecutive_errors += 1
-
-                            if self.progress:
-                                self.progress.fail_note(
-                                    relative_path,
-                                    qa_pair.card_index,
-                                    lang,
-                                    error_message,
-                                )
+                consecutive_errors += failures_this_note
 
                 self.stats["processed"] = self.stats.get("processed", 0) + 1
 
@@ -698,62 +727,104 @@ class NoteScanner:
 
             slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
 
-            # Generate cards for each Q/A pair and language
-            for qa_pair in qa_pairs:
-                for lang in metadata.language_tags:
-                    # Check if already processed
-                    if self.progress and self.progress.is_note_completed(
+            tasks = [
+                (qa_pair, lang)
+                for qa_pair in qa_pairs
+                for lang in metadata.language_tags
+                if not (
+                    self.progress
+                    and self.progress.is_note_completed(
                         relative_path, qa_pair.card_index, lang
-                    ):
-                        continue
+                    )
+                )
+            ]
 
-                    # Track progress
+            max_workers = max(
+                1, min(self.config.max_concurrent_generations, len(tasks))
+            )
+
+            def _generate_single(
+                qa_pair: QAPair,
+                lang: str,
+                relative_path: str = relative_path,
+                metadata: Any = metadata,
+                note_content: str = note_content,
+                qa_pairs: list[QAPair] = qa_pairs,
+                file_path: Any = file_path,
+                slug_view: Collection[str] = slug_view,
+            ):
+                if self.progress:
+                    self.progress.start_note(relative_path, qa_pair.card_index, lang)
+                try:
+                    card = self.card_generator.generate_card(
+                        qa_pair=qa_pair,
+                        metadata=metadata,
+                        relative_path=relative_path,
+                        lang=lang,
+                        existing_slugs=slug_view,
+                        note_content=note_content,
+                        all_qa_pairs=qa_pairs,
+                    )
                     if self.progress:
-                        self.progress.start_note(
-                            relative_path, qa_pair.card_index, lang
+                        self.progress.complete_note(
+                            relative_path, qa_pair.card_index, lang, 1
+                        )
+                    return card, None, None
+                except Exception as e:  # pragma: no cover - network/LLM
+                    error_type_name = type(e).__name__
+                    error_message = str(e)
+
+                    self._archive_note_safely(
+                        file_path=file_path,
+                        relative_path=relative_path,
+                        error=e,
+                        processing_stage="card_generation",
+                        note_content=note_content if note_content else None,
+                        card_index=qa_pair.card_index,
+                        language=lang,
+                    )
+
+                    if self.progress:
+                        self.progress.fail_note(
+                            relative_path, qa_pair.card_index, lang, error_message
                         )
 
-                    try:
-                        card = self.card_generator.generate_card(
-                            qa_pair=qa_pair,
-                            metadata=metadata,
-                            relative_path=relative_path,
-                            lang=lang,
-                            existing_slugs=slug_view,
-                            note_content=note_content,
-                            all_qa_pairs=qa_pairs,
-                        )
+                    return None, error_message, error_type_name
+
+            if max_workers == 1:
+                for qa_pair, lang in tasks:
+                    card, error_message, error_type_name = _generate_single(
+                        qa_pair, lang
+                    )
+                    if card:
                         cards[card.slug] = card
                         new_slugs.add(card.slug)
-
-                        # Mark as completed
-                        if self.progress:
-                            self.progress.complete_note(
-                                relative_path, qa_pair.card_index, lang, 1
-                            )
-
-                    except Exception as e:
-                        error_type_name = type(e).__name__
-                        error_message = str(e)
-
-                        # Archive problematic note
-                        self._archive_note_safely(
-                            file_path=file_path,
-                            relative_path=relative_path,
-                            error=e,
-                            processing_stage="card_generation",
-                            note_content=note_content if note_content else None,
-                            card_index=qa_pair.card_index,
-                            language=lang,
-                        )
-
-                        if self.progress:
-                            self.progress.fail_note(
-                                relative_path, qa_pair.card_index, lang, error_message
-                            )
-
+                    elif error_message:
                         result_info["error"] = error_message
                         result_info["error_type"] = error_type_name
+            else:
+                import threading
+
+                lock = threading.Lock()
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_ctx = {
+                        executor.submit(_generate_single, qa_pair, lang): (
+                            qa_pair,
+                            lang,
+                        )
+                        for qa_pair, lang in tasks
+                    }
+                    for future in as_completed(future_to_ctx):
+                        card, error_message, error_type_name = future.result()
+                        with lock:
+                            if card:
+                                cards[card.slug] = card
+                                new_slugs.add(card.slug)
+                            elif error_message:
+                                result_info["error"] = error_message
+                                result_info["error_type"] = error_type_name
 
             result_info["success"] = True
             result_info["cards_count"] = len(cards)

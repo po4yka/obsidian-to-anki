@@ -16,6 +16,7 @@ from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
 from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
+from obsidian_anki_sync.utils.async_runner import AsyncioRunner
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
 from obsidian_anki_sync.utils.guid import deterministic_guid
 from obsidian_anki_sync.utils.logging import get_logger
@@ -44,6 +45,7 @@ class CardGenerator:
         slug_counter_lock: Any = None,
         stats: dict[str, Any] | None = None,
         existing_cards_for_duplicate_detection: list | None = None,
+        async_runner: AsyncioRunner | None = None,
     ):
         """Initialize card generator.
 
@@ -81,6 +83,7 @@ class CardGenerator:
         self.existing_cards_for_duplicate_detection = (
             existing_cards_for_duplicate_detection
         )
+        self._async_runner = async_runner or AsyncioRunner.get_global()
 
     def set_existing_cards_for_duplicate_detection(self, existing_cards: list | None):
         """Set existing cards for duplicate detection.
@@ -155,9 +158,6 @@ class CardGenerator:
             cache_miss=True,
         )
 
-        # Run agent pipeline
-        import asyncio
-
         file_path = self.config.vault_path / relative_path
 
         if not file_path.exists():
@@ -172,7 +172,7 @@ class CardGenerator:
             import inspect
 
             if inspect.iscoroutinefunction(self.agent_orchestrator.process_note):
-                result = asyncio.run(
+                result = self._async_runner.run(
                     self.agent_orchestrator.process_note(
                         note_content=note_content,
                         metadata=metadata,
