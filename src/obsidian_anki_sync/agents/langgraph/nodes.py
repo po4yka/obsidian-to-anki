@@ -539,6 +539,10 @@ async def generation_node(state: PipelineState) -> PipelineState:
     If Chain of Thought (CoT) reasoning is enabled, this node will consume
     recommendations from the preceding think_before_generation_node.
 
+    If RAG is enabled, this node will:
+    - Enrich context with related concepts from the knowledge base
+    - Retrieve few-shot examples for improved generation quality
+
     Args:
         state: Current pipeline state
 
@@ -562,6 +566,50 @@ async def generation_node(state: PipelineState) -> PipelineState:
         # Log a summary of the recommendations
         for i, rec in enumerate(reasoning_recommendations[:3], 1):  # Log first 3
             logger.debug(f"cot_recommendation_{i}", recommendation=rec[:100])
+
+    # RAG: Enrich context and get few-shot examples before generation
+    rag_enrichment = None
+    rag_examples = None
+    if state.get("enable_rag") and state.get("rag_integration"):
+        rag_integration = state["rag_integration"]
+        metadata_dict = state["metadata_dict"]
+
+        # Get context enrichment
+        if state.get("rag_context_enrichment", True):
+            try:
+                rag_enrichment = await rag_integration.enrich_generation_context(
+                    note_content=state["note_content"],
+                    metadata=metadata_dict,
+                )
+                if rag_enrichment:
+                    state["rag_enrichment"] = rag_enrichment
+                    logger.info(
+                        "rag_context_enrichment_complete",
+                        related_concepts=len(rag_enrichment.get("related_concepts", [])),
+                        few_shot_examples=len(rag_enrichment.get("few_shot_examples", [])),
+                    )
+            except Exception as e:
+                logger.warning("rag_context_enrichment_failed", error=str(e))
+
+        # Get few-shot examples
+        if state.get("rag_few_shot_examples", True):
+            try:
+                topic = metadata_dict.get("topic", "")
+                difficulty = metadata_dict.get("difficulty")
+                if topic:
+                    rag_examples = await rag_integration.get_examples_for_generation(
+                        topic=topic,
+                        difficulty=difficulty,
+                    )
+                    if rag_examples:
+                        state["rag_examples"] = rag_examples
+                        logger.info(
+                            "rag_few_shot_examples_retrieved",
+                            count=len(rag_examples),
+                            topic=topic,
+                        )
+            except Exception as e:
+                logger.warning("rag_few_shot_examples_failed", error=str(e))
 
     # Deserialize data
     metadata = NoteMetadata(**state["metadata_dict"])
@@ -654,13 +702,15 @@ async def generation_node(state: PipelineState) -> PipelineState:
                         )
                     )
                 else:
-                    # Legacy PydanticAI agent
+                    # Legacy PydanticAI agent (with RAG context)
                     tasks.append(
                         generator.generate_cards(
                             note_content=state["note_content"],
                             metadata=metadata,
                             qa_pairs=chunk,
                             slug_base=state["slug_base"],
+                            rag_enrichment=rag_enrichment,
+                            rag_examples=rag_examples,
                         )
                     )
 
@@ -727,12 +777,14 @@ async def generation_node(state: PipelineState) -> PipelineState:
                         gen_result.warnings = []
                     gen_result.warnings.extend(unified_result.warnings)
             else:
-                # Legacy PydanticAI agent
+                # Legacy PydanticAI agent (with RAG context)
                 gen_result = await generator.generate_cards(
                     note_content=state["note_content"],
                     metadata=metadata,
                     qa_pairs=qa_pairs,
                     slug_base=state["slug_base"],
+                    rag_enrichment=rag_enrichment,
+                    rag_examples=rag_examples,
                 )
             gen_result.generation_time = time.time() - start_time
 
@@ -1313,6 +1365,8 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     """Execute duplicate detection stage.
 
     Checks newly generated cards against existing cards from Anki.
+    If RAG is enabled, uses vector-based semantic similarity search first,
+    then falls back to LLM-based detection for remaining cards.
 
     Args:
         state: Current pipeline state
@@ -1341,112 +1395,220 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         state["current_stage"] = "complete"
         return state
 
-    # Check if we have existing cards to compare against
-    if not state.get("existing_cards_dicts"):
-        logger.info("duplicate_detection_skipped", reason="no_existing_cards")
-        state["duplicate_detection"] = None
+    # Deserialize cards for checking
+    new_cards = [
+        GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
+    ]
+
+    # RAG-based duplicate detection (faster, semantic similarity)
+    rag_duplicate_results = []
+    cards_to_check_with_llm = []
+
+    if state.get("enable_rag") and state.get("rag_duplicate_detection") and state.get("rag_integration"):
+        rag_integration = state["rag_integration"]
+        logger.info("rag_duplicate_detection_start", cards_count=len(new_cards))
+
+        for card in new_cards:
+            try:
+                # Extract question and answer from APF HTML (simplified extraction)
+                question = card.slug  # Use slug as question proxy
+                answer = card.apf_html[:500] if card.apf_html else ""
+
+                rag_result = await rag_integration.check_for_duplicates(
+                    question=question,
+                    answer=answer,
+                )
+
+                rag_duplicate_results.append({
+                    "card_slug": card.slug,
+                    "is_duplicate": rag_result.get("is_duplicate", False),
+                    "confidence": rag_result.get("confidence", 0.0),
+                    "recommendation": rag_result.get("recommendation", ""),
+                    "similar_count": rag_result.get("similar_count", 0),
+                    "source": "rag",
+                })
+
+                if rag_result.get("is_duplicate"):
+                    logger.info(
+                        "rag_duplicate_detected",
+                        slug=card.slug,
+                        confidence=rag_result.get("confidence"),
+                        recommendation=rag_result.get("recommendation"),
+                    )
+                elif rag_result.get("confidence", 0) < 0.5:
+                    # Low confidence from RAG, add to LLM check list
+                    cards_to_check_with_llm.append(card)
+
+            except Exception as e:
+                logger.warning(
+                    "rag_duplicate_check_failed",
+                    slug=card.slug,
+                    error=str(e),
+                )
+                cards_to_check_with_llm.append(card)
+
+        state["rag_duplicate_results"] = rag_duplicate_results
+        logger.info(
+            "rag_duplicate_detection_complete",
+            duplicates_found=sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+            total_checked=len(new_cards),
+            remaining_for_llm=len(cards_to_check_with_llm),
+        )
+
+        # If all cards checked by RAG and no LLM fallback needed
+        if not cards_to_check_with_llm:
+            detection_time = time.time() - start_time
+            detection_summary = {
+                "total_cards_checked": len(new_cards),
+                "duplicates_found": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+                "results": rag_duplicate_results,
+                "detection_time": detection_time,
+                "method": "rag",
+            }
+            state["duplicate_detection"] = detection_summary
+            state["stage_times"]["duplicate_detection"] = detection_time
+            state["current_stage"] = "complete"
+            state["messages"].append(
+                f"Duplicate detection (RAG): {detection_summary['duplicates_found']} duplicates found"
+            )
+            return state
+    else:
+        # No RAG, use LLM for all cards
+        cards_to_check_with_llm = new_cards
+
+    # Check if we have existing cards to compare against (for LLM-based detection)
+    if not state.get("existing_cards_dicts") and cards_to_check_with_llm:
+        logger.info("duplicate_detection_skipped", reason="no_existing_cards_for_llm")
+        # Return RAG results if available
+        if rag_duplicate_results:
+            detection_time = time.time() - start_time
+            detection_summary = {
+                "total_cards_checked": len(new_cards),
+                "duplicates_found": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+                "results": rag_duplicate_results,
+                "detection_time": detection_time,
+                "method": "rag",
+            }
+            state["duplicate_detection"] = detection_summary
+            state["stage_times"]["duplicate_detection"] = detection_time
+        else:
+            state["duplicate_detection"] = None
         state["current_stage"] = "complete"
         return state
 
-    try:
-        # Use cached model from state, or create on demand as fallback
-        model = state.get("duplicate_detection_model")
-        if model is None:
-            # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("duplicate_detection")
-            model = create_openrouter_model_from_env(model_name=model_name)
+    # LLM-based detection for remaining cards
+    llm_duplicate_results = []
+    llm_duplicates_found = 0
 
-        # Create duplicate detection agent
-        detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
+    if cards_to_check_with_llm:
+        try:
+            # Use cached model from state, or create on demand as fallback
+            model = state.get("duplicate_detection_model")
+            if model is None:
+                # Fallback: create model on demand if not cached
+                model_name = state["config"].get_model_for_agent("duplicate_detection")
+                model = create_openrouter_model_from_env(model_name=model_name)
 
-        # Deserialize cards
-        new_cards = [
-            GeneratedCard(**card_dict) for card_dict in state["generation"]["cards"]
-        ]
-        existing_cards_dicts = state.get("existing_cards_dicts")
-        assert (
-            existing_cards_dicts is not None
-        ), "existing_cards_dicts should not be None"
-        existing_cards = [
-            GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
-        ]
+            # Create duplicate detection agent
+            detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
 
-        # Check each new card against existing cards in parallel
-        tasks = [
-            detection_agent.find_duplicates(new_card, existing_cards)
-            for new_card in new_cards
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Get existing cards for LLM comparison
+            existing_cards_dicts = state.get("existing_cards_dicts")
+            assert (
+                existing_cards_dicts is not None
+            ), "existing_cards_dicts should not be None"
+            existing_cards = [
+                GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
+            ]
 
-        duplicate_results = []
-        total_duplicates_found = 0
+            # Check each card against existing cards in parallel
+            tasks = [
+                detection_agent.find_duplicates(card, existing_cards)
+                for card in cards_to_check_with_llm
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for i, result in enumerate(results):
-            new_card = new_cards[i]
-            if isinstance(result, Exception):
-                logger.exception(
-                    "card_duplicate_check_failed", slug=new_card.slug, error=str(result)
-                )
-                # Add empty result for this card
-                duplicate_results.append(
-                    {
-                        "card_slug": new_card.slug,
-                        "result": [],
-                    }
-                )
-            else:
-                duplicate_results.append(
-                    {
-                        "card_slug": new_card.slug,
-                        "result": result.model_dump(),
-                    }
-                )
-
-                if result.is_duplicate:
-                    total_duplicates_found += 1
-                    logger.warning(
-                        "duplicate_card_detected",
-                        new_slug=new_card.slug,
-                        best_match=(
-                            result.best_match.card_slug if result.best_match else None
-                        ),
-                        similarity=(
-                            result.best_match.similarity_score
-                            if result.best_match
-                            else 0.0
-                        ),
-                        recommendation=result.recommendation,
+            for i, result in enumerate(results):
+                card = cards_to_check_with_llm[i]
+                if isinstance(result, Exception):
+                    logger.exception(
+                        "card_duplicate_check_failed", slug=card.slug, error=str(result)
                     )
+                    llm_duplicate_results.append({
+                        "card_slug": card.slug,
+                        "is_duplicate": False,
+                        "confidence": 0.0,
+                        "source": "llm",
+                        "result": [],
+                    })
+                else:
+                    llm_duplicate_results.append({
+                        "card_slug": card.slug,
+                        "is_duplicate": result.is_duplicate,
+                        "confidence": result.best_match.similarity_score if result.best_match else 0.0,
+                        "recommendation": result.recommendation,
+                        "source": "llm",
+                        "result": result.model_dump(),
+                    })
 
-        # Store all results
-        detection_time = time.time() - start_time
-        detection_summary = {
-            "total_cards_checked": len(new_cards),
-            "duplicates_found": total_duplicates_found,
-            "results": duplicate_results,
-            "detection_time": detection_time,
-        }
+                    if result.is_duplicate:
+                        llm_duplicates_found += 1
+                        logger.warning(
+                            "llm_duplicate_card_detected",
+                            new_slug=card.slug,
+                            best_match=(
+                                result.best_match.card_slug if result.best_match else None
+                            ),
+                            similarity=(
+                                result.best_match.similarity_score
+                                if result.best_match
+                                else 0.0
+                            ),
+                            recommendation=result.recommendation,
+                        )
 
-        state["duplicate_detection"] = detection_summary
-        state["stage_times"]["duplicate_detection"] = detection_time
+            logger.info(
+                "llm_duplicate_detection_complete",
+                cards_checked=len(cards_to_check_with_llm),
+                duplicates_found=llm_duplicates_found,
+            )
 
-        logger.info(
-            "langgraph_duplicate_detection_complete",
-            cards_checked=len(new_cards),
-            duplicates_found=total_duplicates_found,
-            time=detection_summary["detection_time"],
-        )
+        except (ValueError, KeyError) as e:
+            logger.warning("llm_duplicate_detection_failed", error=str(e))
 
-    except (ValueError, KeyError) as e:
-        logger.warning("duplicate_detection_failed", error=str(e))
-        state["duplicate_detection"] = None
-        state["stage_times"]["duplicate_detection"] = time.time() - start_time
+    # Merge RAG and LLM results
+    all_results = rag_duplicate_results + llm_duplicate_results
+    total_duplicates = sum(1 for r in all_results if r.get("is_duplicate"))
+
+    # Store all results
+    detection_time = time.time() - start_time
+    detection_summary = {
+        "total_cards_checked": len(new_cards),
+        "duplicates_found": total_duplicates,
+        "rag_duplicates": sum(1 for r in rag_duplicate_results if r.get("is_duplicate")),
+        "llm_duplicates": llm_duplicates_found,
+        "results": all_results,
+        "detection_time": detection_time,
+        "method": "hybrid" if rag_duplicate_results and llm_duplicate_results else (
+            "rag" if rag_duplicate_results else "llm"
+        ),
+    }
+
+    state["duplicate_detection"] = detection_summary
+    state["stage_times"]["duplicate_detection"] = detection_time
+
+    logger.info(
+        "langgraph_duplicate_detection_complete",
+        cards_checked=len(new_cards),
+        duplicates_found=total_duplicates,
+        method=detection_summary["method"],
+        time=detection_summary["detection_time"],
+    )
 
     # Move to complete
     state["current_stage"] = "complete"
-    duplicate_detection = state.get("duplicate_detection") or {}
     state["messages"].append(
-        f"Duplicate detection: {duplicate_detection.get('duplicates_found', 0)} duplicates found"
+        f"Duplicate detection ({detection_summary['method']}): {total_duplicates} duplicates found"
     )
 
     return state

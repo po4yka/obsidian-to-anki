@@ -56,6 +56,8 @@ class GeneratorAgentAI:
         metadata: NoteMetadata,
         qa_pairs: list[QAPair],
         slug_base: str,
+        rag_enrichment: dict | None = None,
+        rag_examples: list[dict] | None = None,
     ) -> GenerationResult:
         """Generate APF cards from Q/A pairs.
 
@@ -64,6 +66,8 @@ class GeneratorAgentAI:
             metadata: Note metadata
             qa_pairs: Q/A pairs to convert
             slug_base: Base slug for card identifiers
+            rag_enrichment: Optional RAG context enrichment data
+            rag_examples: Optional few-shot examples from RAG
 
         Returns:
             GenerationResult with all generated cards
@@ -72,6 +76,8 @@ class GeneratorAgentAI:
             "pydantic_ai_generation_start",
             title=metadata.title,
             qa_count=len(qa_pairs),
+            has_rag_enrichment=rag_enrichment is not None,
+            has_rag_examples=rag_examples is not None,
         )
 
         # Create dependencies
@@ -89,9 +95,31 @@ Title: {metadata.title}
 Topic: {metadata.topic}
 Languages: {', '.join(metadata.language_tags)}
 Slug Base: {slug_base}
-
-Q&A Pairs ({len(qa_pairs)}):
 """
+
+        # Add RAG context enrichment if available
+        if rag_enrichment:
+            related_concepts = rag_enrichment.get("related_concepts", [])
+            if related_concepts:
+                prompt += "\n## Related Concepts (from knowledge base)\n"
+                for concept in related_concepts[:3]:
+                    title = concept.get("title", "")
+                    content = concept.get("content", "")[:200]
+                    if title:
+                        prompt += f"- {title}: {content}\n"
+                    else:
+                        prompt += f"- {content}\n"
+
+        # Add few-shot examples if available
+        if rag_examples:
+            prompt += "\n## Example Q&A Cards (for reference)\n"
+            for i, example in enumerate(rag_examples[:2], 1):
+                q = example.get("question", "")[:150]
+                a = example.get("answer", "")[:200]
+                prompt += f"\nExample {i}:\nQ: {q}\nA: {a}\n"
+
+        prompt += f"\nQ&A Pairs ({len(qa_pairs)}):\n"
+
         for idx, qa in enumerate(qa_pairs, 1):
             prompt += f"\n{idx}. Q: {qa.question_en[:100]}...\n   A: {qa.answer_en[:100]}...\n"
 

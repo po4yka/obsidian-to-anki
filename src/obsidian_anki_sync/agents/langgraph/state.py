@@ -148,3 +148,24 @@ class PipelineState(TypedDict):
     reflection_skip_reason: str | None  # Reason for skipping reflection
     # Selected revision strategy (light_edit, moderate_revision, major_rewrite)
     revision_strategy: str | None
+
+    # ============================================================================
+    # RAG (Retrieval-Augmented Generation) Configuration
+    # ============================================================================
+    enable_rag: bool  # Master toggle for RAG features
+    rag_context_enrichment: bool  # Use RAG for context enrichment
+    rag_duplicate_detection: bool  # Use RAG for duplicate detection
+    rag_few_shot_examples: bool  # Use RAG for few-shot examples
+
+    # RAG Integration instance (cached for performance)
+    rag_integration: Any | None  # RAGIntegration instance
+
+    # RAG Results (per-stage outputs)
+    rag_enrichment: dict | None  # RAG context enrichment data
+    rag_examples: list[dict] | None  # Few-shot examples from RAG
+    rag_duplicate_results: list[dict] | None  # RAG-based duplicate check results
+
+    # Unified agent framework configuration
+    agent_framework: str  # Agent framework to use ("pydantic_ai", "langchain", etc.)
+    agent_selector: Any | None  # UnifiedAgentSelector instance
+    split_validator_model: Any | None  # Model for split validation
