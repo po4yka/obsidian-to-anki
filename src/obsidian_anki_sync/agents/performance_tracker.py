@@ -3,7 +3,6 @@
 import time
 from collections import defaultdict
 
-
 from ..anki.client import AnkiClient
 from ..models import Card
 from ..utils.logging import get_logger
@@ -100,8 +99,7 @@ class PerformanceTracker:
                 self.get_card_performance(note_ids)
 
                 for card in cards:
-                    card_issues = self._analyze_single_card_performance(
-                        card, {})
+                    card_issues = self._analyze_single_card_performance(card, {})
                     for issue_type, affected_cards in card_issues.items():
                         issues[issue_type].extend(affected_cards)
 
@@ -150,8 +148,11 @@ class PerformanceTracker:
                 metrics["difficulty_indicator"] = "medium"
 
         except (KeyError, TypeError) as e:
-            logger.debug("metric_calculation_error", error=str(e),
-                         card_info_keys=list(card_info.keys()))
+            logger.debug(
+                "metric_calculation_error",
+                error=str(e),
+                card_info_keys=list(card_info.keys()),
+            )
 
         return metrics
 
@@ -192,7 +193,9 @@ class PerformanceTracker:
 
         return dict(issues)
 
-    def get_quality_insights(self, performance_data: dict[int, dict[str, float]]) -> dict[str, float]:
+    def get_quality_insights(
+        self, performance_data: dict[int, dict[str, float]]
+    ) -> dict[str, float]:
         """Generate quality insights from performance data.
 
         Args:
@@ -233,10 +236,8 @@ class PerformanceTracker:
             avg_retention = insights["average_retention"]
             avg_ease = insights["average_ease_factor"]
 
-            quality_score = (avg_retention * 0.7) + \
-                ((avg_ease - 1.3) / 1.7 * 0.3)
-            insights["overall_quality_score"] = max(
-                0.0, min(1.0, quality_score))
+            quality_score = (avg_retention * 0.7) + ((avg_ease - 1.3) / 1.7 * 0.3)
+            insights["overall_quality_score"] = max(0.0, min(1.0, quality_score))
 
         insights["total_cards_analyzed"] = total_cards
 
@@ -279,10 +280,12 @@ class PerformanceTracker:
 
         if reviews_today > 200:
             recommendations.append(
-                "High review count today - consider adjusting daily limits")
+                "High review count today - consider adjusting daily limits"
+            )
         elif reviews_today < 20:
             recommendations.append(
-                "Low review count - you may need more cards or different scheduling")
+                "Low review count - you may need more cards or different scheduling"
+            )
 
         # Add more sophisticated recommendations based on available metrics
         # This would be expanded based on what statistics are available

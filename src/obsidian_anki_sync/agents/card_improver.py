@@ -3,12 +3,10 @@
 import re
 import time
 
-
 from ..models import NoteMetadata
-from .models import GeneratedCard
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
-from .models import QualityReport
+from .models import GeneratedCard, QualityReport
 
 logger = get_logger(__name__)
 
@@ -37,8 +35,7 @@ class CardImprover:
         self.model = model
         self.temperature = temperature
 
-        logger.info("card_improver_initialized",
-                    has_llm=llm_provider is not None)
+        logger.info("card_improver_initialized", has_llm=llm_provider is not None)
 
     def improve_card(
         self,
@@ -59,8 +56,11 @@ class CardImprover:
             Improved card (or original if no improvements applied)
         """
         if quality_report.overall_score >= 0.8:
-            logger.debug("card_quality_sufficient", slug=card.slug,
-                         score=quality_report.overall_score)
+            logger.debug(
+                "card_quality_sufficient",
+                slug=card.slug,
+                score=quality_report.overall_score,
+            )
             return card
 
         start_time = time.time()
@@ -74,8 +74,7 @@ class CardImprover:
         )
 
         # Apply rule-based fixes first (deterministic, fast)
-        improved_card = self._apply_rule_based_fixes(
-            improved_card, quality_report)
+        improved_card = self._apply_rule_based_fixes(improved_card, quality_report)
 
         # Apply LLM-powered improvements for complex issues
         if self.llm_provider and quality_report.overall_score < 0.6:
@@ -111,16 +110,13 @@ class CardImprover:
                 if improved.answer:
                     improved.answer = self._fix_html_tags(improved.answer)
             elif "language class" in suggestion.lower():
-                improved.question = self._add_code_language_classes(
-                    improved.question)
+                improved.question = self._add_code_language_classes(improved.question)
                 if improved.answer:
-                    improved.answer = self._add_code_language_classes(
-                        improved.answer)
+                    improved.answer = self._add_code_language_classes(improved.answer)
             elif "slug format" in suggestion.lower():
                 improved.slug = self._fix_slug_format(improved.slug)
             elif "insufficient tags" in suggestion.lower():
-                improved.tags = self._add_missing_tags(
-                    improved.tags, improved.question)
+                improved.tags = self._add_missing_tags(improved.tags, improved.question)
             elif "duplicate tags" in suggestion.lower():
                 improved.tags = self._remove_duplicate_tags(improved.tags)
             elif "alt text" in suggestion.lower():
@@ -142,19 +138,27 @@ class CardImprover:
 
         # Only apply LLM improvements for very low quality cards or specific issues
         complex_issues = [
-            issue for issue in quality_report.suggestions
-            if any(keyword in issue.lower() for keyword in [
-                "ambiguous", "unclear", "too complex", "cognitive load",
-                "passive", "active recall", "context"
-            ])
+            issue
+            for issue in quality_report.suggestions
+            if any(
+                keyword in issue.lower()
+                for keyword in [
+                    "ambiguous",
+                    "unclear",
+                    "too complex",
+                    "cognitive load",
+                    "passive",
+                    "active recall",
+                    "context",
+                ]
+            )
         ]
 
         if not complex_issues or quality_report.overall_score > 0.5:
             return card
 
         try:
-            prompt = self._build_improvement_prompt(
-                card, complex_issues, metadata)
+            prompt = self._build_improvement_prompt(card, complex_issues, metadata)
 
             response = self.llm_provider.generate(
                 prompt=prompt,
@@ -166,15 +170,12 @@ class CardImprover:
             improved_content = self._parse_improvement_response(response)
             if improved_content:
                 improved_card = card.model_copy()
-                improved_card.question = improved_content.get(
-                    "question", card.question)
-                improved_card.answer = improved_content.get(
-                    "answer", card.answer)
+                improved_card.question = improved_content.get("question", card.question)
+                improved_card.answer = improved_content.get("answer", card.answer)
                 return improved_card
 
         except Exception as e:
-            logger.warning("llm_improvement_failed",
-                           error=str(e), slug=card.slug)
+            logger.warning("llm_improvement_failed", error=str(e), slug=card.slug)
 
         return card
 
@@ -185,8 +186,7 @@ class CardImprover:
             return text
 
         # Add question mark if missing and text looks like a question
-        question_starters = ["what", "how", "why",
-                             "when", "where", "which", "who"]
+        question_starters = ["what", "how", "why", "when", "where", "which", "who"]
         if any(text.lower().startswith(word) for word in question_starters):
             if not text.endswith("?"):
                 text += "?"
@@ -221,7 +221,7 @@ class CardImprover:
     def _add_code_language_classes(self, text: str) -> str:
         """Add language classes to code blocks."""
         # Find code blocks without language classes
-        pattern = r'(<pre><code)([^>]*>.*?)</code></pre>'
+        pattern = r"(<pre><code)([^>]*>.*?)</code></pre>"
 
         def add_language_class(match):
             code_tag = match.group(1)
@@ -232,7 +232,7 @@ class CardImprover:
                 return match.group(0)
 
             # Try to detect language from content
-            code_content = rest.replace('</code>', '').replace('>', '')
+            code_content = rest.replace("</code>", "").replace(">", "")
             detected_lang = self._detect_code_language(code_content)
 
             if detected_lang:
@@ -248,27 +248,42 @@ class CardImprover:
         code_lower = code.lower()
 
         # Python indicators
-        if any(keyword in code_lower for keyword in ["def ", "import ", "print(", "class "]):
+        if any(
+            keyword in code_lower for keyword in ["def ", "import ", "print(", "class "]
+        ):
             return "python"
 
         # JavaScript indicators
-        if any(keyword in code_lower for keyword in ["function ", "const ", "let ", "console.log"]):
+        if any(
+            keyword in code_lower
+            for keyword in ["function ", "const ", "let ", "console.log"]
+        ):
             return "javascript"
 
         # Java indicators
-        if any(keyword in code_lower for keyword in ["public class", "system.out", "void main"]):
+        if any(
+            keyword in code_lower
+            for keyword in ["public class", "system.out", "void main"]
+        ):
             return "java"
 
         # Kotlin indicators
-        if any(keyword in code_lower for keyword in ["fun ", "val ", "var ", "println"]):
+        if any(
+            keyword in code_lower for keyword in ["fun ", "val ", "var ", "println"]
+        ):
             return "kotlin"
 
         # SQL indicators
-        if any(keyword in code_lower for keyword in ["select ", "from ", "where ", "insert "]):
+        if any(
+            keyword in code_lower
+            for keyword in ["select ", "from ", "where ", "insert "]
+        ):
             return "sql"
 
         # Bash indicators
-        if any(keyword in code_lower for keyword in ["#!/bin/bash", "echo ", "ls ", "cd "]):
+        if any(
+            keyword in code_lower for keyword in ["#!/bin/bash", "echo ", "ls ", "cd "]
+        ):
             return "bash"
 
         return None
@@ -282,16 +297,16 @@ class CardImprover:
         slug = slug.lower()
 
         # Replace spaces and underscores with hyphens
-        slug = re.sub(r'[_\s]+', '-', slug)
+        slug = re.sub(r"[_\s]+", "-", slug)
 
         # Remove invalid characters
-        slug = re.sub(r'[^a-z0-9-]', '', slug)
+        slug = re.sub(r"[^a-z0-9-]", "", slug)
 
         # Remove multiple consecutive hyphens
-        slug = re.sub(r'-+', '-', slug)
+        slug = re.sub(r"-+", "-", slug)
 
         # Remove leading/trailing hyphens
-        slug = slug.strip('-')
+        slug = slug.strip("-")
 
         return slug
 
@@ -315,8 +330,10 @@ class CardImprover:
             new_tags.append("api")
 
         # Ensure we have at least one language tag
-        has_language_tag = any(tag in ["kotlin", "java", "python", "javascript", "typescript"]
-                               for tag in new_tags)
+        has_language_tag = any(
+            tag in ["kotlin", "java", "python", "javascript", "typescript"]
+            for tag in new_tags
+        )
         if not has_language_tag:
             new_tags.append("programming")
 
@@ -336,11 +353,11 @@ class CardImprover:
 
     def _add_image_alt_text(self, text: str) -> str:
         """Add alt text to images that don't have it."""
-        pattern = r'(<img[^>]+)>'  # Find img tags
+        pattern = r"(<img[^>]+)>"  # Find img tags
 
         def add_alt(match):
             img_tag = match.group(1)
-            if 'alt=' in img_tag:
+            if "alt=" in img_tag:
                 return match.group(0)  # Already has alt text
 
             # Add generic alt text
@@ -389,6 +406,7 @@ Only return the JSON, no other text or explanations."""
         """Parse LLM improvement response."""
         try:
             import json
+
             result = json.loads(response.strip())
             if isinstance(result, dict) and "question" in result:
                 return result

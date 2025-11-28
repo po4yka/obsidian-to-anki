@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 
-
 from ..entities.card import Card
 from ..entities.note import Note, QAPair
 
@@ -28,10 +27,7 @@ class ICardGenerator(ABC):
 
     @abstractmethod
     def generate_card_from_qa_pair(
-        self,
-        qa_pair: QAPair,
-        note: Note,
-        language: str
+        self, qa_pair: QAPair, note: Note, language: str
     ) -> Card:
         """Generate a single card from a Q&A pair.
 
@@ -47,11 +43,7 @@ class ICardGenerator(ABC):
 
     @abstractmethod
     def generate_apf_html(
-        self,
-        qa_pair: QAPair,
-        language: str,
-        note_title: str,
-        card_index: int
+        self, qa_pair: QAPair, language: str, note_title: str, card_index: int
     ) -> str:
         """Generate APF-formatted HTML for a card.
 
@@ -101,12 +93,7 @@ class ICardGenerator(ABC):
 
     @abstractmethod
     def create_manifest(
-        self,
-        note: Note,
-        card_index: int,
-        language: str,
-        slug: str,
-        slug_base: str
+        self, note: Note, card_index: int, language: str, slug: str, slug_base: str
     ) -> dict:
         """Create manifest data for a card.
 

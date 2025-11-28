@@ -7,7 +7,7 @@ import re
 import time
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...utils.logging import get_logger
 from ..duplicate_detection_prompts import DUPLICATE_DETECTION_PROMPT
@@ -23,7 +23,7 @@ class DuplicateDetectionAgentAI:
     Analyzes cards to identify duplicates and overlapping content.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize duplicate detection agent.
 
         Args:
@@ -36,7 +36,7 @@ class DuplicateDetectionAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[DuplicateDetectionDeps, DuplicateDetectionOutput] = Agent(
             model=self.model,
-            result_type=DuplicateDetectionOutput,
+            output_type=DuplicateDetectionOutput,
             system_prompt=DUPLICATE_DETECTION_PROMPT,
         )
 

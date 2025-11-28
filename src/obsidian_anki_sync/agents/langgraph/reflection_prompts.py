@@ -119,18 +119,19 @@ Recommend revision only if enrichments are actively harmful or significantly sub
     domain_criteria = get_domain_criteria(domain)
     if domain_criteria and domain_criteria.prompt_additions:
         # For enrichment, we might want to customize the criteria further
-        domain_specific_enrichment = domain_criteria.prompt_additions.replace(
-            "PROGRAMMING-SPECIFIC CRITERIA:",
-            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
-        ).replace(
-            "MEDICAL-SPECIFIC CRITERIA:",
-            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
-        ).replace(
-            "INTERVIEW-SPECIFIC CRITERIA:",
-            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
-        ).replace(
-            "GENERAL KNOWLEDGE CRITERIA:",
-            "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+        domain_specific_enrichment = (
+            domain_criteria.prompt_additions.replace(
+                "PROGRAMMING-SPECIFIC CRITERIA:", "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+            )
+            .replace(
+                "MEDICAL-SPECIFIC CRITERIA:", "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+            )
+            .replace(
+                "INTERVIEW-SPECIFIC CRITERIA:", "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+            )
+            .replace(
+                "GENERAL KNOWLEDGE CRITERIA:", "DOMAIN-SPECIFIC ENRICHMENT CRITERIA:"
+            )
         )
         base_prompt += f"\n\n{domain_specific_enrichment}"
 

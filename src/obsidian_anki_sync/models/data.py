@@ -25,34 +25,27 @@ class NoteMetadata(BaseModel):
     id: str = Field(min_length=1, description="Unique identifier for the note")
     title: str = Field(min_length=1, description="Note title")
     topic: str = Field(min_length=1, description="Note topic")
-    language_tags: list[str] = Field(
-        default_factory=list, description="Language tags")
+    language_tags: list[str] = Field(default_factory=list, description="Language tags")
     created: datetime = Field(description="Creation timestamp")
     updated: datetime = Field(description="Last update timestamp")
-    aliases: list[str] = Field(
-        default_factory=list, description="Note aliases")
+    aliases: list[str] = Field(default_factory=list, description="Note aliases")
     subtopics: list[str] = Field(default_factory=list, description="Subtopics")
-    question_kind: str | None = Field(
-        default=None, description="Type of questions")
-    difficulty: str | None = Field(
-        default=None, description="Difficulty level")
-    original_language: str | None = Field(
-        default=None, description="Original language")
+    question_kind: str | None = Field(default=None, description="Type of questions")
+    difficulty: str | None = Field(default=None, description="Difficulty level")
+    original_language: str | None = Field(default=None, description="Original language")
     source: str | None = Field(default=None, description="Source information")
-    source_note: str | None = Field(
-        default=None, description="Source note reference")
+    source_note: str | None = Field(default=None, description="Source note reference")
     status: str | None = Field(default=None, description="Note status")
-    moc: str | None = Field(
-        default=None, description="Map of Content reference")
-    related: list[str] = Field(
-        default_factory=list, description="Related notes")
+    moc: str | None = Field(default=None, description="Map of Content reference")
+    related: list[str] = Field(default_factory=list, description="Related notes")
     tags: list[str] = Field(default_factory=list, description="Note tags")
     sources: list[dict[str, Any]] = Field(
-        default_factory=list, description="Source metadata")
-    anki_note_type: str | None = Field(
-        default=None, description="Anki note type")
+        default_factory=list, description="Source metadata"
+    )
+    anki_note_type: str | None = Field(default=None, description="Anki note type")
     anki_slugs: list[str] = Field(
-        default_factory=list, description="Generated Anki slugs")
+        default_factory=list, description="Generated Anki slugs"
+    )
 
 
 class QAPair(BaseModel):
@@ -78,17 +71,18 @@ class Manifest(BaseModel):
 
     slug: str = Field(min_length=1, description="Unique card slug")
     slug_base: str = Field(
-        min_length=1, description="Base slug without language suffix")
+        min_length=1, description="Base slug without language suffix"
+    )
     lang: str = Field(min_length=2, max_length=2, description="Language code")
     source_path: str = Field(min_length=1, description="Source note file path")
-    source_anchor: str = Field(
-        min_length=1, description="Anchor in source file")
+    source_anchor: str = Field(min_length=1, description="Anchor in source file")
     note_id: str = Field(min_length=1, description="Note unique identifier")
     note_title: str = Field(min_length=1, description="Note title")
     card_index: int = Field(ge=0, description="Card index in note")
     guid: str = Field(min_length=1, description="Anki GUID")
-    hash6: str | None = Field(default=None, min_length=6,
-                              max_length=6, description="6-character content hash")
+    hash6: str | None = Field(
+        default=None, min_length=6, max_length=6, description="6-character content hash"
+    )
 
 
 class Card(BaseModel):
@@ -98,15 +92,14 @@ class Card(BaseModel):
 
     slug: str = Field(min_length=1, description="Unique card slug")
     lang: str = Field(min_length=2, max_length=2, description="Language code")
-    apf_html: str = Field(
-        min_length=1, description="APF formatted HTML content")
+    apf_html: str = Field(min_length=1, description="APF formatted HTML content")
     manifest: Manifest = Field(description="Card manifest information")
     content_hash: str = Field(
-        min_length=1, description="Content hash for change detection")
+        min_length=1, description="Content hash for change detection"
+    )
     note_type: str = Field(default="APF::Simple", description="Anki note type")
     tags: list[str] = Field(default_factory=list, description="Card tags")
-    guid: str = Field(
-        default="", description="Anki GUID (populated after creation)")
+    guid: str = Field(default="", description="Anki GUID (populated after creation)")
 
 
 class ValidationResult(BaseModel):
@@ -114,10 +107,8 @@ class ValidationResult(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    errors: list[str] = Field(default_factory=list,
-                              description="Validation errors")
-    warnings: list[str] = Field(
-        default_factory=list, description="Validation warnings")
+    errors: list[str] = Field(default_factory=list, description="Validation errors")
+    warnings: list[str] = Field(default_factory=list, description="Validation warnings")
 
     @computed_field
     def is_valid(self) -> bool:
@@ -131,9 +122,10 @@ class SyncAction(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str = Field(
-        description="Action type: 'create', 'update', 'delete', 'restore', 'skip'")
+        description="Action type: 'create', 'update', 'delete', 'restore', 'skip'"
+    )
     card: Card = Field(description="Card to be acted upon")
     anki_guid: int | None = Field(
-        default=None, description="Anki GUID for existing cards")
-    reason: str | None = Field(
-        default=None, description="Reason for this action")
+        default=None, description="Anki GUID for existing cards"
+    )
+    reason: str | None = Field(default=None, description="Reason for this action")

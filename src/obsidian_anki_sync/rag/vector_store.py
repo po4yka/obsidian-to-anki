@@ -138,7 +138,7 @@ class VaultVectorStore:
 
         # Process in batches
         for i in range(0, len(new_chunks), batch_size):
-            batch = new_chunks[i:i + batch_size]
+            batch = new_chunks[i : i + batch_size]
 
             # Generate embeddings
             texts = [c.content for c in batch]
@@ -259,13 +259,23 @@ class VaultVectorStore:
                 if similarity < min_similarity:
                     continue
 
-                search_results.append(SearchResult(
-                    chunk_id=chunk_id,
-                    content=results["documents"][0][i] if results["documents"] else "",
-                    score=distance,
-                    metadata=results["metadatas"][0][i] if results["metadatas"] else {},
-                    source_file=results["metadatas"][0][i].get("source_file", "") if results["metadatas"] else "",
-                ))
+                search_results.append(
+                    SearchResult(
+                        chunk_id=chunk_id,
+                        content=(
+                            results["documents"][0][i] if results["documents"] else ""
+                        ),
+                        score=distance,
+                        metadata=(
+                            results["metadatas"][0][i] if results["metadatas"] else {}
+                        ),
+                        source_file=(
+                            results["metadatas"][0][i].get("source_file", "")
+                            if results["metadatas"]
+                            else ""
+                        ),
+                    )
+                )
 
         logger.debug(
             "search_completed",

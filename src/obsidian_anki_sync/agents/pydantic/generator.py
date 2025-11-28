@@ -3,9 +3,8 @@
 Generates APF cards from Q/A pairs using structured outputs.
 """
 
-
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata, QAPair
 from ...utils.content_hash import compute_content_hash
@@ -29,7 +28,7 @@ class GeneratorAgentAI:
     Ensures type-safe card generation with validation.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.3):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.3):
         """Initialize generator agent.
 
         Args:
@@ -45,7 +44,7 @@ class GeneratorAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
             model=self.model,
-            result_type=CardGenerationOutput,
+            output_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
         )
 

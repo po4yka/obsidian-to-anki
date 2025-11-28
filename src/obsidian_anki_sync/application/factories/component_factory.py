@@ -1,8 +1,6 @@
 """Factory for creating sync engine components."""
 
-
 from ...domain.interfaces.anki_client import IAnkiClient
-from ...domain.interfaces.anki_config import IAnkiConfig
 from ...domain.interfaces.card_generator import ICardGenerator
 from ...domain.interfaces.llm_provider import ILLMProvider
 from ...domain.interfaces.note_parser import INoteParser
@@ -37,12 +35,11 @@ class ComponentFactory:
         if self._cache_manager is None:
             # Get config from container
             config = self.container.resolve(IVaultConfig)
-            db_path = getattr(config, 'db_path', None)
+            db_path = getattr(config, "db_path", None)
             if not db_path:
-                # Fallback - get from anki config or create default
-                anki_config = self.container.resolve(IAnkiConfig)
-                # For now, create with a default path
+                # Fallback - create with a default path
                 from pathlib import Path
+
                 db_path = Path(".sync_state.db")
 
             self._cache_manager = CacheManager(db_path)
@@ -126,16 +123,10 @@ class ComponentFactory:
 
         # Log component creation
         for name, component in components.items():
-            logger.debug(
-                "component_created",
-                name=name,
-                type=type(component).__name__
-            )
+            logger.debug("component_created", name=name,
+                         type=type(component).__name__)
 
-        logger.info(
-            "all_components_created",
-            component_count=len(components)
-        )
+        logger.info("all_components_created", component_count=len(components))
 
         return components
 

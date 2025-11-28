@@ -46,9 +46,9 @@ class Note:
     def is_valid(self) -> bool:
         """Check if note meets business requirements."""
         return (
-            self.has_minimum_content() and
-            self.has_valid_metadata() and
-            self.has_qa_pairs()
+            self.has_minimum_content()
+            and self.has_valid_metadata()
+            and self.has_qa_pairs()
         )
 
     def has_minimum_content(self) -> bool:
@@ -58,9 +58,9 @@ class Note:
     def has_valid_metadata(self) -> bool:
         """Check if metadata meets requirements."""
         return (
-            self.metadata.topic and
-            len(self.metadata.language_tags) > 0 and
-            self.metadata.status != "draft"  # Business rule: no draft notes
+            self.metadata.topic
+            and len(self.metadata.language_tags) > 0
+            and self.metadata.status != "draft"  # Business rule: no draft notes
         )
 
     def has_qa_pairs(self) -> bool:
@@ -68,10 +68,10 @@ class Note:
         # Look for Q&A patterns in content
         content_lower = self.content.lower()
         return (
-            "# question" in content_lower or
-            "# вопрос" in content_lower or
-            "## answer" in content_lower or
-            "## ответ" in content_lower
+            "# question" in content_lower
+            or "# вопрос" in content_lower
+            or "## answer" in content_lower
+            or "## ответ" in content_lower
         )
 
     def get_relative_path(self, vault_root: Path) -> str:
@@ -156,5 +156,7 @@ class QAPair:
     @property
     def content_hash(self) -> str:
         """Calculate content hash for this Q&A pair."""
-        content = f"{self.question_en}{self.question_ru}{self.answer_en}{self.answer_ru}"
-        return hashlib.sha256(content.encode('utf-8')).hexdigest()[:6]
+        content = (
+            f"{self.question_en}{self.question_ru}{self.answer_en}{self.answer_ru}"
+        )
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()[:6]

@@ -103,8 +103,7 @@ class ErrorRecoveryManager:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
                 embedding_model = getattr(
                     config, "embedding_model", "text-embedding-3-small"
                 )
@@ -118,8 +117,7 @@ class ErrorRecoveryManager:
                     "agent_memory_store_initialized", path=str(memory_storage_path)
                 )
             except Exception as e:
-                logger.warning(
-                    "memory_store_initialization_failed", error=str(e))
+                logger.warning("memory_store_initialization_failed", error=str(e))
 
         self.metrics_collector = MetricsCollector(metrics_storage)
         self.performance_tracker = PerformanceTracker(
@@ -137,8 +135,7 @@ class ErrorRecoveryManager:
         confidence_threshold = 0.7
 
         if config:
-            circuit_breaker_config = getattr(
-                config, "circuit_breaker_config", {})
+            circuit_breaker_config = getattr(config, "circuit_breaker_config", {})
             rate_limit_config = getattr(config, "rate_limit_config", {})
             bulkhead_config = getattr(config, "bulkhead_config", {})
             confidence_threshold = getattr(config, "confidence_threshold", 0.7)
@@ -189,8 +186,7 @@ class ErrorRecoveryManager:
                 method_used="normal_parsing",
             )
         except ParserError as e:
-            logger.warning("initial_parsing_failed",
-                           file=str(file_path), error=str(e))
+            logger.warning("initial_parsing_failed", file=str(file_path), error=str(e))
             original_error = str(e)
 
         # Strategy 2: Preprocess and retry
@@ -198,11 +194,9 @@ class ErrorRecoveryManager:
             processed_content, warnings = self._preprocess_file(file_path)
             if processed_content:
                 # Write processed content to temp file and parse
-                temp_path = self._create_temp_file(
-                    processed_content, file_path)
+                temp_path = self._create_temp_file(processed_content, file_path)
                 try:
-                    metadata, qa_pairs = parse_note(
-                        temp_path, tolerant_parsing=True)
+                    metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
@@ -239,8 +233,7 @@ class ErrorRecoveryManager:
             if repaired_content:
                 temp_path = self._create_temp_file(repaired_content, file_path)
                 try:
-                    metadata, qa_pairs = parse_note(
-                        temp_path, tolerant_parsing=True)
+                    metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
@@ -262,8 +255,7 @@ class ErrorRecoveryManager:
                 metadata=metadata,
                 qa_pairs=qa_pairs,
                 method_used="minimal_structure_fallback",
-                warnings=[
-                    "Created minimal valid structure due to parsing failures"],
+                warnings=["Created minimal valid structure due to parsing failures"],
                 original_error=original_error,
             )
         except Exception as e:
@@ -281,8 +273,7 @@ class ErrorRecoveryManager:
         """Preprocess file content to fix common issues."""
         try:
             content = file_path.read_text(encoding="utf-8")
-            processed_content, warnings = self.preprocessor.preprocess_content(
-                content)
+            processed_content, warnings = self.preprocessor.preprocess_content(content)
             return processed_content, warnings
         except Exception as e:
             logger.error("preprocessing_failed", error=str(e))
@@ -376,14 +367,12 @@ class ErrorRecoveryManager:
                 lines.insert(frontmatter_end + 1, "")
                 lines.insert(frontmatter_end + 2, question_marker)
                 lines.insert(frontmatter_end + 3, "")
-                lines.insert(frontmatter_end + 4,
-                             "[Question content to be added]")
+                lines.insert(frontmatter_end + 4, "[Question content to be added]")
 
             if answer_marker not in content_str:
                 # Add after question section
                 question_idx = next(
-                    (i for i, line in enumerate(lines)
-                     if question_marker in line), -1
+                    (i for i, line in enumerate(lines) if question_marker in line), -1
                 )
                 if question_idx >= 0:
                     # Find end of question section
@@ -396,8 +385,7 @@ class ErrorRecoveryManager:
                     lines.insert(insert_pos, "")
                     lines.insert(insert_pos + 1, answer_marker)
                     lines.insert(insert_pos + 2, "")
-                    lines.insert(insert_pos + 3,
-                                 "[Answer content to be added]")
+                    lines.insert(insert_pos + 3, "[Answer content to be added]")
 
         return "\n".join(lines)
 
@@ -535,8 +523,7 @@ class ErrorRecoveryManager:
                                 continue
 
                     # Solve problem using router (includes all resilience patterns)
-                    result = self.router.solve_problem(
-                        domain, content, error_context)
+                    result = self.router.solve_problem(domain, content, error_context)
                     duration = time.time() - start_time
 
                     # Record metrics if monitoring enabled
@@ -628,8 +615,7 @@ class ErrorRecoveryManager:
 
                     continue
 
-            logger.info("no_specialized_agent_succeeded",
-                        attempts=len(diagnoses))
+            logger.info("no_specialized_agent_succeeded", attempts=len(diagnoses))
             return None
 
         except Exception as e:
@@ -692,8 +678,7 @@ def parse_note_with_error_recovery(
 
         if result.warnings:
             for warning in result.warnings:
-                logger.warning("recovery_warning",
-                               warning=warning, file=str(file_path))
+                logger.warning("recovery_warning", warning=warning, file=str(file_path))
 
         return result.metadata, result.qa_pairs
     else:

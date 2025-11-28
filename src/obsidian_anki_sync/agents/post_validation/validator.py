@@ -80,10 +80,8 @@ class PostValidatorAgent:
             for error in syntax_errors:
                 # Extract error type from error message
                 if "APF format:" in error:
-                    error_type = error.split("APF format:")[
-                        1].strip().split()[0:3]
-                    error_key = " ".join(
-                        error_type) if error_type else "unknown"
+                    error_type = error.split("APF format:")[1].strip().split()[0:3]
+                    error_key = " ".join(error_type) if error_type else "unknown"
                 elif "HTML:" in error:
                     error_key = "HTML validation"
                 else:
@@ -105,8 +103,7 @@ class PostValidatorAgent:
 
             # Log each error individually (up to 20 to avoid spam)
             for i, error in enumerate(syntax_errors[:20]):
-                logger.warning("validation_error_detail",
-                               error_num=i + 1, error=error)
+                logger.warning("validation_error_detail", error_num=i + 1, error=error)
 
             if len(syntax_errors) > 20:
                 logger.warning(
@@ -212,18 +209,17 @@ class PostValidatorAgent:
                 logger.debug("auto_fix_classified_template_header")
                 fixed_cards = RuleBasedHeaderFixer.apply_fixes(cards)
                 if fixed_cards:
-                    logger.info("auto_fix_header_success",
-                                cards_fixed=len(fixed_cards))
+                    logger.info("auto_fix_header_success", cards_fixed=len(fixed_cards))
                     return fixed_cards
 
             elif error_classification == "template_structure":
                 # Missing fields, extra content - deterministic fixes
                 logger.debug("auto_fix_classified_template_structure")
-                fixed_cards = DeterministicFixer.apply_fixes(
-                    cards, error_details)
+                fixed_cards = DeterministicFixer.apply_fixes(cards, error_details)
                 if fixed_cards:
-                    logger.info("auto_fix_structure_success",
-                                cards_fixed=len(fixed_cards))
+                    logger.info(
+                        "auto_fix_structure_success", cards_fixed=len(fixed_cards)
+                    )
                     return fixed_cards
 
             elif error_classification == "template_content":
@@ -231,8 +227,9 @@ class PostValidatorAgent:
                 logger.debug("auto_fix_classified_template_content")
                 fixed_cards = self._llm_based_fix(cards, error_details)
                 if fixed_cards:
-                    logger.info("auto_fix_content_success",
-                                cards_fixed=len(fixed_cards))
+                    logger.info(
+                        "auto_fix_content_success", cards_fixed=len(fixed_cards)
+                    )
                     return fixed_cards
 
             elif error_classification == "bilingual_consistency":
@@ -240,8 +237,9 @@ class PostValidatorAgent:
                 logger.debug("auto_fix_bilingual_with_llm")
                 fixed_cards = self._llm_based_fix(cards, error_details)
                 if fixed_cards:
-                    logger.info("auto_fix_bilingual_llm_success",
-                                cards_fixed=len(fixed_cards))
+                    logger.info(
+                        "auto_fix_bilingual_llm_success", cards_fixed=len(fixed_cards)
+                    )
                     return fixed_cards
 
             # Fallback: Progressive recovery strategy for unclassified or complex errors
@@ -251,8 +249,9 @@ class PostValidatorAgent:
             logger.debug("auto_fix_strategy_1_deterministic")
             fixed_cards = DeterministicFixer.apply_fixes(cards, error_details)
             if fixed_cards:
-                logger.info("auto_fix_deterministic_success",
-                            cards_fixed=len(fixed_cards))
+                logger.info(
+                    "auto_fix_deterministic_success", cards_fixed=len(fixed_cards)
+                )
                 return fixed_cards
 
             # Strategy 2: Try rule-based header fixes
@@ -263,16 +262,16 @@ class PostValidatorAgent:
                 logger.debug("auto_fix_strategy_2_rule_based")
                 fixed_cards = RuleBasedHeaderFixer.apply_fixes(cards)
                 if fixed_cards:
-                    logger.info("auto_fix_rule_based_success",
-                                cards_fixed=len(fixed_cards))
+                    logger.info(
+                        "auto_fix_rule_based_success", cards_fixed=len(fixed_cards)
+                    )
                     return fixed_cards
 
             # Strategy 3: LLM-based fix for complex issues
             logger.debug("auto_fix_strategy_3_llm")
             fixed_cards = self._llm_based_fix(cards, error_details)
             if fixed_cards:
-                logger.info("auto_fix_llm_success",
-                            cards_fixed=len(fixed_cards))
+                logger.info("auto_fix_llm_success", cards_fixed=len(fixed_cards))
                 return fixed_cards
 
             # Strategy 4: Aggressive deterministic fixes (last resort)
@@ -318,7 +317,7 @@ class PostValidatorAgent:
             "Use 'CardType:' with capital C and T",
             "Header must have spaces around pipe",
             "Tags must be space-separated",
-            "card header"  # lowercase for broader matching
+            "card header",  # lowercase for broader matching
         ]
 
         if any(indicator in error_details for indicator in header_indicators):
@@ -335,7 +334,7 @@ class PostValidatorAgent:
             "Extra 'END_OF_CARDS' text",
             "Missing manifest",
             "Tag '",
-            "not in snake_case format"
+            "not in snake_case format",
         ]
 
         if any(indicator in error_details for indicator in structure_indicators):
@@ -348,7 +347,7 @@ class PostValidatorAgent:
             "Card type mismatch",
             "Code block presence mismatch",
             "Preference statement mismatch",
-            "bilingual_consistency"
+            "bilingual_consistency",
         ]
 
         if any(indicator in error_details for indicator in bilingual_indicators):
@@ -361,7 +360,7 @@ class PostValidatorAgent:
             "Sample (code block or image)",
             "Sample (code block)",
             "wrong section",
-            "APF v2.1 requires"
+            "APF v2.1 requires",
         ]
 
         if any(indicator in error_details for indicator in content_indicators):
@@ -432,8 +431,7 @@ class PostValidatorAgent:
                 )
                 return None
 
-            logger.info("auto_fix_success",
-                        corrected_cards_count=len(corrected_data))
+            logger.info("auto_fix_success", corrected_cards_count=len(corrected_data))
             return [GeneratedCard(**card) for card in corrected_data]
 
         except Exception as llm_error:

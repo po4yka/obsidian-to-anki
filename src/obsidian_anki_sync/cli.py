@@ -9,9 +9,9 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 
+from .cli_commands.rag_commands import rag_app
 from .cli_commands.shared import get_config_and_logger
 from .cli_commands.sync_handler import run_sync
-from .cli_commands.rag_commands import rag_app
 from .obsidian.note_validator import validate_note_structure
 from .obsidian.parser import parse_frontmatter
 from .utils.log_analyzer import LogAnalyzer
@@ -25,7 +25,8 @@ app = typer.Typer(
 )
 
 # Add RAG subcommand group
-app.add_typer(rag_app, name="rag", help="RAG (Retrieval-Augmented Generation) commands")
+app.add_typer(rag_app, name="rag",
+              help="RAG (Retrieval-Augmented Generation) commands")
 
 console = Console()
 
@@ -846,7 +847,7 @@ def export_deck(
 
         errors = [r for r in results if not r.passed and r.severity == "error"]
         if errors:
-            console.print(f"\n[bold red]Pre-flight checks failed.[/bold red]")
+            console.print("\n[bold red]Pre-flight checks failed.[/bold red]")
             raise typer.Exit(code=1)
 
         # Export deck
@@ -945,7 +946,7 @@ def import_deck(
 
         errors = [r for r in results if not r.passed and r.severity == "error"]
         if errors:
-            console.print(f"\n[bold red]Pre-flight checks failed.[/bold red]")
+            console.print("\n[bold red]Pre-flight checks failed.[/bold red]")
             raise typer.Exit(code=1)
 
         # Import cards
@@ -967,7 +968,7 @@ def import_deck(
                 key_field=key_field,
             )
 
-        console.print(f"\n[bold green]Import complete![/bold green]")
+        console.print("\n[bold green]Import complete![/bold green]")
         console.print(f"  Created: {result['created']}")
         console.print(f"  Updated: {result['updated']}")
         if result["errors"] > 0:
@@ -1119,7 +1120,7 @@ def process_file(
         processed_slugs = set()
         processed_cards = []
         if output.exists() and not force:
-            processed_slugs = get_processed_slugs(output, output_format)
+            processed_slugs = get_processed_slugs(output, output_file_format)
             processed_cards = load_cards_from_file(output)
             console.print(
                 f"[cyan]Found {len(processed_cards)} already processed cards[/cyan]"
@@ -1192,7 +1193,8 @@ def process_file(
                 # Save incrementally every 10 cards
                 if i % 10 == 0:
                     all_processed = processed_cards + updated_cards
-                    save_cards_to_file(all_processed, output, output_format)
+                    save_cards_to_file(
+                        all_processed, output, output_file_format)
                     console.print(
                         f"  [dim]Saved progress ({i}/{len(cards_to_process)})[/dim]"
                     )
@@ -1209,7 +1211,7 @@ def process_file(
         all_processed = processed_cards + updated_cards
         save_cards_to_file(all_processed, output, output_file_format)
 
-        console.print(f"\n[bold green]Processing complete![/bold green]")
+        console.print("\n[bold green]Processing complete![/bold green]")
         console.print(f"  Success: {success_count}")
         console.print(f"  Errors: {error_count}")
         console.print(f"  Output: {output}")
@@ -1291,7 +1293,7 @@ def query_anki(
 
         errors = [r for r in results if not r.passed and r.severity == "error"]
         if errors:
-            console.print(f"\n[bold red]Pre-flight checks failed.[/bold red]")
+            console.print("\n[bold red]Pre-flight checks failed.[/bold red]")
             raise typer.Exit(code=1)
 
         # Execute query
@@ -1684,7 +1686,7 @@ def show_index(
     ] = "INFO",
 ) -> None:
     """Show vault and Anki card index statistics."""
-    _, logger = get_config_and_logger(config_path, log_level)
+    config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("show_index_started")
 

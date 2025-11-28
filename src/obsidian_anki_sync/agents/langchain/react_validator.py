@@ -10,8 +10,8 @@ from langchain_core.tools import BaseTool
 
 from ...models import GeneratedCard, PostValidationResult, PreValidationResult
 from ...utils.logging import get_logger
-from .react_agent import ReActAgent
 from .base import LangChainAgentResult
+from .react_agent import ReActAgent
 
 logger = get_logger(__name__)
 
@@ -40,6 +40,7 @@ class ReActValidatorAgent:
         """
         if tools is None:
             from .tools import get_tools_for_agent
+
             agent_type = f"{validator_type}_validator"
             tools = get_tools_for_agent(agent_type)
 
@@ -133,29 +134,32 @@ class ReActValidatorAgent:
 
         for i, card in enumerate(cards, 1):
             tags_str = " ".join(card.tags)
-            apf_lines.extend([
-                f"<!-- Card {i} | slug: {card.slug} | CardType: {card.card_type} | Tags: {tags_str} -->",
-                "",
-                "<!-- Title -->",
-                card.front,
-                "",
-                "<!-- Key point -->",
-                card.back,
-                "",
-                f"<!-- manifest: {{\"slug\":\"{card.slug}\",\"lang\":\"en\",\"type\":\"{card.card_type}\",\"tags\":{card.tags}}} -->",
-                "",
-            ])
+            apf_lines.extend(
+                [
+                    f"<!-- Card {i} | slug: {card.slug} | CardType: {card.card_type} | Tags: {tags_str} -->",
+                    "",
+                    "<!-- Title -->",
+                    card.front,
+                    "",
+                    "<!-- Key point -->",
+                    card.back,
+                    "",
+                    f'<!-- manifest: {{"slug":"{card.slug}","lang":"en","type":"{card.card_type}","tags":{card.tags}}} -->',
+                    "",
+                ]
+            )
 
-        apf_lines.extend([
-            "<!-- END_CARDS -->",
-            "END_OF_CARDS",
-        ])
+        apf_lines.extend(
+            [
+                "<!-- END_CARDS -->",
+                "END_OF_CARDS",
+            ]
+        )
 
         return "\n".join(apf_lines)
 
     def _process_pre_validation_result(
-        self,
-        agent_result: LangChainAgentResult
+        self, agent_result: LangChainAgentResult
     ) -> PreValidationResult:
         """Process ReAct result into PreValidationResult.
 
@@ -182,10 +186,16 @@ class ReActValidatorAgent:
 
         # Determine validity based on output
         is_valid = True
-        if any(phrase in output.lower() for phrase in [
-            "validation failed", "content invalid", "structure issues",
-            "critical problems", "cannot proceed"
-        ]):
+        if any(
+            phrase in output.lower()
+            for phrase in [
+                "validation failed",
+                "content invalid",
+                "structure issues",
+                "critical problems",
+                "cannot proceed",
+            ]
+        ):
             is_valid = False
 
         # Extract error details
@@ -195,7 +205,10 @@ class ReActValidatorAgent:
             error_lines = []
             for step in reasoning_data:
                 observation = step.get("observation", "")
-                if any(word in observation.lower() for word in ["error", "issue", "problem", "invalid"]):
+                if any(
+                    word in observation.lower()
+                    for word in ["error", "issue", "problem", "invalid"]
+                ):
                     error_lines.append(observation)
 
             error_details = " ".join(error_lines) if error_lines else output
@@ -204,7 +217,10 @@ class ReActValidatorAgent:
         suggested_fixes = []
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["suggest", "fix", "recommend", "should"]):
+            if any(
+                word in line.lower()
+                for word in ["suggest", "fix", "recommend", "should"]
+            ):
                 suggested_fixes.append(line.strip())
 
         # Adjust confidence based on reasoning depth
@@ -228,9 +244,7 @@ class ReActValidatorAgent:
         )
 
     def _process_post_validation_result(
-        self,
-        agent_result: LangChainAgentResult,
-        original_cards: List[GeneratedCard]
+        self, agent_result: LangChainAgentResult, original_cards: List[GeneratedCard]
     ) -> PostValidationResult:
         """Process ReAct result into PostValidationResult.
 
@@ -258,10 +272,16 @@ class ReActValidatorAgent:
 
         # Determine validity
         is_valid = True
-        if any(phrase in output.lower() for phrase in [
-            "validation failed", "cards invalid", "critical issues",
-            "cannot accept", "major problems"
-        ]):
+        if any(
+            phrase in output.lower()
+            for phrase in [
+                "validation failed",
+                "cards invalid",
+                "critical issues",
+                "cannot accept",
+                "major problems",
+            ]
+        ):
             is_valid = False
 
         # Extract warnings and suggestions
@@ -273,13 +293,19 @@ class ReActValidatorAgent:
             observation = step.get("observation", "")
             if "warning" in observation.lower():
                 warnings.append(observation)
-            if any(word in observation.lower() for word in ["fix", "correct", "update", "change"]):
+            if any(
+                word in observation.lower()
+                for word in ["fix", "correct", "update", "change"]
+            ):
                 auto_fix_suggestions.append(observation)
 
         # Extract suggestions from final output
         lines = output.split("\n")
         for line in lines:
-            if any(word in line.lower() for word in ["suggest", "fix", "recommend", "improve"]):
+            if any(
+                word in line.lower()
+                for word in ["suggest", "fix", "recommend", "improve"]
+            ):
                 auto_fix_suggestions.append(line.strip())
 
         # Adjust confidence based on validation thoroughness
@@ -300,7 +326,6 @@ class ReActValidatorAgent:
             is_valid=is_valid,
             error_details="" if is_valid else output,
             warnings=warnings,
-            auto_fix_suggestions=list(
-                set(auto_fix_suggestions)),  # Remove duplicates
+            auto_fix_suggestions=list(set(auto_fix_suggestions)),  # Remove duplicates
             confidence=confidence,
         )

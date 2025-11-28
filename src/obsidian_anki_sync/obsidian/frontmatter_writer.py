@@ -39,7 +39,7 @@ def update_frontmatter(file_path: Path, updates: dict[str, Any]) -> bool:
         return False
 
     frontmatter_text = match.group(1)
-    body = content[match.end():]
+    body = content[match.end() :]
 
     # Parse with ruamel.yaml to preserve formatting
     yaml = YAML()
@@ -76,7 +76,9 @@ def update_frontmatter(file_path: Path, updates: dict[str, Any]) -> bool:
     # Write back
     try:
         file_path.write_text(new_content, encoding="utf-8")
-        logger.info("frontmatter_updated", file=str(file_path), fields=list(updates.keys()))
+        logger.info(
+            "frontmatter_updated", file=str(file_path), fields=list(updates.keys())
+        )
         return True
     except OSError as e:
         logger.error("failed_to_write_file", file=str(file_path), error=str(e))
@@ -84,9 +86,7 @@ def update_frontmatter(file_path: Path, updates: dict[str, Any]) -> bool:
 
 
 def update_anki_sync_status(
-    file_path: Path,
-    slugs: list[str],
-    sync_time: datetime | None = None
+    file_path: Path, slugs: list[str], sync_time: datetime | None = None
 ) -> bool:
     """
     Update Anki sync status in note frontmatter.

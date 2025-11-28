@@ -81,7 +81,6 @@ Your task is to generate high-quality flashcards from Q&A pairs. You have access
 - apf_validator: Validate APF card structure
 
 Use these tools effectively to create well-formatted, valid APF cards. Always ensure cards follow APF v2.1 specification.""",
-
             "validator": """You are a validation specialist for APF cards and content.
 
 Your role is to validate and ensure quality of generated cards and content. You have access to:
@@ -91,7 +90,6 @@ Your role is to validate and ensure quality of generated cards and content. You 
 - content_hash: Verify content integrity
 
 Use these tools to thoroughly validate content and provide detailed feedback on any issues found.""",
-
             "pre_validator": """You are a pre-validation specialist for note content and structure.
 
 Your task is to validate notes before card generation. You have access to:
@@ -101,7 +99,6 @@ Your task is to validate notes before card generation. You have access to:
 - content_hash: Check content integrity
 
 Use these tools to ensure notes are properly structured before processing.""",
-
             "post_validator": """You are a post-validation specialist for generated cards.
 
 Your role is to validate completed cards and suggest improvements. You have access to:
@@ -113,7 +110,9 @@ Your role is to validate completed cards and suggest improvements. You have acce
 Provide comprehensive validation results and actionable improvement suggestions.""",
         }
 
-        return prompts.get(agent_type, "You are a helpful AI assistant with access to various tools.")
+        return prompts.get(
+            agent_type, "You are a helpful AI assistant with access to various tools."
+        )
 
     def _create_agent(self) -> ToolCallingAgent:
         """Create the underlying LangChain tool calling agent.
@@ -122,11 +121,13 @@ Provide comprehensive validation results and actionable improvement suggestions.
             LangChain ToolCallingAgent instance
         """
         # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.system_prompt),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                ("human", "{input}"),
+                ("placeholder", "{agent_scratchpad}"),
+            ]
+        )
 
         # Create the agent
         agent = create_tool_calling_agent(
@@ -137,11 +138,7 @@ Provide comprehensive validation results and actionable improvement suggestions.
 
         return agent
 
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the tool calling agent.
 
         Args:
@@ -161,10 +158,10 @@ Provide comprehensive validation results and actionable improvement suggestions.
                 verbose=kwargs.get("verbose", False),
                 max_iterations=kwargs.get("max_iterations", 5),
                 max_execution_time=kwargs.get("max_execution_time"),
-                handle_parsing_errors=kwargs.get(
-                    "handle_parsing_errors", True),
+                handle_parsing_errors=kwargs.get("handle_parsing_errors", True),
                 return_intermediate_steps=kwargs.get(
-                    "return_intermediate_steps", False),
+                    "return_intermediate_steps", False
+                ),
             )
 
             # Prepare input
@@ -274,11 +271,13 @@ Please use the metadata extraction tools to parse YAML frontmatter and extract r
         tool_calls = []
         for step in intermediate_steps:
             action, observation = step
-            tool_calls.append({
-                "tool": action.tool,
-                "input": action.tool_input,
-                "output": observation,
-            })
+            tool_calls.append(
+                {
+                    "tool": action.tool,
+                    "input": action.tool_input,
+                    "output": observation,
+                }
+            )
 
         logger.info(
             "tool_calling_agent_completed",

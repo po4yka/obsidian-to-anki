@@ -112,8 +112,7 @@ class WorkflowBuilder:
         enable_cot = getattr(self.config, "enable_cot_reasoning", False)
 
         # Add optional note correction node (if enabled)
-        enable_note_correction = getattr(
-            self.config, "enable_note_correction", False)
+        enable_note_correction = getattr(self.config, "enable_note_correction", False)
         if enable_note_correction:
             workflow.add_node(
                 "note_correction",
@@ -225,8 +224,7 @@ class WorkflowBuilder:
         # Reflection nodes run AFTER action nodes to evaluate outputs
         # They do NOT retry - reflection failure should not block pipeline
         # ====================================================================
-        enable_self_reflection = getattr(
-            self.config, "enable_self_reflection", False)
+        enable_self_reflection = getattr(self.config, "enable_self_reflection", False)
 
         if enable_self_reflection:
             # Add reflection nodes (run AFTER action nodes)

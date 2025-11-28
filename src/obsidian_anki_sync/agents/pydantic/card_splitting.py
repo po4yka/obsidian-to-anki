@@ -6,7 +6,7 @@ Determines whether a note should generate one card or multiple cards.
 import time
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata, QAPair
 from ...utils.logging import get_logger
@@ -25,7 +25,7 @@ class CardSplittingAgentAI:
     and provides a splitting plan if needed.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize card splitting agent.
 
         Args:
@@ -38,7 +38,7 @@ class CardSplittingAgentAI:
         # Create PydanticAI agent
         self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(
             model=self.model,
-            result_type=CardSplittingOutput,
+            output_type=CardSplittingOutput,
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
         )
 

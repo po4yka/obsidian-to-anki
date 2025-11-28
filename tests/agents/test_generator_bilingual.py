@@ -10,10 +10,10 @@ from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
 
 
 @pytest.fixture
-def bilingual_generator_agent(mock_ollama_provider):
+def bilingual_generator_agent(mock_llm_provider):
     """Create a GeneratorAgent instance for bilingual testing."""
     return GeneratorAgent(
-        ollama_client=mock_ollama_provider, model="qwen3:32b", temperature=0.3
+        ollama_client=mock_llm_provider, model="qwen3:32b", temperature=0.3
     )
 
 
@@ -323,8 +323,8 @@ How to prohibit object creation in Kotlin?
 <!-- END_CARDS -->
 END_OF_CARDS'''
 
-        bilingual_generator_agent.ollama_client.generate.return_value = {
-            "response": mock_response}
+        bilingual_generator_agent.ollama_client.set_response(
+            "Test content", mock_response)
 
         # Generate cards
         result = bilingual_generator_agent.generate_cards(
@@ -338,9 +338,6 @@ END_OF_CARDS'''
         assert len(result.cards) == 2  # Should have both EN and RU cards
         assert result.cards[0].lang == "en"
         assert result.cards[1].lang == "ru"
-
-        # Verify the call was made for English first
-        assert bilingual_generator_agent.ollama_client.generate.call_count >= 1
 
     def test_translation_assembly(self, bilingual_generator_agent, kotlin_singleton_metadata):
         """Test that translated cards are assembled correctly from English structure."""

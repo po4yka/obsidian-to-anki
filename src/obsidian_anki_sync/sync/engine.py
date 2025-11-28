@@ -15,11 +15,11 @@ except ImportError:
 
 try:
     from tenacity import (
+        before_sleep_log,
         retry,
         retry_if_exception_type,
         stop_after_attempt,
         wait_exponential,
-        before_sleep_log,
     )
 except ImportError:
     # Fallback if tenacity not available
@@ -132,12 +132,10 @@ class SyncEngine:
             # Use the same provider as the orchestrator
             # Resolve model from config (handles empty strings and presets)
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(
-                config, "qa_extractor_temperature", None)
+            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
             if qa_extractor_temp is None:
                 # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task(
-                    "qa_extraction")
+                model_config = config.get_model_config_for_task("qa_extraction")
                 qa_extractor_temp = model_config.get("temperature", 0.0)
             reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
@@ -283,8 +281,7 @@ class SyncEngine:
             and self.agent_orchestrator
         ):
             if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(
-                    self.progress_display)
+                self.agent_orchestrator.set_progress_display(self.progress_display)
 
     def _get_anki_model_name(self, internal_note_type: str) -> str:
         """Get the actual Anki model name from internal note type.
@@ -445,8 +442,7 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(
-            f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -671,6 +667,7 @@ class SyncEngine:
             return
 
         import gc
+
         from ..utils.content_hash import clear_content_hash_cache
 
         # Clear content hash cache to free memory

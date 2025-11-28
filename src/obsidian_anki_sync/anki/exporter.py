@@ -336,8 +336,7 @@ def _card_to_note(card: Card) -> genanki.Note:
         return note
 
     except Exception as e:
-        raise DeckExportError(
-            f"Failed to convert card {card.slug}: {e}") from e
+        raise DeckExportError(f"Failed to convert card {card.slug}: {e}") from e
 
 
 def export_deck(
@@ -512,8 +511,7 @@ def export_cards_to_csv(
             # Create empty CSV with headers
             with output_path.open("w", encoding="utf-8", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(
-                    ["noteId", "slug", "noteType", "tags", "fields"])
+                writer.writerow(["noteId", "slug", "noteType", "tags", "fields"])
             logger.info("empty_csv_created", output_path=str(output_path))
             return
 
@@ -549,8 +547,7 @@ def export_cards_to_csv(
 
         # Write CSV file
         with output_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=field_names, extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=field_names, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(card_data_list)
 

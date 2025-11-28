@@ -75,8 +75,7 @@ class NoteDiscoveryService:
         # Filter for incremental processing
         if incremental:
             processed_paths = self._get_processed_paths()
-            note_files = [f for f in note_files if str(
-                f) not in processed_paths]
+            note_files = [f for f in note_files if str(f) not in processed_paths]
             logger.debug("filtered_incremental", remaining=len(note_files))
 
         # Apply sampling
@@ -108,9 +107,7 @@ class NoteDiscoveryService:
         return notes
 
     def _find_note_files(
-        self,
-        source_path: Path,
-        exclude_patterns: list[str | None] = None
+        self, source_path: Path, exclude_patterns: list[str | None] = None
     ) -> list[Path]:
         """Find all markdown note files in the source directory.
 
@@ -210,7 +207,7 @@ class NoteDiscoveryService:
             File content as string
         """
         try:
-            return file_path.read_text(encoding='utf-8')
+            return file_path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError) as e:
             logger.warning(
                 "failed_to_read_file",
@@ -243,8 +240,9 @@ class NoteDiscoveryService:
 
             # Count by primary language
             primary_lang = note.metadata.primary_language
-            stats["by_language"][primary_lang] = stats["by_language"].get(
-                primary_lang, 0) + 1
+            stats["by_language"][primary_lang] = (
+                stats["by_language"].get(primary_lang, 0) + 1
+            )
 
             # Count by status
             status = note.metadata.status or "unknown"
@@ -252,7 +250,8 @@ class NoteDiscoveryService:
 
             # Count by difficulty
             difficulty = note.metadata.difficulty or "unknown"
-            stats["by_difficulty"][difficulty] = stats["by_difficulty"].get(
-                difficulty, 0) + 1
+            stats["by_difficulty"][difficulty] = (
+                stats["by_difficulty"].get(difficulty, 0) + 1
+            )
 
         return stats

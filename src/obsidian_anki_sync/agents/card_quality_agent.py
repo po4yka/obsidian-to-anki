@@ -4,10 +4,9 @@ import re
 import time
 
 from ..models import NoteMetadata
-from .models import GeneratedCard
 from ..providers.base import BaseLLMProvider
 from ..utils.logging import get_logger
-from .models import QualityReport, QualityDimension
+from .models import GeneratedCard, QualityDimension, QualityReport
 
 logger = get_logger(__name__)
 
@@ -56,8 +55,7 @@ class CardQualityAgent:
         """
         start_time = time.time()
 
-        logger.debug("assessing_card_quality",
-                     slug=card.slug, card_type=card.card_type)
+        logger.debug("assessing_card_quality", slug=card.slug, card_type=card.card_type)
 
         # Assess each quality dimension
         dimensions = self._assess_all_dimensions(card, metadata, context_cards)
@@ -122,7 +120,10 @@ class CardQualityAgent:
         score = 1.0  # Start with perfect score, deduct for issues
 
         # Check for placeholder content
-        if any(placeholder in card.question.lower() for placeholder in ["tbd", "todo", "fill in"]):
+        if any(
+            placeholder in card.question.lower()
+            for placeholder in ["tbd", "todo", "fill in"]
+        ):
             issues.append("Contains placeholder content")
             score -= 0.3
 
@@ -138,9 +139,8 @@ class CardQualityAgent:
 
         # Check for proper capitalization and punctuation
         question = card.question.strip()
-        if not question[0].isupper() or not question.endswith(('?', '.', '!')):
-            issues.append(
-                "Question lacks proper capitalization or punctuation")
+        if not question[0].isupper() or not question.endswith(("?", ".", "!")):
+            issues.append("Question lacks proper capitalization or punctuation")
             score -= 0.1
 
         # Check answer quality
@@ -151,11 +151,15 @@ class CardQualityAgent:
                 score -= 0.2
 
         # Verify content matches programming domain
-        tech_indicators = ["function", "class",
-                           "method", "api", "code", "programming"]
-        has_tech_content = any(indicator in card.question.lower()
-                               for indicator in tech_indicators)
-        if metadata.tags and "programming" in " ".join(metadata.tags) and not has_tech_content:
+        tech_indicators = ["function", "class", "method", "api", "code", "programming"]
+        has_tech_content = any(
+            indicator in card.question.lower() for indicator in tech_indicators
+        )
+        if (
+            metadata.tags
+            and "programming" in " ".join(metadata.tags)
+            and not has_tech_content
+        ):
             issues.append("Content doesn't match programming domain")
             score -= 0.2
 
@@ -180,14 +184,13 @@ class CardQualityAgent:
             score -= 0.2
 
         # Active recall: Question should require memory retrieval
-        passive_indicators = ["is", "are", "does",
-                              "do", "can", "should", "would"]
+        passive_indicators = ["is", "are", "does", "do", "can", "should", "would"]
         question_lower = card.question.lower()
-        passive_count = sum(
-            1 for word in passive_indicators if word in question_lower)
+        passive_count = sum(1 for word in passive_indicators if word in question_lower)
         if passive_count > 2:
             issues.append(
-                "Question may be passive recognition rather than active recall")
+                "Question may be passive recognition rather than active recall"
+            )
             score -= 0.15
 
         # Cognitive load: Answer shouldn't be too long
@@ -197,15 +200,13 @@ class CardQualityAgent:
 
         # Context sufficiency: Question should have enough context
         if len(card.question.split()) < 5:
-            issues.append(
-                "Question lacks sufficient context for unambiguous recall")
+            issues.append("Question lacks sufficient context for unambiguous recall")
             score -= 0.1
 
         # Cloze quality (if applicable)
         if card.card_type == "Missing":
             cloze_pattern = r"\{\{c\d+::[^}]+\}\}"
-            clozes = re.findall(
-                cloze_pattern, card.question + (card.answer or ""))
+            clozes = re.findall(cloze_pattern, card.question + (card.answer or ""))
             if len(clozes) > 3:
                 issues.append("Too many clozes - may be dependent concepts")
                 score -= 0.15
@@ -238,16 +239,18 @@ class CardQualityAgent:
 
         # Check code block language specification
         code_blocks = re.findall(
-            r'<pre><code[^>]*>(.*?)</code></pre>', card.question + (card.answer or ""), re.DOTALL)
+            r"<pre><code[^>]*>(.*?)</code></pre>",
+            card.question + (card.answer or ""),
+            re.DOTALL,
+        )
         for block in code_blocks:
             if not re.search(r'class="language-[^"]*"', block):
                 issues.append("Code block missing language class")
                 score -= 0.1
 
         # Check for proper slug format
-        if not re.match(r'^[a-z0-9-]+$', card.slug or ""):
-            issues.append(
-                "Invalid slug format (should be lowercase with hyphens only)")
+        if not re.match(r"^[a-z0-9-]+$", card.slug or ""):
+            issues.append("Invalid slug format (should be lowercase with hyphens only)")
             score -= 0.1
 
         # Check tag quality
@@ -275,25 +278,25 @@ class CardQualityAgent:
         score = 1.0
 
         # Check for images without alt text
-        img_pattern = r'<img[^>]+>'
+        img_pattern = r"<img[^>]+>"
         images = re.findall(img_pattern, card.question + (card.answer or ""))
         for img in images:
-            if 'alt=' not in img:
+            if "alt=" not in img:
                 issues.append("Image missing alt text for screen readers")
                 score -= 0.2
 
         # Check for sufficient color contrast (basic check)
-        if 'color:' in card.question.lower() or 'color:' in (card.answer or "").lower():
+        if "color:" in card.question.lower() or "color:" in (card.answer or "").lower():
             # If colors are specified, they should meet contrast requirements
             # This is a basic check - full WCAG compliance would need more analysis
             issues.append(
-                "Color usage detected - verify contrast ratios meet WCAG standards")
+                "Color usage detected - verify contrast ratios meet WCAG standards"
+            )
             score -= 0.1
 
         # Check for semantic HTML structure
-        if card.question.count('<p>') > 10:
-            issues.append(
-                "Excessive paragraph breaks may indicate poor structure")
+        if card.question.count("<p>") > 10:
+            issues.append("Excessive paragraph breaks may indicate poor structure")
             score -= 0.1
 
         score = max(0.0, score)
@@ -305,7 +308,9 @@ class CardQualityAgent:
             strengths=self._identify_accessibility_strengths(card),
         )
 
-    def _calculate_overall_score(self, dimensions: dict[str, QualityDimension]) -> float:
+    def _calculate_overall_score(
+        self, dimensions: dict[str, QualityDimension]
+    ) -> float:
         """Calculate weighted overall quality score."""
         total_weighted_score = 0.0
         total_weight = 0.0
@@ -323,9 +328,12 @@ class CardQualityAgent:
         suggestions = []
 
         for dim_name, dimension in dimensions.items():
-            if dimension.score < 0.8:  # Only suggest improvements for low-scoring dimensions
-                suggestions.extend(self._get_dimension_improvements(
-                    dim_name, dimension.issues))
+            if (
+                dimension.score < 0.8
+            ):  # Only suggest improvements for low-scoring dimensions
+                suggestions.extend(
+                    self._get_dimension_improvements(dim_name, dimension.issues)
+                )
 
         # Remove duplicates while preserving order
         seen = set()
@@ -337,47 +345,49 @@ class CardQualityAgent:
 
         return unique_suggestions
 
-    def _get_dimension_improvements(self, dimension: str, issues: list[str]) -> list[str]:
+    def _get_dimension_improvements(
+        self, dimension: str, issues: list[str]
+    ) -> list[str]:
         """Get improvement suggestions for a specific dimension."""
         suggestions = []
 
         for issue in issues:
             if "placeholder" in issue.lower():
                 suggestions.append(
-                    "Replace placeholder content with actual code examples")
+                    "Replace placeholder content with actual code examples"
+                )
             elif "incomplete" in issue.lower():
-                suggestions.append(
-                    "Complete partial code examples with runnable code")
+                suggestions.append("Complete partial code examples with runnable code")
             elif "too short" in issue.lower():
-                suggestions.append(
-                    "Add more context to make the question unambiguous")
+                suggestions.append("Add more context to make the question unambiguous")
             elif "punctuation" in issue.lower():
                 suggestions.append("Add proper punctuation and capitalization")
             elif "too brief" in issue.lower():
-                suggestions.append(
-                    "Expand answer with more complete explanation")
+                suggestions.append("Expand answer with more complete explanation")
             elif "doesn't match" in issue.lower():
                 suggestions.append(
-                    "Ensure content aligns with the specified domain/tags")
+                    "Ensure content aligns with the specified domain/tags"
+                )
             elif "too long" in issue.lower():
-                suggestions.append(
-                    "Split complex questions into multiple atomic cards")
+                suggestions.append("Split complex questions into multiple atomic cards")
             elif "passive" in issue.lower():
                 suggestions.append(
-                    "Rewrite as active recall question (What/How/Why format)")
+                    "Rewrite as active recall question (What/How/Why format)"
+                )
             elif "cognitive load" in issue.lower():
-                suggestions.append(
-                    "Break down complex answers into simpler components")
+                suggestions.append("Break down complex answers into simpler components")
             elif "clozes" in issue.lower():
                 suggestions.append(
-                    "Review cloze deletions to ensure independent concepts")
+                    "Review cloze deletions to ensure independent concepts"
+                )
             elif "unclosed" in issue.lower():
                 suggestions.append("Fix HTML tag structure")
             elif "language class" in issue.lower():
                 suggestions.append("Add language specification to code blocks")
             elif "slug format" in issue.lower():
                 suggestions.append(
-                    "Use lowercase letters, numbers, and hyphens only in slug")
+                    "Use lowercase letters, numbers, and hyphens only in slug"
+                )
             elif "insufficient tags" in issue.lower():
                 suggestions.append("Add at least 3 relevant tags")
             elif "duplicate tags" in issue.lower():
@@ -385,8 +395,7 @@ class CardQualityAgent:
             elif "alt text" in issue.lower():
                 suggestions.append("Add descriptive alt text for all images")
             elif "color" in issue.lower():
-                suggestions.append(
-                    "Verify color contrast meets WCAG AA standards")
+                suggestions.append("Verify color contrast meets WCAG AA standards")
             elif "structure" in issue.lower():
                 suggestions.append("Improve semantic HTML structure")
 
@@ -442,8 +451,7 @@ class CardQualityAgent:
 
         # Check cloze usage
         if card.card_type == "Missing":
-            cloze_count = len(re.findall(
-                r"\{\{c\d+::[^}]+\}\}", card.question))
+            cloze_count = len(re.findall(r"\{\{c\d+::[^}]+\}\}", card.question))
             if 1 <= cloze_count <= 3:
                 strengths.append("Appropriate number of independent clozes")
 
@@ -456,14 +464,16 @@ class CardQualityAgent:
         if card.tags and len(card.tags) >= 3:
             strengths.append("Good tag coverage")
 
-        if re.match(r'^[a-z0-9-]+$', card.slug or ""):
+        if re.match(r"^[a-z0-9-]+$", card.slug or ""):
             strengths.append("Proper slug format")
 
         code_blocks = re.findall(
-            r'<pre><code[^>]*>(.*?)</code></pre>', card.question + (card.answer or ""), re.DOTALL)
+            r"<pre><code[^>]*>(.*?)</code></pre>",
+            card.question + (card.answer or ""),
+            re.DOTALL,
+        )
         if code_blocks and all('class="language-' in block for block in code_blocks):
-            strengths.append(
-                "Well-formatted code blocks with language specification")
+            strengths.append("Well-formatted code blocks with language specification")
 
         return strengths
 
@@ -475,7 +485,7 @@ class CardQualityAgent:
         if re.search(img_pattern, card.question + (card.answer or "")):
             strengths.append("Images include alt text")
 
-        if card.question.count('<p>') <= 5:
+        if card.question.count("<p>") <= 5:
             strengths.append("Clean, well-structured HTML")
 
         return strengths

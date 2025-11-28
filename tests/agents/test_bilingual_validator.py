@@ -117,7 +117,7 @@ How to prohibit object creation?
         }
         ru_parsed = en_parsed.copy()
         ru_parsed["key_point_notes"] = [
-            "Используйте приватный конструктор", "Предпочтительнее приватный конструктор"]
+            "Используйте приватный конструктор", "Приватный конструктор обязателен"]
 
         errors = _compare_card_structures(1, en_parsed, ru_parsed)
 

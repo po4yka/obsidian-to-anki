@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 from pydantic import Field
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..config import Config
@@ -30,17 +30,20 @@ class OpenRouterSettings(BaseSettings):
     )
 
     openrouter_api_key: str | None = Field(
-        default=None, description="OpenRouter API key")
+        default=None, description="OpenRouter API key"
+    )
     openrouter_site_url: str | None = Field(
-        default=None, description="Site URL for rankings")
+        default=None, description="Site URL for rankings"
+    )
     openrouter_site_name: str | None = Field(
-        default=None, description="Site name for rankings")
+        default=None, description="Site name for rankings"
+    )
 
 
-class EnhancedOpenRouterModel(OpenAIModel):
+class EnhancedOpenRouterModel(OpenAIChatModel):
     """Enhanced OpenRouter model that uses OpenRouterProvider for reasoning support.
 
-    This model extends PydanticAI's OpenAIModel but routes requests through
+    This model extends PydanticAI's OpenAIChatModel but routes requests through
     the OpenRouterProvider to enable reasoning configuration and other enhancements.
     """
 
@@ -65,7 +68,7 @@ class EnhancedOpenRouterModel(OpenAIModel):
             site_name: Site name for rankings
             max_tokens: Maximum tokens per request
             reasoning_enabled: Enable reasoning for this model
-            **kwargs: Additional OpenAIModel arguments
+            **kwargs: Additional OpenAIChatModel arguments
         """
         # Initialize with basic config first
         super().__init__(
@@ -217,7 +220,7 @@ class PydanticAIModelFactory:
         site_url: str | None = None,
         site_name: str | None = None,
         **kwargs: Any,
-    ) -> OpenAIModel:
+    ) -> OpenAIChatModel:
         """Create a PydanticAI model using OpenRouter.
 
         OpenRouter provides access to multiple LLM providers through an OpenAI-compatible API.
@@ -228,10 +231,10 @@ class PydanticAIModelFactory:
             base_url: OpenRouter API base URL
             site_url: Your site URL for OpenRouter rankings (optional)
             site_name: Your site name for OpenRouter rankings (optional)
-            **kwargs: Additional configuration passed to OpenAIModel
+            **kwargs: Additional configuration passed to OpenAIChatModel
 
         Returns:
-            Configured OpenAIModel instance pointing to OpenRouter
+            Configured OpenAIChatModel instance pointing to OpenRouter
 
         Raises:
             ValueError: If no API key is provided or found in environment
@@ -267,7 +270,7 @@ class PydanticAIModelFactory:
         )
 
         # Create OpenAI-compatible model pointing to OpenRouter
-        model = OpenAIModel(  # type: ignore[call-overload]
+        model = OpenAIChatModel(  # type: ignore[call-overload]
             model_name,
             base_url=base_url,
             api_key=api_key,
@@ -291,7 +294,7 @@ class PydanticAIModelFactory:
         provider: str | None = None,
         reasoning_enabled: bool | None = None,
         max_tokens: int | None = None,
-    ) -> OpenAIModel:
+    ) -> OpenAIChatModel:
         """Create a PydanticAI model from service configuration.
 
         Args:
@@ -323,7 +326,7 @@ class PydanticAIModelFactory:
             )
         elif provider.lower() in ("ollama", "lm_studio", "lmstudio"):
             # For now, Ollama and LM Studio can use OpenAI-compatible interface
-            # PydanticAI's OpenAIModel works with any OpenAI-compatible endpoint
+            # PydanticAI's OpenAIChatModel works with any OpenAI-compatible endpoint
             base_url = (
                 config.ollama_base_url
                 if provider.lower() == "ollama"
@@ -351,7 +354,7 @@ class PydanticAIModelFactory:
                 ),
             )
 
-            return OpenAIModel(  # type: ignore[call-overload,no-any-return]
+            return OpenAIChatModel(  # type: ignore[call-overload,no-any-return]
                 model_name,
                 base_url=base_url,
                 api_key=api_key,
@@ -366,7 +369,7 @@ class PydanticAIModelFactory:
 
 def create_openrouter_model_from_env(
     model_name: str = "anthropic/claude-3-5-sonnet",
-) -> OpenAIModel:
+) -> OpenAIChatModel:
     """Convenience function to create OpenRouter model from environment variables.
 
     Expects:
@@ -378,7 +381,7 @@ def create_openrouter_model_from_env(
         model_name: Model to use (default: anthropic/claude-3-5-sonnet)
 
     Returns:
-        Configured OpenAIModel instance
+        Configured OpenAIChatModel instance
     """
     settings = OpenRouterSettings()
     return PydanticAIModelFactory.create_openrouter_model(

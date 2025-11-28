@@ -1,6 +1,6 @@
 """Unit tests for SplitValidatorAgentAI."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,7 +24,12 @@ def mock_model():
 @pytest.fixture
 def split_validator(mock_model):
     """Create a split validator agent with mock model."""
-    return SplitValidatorAgentAI(model=mock_model)
+    with patch("obsidian_anki_sync.agents.pydantic.split_validator.Agent") as mock_agent_class:
+        mock_agent_instance = MagicMock()
+        mock_agent_class.return_value = mock_agent_instance
+        agent = SplitValidatorAgentAI(model=mock_model)
+        agent.agent = mock_agent_instance
+        yield agent
 
 
 @pytest.mark.asyncio

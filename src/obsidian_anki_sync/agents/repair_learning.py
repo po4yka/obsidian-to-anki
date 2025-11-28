@@ -94,8 +94,8 @@ class RepairLearningSystem:
                 current_avg = pattern.average_quality_improvement
                 count = pattern.success_count
                 pattern.average_quality_improvement = (
-                    (current_avg * (count - 1) + quality_improvement) / count
-                )
+                    current_avg * (count - 1) + quality_improvement
+                ) / count
         else:
             # Create new pattern
             pattern = RepairPattern(
@@ -137,7 +137,9 @@ class RepairLearningSystem:
         # Exact match
         if signature in self.patterns:
             pattern = self.patterns[signature]
-            if pattern.success_count / pattern.total_attempts >= 0.7:  # 70% success rate
+            if (
+                pattern.success_count / pattern.total_attempts >= 0.7
+            ):  # 70% success rate
                 return pattern.successful_strategy
 
         # Category-based suggestion
@@ -200,7 +202,9 @@ class RepairLearningSystem:
 
         # Sort by success rate
         similar.sort(
-            key=lambda p: p.success_count / p.total_attempts if p.total_attempts > 0 else 0,
+            key=lambda p: (
+                p.success_count / p.total_attempts if p.total_attempts > 0 else 0
+            ),
             reverse=True,
         )
 

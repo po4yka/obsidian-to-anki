@@ -193,6 +193,7 @@ def repair_corrected_cards_array(text: str) -> str:
     try:
         # Try to parse as-is first
         import json
+
         json.loads(text)
         return text  # Already valid
     except json.JSONDecodeError:
@@ -200,6 +201,7 @@ def repair_corrected_cards_array(text: str) -> str:
 
     # Look for corrected_cards array pattern
     import re
+
     corrected_cards_match = re.search(
         r'"corrected_cards"\s*:\s*\[([^\]]*)$', text, re.DOTALL
     )
@@ -212,13 +214,13 @@ def repair_corrected_cards_array(text: str) -> str:
 
     # Split by card objects (look for complete objects separated by commas)
     # This is tricky because cards may contain nested objects
-    repaired_cards = []
     remaining = array_content.strip()
 
     # If the array is empty or just whitespace, complete it
     if not remaining or remaining == "":
         completed = text.replace(
-            corrected_cards_match.group(0), '"corrected_cards": []')
+            corrected_cards_match.group(0), '"corrected_cards": []'
+        )
         if not completed.rstrip().endswith("}"):
             completed += "\n}"
         return completed
@@ -259,7 +261,7 @@ def repair_corrected_cards_array(text: str) -> str:
                 brace_depth -= 1
                 if brace_depth == 0 and card_start != -1:
                     # Found a complete card object
-                    card_text = remaining[card_start:i+1]
+                    card_text = remaining[card_start: i + 1]
                     try:
                         # Validate it's proper JSON
                         json.loads(card_text)
@@ -416,8 +418,11 @@ def repair_truncated_array(text: str) -> str:
                 # Add closing braces for any open objects
                 repaired += "}" * brace_count
                 repaired += ']"'
-                logger.debug("repaired_array_truncation", original_length=len(
-                    text), repaired_length=len(repaired))
+                logger.debug(
+                    "repaired_array_truncation",
+                    original_length=len(text),
+                    repaired_length=len(repaired),
+                )
                 return repaired
 
     return text

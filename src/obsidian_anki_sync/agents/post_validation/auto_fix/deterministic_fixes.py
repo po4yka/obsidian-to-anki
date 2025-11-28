@@ -100,8 +100,10 @@ class DeterministicFixer:
             any_fixes = any_fixes or card_fixed
 
         # Second pass: Apply cross-card consistency fixes
-        fixed_cards, consistency_fixed = DeterministicFixer._fix_missing_optional_sections(
-            fixed_cards, error_details
+        fixed_cards, consistency_fixed = (
+            DeterministicFixer._fix_missing_optional_sections(
+                fixed_cards, error_details
+            )
         )
         any_fixes = any_fixes or consistency_fixed
 
@@ -184,12 +186,19 @@ class DeterministicFixer:
             return html, False
 
         # Skip if this is the false positive about CardType vs type (CardType is correct)
-        if "CardType:" in error_details and "instead of" in error_details and "type:" in error_details:
+        if (
+            "CardType:" in error_details
+            and "instead of" in error_details
+            and "type:" in error_details
+        ):
             return html, False
 
         # Try to extract and fix card header - match various formats
         header_match = re.search(
-            r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*(?:CardType|type):\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*([^>]+?)\s*-->", html, re.IGNORECASE)
+            r"<!--\s*Card\s+(\d+)\s*\|\s*slug:\s*([a-z0-9-]+)\s*\|\s*(?:CardType|type):\s*(Simple|Missing|Draw)\s*\|\s*Tags:\s*([^>]+?)\s*-->",
+            html,
+            re.IGNORECASE,
+        )
         if header_match:
             # Full header match - extract components
             card_num, extracted_slug, card_type, tags_str = header_match.groups()
@@ -210,8 +219,7 @@ class DeterministicFixer:
                 r"(?:CardType|type):\s*(Simple|Missing|Draw)", html, re.IGNORECASE
             )
             card_type = (
-                card_type_match.group(1).capitalize()
-                if card_type_match else "Simple"
+                card_type_match.group(1).capitalize() if card_type_match else "Simple"
             )
 
             # Extract tags
@@ -322,8 +330,7 @@ class DeterministicFixer:
 
         # Find standalone <code> tags not inside <pre>
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-        matches = list(re.finditer(
-            code_pattern, html, re.DOTALL | re.IGNORECASE))
+        matches = list(re.finditer(code_pattern, html, re.DOTALL | re.IGNORECASE))
 
         if not matches:
             return html, False
@@ -336,10 +343,9 @@ class DeterministicFixer:
             end_pos = match.end()
 
             # Check if already inside <pre>
-            context_before = html[max(0, start_pos - 500): start_pos]
+            context_before = html[max(0, start_pos - 500) : start_pos]
             pre_matches = list(
-                re.finditer(r"<pre(?:\s[^>]*)?>",
-                            context_before, re.IGNORECASE)
+                re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE)
             )
             if pre_matches:
                 last_pre = pre_matches[-1]
@@ -442,8 +448,7 @@ class DeterministicFixer:
             return html, False
 
         # Extract slug from card header
-        header_match = re.search(
-            r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", html)
+        header_match = re.search(r"<!--\s*Card\s+\d+\s*\|\s*slug:\s*([^\s|]+)", html)
         if not header_match:
             return html, False
 
@@ -552,8 +557,7 @@ class DeterministicFixer:
             return html, False
 
         # Try to fix malformed JSON in manifest
-        manifest_match = re.search(
-            r"<!--\s*manifest:\s*({.*?})\s*-->", html, re.DOTALL)
+        manifest_match = re.search(r"<!--\s*manifest:\s*({.*?})\s*-->", html, re.DOTALL)
         if not manifest_match:
             return html, False
 
@@ -612,7 +616,9 @@ class DeterministicFixer:
         """
         if not (
             "optional" in error_details.lower()
-            and ("missing" in error_details.lower() or "absent" in error_details.lower())
+            and (
+                "missing" in error_details.lower() or "absent" in error_details.lower()
+            )
         ):
             return cards, False
 
@@ -636,11 +642,18 @@ class DeterministicFixer:
         # Define optional section patterns to check
         optional_sections = [
             ("<!-- Subtitle (optional) -->", "<!-- Subtitle (optional) -->\n\n"),
-            ("<!-- Syntax (inline) (optional) -->",
-             "<!-- Syntax (inline) (optional) -->\n<code>placeholder</code>\n\n"),
-            ("<!-- Sample (caption) (optional) -->", "<!-- Sample (caption) (optional) -->\nSample caption\n\n<!-- Sample (code block or image) (optional) -->\n<pre><code class=\"language-placeholder\">// placeholder code</code></pre>\n\n"),
-            ("<!-- Other notes (optional) -->",
-             "<!-- Other notes (optional) -->\n<ul>\n  <li>Placeholder note</li>\n</ul>\n\n"),
+            (
+                "<!-- Syntax (inline) (optional) -->",
+                "<!-- Syntax (inline) (optional) -->\n<code>placeholder</code>\n\n",
+            ),
+            (
+                "<!-- Sample (caption) (optional) -->",
+                '<!-- Sample (caption) (optional) -->\nSample caption\n\n<!-- Sample (code block or image) (optional) -->\n<pre><code class="language-placeholder">// placeholder code</code></pre>\n\n',
+            ),
+            (
+                "<!-- Other notes (optional) -->",
+                "<!-- Other notes (optional) -->\n<ul>\n  <li>Placeholder note</li>\n</ul>\n\n",
+            ),
             ("<!-- Markdown (optional) -->", "<!-- Markdown (optional) -->\n\n"),
         ]
 
@@ -663,20 +676,21 @@ class DeterministicFixer:
                 card_fixed = False
 
                 for section_name, section_template in optional_sections:
-                    if section_name in present_sections and section_name not in card_html:
+                    if (
+                        section_name in present_sections
+                        and section_name not in card_html
+                    ):
                         # This section exists in other language versions but not this one
                         # Insert it before Key point notes or at end before manifest
                         if "<!-- Key point notes -->" in card_html:
                             card_html = card_html.replace(
                                 "<!-- Key point notes -->",
                                 section_template + "<!-- Key point notes -->",
-                                1  # Only replace first occurrence
+                                1,  # Only replace first occurrence
                             )
                         elif "<!-- manifest:" in card_html:
                             card_html = card_html.replace(
-                                "<!-- manifest:",
-                                section_template + "<!-- manifest:",
-                                1
+                                "<!-- manifest:", section_template + "<!-- manifest:", 1
                             )
                         else:
                             # Fallback: add at end before END_CARDS
@@ -684,7 +698,7 @@ class DeterministicFixer:
                                 card_html = card_html.replace(
                                     "<!-- END_CARDS -->",
                                     section_template + "<!-- END_CARDS -->",
-                                    1
+                                    1,
                                 )
 
                         logger.debug(
@@ -768,7 +782,8 @@ class DeterministicFixer:
                         if end_count > 1:
                             # Remove all END_OF_CARDS and add just one
                             after_end_clean = after_end.replace(
-                                "END_OF_CARDS", "").strip()
+                                "END_OF_CARDS", ""
+                            ).strip()
                             html = before_end + "<!-- END_CARDS -->\n" + after_end_clean
                             if after_end_clean:
                                 html += "\n"

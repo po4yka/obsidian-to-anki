@@ -37,17 +37,23 @@ class RepairMetrics:
     total_successes: int = 0
     total_failures: int = 0
     attempts_by_category: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     successes_by_category: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     failures_by_category: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     attempts_by_strategy: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     successes_by_strategy: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     failures_by_strategy: dict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
+        default_factory=lambda: defaultdict(int)
+    )
     average_repair_time: float = 0.0
     average_quality_improvement: float = 0.0
     repair_patterns: list[dict[str, Any]] = field(default_factory=list)
@@ -119,8 +125,8 @@ class RepairMetricsCollector:
                 current_avg = self.metrics.average_quality_improvement
                 count = self.metrics.total_successes
                 self.metrics.average_quality_improvement = (
-                    (current_avg * (count - 1) + improvement) / count
-                )
+                    current_avg * (count - 1) + improvement
+                ) / count
         else:
             self.metrics.total_failures += 1
             self.metrics.failures_by_category[error_category] += 1
@@ -131,8 +137,8 @@ class RepairMetricsCollector:
         current_avg_time = self.metrics.average_repair_time
         count = self.metrics.total_attempts
         self.metrics.average_repair_time = (
-            (current_avg_time * (count - 1) + repair_time) / count
-        )
+            current_avg_time * (count - 1) + repair_time
+        ) / count
 
         # Store pattern for learning
         pattern = {

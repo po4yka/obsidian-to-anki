@@ -75,7 +75,7 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
 
     # Split into separate error items if numbered
     # Pattern matches "1) ...", "2) ...", etc.
-    error_items = re.split(r'(?=\d+\)\s)', error_details)
+    error_items = re.split(r"(?=\d+\)\s)", error_details)
     filtered_items = []
     removed_any = False
 
@@ -106,13 +106,13 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
     # Renumber remaining errors
     if len(filtered_items) == 1:
         # Single error, remove numbering
-        result = re.sub(r'^\d+\)\s*', '', filtered_items[0])
+        result = re.sub(r"^\d+\)\s*", "", filtered_items[0])
     else:
         # Multiple errors, renumber
         result_parts = []
         for i, item in enumerate(filtered_items, 1):
             # Remove old numbering and add new
-            item_text = re.sub(r'^\d+\)\s*', '', item)
+            item_text = re.sub(r"^\d+\)\s*", "", item)
             result_parts.append(f"{i}) {item_text}")
         result = " ".join(result_parts)
 
@@ -120,8 +120,9 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
         logger.info(
             "false_positives_filtered",
             original_errors=original[:200],
-            filtered_errors=result[:
-                                   200] if result else "(all errors were false positives)",
+            filtered_errors=(
+                result[:200] if result else "(all errors were false positives)"
+            ),
         )
 
     return result, removed_any
@@ -184,53 +185,46 @@ def _parse_card_for_comparison(apf_html: str) -> dict:
     }
 
     # Extract title
-    title_match = re.search(
-        r'<!-- Title -->\s*\n(.*?)\n\s*\n', apf_html, re.DOTALL)
+    title_match = re.search(r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
     if title_match:
         result["title"] = title_match.group(1).strip()
 
     # Extract key point notes
     notes_match = re.search(
-        r'<!-- Key point notes -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
-        apf_html,
-        re.DOTALL
+        r"<!-- Key point notes -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>", apf_html, re.DOTALL
     )
     if notes_match:
         ul_content = notes_match.group(1)
-        li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+        li_matches = re.findall(r"<li>(.*?)</li>", ul_content, re.DOTALL)
         result["key_point_notes"] = [li.strip() for li in li_matches]
         result["key_point_notes_count"] = len(result["key_point_notes"])
 
     # Check for key point code
-    if '<!-- Key point (code block / image) -->' in apf_html:
+    if "<!-- Key point (code block / image) -->" in apf_html:
         code_match = re.search(
-            r'<!-- Key point \(code block / image\) -->\s*\n(.*?)\n\s*\n<!-- Key point notes -->',
+            r"<!-- Key point \(code block / image\) -->\s*\n(.*?)\n\s*\n<!-- Key point notes -->",
             apf_html,
-            re.DOTALL
+            re.DOTALL,
         )
         if code_match:
             code_block = code_match.group(1).strip()
-            result["has_key_point_code"] = (
-                code_block.startswith('<pre><code') and
-                code_block.endswith('</code></pre>')
-            )
+            result["has_key_point_code"] = code_block.startswith(
+                "<pre><code"
+            ) and code_block.endswith("</code></pre>")
 
     # Extract other notes
     other_match = re.search(
-        r'<!-- Other notes.*? -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>',
-        apf_html,
-        re.DOTALL
+        r"<!-- Other notes.*? -->\s*\n<ul>\s*\n(.*?)\n\s*</ul>", apf_html, re.DOTALL
     )
     if other_match:
         ul_content = other_match.group(1)
-        li_matches = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
+        li_matches = re.findall(r"<li>(.*?)</li>", ul_content, re.DOTALL)
         result["other_notes"] = [li.strip() for li in li_matches]
         result["other_notes_count"] = len(result["other_notes"])
 
     # Extract card type from header
     header_match = re.search(
-        r'<!-- Card \d+ \| slug: .*? \| CardType: (\w+) \| Tags:',
-        apf_html
+        r"<!-- Card \d+ \| slug: .*? \| CardType: (\w+) \| Tags:", apf_html
     )
     if header_match:
         result["card_type"] = header_match.group(1)
@@ -373,8 +367,7 @@ def semantic_validation(
     if error_details:
         all_error_details.append(error_details)
 
-    combined_error_details = "; ".join(
-        all_error_details) if all_error_details else ""
+    combined_error_details = "; ".join(all_error_details) if all_error_details else ""
 
     # If we have bilingual errors, validation should fail
     if bilingual_errors:
@@ -383,8 +376,7 @@ def semantic_validation(
 
     # Filter out known false positive errors (LLM hallucinations) from LLM-generated errors only
     if error_details and not bilingual_errors:  # Only filter if no bilingual errors
-        filtered_errors, had_false_positives = _filter_false_positives(
-            error_details)
+        filtered_errors, had_false_positives = _filter_false_positives(error_details)
 
         if had_false_positives:
             if not filtered_errors:

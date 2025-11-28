@@ -4,7 +4,6 @@ Provides convenient functions to integrate RAG capabilities
 into card generation, validation, and enrichment agents.
 """
 
-from pathlib import Path
 from typing import Any
 
 from ..config import Config
@@ -224,8 +223,7 @@ class RAGIntegration:
 
             if concepts_text:
                 context_parts.append(
-                    "Related concepts from knowledge base:\n" +
-                    "\n".join(concepts_text)
+                    "Related concepts from knowledge base:\n" + "\n".join(concepts_text)
                 )
 
         # Add few-shot examples
@@ -239,8 +237,7 @@ class RAGIntegration:
 
             if examples_text:
                 context_parts.append(
-                    "Example Q&A from similar cards:\n" +
-                    "\n---\n".join(examples_text)
+                    "Example Q&A from similar cards:\n" + "\n---\n".join(examples_text)
                 )
 
         if not context_parts:
@@ -281,6 +278,7 @@ def get_rag_integration(config: Config | None = None) -> RAGIntegration:
     if _rag_integration is None:
         if config is None:
             from ..config import get_config
+
             config = get_config()
         _rag_integration = RAGIntegration(config)
 

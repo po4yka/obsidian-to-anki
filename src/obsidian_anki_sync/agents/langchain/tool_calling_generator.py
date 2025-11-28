@@ -3,15 +3,15 @@
 Specialized tool calling agent for generating APF cards with parallel tool support.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...models import NoteMetadata, QAPair, GeneratedCard, GenerationResult
+from ...models import GeneratedCard, GenerationResult, NoteMetadata, QAPair
 from ...utils.logging import get_logger
-from .tool_calling_agent import ToolCallingAgent
 from .base import LangChainAgentResult
+from .tool_calling_agent import ToolCallingAgent
 
 logger = get_logger(__name__)
 
@@ -40,6 +40,7 @@ class ToolCallingGeneratorAgent:
         """
         if tools is None:
             from .tools import get_tools_for_agent
+
             tools = get_tools_for_agent("generator")
 
         self.agent = ToolCallingAgent(
@@ -147,7 +148,7 @@ class ToolCallingGeneratorAgent:
         import re
 
         # Find card sections
-        card_pattern = r'<!-- Card (\d+) \| slug: ([^|]+) \| CardType: ([^|]+) \| Tags: ([^-->]+) -->'
+        card_pattern = r"<!-- Card (\d+) \| slug: ([^|]+) \| CardType: ([^|]+) \| Tags: ([^-->]+) -->"
         matches = re.findall(card_pattern, output, re.MULTILINE)
 
         for match in matches:
@@ -170,7 +171,9 @@ class ToolCallingGeneratorAgent:
 
         return cards
 
-    def _extract_card_content(self, output: str, card_number: int) -> Optional[Dict[str, str]]:
+    def _extract_card_content(
+        self, output: str, card_number: int
+    ) -> Optional[Dict[str, str]]:
         """Extract content for a specific card number.
 
         Args:
@@ -182,11 +185,11 @@ class ToolCallingGeneratorAgent:
         """
         # This is a simplified implementation
         # In practice, you'd need proper APF parsing logic
-        lines = output.split('\n')
+        lines = output.split("\n")
         card_start = None
 
         for i, line in enumerate(lines):
-            if f'<!-- Card {card_number} |' in line:
+            if f"<!-- Card {card_number} |" in line:
                 card_start = i
                 break
 
@@ -195,23 +198,23 @@ class ToolCallingGeneratorAgent:
 
         # Extract content until next card or end
         content_lines = []
-        for line in lines[card_start + 1:]:
-            if line.startswith('<!-- Card ') and 'slug:' in line:
+        for line in lines[card_start + 1 :]:
+            if line.startswith("<!-- Card ") and "slug:" in line:
                 break
             content_lines.append(line)
 
-        content = '\n'.join(content_lines).strip()
+        content = "\n".join(content_lines).strip()
 
         # Simple front/back extraction (very simplified)
-        if '<!-- Title -->' in content:
-            parts = content.split('<!-- Title -->', 1)
+        if "<!-- Title -->" in content:
+            parts = content.split("<!-- Title -->", 1)
             if len(parts) > 1:
-                title_part = parts[1].split('<!--', 1)[0].strip()
+                title_part = parts[1].split("<!--", 1)[0].strip()
                 back_part = ""
-                if '<!-- Key point -->' in content:
-                    back_parts = content.split('<!-- Key point -->', 1)
+                if "<!-- Key point -->" in content:
+                    back_parts = content.split("<!-- Key point -->", 1)
                     if len(back_parts) > 1:
-                        back_part = back_parts[1].split('<!--', 1)[0].strip()
+                        back_part = back_parts[1].split("<!--", 1)[0].strip()
 
                 return {
                     "front": title_part,

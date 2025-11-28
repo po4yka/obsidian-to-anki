@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-
 from ..entities.note import NoteMetadata, QAPair
 
 
@@ -27,7 +26,9 @@ class INoteParser(ABC):
         pass
 
     @abstractmethod
-    def parse_frontmatter(self, content: str, file_path: Path | None = None) -> NoteMetadata:
+    def parse_frontmatter(
+        self, content: str, file_path: Path | None = None
+    ) -> NoteMetadata:
         """Parse YAML frontmatter from note content.
 
         Args:
@@ -57,7 +58,7 @@ class INoteParser(ABC):
         metadata: NoteMetadata,
         content: str,
         enforce_bilingual: bool = True,
-        check_code_fences: bool = True
+        check_code_fences: bool = True,
     ) -> list[str]:
         """Validate note structure and return issues.
 

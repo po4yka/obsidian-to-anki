@@ -8,12 +8,11 @@ import time
 from typing import Any, Dict, List, Optional
 
 from ...config import Config
-from ...models import GeneratedCard, NoteMetadata, QAPair
+from ...models import GeneratedCard
 from ...utils.logging import get_logger
 from .advanced_memory import (
     AdvancedMemoryStore,
     CardGenerationPattern,
-    MemorizationFeedback,
     UserCardPreferences,
 )
 from .unified_agent import UnifiedAgentInterface, UnifiedAgentResult
@@ -31,7 +30,9 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
     - Provides context-aware card creation
     """
 
-    def __init__(self, config: Config, memory_store: Optional[AdvancedMemoryStore] = None):
+    def __init__(
+        self, config: Config, memory_store: Optional[AdvancedMemoryStore] = None
+    ):
         """Initialize memory-enhanced generator.
 
         Args:
@@ -49,9 +50,11 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
             # Try to create memory store from config
             try:
                 mongodb_url = getattr(
-                    config, "mongodb_url", "mongodb://localhost:27017")
+                    config, "mongodb_url", "mongodb://localhost:27017"
+                )
                 memory_db_name = getattr(
-                    config, "memory_db_name", "obsidian_anki_memory")
+                    config, "memory_db_name", "obsidian_anki_memory"
+                )
 
                 self.memory_store = AdvancedMemoryStore(
                     config=config,
@@ -77,11 +80,13 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         try:
             # Try to connect (handles async properly)
             import asyncio
+
             if asyncio.iscoroutinefunction(self.memory_store.connect):
                 connected = await self.memory_store.connect()
             else:
                 # Synchronous wrapper for async connect
                 import asyncio
+
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # Schedule connection for later
@@ -97,10 +102,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
             return False
 
     async def _get_similar_patterns(
-        self,
-        topic: str,
-        complexity: str = "medium",
-        min_quality: float = 0.7
+        self, topic: str, complexity: str = "medium", min_quality: float = 0.7
     ) -> List[CardGenerationPattern]:
         """Get similar successful card generation patterns.
 
@@ -120,20 +122,22 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                 topic=topic,
                 complexity=complexity,
                 min_quality_score=min_quality,
-                limit=3
+                limit=3,
             )
             logger.info(
                 "retrieved_similar_patterns",
                 topic=topic,
                 complexity=complexity,
-                pattern_count=len(patterns)
+                pattern_count=len(patterns),
             )
             return patterns
         except Exception as e:
             logger.error(f"Failed to retrieve patterns: {e}")
             return []
 
-    async def _get_user_preferences(self, user_id: str, topic: str) -> Optional[UserCardPreferences]:
+    async def _get_user_preferences(
+        self, user_id: str, topic: str
+    ) -> Optional[UserCardPreferences]:
         """Get user preferences for card generation.
 
         Args:
@@ -153,14 +157,16 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                     "user_preferences_found",
                     user_id=user_id,
                     topic=topic,
-                    confidence=prefs.confidence
+                    confidence=prefs.confidence,
                 )
             return prefs
         except Exception as e:
             logger.error(f"Failed to retrieve user preferences: {e}")
             return None
 
-    async def _analyze_content_complexity(self, note_content: str, qa_pairs: List[Dict[str, Any]]) -> str:
+    async def _analyze_content_complexity(
+        self, note_content: str, qa_pairs: List[Dict[str, Any]]
+    ) -> str:
         """Analyze the complexity of note content.
 
         Args:
@@ -181,7 +187,9 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         else:
             return "complex"
 
-    async def _get_topic_feedback_insights(self, topic: str) -> Optional[Dict[str, Any]]:
+    async def _get_topic_feedback_insights(
+        self, topic: str
+    ) -> Optional[Dict[str, Any]]:
         """Get feedback insights for a topic to improve generation.
 
         Args:
@@ -208,7 +216,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         patterns: List[CardGenerationPattern],
         user_prefs: Optional[UserCardPreferences],
         topic: str,
-        complexity: str
+        complexity: str,
     ) -> str:
         """Enhance generation prompt with memory insights.
 
@@ -232,7 +240,8 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
 
             for i, pattern in enumerate(patterns[:2]):  # Use top 2 patterns
                 enhancements.append(
-                    f"**Pattern {i+1}** (Quality: {pattern.quality_score:.2f}):")
+                    f"**Pattern {i+1}** (Quality: {pattern.quality_score:.2f}):"
+                )
                 enhancements.append(f"- Card Type: {pattern.card_type}")
                 enhancements.append(
                     f"- Question Style: {pattern.question_structure}")
@@ -244,9 +253,11 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         if user_prefs and user_prefs.confidence > 0.6:
             enhancements.append("## User Preferences")
             enhancements.append(
-                f"- Preferred Card Type: {user_prefs.preferred_card_type}")
+                f"- Preferred Card Type: {user_prefs.preferred_card_type}"
+            )
             enhancements.append(
-                f"- Preferred Difficulty: {user_prefs.preferred_difficulty}")
+                f"- Preferred Difficulty: {user_prefs.preferred_difficulty}"
+            )
 
             if user_prefs.rejection_patterns:
                 enhancements.append("- Avoid these patterns:")
@@ -266,12 +277,12 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         if feedback_insights:
             enhancements.append("")
             enhancements.append("## Quality Insights from Past Generations")
-            avg_quality = feedback_insights.get("avg_quality_score", 0.0)
             enhancements.append(".2f")
 
             if feedback_insights.get("high_quality_percentage", 0) > 0.7:
                 enhancements.append(
-                    "- This topic typically produces high-quality cards")
+                    "- This topic typically produces high-quality cards"
+                )
                 enhancements.append("- Focus on maintaining current standards")
             elif feedback_insights.get("low_quality_percentage", 0) > 0.3:
                 enhancements.append(
@@ -314,7 +325,6 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
             # Extract topic and user info
             topic = metadata.get("topic", "general")
             user_id = metadata.get("user_id", "default")
-            title = metadata.get("title", "Unknown")
 
             # Analyze content complexity
             complexity = await self._analyze_content_complexity(note_content, qa_pairs)
@@ -351,16 +361,18 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                     "patterns_used": len(patterns),
                     "user_preferences_applied": user_prefs is not None,
                     "complexity": complexity,
-                    "processing_time": processing_time
+                    "processing_time": processing_time,
                 },
                 confidence=0.85,  # Memory-enhanced generation
                 agent_framework=self.agent_framework,
                 agent_type=self.agent_type,
                 metadata={
                     "memory_patterns_used": len(patterns),
-                    "user_preferences_applied": user_prefs.confidence if user_prefs else 0.0,
-                    "content_complexity": complexity
-                }
+                    "user_preferences_applied": (
+                        user_prefs.confidence if user_prefs else 0.0
+                    ),
+                    "content_complexity": complexity,
+                },
             )
 
         except Exception as e:
@@ -378,7 +390,7 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
         note_content: str,
         metadata: Dict[str, Any],
         qa_pairs: List[Dict[str, Any]],
-        enhanced_prompt: str
+        enhanced_prompt: str,
     ) -> List[GeneratedCard]:
         """Generate cards using the enhanced prompt.
 
@@ -406,18 +418,15 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                     "source": "memory_enhanced_generator",
                     "qa_index": i,
                     "slug_base": metadata.get("slug_base", ""),
-                    "language": metadata.get("language", "en")
-                }
+                    "language": metadata.get("language", "en"),
+                },
             )
             cards.append(card)
 
         return cards
 
     async def _store_generation_pattern(
-        self,
-        cards: List[GeneratedCard],
-        metadata: Dict[str, Any],
-        complexity: str
+        self, cards: List[GeneratedCard], metadata: Dict[str, Any], complexity: str
     ):
         """Store successful generation pattern for future learning.
 
@@ -434,8 +443,9 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
 
             # Analyze generated cards for patterns
             card_types = [card.card_type for card in cards]
-            dominant_type = max(
-                set(card_types), key=card_types.count) if card_types else "simple"
+            dominant_type = (
+                max(set(card_types), key=card_types.count) if card_types else "simple"
+            )
 
             # Create pattern
             pattern = CardGenerationPattern(
@@ -449,10 +459,11 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
                 last_used=time.time(),
                 metadata={
                     "card_count": len(cards),
-                    "avg_question_length": sum(len(card.question) for card in cards) / len(cards),
+                    "avg_question_length": sum(len(card.question) for card in cards)
+                    / len(cards),
                     "language": metadata.get("language", "en"),
-                    "tags": metadata.get("tags", [])
-                }
+                    "tags": metadata.get("tags", []),
+                },
             )
 
             await self.memory_store.store_card_generation_pattern(pattern)

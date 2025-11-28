@@ -6,11 +6,10 @@ used in the card generation pipeline.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel
 
 from ...utils.logging import get_logger
 
@@ -88,11 +87,7 @@ class BaseLangChainAgent(ABC):
         pass
 
     @abstractmethod
-    async def run(
-        self,
-        input_data: Dict[str, Any],
-        **kwargs
-    ) -> LangChainAgentResult:
+    async def run(self, input_data: Dict[str, Any], **kwargs) -> LangChainAgentResult:
         """Run the agent with given input data.
 
         Args:
@@ -183,6 +178,7 @@ class BaseLangChainAgent(ABC):
 
         # Look for percentage patterns
         import re
+
         percentage_match = re.search(r"(\d+)%", output)
         if percentage_match:
             percentage = int(percentage_match.group(1)) / 100.0

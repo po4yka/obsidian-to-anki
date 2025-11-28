@@ -17,16 +17,12 @@ from pydantic import BaseModel, Field
 class RevisionSuggestion(BaseModel):
     """A specific suggestion for revising the output."""
 
-    issue: str = Field(
-        description="The specific issue identified in the output"
-    )
+    issue: str = Field(description="The specific issue identified in the output")
     severity: str = Field(
         default="medium",
         description="Severity of the issue: 'low', 'medium', 'high', 'critical'",
     )
-    suggestion: str = Field(
-        description="Specific suggestion for how to fix this issue"
-    )
+    suggestion: str = Field(description="Specific suggestion for how to fix this issue")
     affected_field: str = Field(
         default="",
         description="The field or section of the output affected by this issue",
@@ -39,9 +35,7 @@ class ReflectionOutput(BaseModel):
     All stage-specific reflection outputs inherit from this base class.
     """
 
-    reflection: str = Field(
-        description="Full self-reflection analysis of the output"
-    )
+    reflection: str = Field(description="Full self-reflection analysis of the output")
     quality_assessment: str = Field(
         description="Overall quality assessment of the output"
     )
@@ -201,9 +195,7 @@ class ReflectionTrace(BaseModel):
             quality_assessment=output.quality_assessment,
             issues_found=output.issues_found,
             strengths=output.strengths,
-            revision_suggestions=[
-                s.model_dump() for s in output.revision_suggestions
-            ],
+            revision_suggestions=[s.model_dump() for s in output.revision_suggestions],
             revision_needed=output.revision_needed,
             revision_priority=output.revision_priority,
             confidence=output.confidence,
@@ -218,9 +210,7 @@ class ReflectionTrace(BaseModel):
 class RevisionInput(BaseModel):
     """Input for revision node containing reflection feedback."""
 
-    original_output: dict = Field(
-        description="The original output that needs revision"
-    )
+    original_output: dict = Field(description="The original output that needs revision")
     reflection_trace: dict = Field(
         description="The reflection trace with issues and suggestions"
     )
@@ -276,23 +266,21 @@ class RevisionDecision(BaseModel):
     )
     priority_issues: list[str] = Field(
         default_factory=list,
-        description="Top priority issues to address first (by issue type)"
+        description="Top priority issues to address first (by issue type)",
     )
     preserve_elements: list[str] = Field(
         default_factory=list,
-        description="Elements that should not be changed during revision"
+        description="Elements that should not be changed during revision",
     )
     estimated_improvement: float = Field(
         default=0.0,
         ge=0.0,
         le=1.0,
-        description="Estimated improvement in quality score (0.0-1.0)"
+        description="Estimated improvement in quality score (0.0-1.0)",
     )
     cost_benefit_score: float = Field(
-        default=0.0,
-        description="Cost-benefit analysis score (higher = better ROI)"
+        default=0.0, description="Cost-benefit analysis score (higher = better ROI)"
     )
     reasoning: str = Field(
-        default="",
-        description="Explanation of why this revision strategy was chosen"
+        default="", description="Explanation of why this revision strategy was chosen"
     )

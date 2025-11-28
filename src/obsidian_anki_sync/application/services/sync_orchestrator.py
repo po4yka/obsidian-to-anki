@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.card_generator import ICardGenerator
 from ...domain.interfaces.note_parser import INoteParser
@@ -12,7 +11,7 @@ from ...utils.logging import get_logger
 from ..use_cases.apply_changes import ApplyChangesUseCase
 from ..use_cases.determine_sync_actions import DetermineSyncActionsUseCase
 from ..use_cases.generate_cards import GenerateCardsUseCase
-from ..use_cases.sync_notes import SyncNotesUseCase, SyncNotesRequest
+from ..use_cases.sync_notes import SyncNotesRequest, SyncNotesUseCase
 
 logger = get_logger(__name__)
 
@@ -76,8 +75,7 @@ class SyncOrchestrator:
         )
         self.generate_cards_use_case = GenerateCardsUseCase(card_generator)
         self.determine_actions_use_case = DetermineSyncActionsUseCase()
-        self.apply_changes_use_case = ApplyChangesUseCase(
-            anki_client, state_repository)
+        self.apply_changes_use_case = ApplyChangesUseCase(anki_client, state_repository)
 
         logger.info("sync_orchestrator_initialized")
 
@@ -189,16 +187,14 @@ class SyncOrchestrator:
         status = {}
 
         try:
-            status["anki_client"] = {
-                "connected": self.anki_client.check_connection()
-            }
+            status["anki_client"] = {"connected": self.anki_client.check_connection()}
         except Exception as e:
             status["anki_client"] = {"error": str(e)}
 
         try:
             status["state_repository"] = {
                 "accessible": True,  # Basic check
-                "stats": self.state_repository.get_sync_stats()
+                "stats": self.state_repository.get_sync_stats(),
             }
         except Exception as e:
             status["state_repository"] = {"error": str(e)}

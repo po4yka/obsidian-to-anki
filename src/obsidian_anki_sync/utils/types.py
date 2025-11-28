@@ -12,12 +12,13 @@ class RecoveryResult(BaseModel):
 
     success: bool = Field(description="Whether recovery was successful")
     metadata: NoteMetadata | None = Field(
-        default=None, description="Recovered note metadata")
+        default=None, description="Recovered note metadata"
+    )
     qa_pairs: list[QAPair] | None = Field(
-        default=None, description="Recovered Q&A pairs")
-    method_used: str = Field(
-        default="", description="Recovery method that was used")
-    warnings: list[str] = Field(
-        default_factory=list, description="Recovery warnings")
+        default=None, description="Recovered Q&A pairs"
+    )
+    method_used: str = Field(default="", description="Recovery method that was used")
+    warnings: list[str] = Field(default_factory=list, description="Recovery warnings")
     original_error: str | None = Field(
-        default=None, description="Original error message")
+        default=None, description="Original error message"
+    )

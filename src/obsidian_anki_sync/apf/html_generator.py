@@ -293,7 +293,6 @@ class HTMLTemplateGenerator:
         warnings = []
 
         def wrap_code(match):
-            code_content = match.group(1)
             warnings.append("Wrapped standalone code element in pre tags")
             return f"<pre>{match.group(0)}</pre>"
 

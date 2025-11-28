@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.entities.card import Card
 from ...domain.entities.note import Note
 from ...domain.interfaces.card_generator import ICardGenerator
@@ -63,7 +62,8 @@ class GenerateCardsUseCase:
             # Validate note
             if not request.note.is_valid:
                 errors.append(
-                    f"Note {request.note.id} is not valid for card generation")
+                    f"Note {request.note.id} is not valid for card generation"
+                )
                 return GenerateCardsResponse(
                     cards=[],
                     success=False,
@@ -88,15 +88,16 @@ class GenerateCardsUseCase:
             for language in languages:
                 try:
                     note_cards = self.card_generator.generate_cards_from_note(
-                        request.note)
+                        request.note
+                    )
                     # Filter cards by language if needed
-                    language_cards = [
-                        c for c in note_cards if c.language == language]
+                    language_cards = [c for c in note_cards if c.language == language]
 
                     # Validate generated cards
                     for card in language_cards:
                         validation_errors = self.card_generator.validate_card_content(
-                            card)
+                            card
+                        )
                         if validation_errors:
                             stats["validation_errors"] += 1
                             errors.extend(validation_errors)
@@ -106,7 +107,8 @@ class GenerateCardsUseCase:
 
                 except Exception as e:
                     errors.append(
-                        f"Failed to generate cards for language {language}: {e}")
+                        f"Failed to generate cards for language {language}: {e}"
+                    )
 
             return GenerateCardsResponse(
                 cards=cards,

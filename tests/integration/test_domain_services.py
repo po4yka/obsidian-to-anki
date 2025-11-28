@@ -117,8 +117,8 @@ class TestDomainServicesIntegration:
         # Same data should hash the same
         assert hash1 == hash2
 
-        # Different data should hash differently
-        assert hash1 != hash3
+        # List order should not matter (normalized)
+        assert hash1 == hash3
 
     def test_slug_language_extraction(self):
         """Test extracting language from slug."""

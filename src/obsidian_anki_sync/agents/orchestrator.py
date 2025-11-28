@@ -145,8 +145,7 @@ class AgentOrchestrator:
             enable_content_generation=getattr(
                 config, "enable_content_generation", True
             ),
-            repair_missing_sections=getattr(
-                config, "repair_missing_sections", True),
+            repair_missing_sections=getattr(config, "repair_missing_sections", True),
         )
 
         self.generator = GeneratorAgent(
@@ -170,12 +169,9 @@ class AgentOrchestrator:
             pre_val_temp=pre_val_temp,
             gen_temp=gen_temp,
             post_val_temp=post_val_temp,
-            post_val_max_retries=getattr(
-                config, "post_validation_max_retries", 3),
-            post_val_auto_fix=getattr(
-                config, "post_validation_auto_fix", True),
-            post_val_strict=getattr(
-                config, "post_validation_strict_mode", True),
+            post_val_max_retries=getattr(config, "post_validation_max_retries", 3),
+            post_val_auto_fix=getattr(config, "post_validation_auto_fix", True),
+            post_val_strict=getattr(config, "post_validation_strict_mode", True),
         )
 
     def process_note(
@@ -215,8 +211,7 @@ class AgentOrchestrator:
         )
 
         # Stage 1: Pre-validation
-        pre_validation_enabled = getattr(
-            self.config, "pre_validation_enabled", True)
+        pre_validation_enabled = getattr(self.config, "pre_validation_enabled", True)
         pre_val_start = time.time()
 
         if pre_validation_enabled:
@@ -309,8 +304,7 @@ class AgentOrchestrator:
 
         # Stage 3: Post-validation with retry
         post_val_start = time.time()
-        base_max_retries = getattr(
-            self.config, "post_validation_max_retries", 3)
+        base_max_retries = getattr(self.config, "post_validation_max_retries", 3)
         auto_fix = getattr(self.config, "post_validation_auto_fix", True)
         strict_mode = getattr(self.config, "post_validation_strict_mode", True)
 
@@ -401,8 +395,7 @@ class AgentOrchestrator:
 
             # Exponential backoff before retry (except on first attempt)
             if attempt > 0:
-                backoff_seconds = min(2 ** (attempt - 1),
-                                      10)  # Cap at 10 seconds
+                backoff_seconds = min(2 ** (attempt - 1), 10)  # Cap at 10 seconds
                 logger.debug(
                     "post_validation_backoff",
                     seconds=backoff_seconds,
@@ -509,8 +502,7 @@ class AgentOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(
-                    qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")

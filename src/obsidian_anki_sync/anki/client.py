@@ -23,7 +23,9 @@ class AnkiClient(IAnkiClient):
     async HTTP client in the future.
     """
 
-    def __init__(self, url: str, timeout: float = 30.0, enable_health_checks: bool = True):
+    def __init__(
+        self, url: str, timeout: float = 30.0, enable_health_checks: bool = True
+    ):
         """
         Initialize client.
 
@@ -51,8 +53,9 @@ class AnkiClient(IAnkiClient):
                 max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
             ),
         )
-        logger.info("anki_client_initialized", url=url,
-                    health_checks=enable_health_checks)
+        logger.info(
+            "anki_client_initialized", url=url, health_checks=enable_health_checks
+        )
 
     def _check_health(self) -> bool:
         """
@@ -105,10 +108,12 @@ class AnkiClient(IAnkiClient):
         """
         # Perform health check before making requests
         if not self._check_health():
-            logger.warning("anki_unhealthy_skipping_request",
-                           action=action, url=self.url)
+            logger.warning(
+                "anki_unhealthy_skipping_request", action=action, url=self.url
+            )
             raise AnkiConnectError(
-                "AnkiConnect is not responding - check if Anki is running")
+                "AnkiConnect is not responding - check if Anki is running"
+            )
 
         payload = {"action": action, "version": 6, "params": params or {}}
 
@@ -209,8 +214,7 @@ class AnkiClient(IAnkiClient):
 
         result = cast(int, self.invoke("addNote", {"note": note_payload}))
 
-        logger.info("note_added", note_id=result,
-                    deck=deck, note_type=note_type)
+        logger.info("note_added", note_id=result, deck=deck, note_type=note_type)
         return result
 
     def add_notes(
@@ -235,8 +239,7 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
-        result = cast(list[int | None], self.invoke(
-            "addNotes", {"notes": notes}))
+        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -258,8 +261,7 @@ class AnkiClient(IAnkiClient):
             note_id: Note ID
             fields: New field values
         """
-        self.invoke("updateNoteFields", {
-                    "note": {"id": note_id, "fields": fields}})
+        self.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
 
         logger.info("note_updated", note_id=note_id)
 
@@ -498,8 +500,7 @@ class AnkiClient(IAnkiClient):
             List of field names
         """
         return cast(
-            list[str], self.invoke("modelFieldNames", {
-                                   "modelName": model_name})
+            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
         )
 
     def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
@@ -531,7 +532,9 @@ class AnkiClient(IAnkiClient):
         Returns:
             The filename as stored in Anki (may be modified)
         """
-        return cast(str, self.invoke("storeMediaFile", {"filename": filename, "data": data}))
+        return cast(
+            str, self.invoke("storeMediaFile", {"filename": filename, "data": data})
+        )
 
     def suspend_cards(self, card_ids: list[int]) -> None:
         """
@@ -628,8 +631,7 @@ class AnkiClient(IAnkiClient):
                 self.session.close()
                 logger.debug("anki_client_closed", url=self.url)
             except Exception as e:
-                logger.warning("anki_client_cleanup_failed",
-                               url=self.url, error=str(e))
+                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""

@@ -37,9 +37,9 @@ class ContentHashService:
 
         # Compute hash
         if algorithm == "sha256":
-            hash_obj = hashlib.sha256(normalized.encode('utf-8'))
+            hash_obj = hashlib.sha256(normalized.encode("utf-8"))
         elif algorithm == "md5":
-            hash_obj = hashlib.md5(normalized.encode('utf-8'))
+            hash_obj = hashlib.md5(normalized.encode("utf-8"))
         else:
             raise ValueError(f"Unsupported hash algorithm: {algorithm}")
 
@@ -75,12 +75,13 @@ class ContentHashService:
             Hash of file content
         """
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
             return ContentHashService.compute_hash(content)
-        except (OSError, UnicodeDecodeError) as e:
+        except (OSError, UnicodeDecodeError):
             # Fallback to file metadata if content can't be read
             import os
+
             stat = os.stat(file_path)
             metadata = f"{file_path}:{stat.st_size}:{stat.st_mtime}"
             return ContentHashService.compute_hash(metadata)
@@ -103,7 +104,7 @@ class ContentHashService:
         current_content: str,
         previous_hash: str,
         algorithm: str = "sha256",
-        length: int = 64
+        length: int = 64,
     ) -> bool:
         """Check if content has changed compared to previous hash.
 
@@ -135,10 +136,10 @@ class ContentHashService:
             return ""
 
         # Normalize line endings
-        normalized = content.replace('\r\n', '\n').replace('\r', '\n')
+        normalized = content.replace("\r\n", "\n").replace("\r", "\n")
 
-        # Remove trailing whitespace from lines
-        lines = [line.rstrip() for line in normalized.split('\n')]
+        # Remove leading and trailing whitespace from lines
+        lines = [line.strip() for line in normalized.split("\n")]
 
         # Remove empty lines at start and end
         while lines and not lines[0].strip():
@@ -146,7 +147,7 @@ class ContentHashService:
         while lines and not lines[-1].strip():
             lines.pop(-1)
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     @staticmethod
     def _normalize_dict(data: dict[str, Any]) -> str:
@@ -158,11 +159,12 @@ class ContentHashService:
         Returns:
             Normalized string representation
         """
+
         def normalize_value(value: Any) -> str:
             if isinstance(value, dict):
                 return ContentHashService._normalize_dict(value)
             elif isinstance(value, list):
-                return ','.join(sorted(str(normalize_value(item)) for item in value))
+                return ",".join(sorted(str(normalize_value(item)) for item in value))
             elif isinstance(value, (int, float)):
                 return str(value)
             elif isinstance(value, str):
@@ -177,7 +179,7 @@ class ContentHashService:
         for key, value in sorted_items:
             normalized_parts.append(f"{key}:{normalize_value(value)}")
 
-        return '|'.join(normalized_parts)
+        return "|".join(normalized_parts)
 
     @staticmethod
     def _add_to_cache(key: str, value: str) -> None:
@@ -192,8 +194,10 @@ class ContentHashService:
         # Simple LRU-style cache size management
         if len(ContentHashService._cache) > ContentHashService._cache_max_size:
             # Remove oldest entries (simple implementation)
-            items_to_remove = len(ContentHashService._cache) - \
+            items_to_remove = (
+                len(ContentHashService._cache) -
                 ContentHashService._cache_max_size
+            )
             keys_to_remove = list(ContentHashService._cache.keys())[
                 :items_to_remove]
 
@@ -216,5 +220,9 @@ class ContentHashService:
         return {
             "size": len(ContentHashService._cache),
             "max_size": ContentHashService._cache_max_size,
-            "utilization_percent": int((len(ContentHashService._cache) / ContentHashService._cache_max_size) * 100)
+            "utilization_percent": int(
+                (len(ContentHashService._cache) /
+                 ContentHashService._cache_max_size)
+                * 100
+            ),
         }

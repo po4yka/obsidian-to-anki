@@ -4,7 +4,7 @@ This module provides a factory pattern for creating LangChain agents
 based on configuration and task requirements.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
@@ -35,7 +35,7 @@ class LangChainAgentFactory:
         model: Optional[BaseLanguageModel] = None,
         langchain_agent_type: str = "tool_calling",
         tools: Optional[List[BaseTool]] = None,
-        **kwargs
+        **kwargs,
     ) -> BaseLangChainAgent:
         """Create a LangChain agent.
 
@@ -74,7 +74,7 @@ class LangChainAgentFactory:
             model=model,
             tools=tools,
             config=agent_config,
-            **kwargs
+            **kwargs,
         )
 
         # Cache the agent
@@ -104,7 +104,9 @@ class LangChainAgentFactory:
         # In practice, this would convert config model names to LangChain models
         raise NotImplementedError("Model factory integration needed")
 
-    def _get_agent_config(self, agent_type: str, langchain_agent_type: str) -> Dict[str, Any]:
+    def _get_agent_config(
+        self, agent_type: str, langchain_agent_type: str
+    ) -> Dict[str, Any]:
         """Get configuration for a specific agent.
 
         Args:
@@ -172,7 +174,7 @@ class LangChainAgentFactory:
         model: BaseLanguageModel,
         tools: List[BaseTool],
         config: Dict[str, Any],
-        **kwargs
+        **kwargs,
     ) -> BaseLangChainAgent:
         """Create agent based on LangChain agent type.
 
@@ -189,47 +191,34 @@ class LangChainAgentFactory:
         """
         if langchain_agent_type == "tool_calling":
             from .tool_calling_agent import ToolCallingAgent
+
             return ToolCallingAgent(
-                model=model,
-                tools=tools,
-                agent_type=agent_type,
-                **config,
-                **kwargs
+                model=model, tools=tools, agent_type=agent_type, **config, **kwargs
             )
 
         elif langchain_agent_type == "react":
             from .react_agent import ReActAgent
+
             return ReActAgent(
-                model=model,
-                tools=tools,
-                agent_type=agent_type,
-                **config,
-                **kwargs
+                model=model, tools=tools, agent_type=agent_type, **config, **kwargs
             )
 
         elif langchain_agent_type == "structured_chat":
             from .structured_chat_agent import StructuredChatAgent
+
             return StructuredChatAgent(
-                model=model,
-                tools=tools,
-                agent_type=agent_type,
-                **config,
-                **kwargs
+                model=model, tools=tools, agent_type=agent_type, **config, **kwargs
             )
 
         elif langchain_agent_type == "json_chat":
             from .json_chat_agent import JSONChatAgent
+
             return JSONChatAgent(
-                model=model,
-                tools=tools,
-                agent_type=agent_type,
-                **config,
-                **kwargs
+                model=model, tools=tools, agent_type=agent_type, **config, **kwargs
             )
 
         else:
-            raise ValueError(
-                f"Unknown LangChain agent type: {langchain_agent_type}")
+            raise ValueError(f"Unknown LangChain agent type: {langchain_agent_type}")
 
     def get_available_agent_types(self) -> List[str]:
         """Get list of available LangChain agent types.

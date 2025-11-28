@@ -30,8 +30,7 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(
-        default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path("."), description="Source directory within vault"
     )
@@ -76,8 +75,7 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(
-        default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -85,15 +83,16 @@ class Config(BaseSettings):
     model_names: dict[str, str] = Field(
         default_factory=lambda: {
             "APF::Simple": os.getenv("ANKI_MODEL_SIMPLE", "APF: Simple (3.0.0)"),
-            "APF::Missing (Cloze)": os.getenv("ANKI_MODEL_MISSING", "APF: Missing! (3.0.0)"),
+            "APF::Missing (Cloze)": os.getenv(
+                "ANKI_MODEL_MISSING", "APF: Missing! (3.0.0)"
+            ),
             "APF::Draw": os.getenv("ANKI_MODEL_DRAW", "APF: Draw! (3.0.0)"),
         },
         description="Mapping from internal note type to actual Anki model name",
     )
 
     # Runtime settings
-    run_mode: str = Field(
-        default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -308,65 +307,58 @@ class Config(BaseSettings):
     # ============================================================================
     rag_enabled: bool = Field(
         default=False,
-        description="Enable RAG for context enrichment, duplicate detection, and few-shot examples"
+        description="Enable RAG for context enrichment, duplicate detection, and few-shot examples",
     )
 
     rag_db_path: Path = Field(
         default=Path(".chroma_db"),
-        description="Path to ChromaDB persistence directory (relative to vault)"
+        description="Path to ChromaDB persistence directory (relative to vault)",
     )
 
     rag_embedding_model: str = Field(
         default="openai/text-embedding-3-small",
-        description="Embedding model for RAG (via OpenRouter or direct provider)"
+        description="Embedding model for RAG (via OpenRouter or direct provider)",
     )
 
     rag_chunk_size: int = Field(
         default=1000,
         ge=100,
         le=10000,
-        description="Maximum characters per chunk for RAG indexing"
+        description="Maximum characters per chunk for RAG indexing",
     )
 
     rag_chunk_overlap: int = Field(
-        default=200,
-        ge=0,
-        le=500,
-        description="Overlap between chunks for RAG indexing"
+        default=200, ge=0, le=500, description="Overlap between chunks for RAG indexing"
     )
 
     rag_search_k: int = Field(
         default=5,
         ge=1,
         le=20,
-        description="Number of results to retrieve in RAG searches"
+        description="Number of results to retrieve in RAG searches",
     )
 
     rag_similarity_threshold: float = Field(
         default=0.85,
         ge=0.0,
         le=1.0,
-        description="Similarity threshold for duplicate detection"
+        description="Similarity threshold for duplicate detection",
     )
 
     rag_index_on_sync: bool = Field(
-        default=True,
-        description="Automatically re-index changed files during sync"
+        default=True, description="Automatically re-index changed files during sync"
     )
 
     rag_context_enrichment: bool = Field(
-        default=True,
-        description="Use RAG to enrich context during card generation"
+        default=True, description="Use RAG to enrich context during card generation"
     )
 
     rag_duplicate_detection: bool = Field(
-        default=True,
-        description="Use RAG for semantic duplicate detection"
+        default=True, description="Use RAG for semantic duplicate detection"
     )
 
     rag_few_shot_examples: bool = Field(
-        default=True,
-        description="Use RAG to retrieve few-shot examples for generation"
+        default=True, description="Use RAG to retrieve few-shot examples for generation"
     )
 
     # LLM Performance Monitoring
@@ -538,7 +530,7 @@ class Config(BaseSettings):
     # Primary agent framework selection
     agent_framework: str = Field(
         default="pydantic_ai",
-        description="Primary agent framework: 'pydantic_ai' or 'langchain'"
+        description="Primary agent framework: 'pydantic_ai' or 'langchain'",
     )
 
     @field_validator("agent_framework")
@@ -548,33 +540,34 @@ class Config(BaseSettings):
         valid_frameworks = ["pydantic_ai", "langchain"]
         if v not in valid_frameworks:
             raise ValueError(
-                f"agent_framework must be one of {valid_frameworks}, got '{v}'")
+                f"agent_framework must be one of {valid_frameworks}, got '{v}'"
+            )
         return v
 
     # LangChain Agent Type Configuration
     # Specify which LangChain agent type to use for each task
     langchain_generator_type: str = Field(
         default="tool_calling",
-        description="LangChain agent type for card generation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+        description="LangChain agent type for card generation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
     )
     langchain_pre_validator_type: str = Field(
         default="react",
-        description="LangChain agent type for pre-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+        description="LangChain agent type for pre-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
     )
     langchain_post_validator_type: str = Field(
         default="tool_calling",
-        description="LangChain agent type for post-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+        description="LangChain agent type for post-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
     )
     langchain_enrichment_type: str = Field(
         default="structured_chat",
-        description="LangChain agent type for context enrichment: 'tool_calling', 'react', 'structured_chat', 'json_chat'"
+        description="LangChain agent type for context enrichment: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
     )
 
     @field_validator(
         "langchain_generator_type",
         "langchain_pre_validator_type",
         "langchain_post_validator_type",
-        "langchain_enrichment_type"
+        "langchain_enrichment_type",
     )
     @classmethod
     def validate_langchain_agent_type(cls, v: str) -> str:
@@ -582,17 +575,17 @@ class Config(BaseSettings):
         valid_types = ["tool_calling", "react", "structured_chat", "json_chat"]
         if v not in valid_types:
             raise ValueError(
-                f"LangChain agent type must be one of {valid_types}, got '{v}'")
+                f"LangChain agent type must be one of {valid_types}, got '{v}'"
+            )
         return v
 
     # Agent Framework Fallback Configuration
     agent_fallback_on_error: str = Field(
         default="pydantic_ai",
-        description="Fallback agent framework when primary framework fails"
+        description="Fallback agent framework when primary framework fails",
     )
     agent_fallback_on_timeout: str = Field(
-        default="react",
-        description="Fallback agent type when primary agent times out"
+        default="react", description="Fallback agent type when primary agent times out"
     )
 
     # Enhancement Agents (optional quality improvements)
@@ -698,7 +691,8 @@ class Config(BaseSettings):
             "parser_repair": self.parser_repair_model,
             "note_correction": self.note_correction_model or self.parser_repair_model,
             "reasoning": self.reasoning_model or self.generator_model,  # CoT reasoning
-            "reflection": self.reflection_model or self.generator_model,  # Self-reflection
+            "reflection": self.reflection_model
+            or self.generator_model,  # Self-reflection
         }
 
         explicit_model = agent_model_map.get(agent_type, "")
@@ -779,8 +773,7 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(
-            model_task, preset, overrides if overrides else None)
+        config = get_model_config(model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -814,8 +807,7 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(
-            self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -932,8 +924,7 @@ def load_config(config_path: Path | None = None) -> Config:
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(
-            __file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
 
     resolved_config_path: Path | None = None

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.entities.card import SyncAction
 from ...domain.interfaces.anki_client import IAnkiClient
 from ...domain.interfaces.state_repository import IStateRepository
@@ -77,7 +76,8 @@ class ApplyChangesUseCase:
             # Process create actions
             if actions_by_type["create"]:
                 result = self._apply_create_actions(
-                    actions_by_type["create"], request.batch_size)
+                    actions_by_type["create"], request.batch_size
+                )
                 applied_actions.extend(result["applied"])
                 failed_actions.extend(result["failed"])
                 errors.extend(result["errors"])
@@ -88,7 +88,8 @@ class ApplyChangesUseCase:
             # Process update actions
             if actions_by_type["update"]:
                 result = self._apply_update_actions(
-                    actions_by_type["update"], request.batch_size)
+                    actions_by_type["update"], request.batch_size
+                )
                 applied_actions.extend(result["applied"])
                 failed_actions.extend(result["failed"])
                 errors.extend(result["errors"])
@@ -99,7 +100,8 @@ class ApplyChangesUseCase:
             # Process delete actions
             if actions_by_type["delete"]:
                 result = self._apply_delete_actions(
-                    actions_by_type["delete"], request.batch_size)
+                    actions_by_type["delete"], request.batch_size
+                )
                 applied_actions.extend(result["applied"])
                 failed_actions.extend(result["failed"])
                 errors.extend(result["errors"])
@@ -111,8 +113,7 @@ class ApplyChangesUseCase:
             self._update_state_repository(applied_actions)
 
             success = len(failed_actions) == 0 or (
-                request.continue_on_error and
-                len(applied_actions) > 0
+                request.continue_on_error and len(applied_actions) > 0
             )
 
             return ApplyChangesResponse(
@@ -127,7 +128,8 @@ class ApplyChangesUseCase:
             errors.append(f"Apply changes failed: {e}")
             return ApplyChangesResponse(
                 applied_actions=applied_actions,
-                failed_actions=failed_actions + [
+                failed_actions=failed_actions
+                + [
                     {"action": action, "error": str(e)}
                     for action in request.sync_actions[len(applied_actions):]
                 ],
@@ -136,7 +138,9 @@ class ApplyChangesUseCase:
                 stats=stats,
             )
 
-    def _group_actions_by_type(self, actions: list[SyncAction]) -> dict[str, list[SyncAction]]:
+    def _group_actions_by_type(
+        self, actions: list[SyncAction]
+    ) -> dict[str, list[SyncAction]]:
         """Group sync actions by type.
 
         Args:
@@ -162,9 +166,7 @@ class ApplyChangesUseCase:
         return grouped
 
     def _apply_create_actions(
-        self,
-        actions: list[SyncAction],
-        batch_size: int
+        self, actions: list[SyncAction], batch_size: int
     ) -> dict[str, any]:
         """Apply create actions in batches.
 
@@ -180,25 +182,28 @@ class ApplyChangesUseCase:
         errors = []
 
         for i in range(0, len(actions), batch_size):
-            batch = actions[i:i + batch_size]
+            batch = actions[i: i + batch_size]
 
             try:
                 # Create cards in batch
-                created_cards = []
                 for action in batch:
                     try:
                         # Simulate card creation
                         created_card = action.card.with_guid(
                             f"anki_{action.card.slug}")
-                        applied.append({
-                            "action": action,
-                            "result": created_card,
-                        })
+                        applied.append(
+                            {
+                                "action": action,
+                                "result": created_card,
+                            }
+                        )
                     except Exception as e:
-                        failed.append({
-                            "action": action,
-                            "error": str(e),
-                        })
+                        failed.append(
+                            {
+                                "action": action,
+                                "error": str(e),
+                            }
+                        )
                         errors.append(
                             f"Failed to create card {action.card.slug}: {e}")
 
@@ -215,9 +220,7 @@ class ApplyChangesUseCase:
         }
 
     def _apply_update_actions(
-        self,
-        actions: list[SyncAction],
-        batch_size: int
+        self, actions: list[SyncAction], batch_size: int
     ) -> dict[str, any]:
         """Apply update actions in batches.
 
@@ -234,15 +237,19 @@ class ApplyChangesUseCase:
 
         for action in actions:
             try:
-                applied.append({
-                    "action": action,
-                    "result": action.card,
-                })
+                applied.append(
+                    {
+                        "action": action,
+                        "result": action.card,
+                    }
+                )
             except Exception as e:
-                failed.append({
-                    "action": action,
-                    "error": str(e),
-                })
+                failed.append(
+                    {
+                        "action": action,
+                        "error": str(e),
+                    }
+                )
                 errors.append(f"Failed to update card {action.card.slug}: {e}")
 
         return {
@@ -252,9 +259,7 @@ class ApplyChangesUseCase:
         }
 
     def _apply_delete_actions(
-        self,
-        actions: list[SyncAction],
-        batch_size: int
+        self, actions: list[SyncAction], batch_size: int
     ) -> dict[str, any]:
         """Apply delete actions in batches.
 
@@ -271,15 +276,19 @@ class ApplyChangesUseCase:
 
         for action in actions:
             try:
-                applied.append({
-                    "action": action,
-                    "result": None,
-                })
+                applied.append(
+                    {
+                        "action": action,
+                        "result": None,
+                    }
+                )
             except Exception as e:
-                failed.append({
-                    "action": action,
-                    "error": str(e),
-                })
+                failed.append(
+                    {
+                        "action": action,
+                        "error": str(e),
+                    }
+                )
                 errors.append(f"Failed to delete card {action.card.slug}: {e}")
 
         return {
@@ -308,7 +317,7 @@ class ApplyChangesUseCase:
                 elif action.is_delete:
                     # Mark card as deleted (or remove from repository)
                     self.state_repository.delete_card(action.card.slug)
-        except Exception as e:
+        except Exception:
             # Log error but don't fail the operation
             # State inconsistency should be handled by sync recovery
             pass

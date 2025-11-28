@@ -7,7 +7,7 @@ or task requirements.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from ..config import Config
 from ..utils.logging import get_logger
@@ -110,29 +110,31 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
         if agent_type not in self._agents:
             try:
                 if agent_type == "generator":
-                    from .pydantic.generator import GeneratorAgentAI
                     from ...domain.interfaces.llm_config import get_model_for_agent
+                    from .pydantic.generator import GeneratorAgentAI
+
                     model = get_model_for_agent(self.config, "generator")
                     self._agents[agent_type] = GeneratorAgentAI(model)
                 elif agent_type == "pre_validator":
-                    from .pydantic.pre_validator import PreValidatorAgentAI
                     from ...domain.interfaces.llm_config import get_model_for_agent
+                    from .pydantic.pre_validator import PreValidatorAgentAI
+
                     model = get_model_for_agent(self.config, "pre_validator")
                     self._agents[agent_type] = PreValidatorAgentAI(model)
                 elif agent_type == "post_validator":
-                    from .pydantic.post_validator import PostValidatorAgentAI
                     from ...domain.interfaces.llm_config import get_model_for_agent
+                    from .pydantic.post_validator import PostValidatorAgentAI
+
                     model = get_model_for_agent(self.config, "post_validator")
                     self._agents[agent_type] = PostValidatorAgentAI(model)
                 elif agent_type == "context_enrichment":
-                    from .pydantic.context_enrichment import ContextEnrichmentAgentAI
                     from ...domain.interfaces.llm_config import get_model_for_agent
-                    model = get_model_for_agent(
-                        self.config, "context_enrichment")
+                    from .pydantic.context_enrichment import ContextEnrichmentAgentAI
+
+                    model = get_model_for_agent(self.config, "context_enrichment")
                     self._agents[agent_type] = ContextEnrichmentAgentAI(model)
                 else:
-                    raise ValueError(
-                        f"Unknown PydanticAI agent type: {agent_type}")
+                    raise ValueError(f"Unknown PydanticAI agent type: {agent_type}")
             except Exception as e:
                 logger.warning(
                     "pydantic_ai_agent_creation_failed",
@@ -159,12 +161,17 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
             qa_list = [QAPair(**qa) for qa in qa_pairs]
 
             agent = self._get_agent("generator")
-            result = await agent.generate_cards(note_content, note_metadata, qa_list, slug_base)
+            result = await agent.generate_cards(
+                note_content, note_metadata, qa_list, slug_base
+            )
 
             return UnifiedAgentResult(
                 success=result.success,
-                reasoning="Cards generated successfully" if result.success else result.errors[
-                    0] if result.errors else "Generation failed",
+                reasoning=(
+                    "Cards generated successfully"
+                    if result.success
+                    else result.errors[0] if result.errors else "Generation failed"
+                ),
                 data=result,
                 warnings=result.warnings,
                 confidence=0.9,  # PydanticAI generally reliable
@@ -201,7 +208,11 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
 
             return UnifiedAgentResult(
                 success=result.is_valid,
-                reasoning=result.error_details if not result.is_valid else "Pre-validation passed",
+                reasoning=(
+                    result.error_details
+                    if not result.is_valid
+                    else "Pre-validation passed"
+                ),
                 data=result,
                 warnings=[fix for fix in result.suggested_fixes],
                 confidence=result.confidence,
@@ -238,7 +249,11 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
 
             return UnifiedAgentResult(
                 success=result.is_valid,
-                reasoning=result.error_details if not result.is_valid else "Post-validation passed",
+                reasoning=(
+                    result.error_details
+                    if not result.is_valid
+                    else "Post-validation passed"
+                ),
                 data=result,
                 warnings=result.warnings,
                 confidence=result.confidence,
@@ -278,10 +293,13 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
 
             return UnifiedAgentResult(
                 success=result.success,
-                reasoning="Content enriched successfully" if result.success else "Enrichment failed",
+                reasoning=(
+                    "Content enriched successfully"
+                    if result.success
+                    else "Enrichment failed"
+                ),
                 data=result,
-                warnings=result.warnings if hasattr(
-                    result, "warnings") else [],
+                warnings=result.warnings if hasattr(result, "warnings") else [],
                 confidence=0.8,  # Enrichment is subjective
                 agent_framework=self.agent_framework,
                 agent_type="context_enrichment",
@@ -324,6 +342,7 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
         """Get or create LangChain agent factory."""
         if self._factory is None:
             from .langchain.factory import LangChainAgentFactory
+
             self._factory = LangChainAgentFactory(self.config)
         return self._factory
 
@@ -342,19 +361,27 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
         agent_configs = {
             "generator": {
                 "agent_type": "generator",
-                "langchain_agent_type": getattr(self.config, "langchain_generator_type", "tool_calling"),
+                "langchain_agent_type": getattr(
+                    self.config, "langchain_generator_type", "tool_calling"
+                ),
             },
             "pre_validator": {
                 "agent_type": "pre_validator",
-                "langchain_agent_type": getattr(self.config, "langchain_pre_validator_type", "react"),
+                "langchain_agent_type": getattr(
+                    self.config, "langchain_pre_validator_type", "react"
+                ),
             },
             "post_validator": {
                 "agent_type": "post_validator",
-                "langchain_agent_type": getattr(self.config, "langchain_post_validator_type", "tool_calling"),
+                "langchain_agent_type": getattr(
+                    self.config, "langchain_post_validator_type", "tool_calling"
+                ),
             },
             "context_enrichment": {
                 "agent_type": "enrichment",
-                "langchain_agent_type": getattr(self.config, "langchain_enrichment_type", "structured_chat"),
+                "langchain_agent_type": getattr(
+                    self.config, "langchain_enrichment_type", "structured_chat"
+                ),
             },
         }
 
@@ -374,11 +401,17 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
 
             # Use specialized generator agent
             agent = ToolCallingGeneratorAgent()
-            result = await agent.generate_cards(note_content, metadata, qa_pairs, slug_base)
+            result = await agent.generate_cards(
+                note_content, metadata, qa_pairs, slug_base
+            )
 
             return UnifiedAgentResult(
                 success=result.success,
-                reasoning="Cards generated successfully" if result.success else "Generation failed",
+                reasoning=(
+                    "Cards generated successfully"
+                    if result.success
+                    else "Generation failed"
+                ),
                 data=result,
                 warnings=result.warnings,
                 confidence=0.85,  # LangChain agents generally reliable
@@ -413,7 +446,11 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
 
             return UnifiedAgentResult(
                 success=result.is_valid,
-                reasoning=result.error_details if not result.is_valid else "Pre-validation passed",
+                reasoning=(
+                    result.error_details
+                    if not result.is_valid
+                    else "Pre-validation passed"
+                ),
                 data=result,
                 warnings=result.warnings,
                 confidence=result.confidence,
@@ -440,8 +477,8 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
     ) -> UnifiedAgentResult:
         """Run post-validation using LangChain agents."""
         try:
-            from .langchain.tool_calling_validator import ToolCallingValidatorAgent
             from ...models import GeneratedCard
+            from .langchain.tool_calling_validator import ToolCallingValidatorAgent
 
             # Convert to expected types
             card_list = [GeneratedCard(**card) for card in cards]
@@ -452,7 +489,11 @@ class LangChainUnifiedAgent(UnifiedAgentInterface):
 
             return UnifiedAgentResult(
                 success=result.is_valid,
-                reasoning=result.error_details if not result.is_valid else "Post-validation passed",
+                reasoning=(
+                    result.error_details
+                    if not result.is_valid
+                    else "Post-validation passed"
+                ),
                 data=result,
                 warnings=result.warnings,
                 confidence=result.confidence,
@@ -538,6 +579,7 @@ class UnifiedAgentSelector:
         self.memory_enhanced_available = False
         try:
             from .memory_enhanced_generator import MemoryEnhancedGenerator
+
             self.memory_enhanced_generator = MemoryEnhancedGenerator(config)
             self.memory_enhanced_available = True
             logger.info("memory_enhanced_generator_available")
@@ -545,9 +587,7 @@ class UnifiedAgentSelector:
             logger.warning(f"Memory-enhanced generator not available: {e}")
 
     def get_agent(
-        self,
-        framework: Optional[str] = None,
-        task_type: str = "generator"
+        self, framework: Optional[str] = None, task_type: str = "generator"
     ) -> UnifiedAgentInterface:
         """Get unified agent for specified framework and task.
 
@@ -569,8 +609,7 @@ class UnifiedAgentSelector:
                 return self.memory_enhanced_generator
             else:
                 # Fallback to pydantic_ai if memory not available
-                logger.warning(
-                    "memory_enhanced_not_available_fallback_to_pydantic_ai")
+                logger.warning("memory_enhanced_not_available_fallback_to_pydantic_ai")
                 framework = "pydantic_ai"
 
         cache_key = f"{framework}_{task_type}"
@@ -589,7 +628,7 @@ class UnifiedAgentSelector:
         self,
         primary_framework: str,
         fallback_framework: str,
-        task_type: str = "generator"
+        task_type: str = "generator",
     ) -> UnifiedAgentInterface:
         """Get agent with fallback support.
 

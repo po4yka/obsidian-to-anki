@@ -367,7 +367,7 @@ def calculate_repair_backoff(attempt: int, base_interval: float = 0.5) -> float:
     """
     import random
 
-    delay = base_interval * (2.0 ** attempt)
+    delay = base_interval * (2.0**attempt)
     # Add jitter (randomization) to prevent thundering herd
     jitter = random.uniform(0.0, delay * 0.1)
     return min(delay + jitter, 10.0)  # Cap at 10 seconds

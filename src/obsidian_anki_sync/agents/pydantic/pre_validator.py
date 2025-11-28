@@ -6,7 +6,7 @@ Validates note structure, formatting, and frontmatter before generation.
 from pathlib import Path
 
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...models import NoteMetadata, QAPair
 from ...utils.logging import get_logger
@@ -29,7 +29,7 @@ class PreValidatorAgentAI:
     Uses structured outputs for type-safe validation results.
     """
 
-    def __init__(self, model: OpenAIModel, temperature: float = 0.0):
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
         """Initialize pre-validator agent.
 
         Args:
@@ -42,7 +42,7 @@ class PreValidatorAgentAI:
         # Create PydanticAI agent with structured output
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
-            result_type=PreValidationOutput,
+            output_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
         )
 

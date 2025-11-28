@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 from ...domain.entities.card import Card, SyncAction, SyncActionType
 from ...domain.services.content_hash_service import ContentHashService
 
@@ -37,7 +36,9 @@ class DetermineSyncActionsUseCase:
         """Initialize use case."""
         pass
 
-    def execute(self, request: DetermineSyncActionsRequest) -> DetermineSyncActionsResponse:
+    def execute(
+        self, request: DetermineSyncActionsRequest
+    ) -> DetermineSyncActionsResponse:
         """Determine sync actions by comparing Obsidian and Anki states.
 
         Args:
@@ -65,12 +66,10 @@ class DetermineSyncActionsUseCase:
         common_slugs = set(obsidian_by_slug.keys()) & set(anki_by_slug.keys())
 
         # Find cards that only exist in Obsidian (need to be created)
-        obsidian_only_slugs = set(
-            obsidian_by_slug.keys()) - set(anki_by_slug.keys())
+        obsidian_only_slugs = set(obsidian_by_slug.keys()) - set(anki_by_slug.keys())
 
         # Find cards that only exist in Anki (may need to be deleted)
-        anki_only_slugs = set(anki_by_slug.keys()) - \
-            set(obsidian_by_slug.keys())
+        anki_only_slugs = set(anki_by_slug.keys()) - set(obsidian_by_slug.keys())
 
         # Process cards that exist in both systems
         for slug in common_slugs:
@@ -86,12 +85,14 @@ class DetermineSyncActionsUseCase:
                 if action.action_type == SyncActionType.UPDATE:
                     stats["actions_update"] += 1
             elif self._is_conflict(obsidian_card, anki_card):
-                conflicts.append({
-                    "slug": slug,
-                    "obsidian_card": obsidian_card,
-                    "anki_card": anki_card,
-                    "reason": "Content differs between systems",
-                })
+                conflicts.append(
+                    {
+                        "slug": slug,
+                        "obsidian_card": obsidian_card,
+                        "anki_card": anki_card,
+                        "reason": "Content differs between systems",
+                    }
+                )
                 stats["conflicts"] += 1
 
         # Process cards that only exist in Obsidian (create actions)
@@ -124,10 +125,7 @@ class DetermineSyncActionsUseCase:
         )
 
     def _determine_action_for_existing_card(
-        self,
-        obsidian_card: Card,
-        anki_card: Card,
-        conflict_resolution: str
+        self, obsidian_card: Card, anki_card: Card, conflict_resolution: str
     ) -> SyncAction | None:
         """Determine action for a card that exists in both systems.
 

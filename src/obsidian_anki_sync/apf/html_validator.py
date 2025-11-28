@@ -30,13 +30,16 @@ def validate_card_html(apf_html: str) -> list[str]:
 
     # Check for Markdown bold/italic syntax (outside of code blocks)
     # Remove code blocks first to avoid false positives
-    text_without_code = re.sub(r"<pre>.*?</pre>", "", apf_html, flags=re.DOTALL)
+    text_without_code = re.sub(
+        r"<pre>.*?</pre>", "", apf_html, flags=re.DOTALL)
     if re.search(r"\*\*[^*]+\*\*", text_without_code):
-        errors.append("Markdown **bold** detected; use <strong> HTML tags instead.")
+        errors.append(
+            "Markdown **bold** detected; use <strong> HTML tags instead.")
     if re.search(r"(?<!\*)\*[^*]+\*(?!\*)", text_without_code):
         # Single asterisk italic (but not inside double asterisks)
         if re.search(r"(?<!\*)\*[^*\s][^*]*[^*\s]\*(?!\*)", text_without_code):
-            errors.append("Markdown *italic* detected; use <em> HTML tags instead.")
+            errors.append(
+                "Markdown *italic* detected; use <em> HTML tags instead.")
 
     # Validate every <pre> has a <code> child with language class
     for pre in soup.find_all("pre"):
@@ -45,11 +48,6 @@ def validate_card_html(apf_html: str) -> list[str]:
             errors.append("<pre> block without nested <code> element")
             continue
 
-        classes_attr: str | list[str] = code.get("class") or []
-        # BeautifulSoup can return str or list[str] for class attribute
-        classes: list[str] = (
-            classes_attr if isinstance(classes_attr, list) else [classes_attr]
-        )
         # Language classes are recommended but not strictly required for APF validation
         # They are mainly used for syntax highlighting and missing them is not a critical error
         # Skip this check to allow cards with code blocks that don't have language classes

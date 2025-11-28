@@ -42,21 +42,29 @@ class ModelCapabilities(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     supports_structured_outputs: bool = Field(
-        default=True, description="Supports structured JSON outputs")
+        default=True, description="Supports structured JSON outputs"
+    )
     supports_reasoning: bool = Field(
-        default=False, description="Supports reasoning/thinking mode")
+        default=False, description="Supports reasoning/thinking mode"
+    )
     max_output_tokens: int = Field(
-        default=8192, ge=1, description="Maximum output tokens")
+        default=8192, ge=1, description="Maximum output tokens"
+    )
     context_window: int = Field(
-        default=131072, ge=1, description="Context window size in tokens")
+        default=131072, ge=1, description="Context window size in tokens"
+    )
     cost_per_1m_prompt: float = Field(
-        default=0.20, ge=0, description="Cost per million prompt tokens")
+        default=0.20, ge=0, description="Cost per million prompt tokens"
+    )
     cost_per_1m_completion: float = Field(
-        default=0.20, ge=0, description="Cost per million completion tokens")
-    speed_tier: int = Field(default=3, ge=1, le=5,
-                            description="Speed tier (1=fastest, 5=slowest)")
+        default=0.20, ge=0, description="Cost per million completion tokens"
+    )
+    speed_tier: int = Field(
+        default=3, ge=1, le=5, description="Speed tier (1=fastest, 5=slowest)"
+    )
     quality_tier: int = Field(
-        default=3, ge=1, le=5, description="Quality tier (1=basic, 5=excellent)")
+        default=3, ge=1, le=5, description="Quality tier (1=basic, 5=excellent)"
+    )
 
 
 class ModelConfig(BaseModel):
@@ -66,15 +74,20 @@ class ModelConfig(BaseModel):
 
     model_name: str = Field(min_length=1, description="Model identifier/name")
     temperature: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Sampling temperature")
+        default=0.0, ge=0.0, le=1.0, description="Sampling temperature"
+    )
     max_tokens: int | None = Field(
-        default=None, ge=1, description="Maximum tokens to generate")
+        default=None, ge=1, description="Maximum tokens to generate"
+    )
     top_p: float | None = Field(
-        default=None, ge=0.0, le=1.0, description="Top-p sampling parameter")
+        default=None, ge=0.0, le=1.0, description="Top-p sampling parameter"
+    )
     reasoning_enabled: bool = Field(
-        default=False, description="Enable reasoning/thinking mode")
+        default=False, description="Enable reasoning/thinking mode"
+    )
     capabilities: ModelCapabilities | None = Field(
-        default=None, description="Model capabilities")
+        default=None, description="Model capabilities"
+    )
 
     @field_validator("temperature", "top_p", mode="after")
     @classmethod
@@ -462,8 +475,7 @@ def get_model_config(
     Returns:
         Model configuration
     """
-    preset_configs = MODEL_PRESETS.get(
-        preset, MODEL_PRESETS[ModelPreset.BALANCED])
+    preset_configs = MODEL_PRESETS.get(preset, MODEL_PRESETS[ModelPreset.BALANCED])
     config = preset_configs.get(task)
 
     if config is None:
