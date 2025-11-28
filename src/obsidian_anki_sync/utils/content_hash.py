@@ -29,7 +29,10 @@ def compute_content_hash(qa_pair: QAPair, metadata: NoteMetadata, lang: str) -> 
     answer = qa_pair.answer_en if lang == "en" else qa_pair.answer_ru
 
     # Use a tuple of hashable values as the cache key
-    cache_key = (
+    # Flatten nested tuples to ensure type compatibility
+    subtopics_tuple = tuple(sorted(metadata.subtopics))
+    tags_tuple = tuple(sorted(metadata.tags))
+    cache_key: tuple[str, ...] = (
         lang,
         question.strip(),
         answer.strip(),
@@ -39,8 +42,8 @@ def compute_content_hash(qa_pair: QAPair, metadata: NoteMetadata, lang: str) -> 
         qa_pair.context.strip(),
         metadata.title,
         metadata.topic,
-        tuple(sorted(metadata.subtopics)),
-        tuple(sorted(metadata.tags)),
+        *subtopics_tuple,  # Flatten subtopics
+        *tags_tuple,  # Flatten tags
     )
 
     # Check cache first

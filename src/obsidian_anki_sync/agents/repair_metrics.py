@@ -62,7 +62,7 @@ class RepairMetrics:
 class RepairMetricsCollector:
     """Collects and aggregates repair metrics for analysis and learning."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize metrics collector."""
         self.metrics = RepairMetrics()
         self.recent_attempts: list[RepairAttempt] = []
@@ -182,7 +182,7 @@ class RepairMetricsCollector:
         if attempts == 0:
             return 0.0
 
-        return successes / attempts
+        return float(successes / attempts)
 
     def get_best_strategy_for_category(self, category: str) -> str | None:
         """Get best performing strategy for a category.
@@ -260,7 +260,7 @@ class RepairMetricsCollector:
         Returns:
             List of recent repair patterns
         """
-        return self.metrics.repair_patterns[-limit:]
+        return list(self.metrics.repair_patterns[-limit:])  # type: ignore[return-value]
 
 
 # Global metrics collector instance

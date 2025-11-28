@@ -78,15 +78,15 @@ class DependencyContainer:
         """
         # Check singletons first
         if interface in self._singletons:
-            return self._singletons[interface]
+            return self._singletons[interface]  # type: ignore[no-any-return]
 
         # Check registered services
         if interface in self._services:
-            return self._services[interface]
+            return self._services[interface]  # type: ignore[no-any-return]
 
         # Check factories
         if interface in self._factories:
-            return self._factories[interface]()
+            return self._factories[interface]()  # type: ignore[no-any-return]
 
         raise ValueError(f"No implementation registered for {interface.__name__}")
 

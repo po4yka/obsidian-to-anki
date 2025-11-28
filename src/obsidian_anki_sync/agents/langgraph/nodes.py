@@ -69,7 +69,7 @@ def _get_reasoning_recommendations(state: PipelineState) -> list[str]:
             count=len(recommendations),
             stage=current_reasoning.get("stage", "unknown"),
         )
-    return recommendations
+    return recommendations  # type: ignore[no-any-return]
 
 
 # ============================================================================

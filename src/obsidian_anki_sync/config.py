@@ -30,7 +30,8 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path("."), description="Source directory within vault"
     )
@@ -51,18 +52,19 @@ class Config(BaseSettings):
             if not v:
                 # Empty string means not set - will be caught by validation
                 return Path("")
+            # type: ignore[no-any-return]
             return Path(v).expanduser().resolve()
         if isinstance(v, Path):
-            return v.expanduser().resolve()
-        return v
+            return v.expanduser().resolve()  # type: ignore[no-any-return]
+        return v  # type: ignore[no-any-return]
 
     @field_validator("source_dir", "db_path", "data_dir", mode="before")
     @classmethod
     def parse_path(cls, v: Any) -> Path:
         """Convert string to Path."""
         if isinstance(v, str):
-            return Path(v).expanduser()
-        return v
+            return Path(v).expanduser()  # type: ignore[no-any-return]
+        return v  # type: ignore[no-any-return]
 
     @field_validator("source_subdirs", mode="before")
     @classmethod
@@ -71,10 +73,10 @@ class Config(BaseSettings):
         if v is None:
             return None
         if isinstance(v, str):
-            return [Path(v)]
+            return [Path(v)]  # type: ignore[no-any-return]
         if isinstance(v, list):
-            return [Path(str(d)) for d in v]
-        return v
+            return [Path(str(d)) for d in v]  # type: ignore[no-any-return]
+        return v  # type: ignore[no-any-return]
 
     # Anki settings
     anki_connect_url: str = Field(
@@ -83,7 +85,8 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -100,7 +103,8 @@ class Config(BaseSettings):
     )
 
     # Runtime settings
-    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -776,7 +780,8 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
+        config = get_model_config(
+            model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -810,7 +815,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -974,7 +980,8 @@ def load_config(config_path: Path | None = None) -> Config:
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
 
     resolved_config_path: Path | None = None

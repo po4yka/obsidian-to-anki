@@ -119,10 +119,12 @@ class InMemoryMetricsStorage(MetricsStorage):
             filtered = self.metrics
 
             if agent_name:
-                filtered = [m for m in filtered if m["agent_name"] == agent_name]
+                filtered = [
+                    m for m in filtered if m["agent_name"] == agent_name]
 
             if start_time:
-                filtered = [m for m in filtered if m["timestamp"] >= start_time]
+                filtered = [
+                    m for m in filtered if m["timestamp"] >= start_time]
 
             return filtered
 
@@ -337,7 +339,7 @@ class AgentHealthMonitor:
         """Check if health check is needed."""
         with self.lock:
             last_check = self.last_check_time.get(agent_name, 0)
-            return time.time() - last_check > self.check_interval
+            return bool(time.time() - last_check > self.check_interval)
 
 
 class MetricsCollector:
@@ -454,10 +456,12 @@ class PerformanceTracker:
                 metrics.avg_confidence = confidence
             else:
                 metrics.avg_confidence = (
-                    metrics.avg_confidence * (metrics.total_calls - 1) + confidence
+                    metrics.avg_confidence *
+                    (metrics.total_calls - 1) + confidence
                 ) / metrics.total_calls
 
-            self.metrics_collector.record_success(agent_name, confidence, response_time)
+            self.metrics_collector.record_success(
+                agent_name, confidence, response_time)
 
             # Store in persistent memory if available
             if self.memory_store:
@@ -472,7 +476,8 @@ class PerformanceTracker:
                         },
                     )
                 except Exception as e:
-                    logger.warning("performance_metric_store_failed", error=str(e))
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
         else:
             metrics.failure_count += 1
             metrics.last_failure_time = time.time()
@@ -499,14 +504,16 @@ class PerformanceTracker:
                         },
                     )
                 except Exception as e:
-                    logger.warning("performance_metric_store_failed", error=str(e))
+                    logger.warning(
+                        "performance_metric_store_failed", error=str(e))
 
         # Update running average response time
         if metrics.total_calls == 1:
             metrics.avg_response_time = response_time
         else:
             metrics.avg_response_time = (
-                metrics.avg_response_time * (metrics.total_calls - 1) + response_time
+                metrics.avg_response_time *
+                (metrics.total_calls - 1) + response_time
             ) / metrics.total_calls
 
         # Store response time metric

@@ -32,7 +32,7 @@ class RepairPattern:
 class RepairLearningSystem:
     """Learns from repair patterns and suggests optimal strategies."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize learning system."""
         self.patterns: dict[str, RepairPattern] = {}
         self.metrics_collector = get_repair_metrics_collector()

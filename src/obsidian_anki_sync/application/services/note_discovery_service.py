@@ -2,6 +2,7 @@
 
 import random
 from pathlib import Path
+from typing import Any
 
 from ...domain.entities.note import Note, NoteMetadata
 from ...domain.interfaces.note_parser import INoteParser
@@ -69,7 +70,7 @@ class NoteDiscoveryService:
             logger.warning("source_directory_not_found", path=str(source_path))
             return []
 
-        note_files = self._find_note_files(source_path, exclude_patterns)
+        note_files = self._find_note_files(source_path, exclude_patterns or [])
         logger.debug("found_note_files", count=len(note_files))
 
         # Filter for incremental processing
@@ -108,7 +109,7 @@ class NoteDiscoveryService:
         return notes
 
     def _find_note_files(
-        self, source_path: Path, exclude_patterns: list[str | None] = None
+        self, source_path: Path, exclude_patterns: list[str | None] | None = None
     ) -> list[Path]:
         """Find all markdown note files in the source directory.
 
@@ -127,7 +128,7 @@ class NoteDiscoveryService:
                 # Apply exclude patterns
                 if exclude_patterns:
                     relative_path = str(md_file.relative_to(source_path))
-                    if any(pattern in relative_path for pattern in exclude_patterns):
+                    if any(pattern is not None and pattern in relative_path for pattern in exclude_patterns):
                         continue
 
                 note_files.append(md_file)
@@ -163,9 +164,11 @@ class NoteDiscoveryService:
             metadata, qa_pairs = self.note_parser.parse_note(file_path)
 
             # Create domain entity
+            # Note: metadata is Pydantic model with id/title/created/updated fields
+            # but interface declares domain NoteMetadata which doesn't have them
             note = Note(
-                id=metadata.id,
-                title=metadata.title,
+                id=metadata.id,  # type: ignore[attr-defined]
+                title=metadata.title,  # type: ignore[attr-defined]
                 content=self._read_file_content(file_path),
                 file_path=file_path,
                 metadata=NoteMetadata(
@@ -184,8 +187,8 @@ class NoteDiscoveryService:
                     anki_note_type=metadata.anki_note_type,
                     anki_slugs=metadata.anki_slugs or [],
                 ),
-                created_at=metadata.created,
-                updated_at=metadata.updated,
+                created_at=metadata.created,  # type: ignore[attr-defined]
+                updated_at=metadata.updated,  # type: ignore[attr-defined]
             )
 
             return note
@@ -217,7 +220,7 @@ class NoteDiscoveryService:
             )
             return ""
 
-    def get_note_statistics(self, notes: list[Note]) -> dict:
+    def get_note_statistics(self, notes: list[Note]) -> dict[str, Any]:
         """Calculate statistics about discovered notes.
 
         Args:
@@ -226,7 +229,7 @@ class NoteDiscoveryService:
         Returns:
             Statistics dictionary
         """
-        stats = {
+        stats: dict[str, Any] = {
             "total_notes": len(notes),
             "by_topic": {},
             "by_language": {},
@@ -237,7 +240,9 @@ class NoteDiscoveryService:
         for note in notes:
             # Count by topic
             topic = note.metadata.topic
-            stats["by_topic"][topic] = stats["by_topic"].get(topic, 0) + 1
+            topic_key = str(topic) if topic else "unknown"
+            stats["by_topic"][topic_key] = stats["by_topic"].get(
+                topic_key, 0) + 1
 
             # Count by primary language
             primary_lang = note.metadata.primary_language

@@ -22,10 +22,10 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .progress import SyncProgress
 
-from ..domain.entities.card import Card as DomainCard
+from ..domain.entities.card import Card as DomainCard, CardManifest
 from ..domain.entities.note import Note as DomainNote
 from ..domain.interfaces.state_repository import IStateRepository
-from ..models import Card
+from ..models import Card as ModelCard, Manifest
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -332,7 +332,8 @@ class StateDB(IStateRepository):
         # Add missing columns
         for col_name, col_type in columns_to_add.items():
             if col_name not in existing_columns:
-                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                cursor.execute(
+                    f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
 
         # Add index for creation_status (after column is created)
@@ -342,7 +343,7 @@ class StateDB(IStateRepository):
         """
         )
 
-    def insert_card(self, card: Card, anki_guid: int) -> None:
+    def insert_card(self, card: ModelCard, anki_guid: int) -> None:
         """Insert a new card record."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -371,7 +372,7 @@ class StateDB(IStateRepository):
         )
         conn.commit()
 
-    def update_card(self, card: Card) -> None:
+    def update_card(self, card: ModelCard) -> None:
         """Update existing card record."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -415,15 +416,78 @@ class StateDB(IStateRepository):
         """Get all cards from a source note."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM cards WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM cards WHERE source_path = ?", (source_path,))
         return [dict(row) for row in cursor.fetchall()]
 
-    def get_all_cards(self) -> list[dict]:
+    def get_all_cards(self) -> list[DomainCard]:
         """Get all cards."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM cards")
-        return [dict(row) for row in cursor.fetchall()]
+        cards: list[DomainCard] = []
+        for row in cursor.fetchall():
+            row_dict = dict(row)
+            # Convert database row to domain Card entity
+            # Extract required fields with defaults
+            try:
+                slug = row_dict.get("slug", "")
+                lang = row_dict.get("lang", "en")
+                slug_base = row_dict.get("slug_base", slug.rsplit(
+                    "-", 1)[0] if "-" in slug else slug)
+                source_path = row_dict.get("source_path", "")
+                source_anchor = row_dict.get("source_anchor", "")
+                note_id = row_dict.get("note_id", "")
+                note_title = row_dict.get("note_title", "")
+                card_index = row_dict.get("card_index", 0)
+                guid = row_dict.get("guid") or row_dict.get("anki_guid")
+
+                # Ensure required fields have defaults
+                if not source_path:
+                    source_path = "unknown"
+                if not source_anchor:
+                    source_anchor = f"qa-{card_index}"
+                if not note_id:
+                    note_id = "unknown"
+                if not note_title:
+                    note_title = "Unknown"
+
+                # CardManifest requires guid to be str | None, not empty string
+                guid_str: str | None = str(guid) if guid else None
+                manifest = CardManifest(
+                    slug=slug,
+                    slug_base=slug_base,
+                    lang=lang,
+                    source_path=source_path,
+                    source_anchor=source_anchor,
+                    note_id=note_id,
+                    note_title=note_title,
+                    card_index=card_index,
+                    guid=guid_str,
+                    hash6=row_dict.get("hash6"),
+                )
+                # Get apf_html - it might not be in the database, use a default
+                apf_html = row_dict.get("apf_html")
+                if not apf_html:
+                    # Generate minimal APF HTML if missing
+                    apf_html = f'<div class="front">Question</div><div class="back">Answer</div>'
+
+                card = DomainCard(
+                    slug=slug,
+                    language=lang,
+                    apf_html=apf_html,
+                    manifest=manifest,
+                    note_type=row_dict.get("note_type", "APF::Simple"),
+                    tags=row_dict.get("tags", "").split() if isinstance(
+                        row_dict.get("tags"), str) else (row_dict.get("tags") or []),
+                    anki_guid=str(guid) if guid else None,
+                )
+                cards.append(card)
+            except Exception as e:
+                logger.warning("failed_to_convert_card",
+                               error=str(e), row=row_dict)
+                continue
+        return cards
 
     def get_processed_note_paths(self) -> set[str]:
         """Get set of all note paths that have been processed.
@@ -445,7 +509,7 @@ class StateDB(IStateRepository):
 
     def insert_card_extended(
         self,
-        card: Card,
+        card: ModelCard,
         anki_guid: int,
         fields: dict[str, str],
         tags: list[str],
@@ -496,7 +560,7 @@ class StateDB(IStateRepository):
         conn.commit()
 
     def update_card_extended(
-        self, card: Card, fields: dict[str, str], tags: list[str], apf_html: str
+        self, card: ModelCard, fields: dict[str, str], tags: list[str], apf_html: str
     ) -> None:
         """Update card with full content for atomicity support.
 
@@ -537,7 +601,7 @@ class StateDB(IStateRepository):
 
     def insert_cards_batch(
         self,
-        cards_data: list[tuple[Card, int, dict[str, str], list[str], str]],
+        cards_data: list[tuple[ModelCard, int, dict[str, str], list[str], str]],
         deck_name: str,
     ) -> None:
         """Insert multiple cards in a single batch operation.
@@ -591,7 +655,7 @@ class StateDB(IStateRepository):
 
     def update_cards_batch(
         self,
-        cards_data: list[tuple[Card, dict[str, str], list[str]]],
+        cards_data: list[tuple[ModelCard, dict[str, str], list[str]]],
     ) -> None:
         """Update multiple cards in a single batch operation.
 
@@ -903,7 +967,8 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
+        cursor.execute(
+            "DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
         conn.commit()
 
     # Note Index Methods
@@ -997,7 +1062,8 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM note_index WHERE source_path = ?", (source_path,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
@@ -1163,7 +1229,8 @@ class StateDB(IStateRepository):
         cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_database = 1")
         cards_in_database = cursor.fetchone()[0]
 
-        cursor.execute("SELECT status, COUNT(*) FROM card_index GROUP BY status")
+        cursor.execute(
+            "SELECT status, COUNT(*) FROM card_index GROUP BY status")
         card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
@@ -1236,12 +1303,14 @@ class StateDB(IStateRepository):
         """Save sync session data."""
         return "session_id"
 
-    def get_sync_session(self, session_id: str) -> dict[str, Any] | None:
+    def get_sync_session(self, session_id: str) -> dict[str, Any | None]:
         """Retrieve sync session data."""
         progress = self.get_progress(session_id)
         if progress:
-            return {}  # Convert to dict
-        return None
+            # Convert progress to dict with Any | None values
+            return {"progress": progress}  # type: ignore[return-value]
+        # Return empty dict instead of None to match interface
+        return {}
 
     def update_sync_progress(
         self, session_id: str, progress_data: dict[str, Any]

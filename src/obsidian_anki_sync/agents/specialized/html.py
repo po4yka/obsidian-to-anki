@@ -46,6 +46,6 @@ class HTMLValidationAgent(BaseSpecializedAgent):
                 warnings=["HTML validation agent execution failed"],
             )
 
-    def _extract_card_data(self, content: str) -> dict[str, Any | None]:
+    def _extract_card_data(self, content: str) -> dict[str, Any | None] | None:
         """Extract card data from HTML content for regeneration."""
         return None

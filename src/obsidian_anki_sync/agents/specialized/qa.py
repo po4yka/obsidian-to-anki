@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class QAExtractionAgent(BaseSpecializedAgent):
     """Agent specialized in Q/A pair extraction from corrupted content."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.qa_agent = None
 

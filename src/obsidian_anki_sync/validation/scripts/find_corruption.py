@@ -5,7 +5,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -28,10 +28,14 @@ def analyze_file(filepath: Path, vault_root: Path) -> Optional[Dict]:
         issues: List[Dict] = []
 
         # Check for missing sections
-        has_ru_question = bool(re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
-        has_en_question = bool(re.search(r"^# Question \(EN\)", body, re.MULTILINE))
-        has_ru_answer = bool(re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
-        has_en_answer = bool(re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
+        has_ru_question = bool(
+            re.search(r"^# Вопрос \(RU\)", body, re.MULTILINE))
+        has_en_question = bool(
+            re.search(r"^# Question \(EN\)", body, re.MULTILINE))
+        has_ru_answer = bool(
+            re.search(r"^## Ответ \(RU\)", body, re.MULTILINE))
+        has_en_answer = bool(
+            re.search(r"^## Answer \(EN\)", body, re.MULTILINE))
 
         missing_sections: List[str] = []
         if not has_ru_question:
@@ -144,10 +148,10 @@ def main() -> None:
         "trailing_whitespace": [],
     }
 
-    files = sorted(android_dir.glob("q-*.md"))
+    note_files = sorted(android_dir.glob("q-*.md"))
     analyzed = 0
 
-    for filepath in files:
+    for filepath in note_files:
         try:
             content = filepath.read_text(encoding="utf-8")
             if "status: reviewed" not in content:
@@ -251,7 +255,7 @@ def main() -> None:
 
     # Agent 5-6: Restore missing sections (split into 2 batches)
     if corruption_issues["missing_sections"]:
-        files = corruption_issues["missing_sections"]
+        files: list[dict[str, Any]] = corruption_issues["missing_sections"]
         mid = len(files) // 2
 
         agents.append(
@@ -281,7 +285,8 @@ def main() -> None:
             f"{agent['agent_id']:30} - {agent['count']:3} files - {agent['description']}"
         )
     print("=" * 80)
-    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
+    print(
+        f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
     print()
 
     # Save work packages

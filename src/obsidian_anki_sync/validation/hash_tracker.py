@@ -42,7 +42,7 @@ class HashTracker:
             if data.get("version") != CACHE_VERSION:
                 return {"version": CACHE_VERSION, "files": {}}
 
-            return data
+            return dict(data)  # type: ignore[return-value]
         except (json.JSONDecodeError, OSError):
             return {"version": CACHE_VERSION, "files": {}}
 
@@ -100,7 +100,8 @@ class HashTracker:
             return True
 
         current_hash = self.compute_hash(filepath)
-        return current_hash != cached.get("hash")
+        cached_hash = cached.get("hash")
+        return bool(current_hash != cached_hash)
 
     def update(self, filepath: Path, passed: bool, issues_count: int) -> None:
         """Update cache entry after validation.

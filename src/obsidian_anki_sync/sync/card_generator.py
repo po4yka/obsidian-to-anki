@@ -138,7 +138,7 @@ class CardGenerator:
                         cards_returned=len(cached_cards),
                         content_hash=note_content_hash,
                     )
-                    return cached_cards
+                    return cached_cards  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(
                 "agent_cache_read_error",
@@ -319,7 +319,7 @@ class CardGenerator:
                             slug=cached_card.slug,
                             elapsed_ms=elapsed_ms,
                         )
-                        return cached_card
+                        return cached_card  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(
                 "apf_cache_read_error",

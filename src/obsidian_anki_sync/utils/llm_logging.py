@@ -36,7 +36,8 @@ _session_metrics: dict[str, dict[str, Any]] = defaultdict(
 )
 
 # Track the current session in a context-friendly way for thread safety
-_session_id_var: ContextVar[str | None] = ContextVar("llm_session_id", default=None)
+_session_id_var: ContextVar[str | None] = ContextVar(
+    "llm_session_id", default=None)
 
 # OpenRouter pricing (per 1M tokens) - update as needed
 # Source: https://openrouter.ai/models (approximate pricing)
@@ -117,8 +118,10 @@ def calculate_context_window_usage(
         Dictionary with usage statistics
     """
     total_used = prompt_tokens + completion_tokens
-    usage_percent = (total_used / context_window * 100) if context_window > 0 else 0
-    prompt_percent = (prompt_tokens / context_window * 100) if context_window > 0 else 0
+    usage_percent = (total_used / context_window *
+                     100) if context_window > 0 else 0
+    prompt_percent = (prompt_tokens / context_window *
+                      100) if context_window > 0 else 0
     remaining = context_window - total_used
 
     return {
@@ -203,7 +206,7 @@ def set_session_id(session_id: str) -> None:
 
 
 @contextmanager
-def session_context(session_id: str):
+def session_context(session_id: str) -> Any:
     """Temporarily set the active session ID for logging operations."""
 
     token = _session_id_var.set(session_id)
@@ -243,7 +246,8 @@ def log_llm_success(
         **extra_context: Additional context to log
     """
     duration = time.time() - start_time
-    tokens_per_second = calculate_tokens_per_second(completion_tokens, duration)
+    tokens_per_second = calculate_tokens_per_second(
+        completion_tokens, duration)
 
     # Track slow requests (>120 seconds)
     is_slow = duration > 120.0

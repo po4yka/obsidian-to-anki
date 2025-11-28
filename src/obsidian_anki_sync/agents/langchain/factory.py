@@ -165,7 +165,7 @@ class LangChainAgentFactory:
         if agent_type in agent_overrides:
             config.update(agent_overrides[agent_type])
 
-        return config
+        return config  # type: ignore[no-any-return]
 
     def _create_agent_by_type(
         self,

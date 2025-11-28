@@ -20,7 +20,8 @@ class TestAnkiClient:
     def test_successful_invoke(self, mock_anki_url) -> None:
         """Test successful API call."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": "success", "error": None})
+            return_value=httpx.Response(
+                200, json={"result": "success", "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -46,7 +47,8 @@ class TestAnkiClient:
     def test_find_notes(self, mock_anki_url) -> None:
         """Test finding notes."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": [1, 2, 3], "error": None})
+            return_value=httpx.Response(
+                200, json={"result": [1, 2, 3], "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -84,16 +86,16 @@ class TestAnkiClient:
         """Test adding a note (INT-crud-01)."""
         route = respx.post(mock_anki_url)
         route.mock(
-            return_value=httpx.Response(200, json={"result": 12345, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": 12345, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
         note_id = client.add_note(
-            deck="Test Deck",
-            note_type="Basic",
+            deck_name="Test Deck",
+            model_name="Basic",
             fields={"Front": "Q", "Back": "A"},
             tags=["test"],
-            guid="guid-123",
         )
 
         assert note_id == 12345
@@ -144,7 +146,8 @@ class TestAnkiClient:
     def test_suspend_cards(self, mock_anki_url) -> None:
         """Test suspending cards."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": None, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -157,7 +160,8 @@ class TestAnkiClient:
     def test_update_note_fields(self, mock_anki_url) -> None:
         """Test updating note fields (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": None, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)
@@ -169,7 +173,8 @@ class TestAnkiClient:
     def test_delete_notes(self, mock_anki_url) -> None:
         """Test deleting notes (INT-crud-01)."""
         respx.post(mock_anki_url).mock(
-            return_value=httpx.Response(200, json={"result": None, "error": None})
+            return_value=httpx.Response(
+                200, json={"result": None, "error": None})
         )
 
         client = AnkiClient(mock_anki_url)

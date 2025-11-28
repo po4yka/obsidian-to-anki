@@ -72,21 +72,22 @@ def save_cards_to_file(
         if not cards:
             # Create empty CSV
             with output_path.open("w", encoding="utf-8", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["noteId", "slug", "noteType", "tags"])
+                csv_writer = csv.writer(f)
+                csv_writer.writerow(["noteId", "slug", "noteType", "tags"])
             return
 
         # Get all field names
-        all_fields = set()
+        all_fields: set[str] = set()
         for card in cards:
             all_fields.update(card.keys())
 
         field_names = sorted(all_fields)
 
         with output_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=field_names, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(cards)
+            dict_writer: csv.DictWriter[str] = csv.DictWriter(
+                f, fieldnames=field_names, extrasaction="ignore")
+            dict_writer.writeheader()
+            dict_writer.writerows(cards)
     else:
         # YAML
         with output_path.open("w", encoding="utf-8") as f:
@@ -212,7 +213,8 @@ def process_card_with_llm(
                 card[first_key] = result_text
 
     except (ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
-        logger.error("llm_processing_failed", error=str(e), slug=card.get("slug"))
+        logger.error("llm_processing_failed",
+                     error=str(e), slug=card.get("slug"))
         card["_error"] = str(e)
 
     return card

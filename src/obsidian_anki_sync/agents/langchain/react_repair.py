@@ -187,7 +187,8 @@ class ReActRepairAgent:
         # Extract analysis components
         analysis = self._extract_analysis_summary(output)
         findings = self._extract_findings(output, reasoning_chain)
-        recommendations = self._extract_recommendations(output, reasoning_chain)
+        recommendations = self._extract_recommendations(
+            output, reasoning_chain)
 
         logger.info(
             "react_analysis_completed",
@@ -255,7 +256,7 @@ class ReActRepairAgent:
         for step in reasoning_chain:
             observation = step.get("observation", "")
             if any(word in observation.lower() for word in ["cause", "root", "reason"]):
-                return observation.strip()
+                return str(observation.strip())  # type: ignore[no-any-return]
 
         return "Root cause analysis completed"
 

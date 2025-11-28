@@ -35,7 +35,7 @@ class CodeBlockAgent(BaseSpecializedAgent):
         """Repair code fence issues using pattern matching."""
         lines = content.splitlines()
         repaired_lines = []
-        fence_stack = []
+        fence_stack: list[str] = []
 
         for line in lines:
             stripped = line.strip()

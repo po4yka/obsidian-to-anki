@@ -401,7 +401,8 @@ class AdvancedMemoryStore:
         try:
             # Check if pattern exists
             existing = await self.patterns_collection.find_one(
-                {"user_id": pattern.user_id, "preference_type": pattern.preference_type}
+                {"user_id": pattern.user_id,
+                    "preference_type": pattern.preference_type}
             )
 
             if existing:
@@ -556,7 +557,8 @@ class AdvancedMemoryStore:
             if pipeline_result.get("memorization_quality"):
                 quality = pipeline_result["memorization_quality"]
                 if quality.get("is_memorizable"):
-                    patterns["quality_factors"] = ["clear_questions", "self_contained"]
+                    patterns["quality_factors"] = [
+                        "clear_questions", "self_contained"]
 
         # Error patterns
         if not pipeline_result.get("success"):
@@ -709,7 +711,8 @@ class AdvancedMemoryStore:
 
         try:
             # Build query
-            query = {"topic": topic, "quality_score": {"$gte": min_quality_score}}
+            query = {"topic": topic, "quality_score": {
+                "$gte": min_quality_score}}
             if complexity:
                 query["complexity"] = complexity
 
@@ -1005,7 +1008,7 @@ class AdvancedMemoryStore:
                 documents_cleaned=total_cleaned,
             )
 
-            return total_cleaned
+            return int(total_cleaned)  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.error("failed_to_cleanup_memory", error=str(e))

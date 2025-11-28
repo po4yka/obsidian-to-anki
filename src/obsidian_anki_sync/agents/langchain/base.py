@@ -27,7 +27,7 @@ class LangChainAgentResult:
     confidence: float = 1.0
     metadata: dict[str, Any] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.warnings is None:
             self.warnings = []
         if self.metadata is None:
@@ -87,7 +87,7 @@ class BaseLangChainAgent(ABC):
         pass
 
     @abstractmethod
-    async def run(self, input_data: dict[str, Any], **kwargs) -> LangChainAgentResult:
+    async def run(self, input_data: dict[str, Any], **kwargs: Any) -> LangChainAgentResult:
         """Run the agent with given input data.
 
         Args:
@@ -113,7 +113,7 @@ class BaseLangChainAgent(ABC):
             "max_tokens": self.max_tokens,
         }
 
-    def _validate_result(self, result: Any) -> LangChainAgentResult:
+    def _validate_result(self, result: Any) -> Any:
         """Validate and normalize agent result.
 
         Args:
@@ -125,10 +125,10 @@ class BaseLangChainAgent(ABC):
         try:
             if hasattr(result, "success") and hasattr(result, "reasoning"):
                 # Already a LangChainAgentResult
-                return result
+                return result  # type: ignore[return-value]
             elif isinstance(result, dict):
                 # Dictionary result
-                return LangChainAgentResult(
+                return LangChainAgentResult(  # type: ignore[return-value]
                     success=result.get("success", True),
                     reasoning=result.get("reasoning", ""),
                     data=result.get("data"),

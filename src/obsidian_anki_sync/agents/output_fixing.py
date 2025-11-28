@@ -102,7 +102,7 @@ class OutputFixingParser(Generic[T]):
                         result = await self.agent.run(prompt, deps=deps, **kwargs)
                     else:
                         result = await self.agent.run(prompt, system=system, **kwargs)
-                    return result.data
+                    return result.data  # type: ignore[no-any-return]
                 else:
                     # Retry with fixed prompt
                     if last_output is None:
@@ -131,7 +131,7 @@ class OutputFixingParser(Generic[T]):
                             type(last_error).__name__ if last_error else "unknown"
                         ),
                     )
-                    return result.data
+                    return result.data  # type: ignore[no-any-return]
 
             except (ValueError, StructuredOutputError) as e:
                 # PydanticAI raises ValueError for validation errors
@@ -164,6 +164,8 @@ class OutputFixingParser(Generic[T]):
                 # Non-validation errors: don't retry
                 logger.error("output_fixing_unexpected_error", error=str(e))
                 raise
+        # This should never be reached, but mypy needs it
+        raise StructuredOutputError("Unexpected loop exit", details={})
 
     async def _fix_output(
         self,
@@ -236,12 +238,12 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
                 improved_length=len(improved_prompt),
             )
 
-            return improved_prompt
+            return str(improved_prompt)
 
         except Exception as e:
             logger.error("fix_output_llm_failed", error=str(e))
             # Fallback: return original prompt with error context appended
-            return f"{prompt}\n\nIMPORTANT: Previous attempt failed with error: {error}. Please ensure output matches format exactly: {self._get_expected_format()}"
+            return str(f"{prompt}\n\nIMPORTANT: Previous attempt failed with error: {error}. Please ensure output matches format exactly: {self._get_expected_format()}")
 
     def _get_expected_format(self) -> str:
         """Get description of expected output format."""

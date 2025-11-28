@@ -49,8 +49,10 @@ def get_from_clipboard() -> str | None:
 
     try:
         text = pyperclip.paste()
+        if text is None:
+            return None
         logger.debug("text_retrieved_from_clipboard", length=len(text))
-        return text
+        return str(text)
     except Exception as e:
         logger.error("clipboard_paste_failed", error=str(e))
         return None

@@ -81,7 +81,7 @@ class ProgressDisplay:
             return None
 
         # Show last N reflections
-        recent_reflections = self.reflections[-self.max_reflections :]
+        recent_reflections = self.reflections[-self.max_reflections:]
         reflection_text = "\n".join(
             [
                 (
@@ -127,7 +127,7 @@ class ProgressDisplay:
         self.reflections.append(cleaned)
         # Keep only last N reflections
         if len(self.reflections) > self.max_reflections * 2:
-            self.reflections = self.reflections[-self.max_reflections :]
+            self.reflections = self.reflections[-self.max_reflections:]
 
     def clear_reflections(self) -> None:
         """Clear all reflections."""
@@ -176,7 +176,8 @@ class ProgressDisplay:
             # Add stats table if provided
             if stats:
                 stats_table = self._create_stats_table(stats)
-                layout.split_row(Layout(name="main"), Layout(stats_table, size=12))
+                layout.split_row(Layout(name="main"),
+                                 Layout(stats_table, size=12))
                 layout["main"].update(status_layout)
             else:
                 layout["status"].update(status_layout)
@@ -220,20 +221,23 @@ def extract_reasoning_from_response(response: dict[str, Any], model: str) -> str
     """
     # Check for reasoning field (thinking models)
     if "reasoning" in response and response["reasoning"]:
-        return response["reasoning"]
+        reasoning = response["reasoning"]
+        return str(reasoning) if reasoning else None
 
     # Check for thinking/reasoning in message
     message = response.get("message", {})
     if isinstance(message, dict):
         if "reasoning" in message:
-            return message["reasoning"]
+            reasoning = message["reasoning"]
+            return str(reasoning) if reasoning else None
         if "thinking" in message:
-            return message["thinking"]
+            thinking = message["thinking"]
+            return str(thinking) if thinking else None
 
     # Check for extraction_notes or similar fields
     if "extraction_notes" in response:
         notes = response["extraction_notes"]
-        if notes and len(notes) > 50:  # Only show substantial notes
-            return notes
+        if notes and len(str(notes)) > 50:  # Only show substantial notes
+            return str(notes)
 
     return None

@@ -108,7 +108,8 @@ def import_cards_from_csv(
                 # Parse manifest if it's a JSON string
                 if "manifest" in card_data and isinstance(card_data["manifest"], str):
                     try:
-                        card_data["manifest"] = json.loads(card_data["manifest"])
+                        card_data["manifest"] = json.loads(
+                            card_data["manifest"])
                     except json.JSONDecodeError:
                         card_data["manifest"] = {}
 
@@ -192,9 +193,11 @@ def _import_cards(
         if note_ids:
             notes_info = client.notes_info(note_ids)
             for note_info in notes_info:
-                note_id = str(note_info.get("noteId", ""))
-                if note_id:
-                    existing_notes[note_id] = note_info["noteId"]
+                note_id_str = str(note_info.get("noteId", ""))
+                if note_id_str:
+                    note_id_val = note_info.get("noteId")
+                    if isinstance(note_id_val, int):
+                        existing_notes[note_id_str] = note_id_val
 
     # Process cards
     created = 0
@@ -204,7 +207,8 @@ def _import_cards(
     for card_data in cards_data:
         try:
             # Extract fields (exclude metadata fields)
-            metadata_fields = {"noteId", "slug", "noteType", "tags", "manifest"}
+            metadata_fields = {"noteId", "slug",
+                               "noteType", "tags", "manifest"}
             fields = {
                 k: v for k, v in card_data.items() if k not in metadata_fields and v
             }
@@ -214,41 +218,42 @@ def _import_cards(
                 tags = tags.split()
 
             # Determine if this is an update or create
-            note_id = None
+            existing_note_id: int | None = None
             is_update = False
 
             if key_field == "noteId":
                 note_id_str = str(card_data.get("noteId", ""))
                 if note_id_str and note_id_str in existing_notes:
-                    note_id = existing_notes[note_id_str]
-                    is_update = True
+                    note_id_val = existing_notes[note_id_str]
+                    if isinstance(note_id_val, int):
+                        existing_note_id = note_id_val
+                        is_update = True
             elif key_field in card_data:
                 # Search for existing note by key field value
                 key_value = str(card_data[key_field])
                 query = f'deck:"{deck_name}" {key_field}:"{key_value}"'
                 existing_note_ids = client.find_notes(query)
                 if existing_note_ids:
-                    note_id = existing_note_ids[0]
+                    existing_note_id = existing_note_ids[0]
                     is_update = True
 
-            if is_update and note_id:
+            if is_update and existing_note_id is not None:
                 # Update existing note
-                client.update_note_fields(note_id, fields)
+                client.update_note_fields(existing_note_id, fields)
                 if tags:
-                    client.add_tags([note_id], " ".join(tags))
+                    client.add_tags([existing_note_id], " ".join(tags))
                 updated += 1
                 logger.debug(
-                    "note_updated", note_id=note_id, slug=card_data.get("slug")
+                    "note_updated", note_id=existing_note_id, slug=card_data.get("slug")
                 )
             else:
                 # Create new note
+                # Note: GUID support would need to be added to the interface if needed
                 new_note_id = client.add_note(
-                    deck=deck_name,
-                    note_type=note_type or "APF::Simple",
+                    deck_name=deck_name,
+                    model_name=note_type or "APF::Simple",
                     fields=fields,
                     tags=tags,
-                    # Use noteId as GUID if provided
-                    guid=card_data.get("noteId"),
                 )
                 created += 1
                 logger.debug(
