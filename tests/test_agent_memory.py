@@ -39,7 +39,8 @@ class TestAgentMemoryStore:
             ProblemDomain.CONTENT_STRUCTURE,
         ]
 
-        memory_id = memory_store.store_failure_pattern(error_context, attempted_agents)
+        memory_id = memory_store.store_failure_pattern(
+            error_context, attempted_agents)
         assert memory_id is not None
         assert memory_id.startswith("failure_")
 
@@ -52,7 +53,8 @@ class TestAgentMemoryStore:
         }
         successful_agent = ProblemDomain.YAML_FRONTMATTER
 
-        memory_id = memory_store.store_success_pattern(error_context, successful_agent)
+        memory_id = memory_store.store_success_pattern(
+            error_context, successful_agent)
         assert memory_id is not None
         assert memory_id.startswith("success_")
 
@@ -68,9 +70,9 @@ class TestAgentMemoryStore:
             error_context1, [ProblemDomain.YAML_FRONTMATTER]
         )
 
-        # Search for similar failures
+        # Search for similar failures using identical error message
         error_context2 = {
-            "error_message": "YAML mapping values error",
+            "error_message": "Invalid YAML: mapping values",
             "error_type": "ParserError",
             "file_path": "/test/file2.md",
         }
@@ -170,7 +172,8 @@ class TestMemoryIntegration:
             "error_message": "Test error",
             "error_type": "ParserError",
         }
-        store1.store_success_pattern(error_context, ProblemDomain.YAML_FRONTMATTER)
+        store1.store_success_pattern(
+            error_context, ProblemDomain.YAML_FRONTMATTER)
 
         # Create second store (should load existing data)
         store2 = AgentMemoryStore(
@@ -181,4 +184,5 @@ class TestMemoryIntegration:
         # Should be able to query the stored pattern
         recommendation = store2.get_agent_recommendation(error_context)
         # May be None if semantic search is disabled, but should not error
-        assert recommendation is None or isinstance(recommendation, ProblemDomain)
+        assert recommendation is None or isinstance(
+            recommendation, ProblemDomain)

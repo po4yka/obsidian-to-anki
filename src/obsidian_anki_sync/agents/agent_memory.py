@@ -79,8 +79,25 @@ class DummyEmbeddingFunction:
     def __call__(self, input: list[str]) -> list[list[float]]:
         return [[0.0] for _ in input]
 
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        """Embed query texts - same as __call__ for dummy function."""
+        return self(input)
+
     def name(self) -> str:  # pragma: no cover - simple identifier
         return "default"
+
+
+class OpenAIEmbeddingFunction:
+    """OpenAI embedding function compatible with ChromaDB."""
+
+    def __init__(self, embeddings: OpenAIEmbeddings):
+        self.embeddings = embeddings
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return self.embeddings.embed_documents(input)
+
+    def name(self) -> str:
+        return f"openai-{self.embeddings.model}"
 
 
 class AgentMemoryStore:
@@ -111,14 +128,13 @@ class AgentMemoryStore:
         # Initialize embeddings
         self.enable_semantic_search = enable_semantic_search
         self.embeddings: OpenAIEmbeddings | None = None
-        self.embedding_function: Callable[[list[str]], list[list[float]]] | None = None
+        self.embedding_function: Any = None  # ChromaDB EmbeddingFunction protocol
         if enable_semantic_search:
             model = embedding_model or "text-embedding-3-small"
             try:
                 self.embeddings = OpenAIEmbeddings(model=model)
-                self.embedding_function = lambda texts: [
-                    self.embeddings.embed_query(text) for text in texts
-                ]
+                self.embedding_function = OpenAIEmbeddingFunction(
+                    self.embeddings)
             except Exception as e:
                 logger.warning(
                     "openai_embeddings_unavailable",
@@ -312,7 +328,8 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast(
+                "list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
                 "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
             )
@@ -330,13 +347,16 @@ class AgentMemoryStore:
                     # Safe access with bounds checking
                     memory_id = ids[0][i] if i < len(ids[0]) else None
                     metadata = (
-                        metadatas[0][i] if metadatas and len(metadatas[0]) > i else {}
+                        metadatas[0][i] if metadatas and len(
+                            metadatas[0]) > i else {}
                     )
                     document = (
-                        documents[0][i] if documents and len(documents[0]) > i else ""
+                        documents[0][i] if documents and len(
+                            documents[0]) > i else ""
                     )
                     distance = (
-                        distances[0][i] if distances and len(distances[0]) > i else None
+                        distances[0][i] if distances and len(
+                            distances[0]) > i else None
                     )
 
                     if memory_id is None:
@@ -398,7 +418,8 @@ class AgentMemoryStore:
                 )
 
             # Extract recommendation with safe access
-            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast(
+                "list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
                 "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
             )

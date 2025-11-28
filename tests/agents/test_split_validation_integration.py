@@ -26,6 +26,20 @@ def mock_config():
 @pytest.fixture
 def pipeline_state(mock_config):
     """Create a sample pipeline state."""
+    from unittest.mock import MagicMock
+    from obsidian_anki_sync.agents.langgraph.state import register_runtime_resources
+
+    # Create a mock model factory
+    mock_model_factory = MagicMock()
+    mock_model_factory.get_model.side_effect = lambda agent_type: MagicMock(
+    ) if agent_type == "split_validator" else None
+
+    # Register runtime resources and get the key
+    runtime_key = register_runtime_resources(
+        config=mock_config,
+        model_factory=mock_model_factory,
+    )
+
     return PipelineState(
         note_content="Test content",
         metadata_dict=NoteMetadata(
@@ -42,6 +56,9 @@ def pipeline_state(mock_config):
         messages=[],
         stage_times={},
         step_counts={},
+        runtime_key=runtime_key,
+        config_snapshot=mock_config.__dict__ if hasattr(
+            mock_config, '__dict__') else {},
     )
 
 

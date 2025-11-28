@@ -10,10 +10,11 @@ from __future__ import annotations
 import asyncio
 import atexit
 import threading
+from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Coroutine
 
 
 class AsyncioRunner:
@@ -40,10 +41,11 @@ class AsyncioRunner:
                     cls._instance = cls()
         return cls._instance
 
-    def run(self, coro: Awaitable[Any]) -> Any:
+    def run(self, coro: Coroutine[Any, Any, Any]) -> Any:
         """Execute a coroutine on the background loop and wait for result."""
 
-        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        future: Future[Any] = asyncio.run_coroutine_threadsafe(
+            coro, self._loop)
         return future.result()
 
     def stop(self) -> None:

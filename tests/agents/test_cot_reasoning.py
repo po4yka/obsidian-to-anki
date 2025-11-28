@@ -72,6 +72,12 @@ def base_reasoning_output():
 def mock_pipeline_state():
     """Create a minimal pipeline state for testing."""
     from datetime import datetime
+    from unittest.mock import MagicMock
+
+    # Create a mock model factory that returns a model for "reasoning"
+    mock_model_factory = MagicMock()
+    mock_model_factory.get_model.side_effect = lambda agent_type: MagicMock(
+    ) if agent_type == "reasoning" else None
 
     return {
         "note_content": "# Test Note\n\nQ: What is Python?\nA: A programming language.",
@@ -99,6 +105,7 @@ def mock_pipeline_state():
         "stage_times": {},
         "messages": [],
         "max_steps": 100,
+        "model_factory": mock_model_factory,
     }
 
 
@@ -153,8 +160,10 @@ class TestReasoningTraceOutput:
     def test_confidence_bounds(self):
         """Test confidence field validation."""
         # Valid bounds
-        ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=0.0)
-        ReasoningTraceOutput(reasoning="test", planned_approach="test", confidence=1.0)
+        ReasoningTraceOutput(
+            reasoning="test", planned_approach="test", confidence=0.0)
+        ReasoningTraceOutput(
+            reasoning="test", planned_approach="test", confidence=1.0)
 
         # Invalid bounds should raise
         with pytest.raises(ValueError):
@@ -263,25 +272,30 @@ class TestShouldSkipReasoning:
     def test_skip_when_cot_disabled(self, mock_pipeline_state):
         """Test skipping when CoT is disabled globally."""
         mock_pipeline_state["enable_cot_reasoning"] = False
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is True
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is True
 
     def test_skip_when_stage_not_enabled(self, mock_pipeline_state):
         """Test skipping when stage is not in enabled list."""
         mock_pipeline_state["cot_enabled_stages"] = [
             "generation"
         ]  # pre_validation not included
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is True
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is True
 
     def test_no_skip_when_enabled(self, mock_pipeline_state):
         """Test not skipping when CoT and stage are enabled."""
-        assert _should_skip_reasoning(mock_pipeline_state, "pre_validation") is False
-        assert _should_skip_reasoning(mock_pipeline_state, "generation") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "pre_validation") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "generation") is False
 
     def test_no_skip_when_empty_stages_list(self, mock_pipeline_state):
         """Test that empty stages list means all stages enabled."""
         mock_pipeline_state["cot_enabled_stages"] = []
         # With empty list, stage check passes (all enabled)
-        assert _should_skip_reasoning(mock_pipeline_state, "any_stage") is False
+        assert _should_skip_reasoning(
+            mock_pipeline_state, "any_stage") is False
 
 
 class TestStoreReasoningTrace:
@@ -379,6 +393,10 @@ class TestThinkBeforePreValidationNode:
             patch(
                 "obsidian_anki_sync.agents.langgraph.reasoning_nodes.Agent",
                 return_value=mock_agent,
+            ),
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reasoning_nodes.get_model",
+                return_value=MagicMock(),  # Mock model available
             ),
             patch(
                 "obsidian_anki_sync.agents.langgraph.reasoning_nodes.NoteMetadata",
