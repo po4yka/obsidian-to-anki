@@ -4,8 +4,9 @@ Handles fetching Anki state and determining sync actions.
 """
 
 from ..anki.client import AnkiClient
+from ..agents.models import GeneratedCard
 from ..config import Config
-from ..models import Card, SyncAction, GeneratedCard
+from ..models import Card, SyncAction
 from ..sync.state_db import StateDB
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger

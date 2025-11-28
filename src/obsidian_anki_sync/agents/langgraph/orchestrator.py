@@ -4,14 +4,20 @@ This module implements the orchestrator class that builds and executes
 the LangGraph state machine workflow.
 """
 
+from __future__ import annotations
+
 import time
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from langgraph.checkpoint.memory import MemorySaver
 
 from ...config import Config
 from ...models import NoteMetadata, QAPair
+
+if TYPE_CHECKING:
+    from ..models import Card
 from ...utils.logging import get_logger
 from ..models import (
     AgentPipelineResult,
@@ -40,6 +46,13 @@ except ImportError:
     AgentMemoryStore = None
     AdvancedMemoryStore = None
     EnhancedObservabilitySystem = None
+
+# Optional RAG integration
+try:
+    from ...rag.integration import RAGIntegration, get_rag_integration
+except ImportError:
+    RAGIntegration = None
+    get_rag_integration = None
 
 logger = get_logger(__name__)
 
@@ -192,6 +205,33 @@ class LangGraphOrchestrator:
             except Exception as e:
                 logger.warning(
                     "enhanced_observability_init_failed", error=str(e))
+
+        # RAG integration for context enrichment and duplicate detection
+        self.rag_integration = None
+        self.enable_rag = getattr(config, "rag_enabled", False)
+        if self.enable_rag and get_rag_integration is not None:
+            try:
+                self.rag_integration = get_rag_integration(config)
+                if self.rag_integration.is_enabled:
+                    logger.info(
+                        "rag_integration_initialized",
+                        context_enrichment=getattr(
+                            config, "rag_context_enrichment", True
+                        ),
+                        duplicate_detection=getattr(
+                            config, "rag_duplicate_detection", True
+                        ),
+                        few_shot_examples=getattr(
+                            config, "rag_few_shot_examples", True
+                        ),
+                    )
+                else:
+                    logger.warning(
+                        "rag_integration_not_indexed",
+                        hint="Run 'obsidian-anki-sync rag index' to build the index",
+                    )
+            except Exception as e:
+                logger.warning("rag_integration_init_failed", error=str(e))
 
         # Build the workflow graph
         self.workflow = self.workflow_builder.build_workflow()
@@ -544,6 +584,21 @@ class LangGraphOrchestrator:
             "reflection_skipped": False,
             "reflection_skip_reason": None,
             "revision_strategy": None,
+            # RAG (Retrieval-Augmented Generation) configuration
+            "enable_rag": self.enable_rag,
+            "rag_context_enrichment": getattr(
+                self.config, "rag_context_enrichment", True
+            ),
+            "rag_duplicate_detection": getattr(
+                self.config, "rag_duplicate_detection", True
+            ),
+            "rag_few_shot_examples": getattr(
+                self.config, "rag_few_shot_examples", True
+            ),
+            "rag_integration": self.rag_integration,
+            "rag_enrichment": None,
+            "rag_examples": None,
+            "rag_duplicate_results": None,
             # Pipeline stage results
             "pre_validation": None,
             "note_correction": None,
