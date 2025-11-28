@@ -48,7 +48,13 @@ from obsidian_anki_sync.providers.pydantic_ai_models import (
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .node_helpers import increment_step_count
-from .state import PipelineState
+from .state import (
+    PipelineState,
+    get_agent_selector,
+    get_config,
+    get_model,
+    get_rag_integration,
+)
 
 logger = get_logger(__name__)
 
@@ -107,7 +113,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     start_time = time.time()
 
     # Check if note correction is enabled
-    config = state["config"]
+    config = get_config(state)
     if not getattr(config, "enable_note_correction", False):
         logger.info("note_correction_skipped", reason="disabled")
         state["current_stage"] = "pre_validation"
@@ -214,17 +220,19 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
     logger.info("langgraph_pre_validation_start")
     start_time = time.time()
 
+    config = get_config(state)
+
     # Deserialize metadata and QA pairs
     metadata = NoteMetadata(**state["metadata_dict"])
     qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
     file_path = Path(state["file_path"]) if state["file_path"] else None
 
     # Use cached model from state, or create on demand as fallback
-    model = state.get("pre_validator_model")
+    model = get_model(state, "pre_validator")
     if model is None:
         try:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("pre_validator")
+            model_name = config.get_model_for_agent("pre_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
             logger.warning("failed_to_create_openrouter_model", error=str(e))
@@ -334,11 +342,12 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
     qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
 
     # Use cached model from state, or create on demand as fallback
-    model = state.get("card_splitting_model")
+    model = get_model(state, "card_splitting")
     if model is None:
         try:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("card_splitting")
+            config = get_config(state)
+            model_name = config.get_model_for_agent("card_splitting")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
             logger.warning("failed_to_create_card_splitting_model", error=str(e))
@@ -353,7 +362,7 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
     splitting_agent = CardSplittingAgentAI(model=model, temperature=0.0)
 
     # Get splitting preferences from config
-    config = state["config"]
+    config = get_config(state)
     preferred_size = getattr(config, "card_splitting_preferred_size", "medium")
     _prefer_splitting = getattr(
         config, "card_splitting_prefer_splitting", True
@@ -480,10 +489,10 @@ async def split_validation_node(state: PipelineState) -> PipelineState:
     splitting_result = CardSplittingResult(**card_splitting)
 
     # Use cached model or create on demand
-    model = state.get("split_validator_model")
+    model = get_model(state, "split_validator")
     if model is None:
         try:
-            model_name = state["config"].get_model_for_agent("split_validator")
+            model_name = get_config(state).get_model_for_agent("split_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
             logger.warning("failed_to_create_split_validator_model", error=str(e))
@@ -577,8 +586,9 @@ async def generation_node(state: PipelineState) -> PipelineState:
     # RAG: Enrich context and get few-shot examples before generation
     rag_enrichment = None
     rag_examples = None
-    if state.get("enable_rag") and state.get("rag_integration"):
-        rag_integration = state["rag_integration"]
+    rag_integration = get_rag_integration(state) if state.get("enable_rag") else None
+
+    if state.get("enable_rag") and rag_integration:
         metadata_dict = state["metadata_dict"]
 
         # Get context enrichment
@@ -626,12 +636,14 @@ async def generation_node(state: PipelineState) -> PipelineState:
     metadata = NoteMetadata(**state["metadata_dict"])
     qa_pairs = [QAPair(**qa_dict) for qa_dict in state["qa_pairs_dicts"]]
 
+    config = get_config(state)
+
     # Use cached model from state, or create on demand as fallback
-    model = state.get("generator_model")
+    model = get_model(state, "generator")
     if model is None:
         try:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("generator")
+            model_name = config.get_model_for_agent("generator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
             logger.error("failed_to_create_generator_model", error=str(e))
@@ -665,7 +677,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
     # NEW: Use unified agent interface for framework switching
     agent_framework = state.get("agent_framework", "pydantic_ai")
-    agent_selector = state.get("agent_selector")
+    agent_selector = get_agent_selector(state)
 
     if agent_selector:
         # Use unified agent interface
@@ -682,7 +694,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
     try:
         # Determine if we should parallelize
         # Default batch size for parallel generation
-        BATCH_SIZE = getattr(state["config"], "generation_batch_size", 5)
+        BATCH_SIZE = getattr(config, "generation_batch_size", 5)
 
         if len(qa_pairs) > BATCH_SIZE:
             # Parallel generation
@@ -1010,11 +1022,11 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     cards = [GeneratedCard(**card_dict) for card_dict in generation["cards"]]
 
     # Use cached model from state, or create on demand as fallback
-    model = state.get("post_validator_model")
+    model = get_model(state, "post_validator")
     if model is None:
         try:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("post_validator")
+            model_name = get_config(state).get_model_for_agent("post_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
             logger.warning("failed_to_create_post_validator_model", error=str(e))
@@ -1188,10 +1200,10 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
 
     try:
         # Use cached model from state, or create on demand as fallback
-        model = state.get("context_enrichment_model")
+        model = get_model(state, "context_enrichment")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("context_enrichment")
+            model_name = get_config(state).get_model_for_agent("context_enrichment")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create enrichment agent
@@ -1303,10 +1315,10 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
 
     try:
         # Use cached model from state, or create on demand as fallback
-        model = state.get("memorization_quality_model")
+        model = get_model(state, "memorization_quality")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = state["config"].get_model_for_agent("memorization_quality")
+            model_name = get_config(state).get_model_for_agent("memorization_quality")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create memorization quality agent
@@ -1417,9 +1429,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     if (
         state.get("enable_rag")
         and state.get("rag_duplicate_detection")
-        and state.get("rag_integration")
+        and get_rag_integration(state)
     ):
-        rag_integration = state["rag_integration"]
+        rag_integration = get_rag_integration(state)
         logger.info("rag_duplicate_detection_start", cards_count=len(new_cards))
 
         for card in new_cards:
@@ -1525,10 +1537,12 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
     if cards_to_check_with_llm:
         try:
             # Use cached model from state, or create on demand as fallback
-            model = state.get("duplicate_detection_model")
+            model = get_model(state, "duplicate_detection")
             if model is None:
                 # Fallback: create model on demand if not cached
-                model_name = state["config"].get_model_for_agent("duplicate_detection")
+                model_name = get_config(state).get_model_for_agent(
+                    "duplicate_detection"
+                )
                 model = create_openrouter_model_from_env(model_name=model_name)
 
             # Create duplicate detection agent

@@ -35,7 +35,7 @@ from .reasoning_prompts import (
     POST_VALIDATION_REASONING_PROMPT,
     PRE_VALIDATION_REASONING_PROMPT,
 )
-from .state import PipelineState
+from .state import PipelineState, get_model
 
 logger = get_logger(__name__)
 
@@ -138,7 +138,7 @@ async def think_before_pre_validation_node(state: PipelineState) -> PipelineStat
     start_time = time.time()
 
     # Get reasoning model from state
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -228,7 +228,7 @@ async def think_before_generation_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_generation_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -314,7 +314,7 @@ async def think_before_post_validation_node(state: PipelineState) -> PipelineSta
     logger.info("cot_think_before_post_validation_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -401,7 +401,7 @@ async def think_before_card_splitting_node(state: PipelineState) -> PipelineStat
     logger.info("cot_think_before_card_splitting_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -479,7 +479,7 @@ async def think_before_enrichment_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_enrichment_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -554,7 +554,7 @@ async def think_before_memorization_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_memorization_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
@@ -627,7 +627,7 @@ async def think_before_duplicate_node(state: PipelineState) -> PipelineState:
     logger.info("cot_think_before_duplicate_start")
     start_time = time.time()
 
-    model = state.get("reasoning_model")
+    model = get_model(state, "reasoning")
     if model is None:
         logger.warning("cot_reasoning_model_not_available", stage=stage)
         return state
