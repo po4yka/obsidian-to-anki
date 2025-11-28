@@ -1,10 +1,15 @@
 """Tests for state database."""
 
-from obsidian_anki_sync.sync.state_db import StateDB
-from obsidian_anki_sync.models import Card, Manifest
 import pytest
 
-pytestmark = pytest.mark.skip(reason="State DB tests require SQLite setup")
+from obsidian_anki_sync.models import Card, Manifest
+from obsidian_anki_sync.sync.state_db import StateDB
+
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Alias for pytest's tmp_path fixture."""
+    return tmp_path
 
 
 class TestStateDB:

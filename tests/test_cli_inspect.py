@@ -9,9 +9,37 @@ from typer.testing import CliRunner
 from obsidian_anki_sync.cli import app
 from obsidian_anki_sync.config import Config
 
-# Skip these tests as they require file system and external service setup
-pytestmark = pytest.mark.skip(
-    reason="CLI tests require file system and external service setup")
+
+@pytest.fixture
+def sample_note_content():
+    """Sample note content for CLI lint tests."""
+    return """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+---
+
+# Question (EN)
+
+> What is unit testing?
+
+# Вопрос (RU)
+
+> Что такое юнит-тестирование?
+
+---
+
+## Answer (EN)
+
+Unit testing is testing individual components.
+
+## Ответ (RU)
+
+Юнит-тестирование - это тестирование отдельных компонентов.
+"""
 
 
 @pytest.fixture

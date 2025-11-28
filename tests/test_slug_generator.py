@@ -1,10 +1,24 @@
 """Tests for slug generator (UNIT-slug-01)."""
 
-from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
+from datetime import datetime, timezone
+
 import pytest
 
-pytestmark = pytest.mark.skip(
-    reason="Slug generator tests require complex setup")
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
+
+
+@pytest.fixture
+def sample_metadata():
+    """Sample note metadata for slug generator tests."""
+    return NoteMetadata(
+        id="test-note-001",
+        title="Test Note",
+        topic="testing",
+        language_tags=["en", "ru"],
+        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    )
 
 
 class TestSlugGeneration:

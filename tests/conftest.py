@@ -27,6 +27,12 @@ def mock_llm_provider():
 
 
 @pytest.fixture
+def mock_ollama_provider():
+    """Provide a mock Ollama provider for testing (alias for mock_llm_provider)."""
+    return MockLLMProvider()
+
+
+@pytest.fixture
 def mock_state_repository():
     """Provide a mock state repository for testing."""
     return MockStateRepository()

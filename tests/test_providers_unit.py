@@ -8,20 +8,25 @@ Tests cover:
 """
 
 from __future__ import annotations
-from obsidian_anki_sync.providers.ollama import OllamaProvider
-from obsidian_anki_sync.providers.factory import ProviderFactory
-from obsidian_anki_sync.providers.base import BaseLLMProvider
-from obsidian_anki_sync.config import Config
-import respx
-import httpx
-from unittest.mock import MagicMock
-from typing import Any
+
 import json
+from typing import Any
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
+import respx
 
-pytestmark = pytest.mark.skip(
-    reason="Provider unit tests require external service setup")
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.providers.factory import ProviderFactory
+from obsidian_anki_sync.providers.ollama import OllamaProvider
+
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Alias for pytest's tmp_path fixture."""
+    return tmp_path
 
 
 # Test Provider Factory

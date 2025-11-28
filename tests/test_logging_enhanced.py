@@ -1,16 +1,19 @@
 """Tests for enhanced logging configuration."""
 
+import pytest
+
 from obsidian_anki_sync.utils.logging import (
     ConsoleNoiseFilter,
     HighVolumeEventPolicy,
     configure_logging,
     get_logger,
 )
-import pytest
 
-# Skip these tests as they test complex logging setup
-pytestmark = pytest.mark.skip(
-    reason="Enhanced logging tests require file system setup")
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Alias for pytest's tmp_path fixture."""
+    return tmp_path
 
 
 class TestEnhancedLogging:

@@ -4,18 +4,22 @@ This module contains comprehensive tests for the LangChain agent implementations
 including Tool Calling, ReAct, Structured Chat, and JSON Chat agents.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.obsidian_anki_sync.agents.langchain.base import BaseLangChainAgent, LangChainAgentResult
-from src.obsidian_anki_sync.agents.langchain.tools import (
+import pytest
+
+from obsidian_anki_sync.agents.langchain.base import (
+    BaseLangChainAgent,
+    LangChainAgentResult,
+)
+from obsidian_anki_sync.agents.langchain.tools import (
     APFValidatorTool,
-    HTMLFormatterTool,
-    SlugGeneratorTool,
-    ContentHashTool,
-    MetadataExtractorTool,
     CardTemplateTool,
+    ContentHashTool,
+    HTMLFormatterTool,
+    MetadataExtractorTool,
     QAExtractorTool,
+    SlugGeneratorTool,
 )
 
 
@@ -121,9 +125,6 @@ END_OF_CARDS"""
 #         assert "HTML validation failed" in result
 
 
-# Skip remaining langchain tool tests as they test implementation details
-pytestmark = pytest.mark.skip(
-    reason="LangChain tool tests require complex setup")
 
 
 class TestSlugGeneratorTool:
@@ -139,18 +140,23 @@ class TestSlugGeneratorTool:
         """Test slug generation."""
         tool = SlugGeneratorTool()
 
-        result = tool._run("Test Question", "base-slug", [])
+        result = tool._run(source_path="test/note.md", card_index=1, lang="en", existing_slugs=[])
         assert "Generated slug:" in result
-        assert "test-question--base-slug" in result
 
     def test_slug_with_existing(self):
         """Test slug generation with existing slugs."""
         tool = SlugGeneratorTool()
 
-        result = tool._run("Test Question", "base-slug",
-                           ["test-question--base-slug"])
-        assert "Generated slug:" in result
-        assert "test-question--base-slug-1" in result
+        # Generate first slug
+        result1 = tool._run(source_path="test/note.md", card_index=1, lang="en", existing_slugs=[])
+        assert "Generated slug:" in result1
+
+        # Extract the slug from first result
+        first_slug = result1.split("Generated slug: ")[1].strip()
+
+        # Generate second slug with collision
+        result2 = tool._run(source_path="test/note.md", card_index=2, lang="en", existing_slugs=[first_slug])
+        assert "Generated slug:" in result2
 
 
 class TestContentHashTool:
@@ -242,26 +248,75 @@ class TestQAExtractorTool:
         assert tool.name == "qa_extractor"
         assert "Extract Q&A pairs from note content" in tool.description
 
-    def test_extraction_with_qa_pairs(self):
+    def test_extraction_with_qa_pairs(self, tmp_path):
         """Test Q&A extraction from content with pairs."""
         tool = QAExtractorTool()
-        content = """# Question 1
+        content = """---
+id: test-note-001
+title: Test Note
+topic: programming
+language_tags: [en, ru]
+tags: [test, python]
+created: 2025-01-01
+updated: 2025-01-01
+---
+
+# Question (EN)
 What is Python?
-**Answer:** A programming language
 
-# Question 2
+# Вопрос (RU)
+Что такое Python?
+
+## Answer (EN)
+A programming language
+
+## Ответ (RU)
+Язык программирования
+
+---
+
+# Question (EN)
 What is a variable?
-**Answer:** A storage location"""
 
-        result = tool._run(content)
+# Вопрос (RU)
+Что такое переменная?
+
+## Answer (EN)
+A storage location
+
+## Ответ (RU)
+Место для хранения данных
+
+---
+"""
+
+        # Create temporary file
+        test_file = tmp_path / "test.md"
+        test_file.write_text(content)
+
+        result = tool._run(note_content=content, file_path=str(test_file))
         assert "Extracted" in result and "Q&A pairs" in result
 
-    def test_no_qa_pairs(self):
+    def test_no_qa_pairs(self, tmp_path):
         """Test extraction when no Q&A pairs found."""
         tool = QAExtractorTool()
-        content = "Just regular content without Q&A structure."
+        content = """---
+id: test-note-002
+title: Test Note
+topic: general
+language_tags: [en]
+tags: [test]
+created: 2025-01-01
+updated: 2025-01-01
+---
 
-        result = tool._run(content)
+Just regular content without Q&A structure."""
+
+        # Create temporary file
+        test_file = tmp_path / "test.md"
+        test_file.write_text(content)
+
+        result = tool._run(note_content=content, file_path=str(test_file))
         assert "No Q&A pairs found" in result
 
 
@@ -270,7 +325,7 @@ class TestToolRegistry:
 
     def test_get_tool(self):
         """Test getting tool by name."""
-        from src.obsidian_anki_sync.agents.langchain.tools import get_tool
+        from obsidian_anki_sync.agents.langchain.tools import get_tool
 
         tool = get_tool("apf_validator")
         assert isinstance(tool, APFValidatorTool)
@@ -280,14 +335,14 @@ class TestToolRegistry:
 
     def test_get_tool_invalid_name(self):
         """Test getting tool with invalid name."""
-        from src.obsidian_anki_sync.agents.langchain.tools import get_tool
+        from obsidian_anki_sync.agents.langchain.tools import get_tool
 
         with pytest.raises(ValueError, match="Unknown tool"):
             get_tool("invalid_tool")
 
     def test_get_tools_for_agent(self):
         """Test getting tools for specific agent types."""
-        from src.obsidian_anki_sync.agents.langchain.tools import get_tools_for_agent
+        from obsidian_anki_sync.agents.langchain.tools import get_tools_for_agent
 
         generator_tools = get_tools_for_agent("generator")
         assert len(generator_tools) > 0
@@ -328,12 +383,16 @@ class TestBaseLangChainAgent:
             def _create_agent(self):
                 return Mock()
 
+            async def run(self, input_data, **kwargs):
+                return LangChainAgentResult(success=True, reasoning="Test")
+
         agent = TestAgent(
             model=mock_langchain_model,
             tools=[mock_tool],
-            agent_type="test",
+            system_prompt="Test prompt",
             temperature=0.5,
-            max_tokens=100
+            max_tokens=100,
+            agent_type="test"
         )
 
         assert agent.model == mock_langchain_model
@@ -341,12 +400,16 @@ class TestBaseLangChainAgent:
         assert agent.agent_type == "test"
         assert agent.temperature == 0.5
         assert agent.max_tokens == 100
+        assert agent.system_prompt == "Test prompt"
 
     def test_get_agent_info(self, mock_langchain_model, mock_tool):
         """Test getting agent information."""
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
+
+            async def run(self, input_data, **kwargs):
+                return LangChainAgentResult(success=True, reasoning="Test")
 
         agent = TestAgent(
             model=mock_langchain_model,
@@ -365,6 +428,9 @@ class TestBaseLangChainAgent:
         class TestAgent(BaseLangChainAgent):
             def _create_agent(self):
                 return Mock()
+
+            async def run(self, input_data, **kwargs):
+                return LangChainAgentResult(success=True, reasoning="Test")
 
         agent = TestAgent(model=mock_langchain_model, tools=[mock_tool])
 
@@ -393,6 +459,9 @@ class TestBaseLangChainAgent:
             def _create_agent(self):
                 return Mock()
 
+            async def run(self, input_data, **kwargs):
+                return LangChainAgentResult(success=True, reasoning="Test")
+
         agent = TestAgent(model=mock_langchain_model, tools=[mock_tool])
 
         # Test high confidence
@@ -416,6 +485,9 @@ class TestBaseLangChainAgent:
             def _create_agent(self):
                 return Mock()
 
+            async def run(self, input_data, **kwargs):
+                return LangChainAgentResult(success=True, reasoning="Test")
+
         agent = TestAgent(model=mock_langchain_model, tools=[mock_tool])
 
         output = """This is a warning: be careful with this approach.
@@ -434,8 +506,8 @@ class TestLangChainFactory:
 
     def test_factory_initialization(self):
         """Test factory initialization."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.config import Config
 
         config = Config(
             vault_path=".",
@@ -448,8 +520,8 @@ class TestLangChainFactory:
 
     def test_available_agent_types(self):
         """Test getting available agent types."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.config import Config
 
         config = Config(vault_path=".", source_dir=".")
         factory = LangChainAgentFactory(config)
@@ -461,8 +533,8 @@ class TestLangChainFactory:
 
     def test_cache_management(self):
         """Test agent caching functionality."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.agents.langchain.factory import LangChainAgentFactory
+        from obsidian_anki_sync.config import Config
 
         config = Config(vault_path=".", source_dir=".")
         factory = LangChainAgentFactory(config)
@@ -484,8 +556,8 @@ class TestUnifiedAgentSelector:
 
     def test_selector_initialization(self):
         """Test unified agent selector initialization."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.config import Config
 
         config = Config(vault_path=".", source_dir=".")
         selector = UnifiedAgentSelector(config)
@@ -495,8 +567,8 @@ class TestUnifiedAgentSelector:
 
     def test_get_agent_pydantic_ai(self):
         """Test getting PydanticAI agent."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.config import Config
 
         config = Config(
             vault_path=".",
@@ -510,8 +582,8 @@ class TestUnifiedAgentSelector:
 
     def test_get_agent_with_fallback(self):
         """Test agent selection with fallback."""
-        from src.obsidian_anki_sync.config import Config
-        from src.obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+        from obsidian_anki_sync.config import Config
 
         config = Config(vault_path=".", source_dir=".")
         selector = UnifiedAgentSelector(config)

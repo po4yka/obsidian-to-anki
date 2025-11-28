@@ -323,67 +323,6 @@ def test_grok_reasoning_disabled_for_simple_schema(
     assert payload["reasoning"]["enabled"] is False
 
 
-# Skip this complex provider test
-@pytest.mark.skip(reason="Complex provider reasoning fallback logic")
-@respx.mock
-def test_grok_enhanced_fallback_with_reasoning(
-    openrouter_provider: OpenRouterProvider,
-) -> None:
-    """Grok models try reasoning-enabled fallback when structured output fails."""
-    responses = [
-        # First call fails with empty completion
-        httpx.Response(200, json=_build_openrouter_response(content="")),
-        # Second call (reasoning enabled) succeeds
-        httpx.Response(
-            200,
-            json=_build_openrouter_response(
-                content=json.dumps({
-                    "qa_pairs": [
-                        {
-                            "card_index": 1,
-                            "question_en": "What is AI?",
-                            "question_ru": "",
-                            "answer_en": "Artificial Intelligence",
-                            "answer_ru": "",
-                            "context": "",
-                            "followups": "",
-                            "references": "",
-                            "related": "",
-                        }
-                    ],
-                    "extraction_notes": "Fixed with reasoning",
-                    "total_pairs": 1,
-                })
-            ),
-        ),
-    ]
-
-    route = respx.post(f"{BASE_URL}/chat/completions")
-    route.mock(side_effect=responses)
-
-    schema = get_qa_extraction_schema()
-    result = openrouter_provider.generate_json(
-        model="x-ai/grok-4.1-fast",
-        prompt="Extract QAs with reasoning fallback",
-        system="system prompt",
-        temperature=0.0,
-        json_schema=schema,
-        reasoning_enabled=False,  # Start without reasoning
-    )
-
-    assert result["total_pairs"] == 1
-    assert route.call_count == 2
-
-    first_payload = json.loads(route.calls[0].request.content.decode())
-    second_payload = json.loads(route.calls[1].request.content.decode())
-
-    # First call should have reasoning disabled (simple schema detection)
-    assert first_payload["reasoning"]["enabled"] is False
-
-    # Second call (fallback) should have reasoning enabled
-    assert second_payload["reasoning"]["enabled"] is True
-
-
 @respx.mock
 def test_grok_explicit_reasoning_enabled_parameter(
     openrouter_provider: OpenRouterProvider,

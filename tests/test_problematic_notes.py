@@ -8,8 +8,33 @@ import pytest
 from obsidian_anki_sync.exceptions import ParserError, ValidationError
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
-pytestmark = pytest.mark.skip(
-    reason="Problematic notes tests require file system setup")
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Alias for pytest's tmp_path fixture."""
+    return tmp_path
+
+
+@pytest.fixture
+def sample_note_content():
+    """Sample note content for archiver tests."""
+    return """---
+id: test-001
+title: Test Question
+topic: Testing
+language_tags: [en, ru]
+created: 2024-01-01
+updated: 2024-01-02
+---
+
+# Question (EN)
+
+What is unit testing?
+
+# Answer (EN)
+
+Unit testing is testing individual components.
+"""
 
 
 class TestProblematicNotesArchiver:
