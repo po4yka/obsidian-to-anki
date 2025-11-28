@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from typing import TYPE_CHECKING
 
-from ..models import NoteMetadata, QAPair
+if TYPE_CHECKING:
+    from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 # Thread-safe LRU cache for content hashes
 _hash_cache: dict[tuple[str, ...], str] = {}

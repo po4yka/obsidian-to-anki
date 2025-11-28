@@ -12,8 +12,6 @@ from obsidian_anki_sync.validation import AIFixer, AIFixerValidator
 
 def example_basic_usage():
     """Example 1: Basic usage with config."""
-    print("Example 1: Basic AIFixer usage")
-    print("=" * 60)
 
     # Create a minimal config (AI disabled by default)
     config = Config(
@@ -23,14 +21,10 @@ def example_basic_usage():
 
     # Create AIFixer from config
     ai_fixer = AIFixer.from_config(config)
-    print(f"AI Fixer available: {ai_fixer.available}")
-    print()
 
 
 def example_with_provider():
     """Example 2: Using AIFixer with a provider."""
-    print("Example 2: AIFixer with explicit provider")
-    print("=" * 60)
 
     try:
         from obsidian_anki_sync.providers.factory import ProviderFactory
@@ -52,10 +46,6 @@ def example_with_provider():
             temperature=0.1,
         )
 
-        print(f"AI Fixer available: {ai_fixer.available}")
-        print(f"Provider: {provider.get_provider_name()}")
-        print()
-
         # Example: Detect code language
         code_sample = """
 def fibonacci(n):
@@ -64,19 +54,13 @@ def fibonacci(n):
     return fibonacci(n-1) + fibonacci(n-2)
 """
         language = ai_fixer.detect_code_language(code_sample)
-        print(f"Detected language: {language}")
-        print()
 
     except Exception as e:
-        print(f"Error: {e}")
-        print("(This is expected if provider is not available)")
-        print()
+        pass
 
 
 def example_validator():
     """Example 3: Using AIFixerValidator."""
-    print("Example 3: AIFixerValidator usage")
-    print("=" * 60)
 
     # Sample note content with issues
     content = """---
@@ -116,20 +100,15 @@ The code above shows recursion.
 
     # Run validation
     issues = validator.validate()
-    print(f"Found {len(issues)} issue(s)")
     for issue in issues:
-        print(f"  - {issue}")
+        pass
 
-    print(f"\nAvailable fixes: {len(validator.fixes)}")
     for fix in validator.fixes:
-        print(f"  - {fix.description}")
-    print()
+        pass
 
 
 def example_with_ai_enabled():
     """Example 4: AIFixerValidator with AI enabled."""
-    print("Example 4: AIFixerValidator with AI enabled")
-    print("=" * 60)
 
     try:
         # Create config with AI enabled
@@ -178,26 +157,18 @@ def factorial(n):
 
         # Run validation
         issues = validator.validate()
-        print(f"Found {len(issues)} issue(s)")
 
         # Show available fixes
-        print(f"\nAvailable fixes: {len(validator.fixes)}")
         for fix in validator.fixes:
-            print(f"  - {fix.description} (safe: {fix.safe})")
+            pass
 
         # Apply safe fixes
         if validator.get_safe_fixes():
-            print("\nApplying safe fixes...")
             for fix in validator.get_safe_fixes():
-                new_content, new_frontmatter = fix.fix_function()
-                print(f"Applied: {fix.description}")
-
-        print()
+                _new_content, _new_frontmatter = fix.fix_function()
 
     except Exception as e:
-        print(f"Error: {e}")
-        print("(This is expected if provider is not available)")
-        print()
+        pass
 
 
 if __name__ == "__main__":
@@ -206,6 +177,3 @@ if __name__ == "__main__":
     example_with_provider()
     example_validator()
     example_with_ai_enabled()
-
-    print("\nNote: Some examples may fail if providers are not configured.")
-    print("Configure your LLM provider in config.yaml or .env file.")

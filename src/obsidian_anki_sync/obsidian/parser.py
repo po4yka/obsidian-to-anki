@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING, Any
 import frontmatter
 from ruamel.yaml import YAML
 
-from ..exceptions import ParserError
-from ..models import NoteMetadata, QAPair
-from ..obsidian.note_validator import validate_note_structure
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
+from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from ..agents.qa_extractor import QAExtractorAgent
+    from obsidian_anki_sync.agents.qa_extractor import QAExtractorAgent
+    from obsidian_anki_sync.providers.base import BaseLLMProvider
 
 logger = get_logger(__name__)
 
@@ -133,7 +133,7 @@ def configure_llm_extraction(
         logger.info("llm_extraction_disabled")
         return
 
-    from ..agents.qa_extractor import QAExtractorAgent
+    from obsidian_anki_sync.agents.qa_extractor import QAExtractorAgent
 
     extractor = QAExtractorAgent(
         llm_provider=llm_provider,
@@ -184,7 +184,7 @@ def create_qa_extractor(
     Returns:
         Configured QAExtractorAgent instance
     """
-    from ..agents.qa_extractor import QAExtractorAgent
+    from obsidian_anki_sync.agents.qa_extractor import QAExtractorAgent
 
     return QAExtractorAgent(
         llm_provider=llm_provider,
@@ -312,30 +312,36 @@ def parse_note(
     try:
         resolved_path = file_path.resolve()
         if not resolved_path.exists():
-            raise ParserError(f"File does not exist: {resolved_path}")
+            msg = f"File does not exist: {resolved_path}"
+            raise ParserError(msg)
         if not resolved_path.is_file():
-            raise ParserError(f"Path is not a file: {resolved_path}")
+            msg = f"Path is not a file: {resolved_path}"
+            raise ParserError(msg)
 
         # Security: Check file size to prevent DoS attacks
         file_size = resolved_path.stat().st_size
         max_file_size = 10 * 1024 * 1024  # 10MB limit
         if file_size > max_file_size:
-            raise ParserError(
+            msg = (
                 f"File too large: {resolved_path} ({file_size} bytes). "
                 f"Maximum allowed size is {max_file_size} bytes."
             )
+            raise ParserError(msg)
 
     except (OSError, RuntimeError) as e:
-        raise ParserError(f"Cannot resolve path {file_path}: {e}")
+        msg = f"Cannot resolve path {file_path}: {e}"
+        raise ParserError(msg)
 
     if content is None:
         try:
             content = resolved_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
-            raise ParserError(f"Failed to read file {resolved_path}: {e}")
+            msg = f"Failed to read file {resolved_path}: {e}"
+            raise ParserError(msg)
         except Exception as e:
             logger.exception("unexpected_file_read_error", file=str(resolved_path))
-            raise ParserError(f"Unexpected error reading {resolved_path}: {e}")
+            msg = f"Unexpected error reading {resolved_path}: {e}"
+            raise ParserError(msg)
 
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
@@ -423,7 +429,7 @@ def parse_note_with_repair(
             enable_content_generation=enable_content_generation,
         )
 
-        from ..agents.parser_repair import attempt_repair
+        from obsidian_anki_sync.agents.parser_repair import attempt_repair
 
         result = attempt_repair(
             file_path=file_path,
@@ -441,7 +447,8 @@ def parse_note_with_repair(
                 file=str(file_path),
                 original_error=str(e),
             )
-            raise ParserError(f"Parse failed and repair unsuccessful: {e}") from e
+            msg = f"Parse failed and repair unsuccessful: {e}"
+            raise ParserError(msg) from e
 
         # Repair succeeded
         metadata, qa_pairs = result
@@ -693,30 +700,35 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         # Provide more helpful error message
         error_msg = str(e)
         if "backtick" in error_msg.lower() or "`" in error_msg:
-            raise ParserError(
+            msg = (
                 f"Invalid YAML in {file_path}: {e}. "
                 "Note: Backticks (`) are not valid YAML syntax. Use quotes or remove them."
-            ) from e
-        raise ParserError(f"Invalid YAML in {file_path}: {e}") from e
+            )
+            raise ParserError(msg) from e
+        msg = f"Invalid YAML in {file_path}: {e}"
+        raise ParserError(msg) from e
 
     # Extract metadata dictionary
     data = post.metadata
 
     if not data:
-        raise ParserError(f"No frontmatter found in {file_path}")
+        msg = f"No frontmatter found in {file_path}"
+        raise ParserError(msg)
 
     # Validate required fields
     required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
-        raise ParserError(f"Missing required fields in {file_path}: {missing}")
+        msg = f"Missing required fields in {file_path}: {missing}"
+        raise ParserError(msg)
 
     # Parse dates
     try:
         created = _parse_date(data["created"])
         updated = _parse_date(data["updated"])
     except (ValueError, TypeError) as e:
-        raise ParserError(f"Invalid date format in {file_path}: {e}")
+        msg = f"Invalid date format in {file_path}: {e}"
+        raise ParserError(msg)
 
     # Topic mismatch check is now handled by callers for aggregation
 
@@ -851,8 +863,7 @@ def parse_qa_pairs(
 
     # Normalize line endings and strip BOM
     content = content.replace("\r\n", "\n").replace("\r", "\n")
-    if content.startswith("\ufeff"):
-        content = content[1:]
+    content = content.removeprefix("\ufeff")
 
     qa_pairs = []
     card_index = 1
@@ -1179,7 +1190,7 @@ def discover_notes(
     """
     # Convert single path to list for uniform handling
     if source_dir is None:
-        source_dirs = [Path(".")]
+        source_dirs = [Path()]
     elif isinstance(source_dir, list):
         source_dirs = source_dir
     else:
@@ -1254,7 +1265,8 @@ def _parse_date(value: Any) -> datetime:
             except ValueError:
                 continue
 
-    raise ValueError(f"Cannot parse date: {value}")
+    msg = f"Cannot parse date: {value}"
+    raise ValueError(msg)
 
 
 def _ensure_list(value: Any) -> list[Any]:
@@ -1315,12 +1327,11 @@ def _normalize_link_list(value: Any) -> list[str]:
 
     if isinstance(value, list):
         items = value
+    # Support multi-line scalar formats or comma-separated strings
+    elif isinstance(value, str):
+        items = re.split(r"[\n,]+", value)
     else:
-        # Support multi-line scalar formats or comma-separated strings
-        if isinstance(value, str):
-            items = re.split(r"[\n,]+", value)
-        else:
-            items = [value]
+        items = [value]
 
     normalized: list[str] = []
     for item in items:

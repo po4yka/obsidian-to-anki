@@ -5,8 +5,8 @@ from typing import Any
 
 from rich.console import Console
 
-from ..config import Config, load_config, set_config
-from ..utils.logging import configure_logging, get_logger
+from obsidian_anki_sync.config import Config, load_config, set_config
+from obsidian_anki_sync.utils.logging import configure_logging, get_logger
 
 # Shared console for all commands
 console = Console()

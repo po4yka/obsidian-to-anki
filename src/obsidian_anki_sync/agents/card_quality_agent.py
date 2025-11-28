@@ -3,9 +3,10 @@
 import re
 import time
 
-from ..models import NoteMetadata
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import GeneratedCard, QualityDimension, QualityReport
 
 logger = get_logger(__name__)
@@ -86,7 +87,7 @@ class CardQualityAgent:
             card_type = "Missing"
         elif "<img " in card.apf_html and "svg" in card.apf_html.lower():
             card_type = "Draw"
-        question, answer = _extract_qa_from_apf(card.apf_html)
+        _question, _answer = _extract_qa_from_apf(card.apf_html)
         logger.debug("assessing_card_quality", slug=card.slug, card_type=card_type)
 
         # Assess each quality dimension
@@ -277,7 +278,7 @@ class CardQualityAgent:
         score = 1.0
 
         # Extract Q&A from APF HTML
-        question, answer = _extract_qa_from_apf(card.apf_html)
+        _question, _answer = _extract_qa_from_apf(card.apf_html)
 
         # Check HTML structure in APF HTML
         if "<pre>" in card.apf_html and "</pre>" not in card.apf_html:
@@ -452,7 +453,7 @@ class CardQualityAgent:
         base_confidence = min(0.9, 0.6 + (issue_count * 0.1))
 
         # Extract Q&A from APF HTML
-        question, answer = _extract_qa_from_apf(card.apf_html)
+        question, _answer = _extract_qa_from_apf(card.apf_html)
 
         # Adjust for card complexity
         question_length = len(question)
@@ -485,7 +486,7 @@ class CardQualityAgent:
     def _identify_learning_strengths(self, card: GeneratedCard) -> list[str]:
         """Identify learning science-related strengths."""
         # Extract Q&A from APF HTML
-        question, answer = _extract_qa_from_apf(card.apf_html)
+        question, _answer = _extract_qa_from_apf(card.apf_html)
 
         # Extract card type
         card_type = "Simple"

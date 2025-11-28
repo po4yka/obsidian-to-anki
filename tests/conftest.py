@@ -56,18 +56,16 @@ def sample_note_metadata():
 
     # Create with explicit kwargs to handle Pydantic version differences
     return NoteMetadata(
-        **{
-            "id": "test-001",
-            "title": "Test Question",
-            "topic": "Test Topic",
-            "language_tags": ["en", "ru"],
-            "difficulty": "medium",
-            "question_kind": "concept",
-            "tags": ["test", "sample"],
-            "status": "published",
-            "created": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
-            "updated": datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
-        }
+        id="test-001",
+        title="Test Question",
+        topic="Test Topic",
+        language_tags=["en", "ru"],
+        difficulty="medium",
+        question_kind="concept",
+        tags=["test", "sample"],
+        status="published",
+        created=datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
+        updated=datetime.fromisoformat("2024-01-01T00:00:00+00:00"),
     )
 
 

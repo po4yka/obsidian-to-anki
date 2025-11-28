@@ -10,18 +10,18 @@ from typing import TYPE_CHECKING, Any, cast
 
 import diskcache
 
-from ..apf.generator import APFGenerator
-from ..apf.html_validator import validate_card_html
-from ..apf.linter import validate_apf
-from ..config import Config
-from ..models import Card, NoteMetadata, QAPair
-from ..sync.slug_generator import create_manifest, generate_slug
-from ..utils.content_hash import compute_content_hash
-from ..utils.guid import deterministic_guid
-from ..utils.logging import get_logger
+from obsidian_anki_sync.apf.generator import APFGenerator
+from obsidian_anki_sync.apf.html_validator import validate_card_html
+from obsidian_anki_sync.apf.linter import validate_apf
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
+from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.guid import deterministic_guid
+from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from ..agents.langgraph import LangGraphOrchestrator
+    from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 
 logger = get_logger(__name__)
 
@@ -109,7 +109,8 @@ class CardGenerator:
             List of generated cards
         """
         if not self.use_agents or not self.agent_orchestrator:
-            raise RuntimeError("Agent system not initialized")
+            msg = "Agent system not initialized"
+            raise RuntimeError(msg)
 
         # Compute content hash for the entire note
         content_components = [
@@ -189,14 +190,12 @@ class CardGenerator:
                     existing_cards=self.existing_cards_for_duplicate_detection,
                 )
         else:
-            raise RuntimeError("Orchestrator does not have process_note method")
+            msg = "Orchestrator does not have process_note method"
+            raise RuntimeError(msg)
 
         # Track metrics
-        if result.post_validation:
-            if not result.post_validation.is_valid:
-                self.stats["validation_errors"] = (
-                    self.stats.get("validation_errors", 0) + 1
-                )
+        if result.post_validation and not result.post_validation.is_valid:
+            self.stats["validation_errors"] = self.stats.get("validation_errors", 0) + 1
         if result.retry_count > 0:
             self.stats["auto_fix_attempts"] = (
                 self.stats.get("auto_fix_attempts", 0) + result.retry_count
@@ -212,7 +211,8 @@ class CardGenerator:
                 if result.post_validation
                 else "Unknown error"
             )
-            raise ValueError(f"Agent pipeline failed: {error_msg}")
+            msg = f"Agent pipeline failed: {error_msg}"
+            raise ValueError(msg)
 
         # Convert GeneratedCard to Card instances
         cards = self.agent_orchestrator.convert_to_cards(
@@ -277,9 +277,8 @@ class CardGenerator:
         # Use agent system if enabled
         if self.use_agents:
             if not note_content or all_qa_pairs is None:
-                raise ValueError(
-                    "note_content and all_qa_pairs required when using agent system"
-                )
+                msg = "note_content and all_qa_pairs required when using agent system"
+                raise ValueError(msg)
 
             # Generate all cards for the note (cached)
             all_cards = self.generate_with_agents(
@@ -298,9 +297,8 @@ class CardGenerator:
                     )
                     return card
 
-            raise ValueError(
-                f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
-            )
+            msg = f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
+            raise ValueError(msg)
 
         # Check cache for non-agent generation
         content_hash = compute_content_hash(qa_pair, metadata, lang)
@@ -383,7 +381,9 @@ class CardGenerator:
         )
 
         # Generate APF card via LLM
-        card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
+        card = cast(
+            "Card", self.apf_gen.generate_card(qa_pair, metadata, manifest, lang)
+        )
 
         # Ensure content hash is set
         if not card.content_hash:
@@ -396,9 +396,8 @@ class CardGenerator:
                 "validation_errors", 0
             ) + len(validation.errors)
             logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
-            raise ValueError(
-                f"APF validation failed for {slug}: {validation.errors[0]}"
-            )
+            msg = f"APF validation failed for {slug}: {validation.errors[0]}"
+            raise ValueError(msg)
         if validation.warnings:
             logger.debug(
                 "apf_validation_warnings", slug=slug, warnings=validation.warnings
@@ -407,7 +406,8 @@ class CardGenerator:
         html_errors = validate_card_html(card.apf_html)
         if html_errors:
             logger.error("apf_html_invalid", slug=slug, errors=html_errors)
-            raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
+            msg = f"Invalid HTML formatting for {slug}: {html_errors[0]}"
+            raise ValueError(msg)
 
         # Cache the generated card
         try:

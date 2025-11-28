@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ...domain.entities.card import SyncAction
-from ...domain.interfaces.anki_client import IAnkiClient
-from ...domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.domain.entities.card import SyncAction
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
 
 
 @dataclass

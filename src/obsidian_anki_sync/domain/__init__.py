@@ -18,18 +18,18 @@ __all__ = [
     # Entities
     "Card",
     "CardManifest",
-    "SyncAction",
-    "SyncActionType",
-    "Note",
-    "NoteMetadata",
-    "QAPair",
+    # Services
+    "ContentHashService",
     # Interfaces
     "IAnkiClient",
     "ICardGenerator",
     "ILLMProvider",
     "INoteParser",
     "IStateRepository",
-    # Services
-    "ContentHashService",
+    "Note",
+    "NoteMetadata",
+    "QAPair",
     "SlugService",
+    "SyncAction",
+    "SyncActionType",
 ]

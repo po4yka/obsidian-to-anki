@@ -28,24 +28,22 @@ except ModuleNotFoundError:
     _LANGGRAPH_AVAILABLE = False
 
 __all__ = [
-    # Result models
-    "PreValidationResult",
+    # Orchestrators
+    "AgentOrchestrator",  # Legacy orchestrator
+    "AgentPipelineResult",
     "GeneratedCard",
     "GenerationResult",
     "PostValidationResult",
-    "AgentPipelineResult",
-    # Orchestrators
-    "AgentOrchestrator",  # Legacy orchestrator
+    # Result models
+    "PreValidationResult",
 ]
 
 if _LANGGRAPH_AVAILABLE:
-    __all__.append("LangGraphOrchestrator")
+    __all__ += ["LangGraphOrchestrator"]
 
 if _PYDANTIC_AGENTS_AVAILABLE:
-    __all__.extend(
-        [
-            "PreValidatorAgentAI",
-            "GeneratorAgentAI",
-            "PostValidatorAgentAI",
-        ]
-    )
+    __all__ += [
+        "GeneratorAgentAI",
+        "PostValidatorAgentAI",
+        "PreValidatorAgentAI",
+    ]

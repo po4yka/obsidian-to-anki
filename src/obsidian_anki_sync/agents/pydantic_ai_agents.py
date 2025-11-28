@@ -15,9 +15,10 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ..models import NoteMetadata, QAPair
-from ..utils.content_hash import compute_content_hash
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .card_splitting_prompts import CARD_SPLITTING_DECISION_PROMPT
 from .context_enrichment_prompts import CONTEXT_ENRICHMENT_PROMPT
 from .duplicate_detection_prompts import DUPLICATE_DETECTION_PROMPT
@@ -309,20 +310,19 @@ Validate the structure, frontmatter, and content quality."""
         except ValueError as e:
             # Structured output parsing error
             logger.error("pydantic_ai_pre_validation_parse_error", error=str(e))
+            msg = "Failed to parse pre-validation output"
             raise StructuredOutputError(
-                "Failed to parse pre-validation output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_pre_validation_timeout", error=str(e))
-            raise ModelError(
-                "Pre-validation timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Pre-validation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_pre_validation_failed", error=str(e))
-            raise PreValidationError(
-                f"Pre-validation failed: {str(e)}", details={"title": metadata.title}
-            ) from e
+            msg = f"Pre-validation failed: {e!s}"
+            raise PreValidationError(msg, details={"title": metadata.title}) from e
 
 
 class GeneratorAgentAI:
@@ -436,8 +436,9 @@ Q&A Pairs ({len(qa_pairs)}):
                     continue
 
             if not generated_cards:
+                msg = "No valid cards generated"
                 raise GenerationError(
-                    "No valid cards generated",
+                    msg,
                     details={
                         "title": metadata.title,
                         "qa_pairs_count": len(qa_pairs),
@@ -464,20 +465,19 @@ Q&A Pairs ({len(qa_pairs)}):
             raise  # Re-raise our custom error
         except ValueError as e:
             logger.error("pydantic_ai_generation_parse_error", error=str(e))
+            msg = "Failed to parse generation output"
             raise StructuredOutputError(
-                "Failed to parse generation output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_generation_timeout", error=str(e))
-            raise ModelError(
-                "Card generation timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Card generation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_generation_failed", error=str(e))
-            raise GenerationError(
-                f"Card generation failed: {str(e)}", details={"title": metadata.title}
-            ) from e
+            msg = f"Card generation failed: {e!s}"
+            raise GenerationError(msg, details={"title": metadata.title}) from e
 
 
 class PostValidatorAgentAI:
@@ -587,20 +587,19 @@ Cards to validate:
 
         except ValueError as e:
             logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            msg = "Failed to parse post-validation output"
             raise StructuredOutputError(
-                "Failed to parse post-validation output",
+                msg,
                 details={"error": str(e), "cards_count": len(cards)},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_post_validation_timeout", error=str(e))
-            raise ModelError(
-                "Post-validation timed out", details={"cards_count": len(cards)}
-            ) from e
+            msg = "Post-validation timed out"
+            raise ModelError(msg, details={"cards_count": len(cards)}) from e
         except Exception as e:
             logger.error("pydantic_ai_post_validation_failed", error=str(e))
-            raise PostValidationError(
-                f"Post-validation failed: {str(e)}", details={"cards_count": len(cards)}
-            ) from e
+            msg = f"Post-validation failed: {e!s}"
+            raise PostValidationError(msg, details={"cards_count": len(cards)}) from e
 
 
 class MemorizationQualityAgentAI:
@@ -699,15 +698,15 @@ Cards to assess:
 
         except ValueError as e:
             logger.error("pydantic_ai_memorization_parse_error", error=str(e))
+            msg = "Failed to parse memorization assessment output"
             raise StructuredOutputError(
-                "Failed to parse memorization assessment output",
+                msg,
                 details={"error": str(e), "cards_count": len(cards)},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_memorization_timeout", error=str(e))
-            raise ModelError(
-                "Memorization assessment timed out", details={"cards_count": len(cards)}
-            ) from e
+            msg = "Memorization assessment timed out"
+            raise ModelError(msg, details={"cards_count": len(cards)}) from e
         except Exception as e:
             logger.error("pydantic_ai_memorization_failed", error=str(e))
             # Return permissive result instead of failing
@@ -717,7 +716,7 @@ Cards to assess:
                 memorization_score=0.7,  # Default acceptable score
                 issues=[],
                 strengths=[],
-                suggested_improvements=[f"Memorization agent failed: {str(e)}"],
+                suggested_improvements=[f"Memorization agent failed: {e!s}"],
                 assessment_time=0.0,
             )
 
@@ -850,15 +849,15 @@ Questions:
 
         except ValueError as e:
             logger.error("pydantic_ai_card_splitting_parse_error", error=str(e))
+            msg = "Failed to parse card splitting output"
             raise StructuredOutputError(
-                "Failed to parse card splitting output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_card_splitting_timeout", error=str(e))
-            raise ModelError(
-                "Card splitting analysis timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Card splitting analysis timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_card_splitting_failed", error=str(e))
             # Return conservative fallback (no split)
@@ -875,10 +874,10 @@ Questions:
                         answer_summary=(
                             qa_pairs[0].answer_en[:100] if qa_pairs else "Answer"
                         ),
-                        rationale=f"Fallback: Agent failed ({str(e)})",
+                        rationale=f"Fallback: Agent failed ({e!s})",
                     )
                 ],
-                reasoning=f"Card splitting agent failed: {str(e)}. Defaulting to single card.",
+                reasoning=f"Card splitting agent failed: {e!s}. Defaulting to single card.",
                 decision_time=0.0,
                 confidence=0.3,  # Low confidence for fallback
                 fallback_strategy="none",
@@ -1018,7 +1017,7 @@ Analyze similarity and provide your assessment."""
         except Exception as e:
             logger.error("pydantic_ai_duplicate_check_failed", error=str(e))
             # Conservative fallback: assume not duplicate
-            return (False, 0.0, f"Detection failed: {str(e)}")
+            return (False, 0.0, f"Detection failed: {e!s}")
 
     async def find_duplicates(
         self, new_card: GeneratedCard, existing_cards: list[GeneratedCard]
@@ -1041,7 +1040,7 @@ Analyze similarity and provide your assessment."""
 
             # Check against each existing card
             for existing_card in existing_cards:
-                is_dup, score, reasoning = await self.check_duplicate(
+                _is_dup, score, reasoning = await self.check_duplicate(
                     new_card, existing_card
                 )
 
@@ -1328,7 +1327,7 @@ Provide your enrichment assessment."""
                 should_enrich=False,
                 enriched_card=None,
                 additions=[],
-                additions_summary=f"Enrichment failed: {str(e)}",
+                additions_summary=f"Enrichment failed: {e!s}",
                 enrichment_rationale="Agent encountered error",
                 enrichment_time=0.0,
             )

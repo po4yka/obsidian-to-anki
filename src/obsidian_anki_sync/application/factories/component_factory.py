@@ -1,15 +1,17 @@
 """Factory for creating sync engine components."""
 
-from ...domain.interfaces.anki_client import IAnkiClient
-from ...domain.interfaces.card_generator import ICardGenerator
-from ...domain.interfaces.llm_provider import ILLMProvider
-from ...domain.interfaces.note_parser import INoteParser
-from ...domain.interfaces.state_repository import IStateRepository
-from ...domain.interfaces.vault_config import IVaultConfig
-from ...infrastructure.cache.cache_manager import CacheManager
-from ...utils.logging import get_logger
-from ..container import get_container
-from ..services.note_discovery_service import NoteDiscoveryService
+from obsidian_anki_sync.application.container import get_container
+from obsidian_anki_sync.application.services.note_discovery_service import (
+    NoteDiscoveryService,
+)
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.domain.interfaces.llm_provider import ILLMProvider
+from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.domain.interfaces.vault_config import IVaultConfig
+from obsidian_anki_sync.infrastructure.cache.cache_manager import CacheManager
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

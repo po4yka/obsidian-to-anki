@@ -98,7 +98,8 @@ class LevelStub:
     def __init__(self, name: str) -> None:
         level_name = name.upper()
         if level_name not in self._level_map:
-            raise ValueError(f"Unsupported level: {name}")
+            msg = f"Unsupported level: {name}"
+            raise ValueError(msg)
         self.no = self._level_map[level_name]
         self.name = level_name
 

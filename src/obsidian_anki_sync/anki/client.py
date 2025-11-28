@@ -1,15 +1,16 @@
 """AnkiConnect HTTP API client."""
 
+import contextlib
 import time
 from types import TracebackType
 from typing import Any, Literal, cast
 
 import httpx
 
-from ..domain.interfaces.anki_client import IAnkiClient
-from ..exceptions import AnkiConnectError
-from ..utils.logging import get_logger
-from ..utils.retry import retry
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.exceptions import AnkiConnectError
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.retry import retry
 
 logger = get_logger(__name__)
 
@@ -78,7 +79,8 @@ class AnkiClient(IAnkiClient):
             response.raise_for_status()
             result = response.json()
             if result.get("error"):
-                raise AnkiConnectError(f"AnkiConnect error: {result['error']}")
+                msg = f"AnkiConnect error: {result['error']}"
+                raise AnkiConnectError(msg)
             self._is_healthy = True
         except Exception:
             self._is_healthy = False
@@ -111,9 +113,8 @@ class AnkiClient(IAnkiClient):
             logger.warning(
                 "anki_unhealthy_skipping_request", action=action, url=self.url
             )
-            raise AnkiConnectError(
-                "AnkiConnect is not responding - check if Anki is running"
-            )
+            msg = "AnkiConnect is not responding - check if Anki is running"
+            raise AnkiConnectError(msg)
 
         payload = {"action": action, "version": 6, "params": params or {}}
 
@@ -124,21 +125,24 @@ class AnkiClient(IAnkiClient):
             response.raise_for_status()
         except (httpx.TimeoutException, httpx.ConnectError) as e:
             self._is_healthy = False  # Mark as unhealthy on connection errors
-            raise AnkiConnectError(f"Connection error to AnkiConnect: {e}")
+            msg = f"Connection error to AnkiConnect: {e}"
+            raise AnkiConnectError(msg)
         except httpx.HTTPStatusError as e:
-            raise AnkiConnectError(
-                f"HTTP {e.response.status_code} from AnkiConnect: {e}"
-            )
+            msg = f"HTTP {e.response.status_code} from AnkiConnect: {e}"
+            raise AnkiConnectError(msg)
         except httpx.HTTPError as e:
-            raise AnkiConnectError(f"HTTP error calling AnkiConnect: {e}")
+            msg = f"HTTP error calling AnkiConnect: {e}"
+            raise AnkiConnectError(msg)
 
         try:
             result = response.json()
         except (ValueError, TypeError) as e:
-            raise AnkiConnectError(f"Invalid JSON response: {e}")
+            msg = f"Invalid JSON response: {e}"
+            raise AnkiConnectError(msg)
 
         if result.get("error"):
-            raise AnkiConnectError(f"AnkiConnect error: {result['error']}")
+            msg = f"AnkiConnect error: {result['error']}"
+            raise AnkiConnectError(msg)
 
         return result.get("result")
 
@@ -152,7 +156,7 @@ class AnkiClient(IAnkiClient):
         Returns:
             List of note IDs
         """
-        return cast(list[int], self.invoke("findNotes", {"query": query}))
+        return cast("list[int]", self.invoke("findNotes", {"query": query}))
 
     def notes_info(self, note_ids: list[int]) -> list[dict]:
         """
@@ -166,7 +170,9 @@ class AnkiClient(IAnkiClient):
         """
         if not note_ids:
             return []
-        return cast(list[dict[Any, Any]], self.invoke("notesInfo", {"notes": note_ids}))
+        return cast(
+            "list[dict[Any, Any]]", self.invoke("notesInfo", {"notes": note_ids})
+        )
 
     def cards_info(self, card_ids: list[int]) -> list[dict]:
         """
@@ -180,7 +186,9 @@ class AnkiClient(IAnkiClient):
         """
         if not card_ids:
             return []
-        return cast(list[dict[Any, Any]], self.invoke("cardsInfo", {"cards": card_ids}))
+        return cast(
+            "list[dict[Any, Any]]", self.invoke("cardsInfo", {"cards": card_ids})
+        )
 
     def add_note(
         self,
@@ -215,7 +223,7 @@ class AnkiClient(IAnkiClient):
             if clean_tags:
                 note_payload["tags"] = clean_tags
 
-        result = cast(int, self.invoke("addNote", {"note": note_payload}))
+        result = cast("int", self.invoke("addNote", {"note": note_payload}))
 
         logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
         return result
@@ -242,7 +250,7 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
-        result = cast(list[int | None], self.invoke("addNotes", {"notes": notes}))
+        result = cast("list[int | None]", self.invoke("addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -292,7 +300,7 @@ class AnkiClient(IAnkiClient):
         try:
             # Execute all updates in a single multi request
             results = cast(
-                list[dict[str, Any]],
+                "list[dict[str, Any]]",
                 self.invoke("multi", {"actions": actions}),
             )
 
@@ -353,7 +361,8 @@ class AnkiClient(IAnkiClient):
 
         note_info = self.notes_info([note_id])
         if not note_info:
-            raise AnkiConnectError(f"Note not found for tag update: {note_id}")
+            msg = f"Note not found for tag update: {note_id}"
+            raise AnkiConnectError(msg)
 
         current_tags = set(note_info[0].get("tags", []))
         desired_set = set(desired_tags)
@@ -436,7 +445,7 @@ class AnkiClient(IAnkiClient):
 
         try:
             results = cast(
-                list[dict[str, Any]],
+                "list[dict[str, Any]]",
                 self.invoke("multi", {"actions": actions}),
             )
 
@@ -486,11 +495,11 @@ class AnkiClient(IAnkiClient):
 
     def get_deck_names(self) -> list[str]:
         """Get all deck names."""
-        return cast(list[str], self.invoke("deckNames"))
+        return cast("list[str]", self.invoke("deckNames"))
 
     def get_model_names(self) -> list[str]:
         """Get all note type (model) names."""
-        return cast(list[str], self.invoke("modelNames"))
+        return cast("list[str]", self.invoke("modelNames"))
 
     def get_model_field_names(self, model_name: str) -> list[str]:
         """
@@ -503,7 +512,7 @@ class AnkiClient(IAnkiClient):
             List of field names
         """
         return cast(
-            list[str], self.invoke("modelFieldNames", {"modelName": model_name})
+            "list[str]", self.invoke("modelFieldNames", {"modelName": model_name})
         )
 
     def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
@@ -522,7 +531,7 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
-        return cast(list[bool], self.invoke("canAddNotes", {"notes": notes}))
+        return cast("list[bool]", self.invoke("canAddNotes", {"notes": notes}))
 
     def store_media_file(self, filename: str, data: str) -> str:
         """
@@ -536,7 +545,7 @@ class AnkiClient(IAnkiClient):
             The filename as stored in Anki (may be modified)
         """
         return cast(
-            str, self.invoke("storeMediaFile", {"filename": filename, "data": data})
+            "str", self.invoke("storeMediaFile", {"filename": filename, "data": data})
         )
 
     def suspend_cards(self, card_ids: list[int]) -> None:
@@ -575,7 +584,7 @@ class AnkiClient(IAnkiClient):
         Returns:
             List of note IDs matching the query
         """
-        return cast(list[int], self.invoke("guiBrowse", {"query": query}))
+        return cast("list[int]", self.invoke("guiBrowse", {"query": query}))
 
     def get_collection_stats(self) -> str:
         """
@@ -584,7 +593,7 @@ class AnkiClient(IAnkiClient):
         Returns:
             HTML string containing collection statistics
         """
-        return cast(str, self.invoke("getCollectionStatsHtml"))
+        return cast("str", self.invoke("getCollectionStatsHtml"))
 
     def get_model_names_and_ids(self) -> dict[str, int]:
         """
@@ -593,7 +602,7 @@ class AnkiClient(IAnkiClient):
         Returns:
             Dictionary mapping model names to model IDs
         """
-        return cast(dict[str, int], self.invoke("modelNamesAndIds"))
+        return cast("dict[str, int]", self.invoke("modelNamesAndIds"))
 
     def get_num_cards_reviewed_today(self) -> int:
         """
@@ -602,7 +611,7 @@ class AnkiClient(IAnkiClient):
         Returns:
             Number of cards reviewed in the current day
         """
-        return cast(int, self.invoke("getNumCardsReviewedToday"))
+        return cast("int", self.invoke("getNumCardsReviewedToday"))
 
     def sync(self) -> None:
         """Trigger Anki sync."""
@@ -617,15 +626,17 @@ class AnkiClient(IAnkiClient):
 
     def get_note_id_from_card_id(self, card_id: int) -> int:
         """Get note ID from card ID."""
-        return cast(int, self.invoke("cardsToNotes", {"cards": [card_id]})[0])
+        return cast("int", self.invoke("cardsToNotes", {"cards": [card_id]})[0])
 
     def get_card_ids_from_note_id(self, note_id: int) -> list[int]:
         """Get card IDs from note ID."""
-        return cast(list[int], self.invoke("notesToCards", {"notes": [note_id]})[0])
+        return cast("list[int]", self.invoke("notesToCards", {"notes": [note_id]})[0])
 
     def get_deck_stats(self, deck_name: str) -> dict[str, Any]:
         """Get statistics for a deck."""
-        return cast(dict[str, Any], self.invoke("getDeckStats", {"decks": [deck_name]}))
+        return cast(
+            "dict[str, Any]", self.invoke("getDeckStats", {"decks": [deck_name]})
+        )
 
     def close(self) -> None:
         """Close HTTP session and cleanup resources."""
@@ -652,7 +663,5 @@ class AnkiClient(IAnkiClient):
 
     def __del__(self) -> None:
         """Cleanup on deletion."""
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass

@@ -9,9 +9,16 @@ import time
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...utils.logging import get_logger
-from ..duplicate_detection_prompts import DUPLICATE_DETECTION_PROMPT
-from ..models import DuplicateDetectionResult, DuplicateMatch, GeneratedCard
+from obsidian_anki_sync.agents.duplicate_detection_prompts import (
+    DUPLICATE_DETECTION_PROMPT,
+)
+from obsidian_anki_sync.agents.models import (
+    DuplicateDetectionResult,
+    DuplicateMatch,
+    GeneratedCard,
+)
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import DuplicateDetectionDeps, DuplicateDetectionOutput
 
 logger = get_logger(__name__)
@@ -110,7 +117,7 @@ Analyze similarity and provide your assessment."""
         except Exception as e:
             logger.error("pydantic_ai_duplicate_check_failed", error=str(e))
             # Conservative fallback: assume not duplicate
-            return (False, 0.0, f"Detection failed: {str(e)}")
+            return (False, 0.0, f"Detection failed: {e!s}")
 
     async def find_duplicates(
         self, new_card: GeneratedCard, existing_cards: list[GeneratedCard]
@@ -131,7 +138,7 @@ Analyze similarity and provide your assessment."""
 
             # Check against each existing card
             for existing_card in existing_cards:
-                is_dup, score, reasoning = await self.check_duplicate(
+                _is_dup, score, reasoning = await self.check_duplicate(
                     new_card, existing_card
                 )
 

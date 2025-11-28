@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseSpecializedAgent
 from .models import AgentResult
 
@@ -14,7 +15,7 @@ class HTMLValidationAgent(BaseSpecializedAgent):
 
     def solve(self, content: str, context: dict[str, Any]) -> AgentResult:
         """Repair HTML validation issues."""
-        from ...apf.html_generator import HTMLTemplateGenerator
+        from obsidian_anki_sync.apf.html_generator import HTMLTemplateGenerator
 
         try:
             html_generator = HTMLTemplateGenerator()

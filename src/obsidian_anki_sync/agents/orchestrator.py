@@ -12,13 +12,14 @@ import hashlib
 import time
 from pathlib import Path
 
-from ..config import Config
-from ..models import Card, Manifest, NoteMetadata, QAPair
-from ..providers.base import BaseLLMProvider
-from ..providers.factory import ProviderFactory
-from ..providers.ollama import OllamaProvider
-from ..utils.content_hash import compute_content_hash
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.providers.factory import ProviderFactory
+from obsidian_anki_sync.providers.ollama import OllamaProvider
+from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .generator import GeneratorAgent
 from .models import AgentPipelineResult, GeneratedCard
 from .post_validation import PostValidatorAgent
@@ -110,10 +111,11 @@ class AgentOrchestrator:
         provider_name = self.provider.get_provider_name()
         if not self.provider.check_connection():
             logger.error("provider_connection_failed", provider=provider_name)
-            raise ConnectionError(
+            msg = (
                 f"Cannot connect to {provider_name} provider. "
                 "Please check your provider configuration and ensure the service is running."
             )
+            raise ConnectionError(msg)
 
         # Initialize agents
         pre_val_model = getattr(config, "pre_validator_model", "qwen3:8b")

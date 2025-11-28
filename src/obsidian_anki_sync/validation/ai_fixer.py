@@ -11,9 +11,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..providers.base import BaseLLMProvider
-from ..providers.factory import ProviderFactory
-from ..utils.logging import get_logger
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.providers.factory import ProviderFactory
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseValidator, Severity, ValidationIssue
 
 logger = get_logger(__name__)

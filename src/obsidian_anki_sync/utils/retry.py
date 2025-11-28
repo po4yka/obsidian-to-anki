@@ -5,7 +5,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

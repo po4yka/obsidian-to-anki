@@ -6,7 +6,7 @@ classification logic for routing decisions.
 
 from langgraph.types import RetryPolicy
 
-from ..models import RepairStrategy
+from obsidian_anki_sync.agents.models import RepairStrategy
 
 # ============================================================================
 # Retry Policy Configuration
@@ -78,12 +78,12 @@ def is_transient_error(exc: Exception) -> bool:
         return True
 
     # API-specific transient errors
-    if any(
-        term in error_msg for term in ["overloaded", "capacity", "retry", "temporary"]
-    ):
-        return True
-
-    return False
+    return bool(
+        any(
+            term in error_msg
+            for term in ["overloaded", "capacity", "retry", "temporary"]
+        )
+    )
 
 
 # Retry policy with custom retry condition
@@ -454,10 +454,7 @@ class CircuitBreaker:
                 return True
             return False
 
-        if self.state == "half_open":
-            return True
-
-        return False
+        return self.state == "half_open"
 
     def get_state(self) -> str:
         """Get current circuit breaker state.

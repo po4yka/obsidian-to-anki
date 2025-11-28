@@ -7,13 +7,15 @@ This agent activates only when rule-based parsing fails:
 - Re-attempts parsing with repairs
 """
 
+import contextlib
 import json
 from pathlib import Path
 
-from ..exceptions import ParserError
-from ..models import NoteMetadata, QAPair
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .json_schemas import get_parser_repair_schema
 from .langgraph.retry_policies import classify_error_category, select_repair_strategy
 from .models import (
@@ -450,7 +452,8 @@ DO NOT repair (mark as unrepairable):
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
             logger.error("parser_repair_read_failed", file=str(file_path), error=str(e))
-            raise ParserError(f"Cannot read file for repair: {e}")
+            msg = f"Cannot read file for repair: {e}"
+            raise ParserError(msg) from e
 
         # Build repair prompt
         prompt = self._build_repair_prompt(
@@ -642,7 +645,10 @@ ALWAYS:
 
             # Try parsing repaired content
             # Import here to avoid circular dependency
-            from ..obsidian.parser import parse_frontmatter, parse_qa_pairs
+            from obsidian_anki_sync.obsidian.parser import (
+                parse_frontmatter,
+                parse_qa_pairs,
+            )
 
             try:
                 # Write to temporary path for parsing
@@ -724,6 +730,7 @@ ALWAYS:
                     error_message=str(e),
                 )
                 return None
+        return None
 
     def analyze_and_correct_proactively(
         self, content: str, file_path: Path | None = None
@@ -890,10 +897,8 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
                         # Extract quality after if available
                         quality_after_data = repair_result.get("quality_after")
                         if quality_after_data:
-                            try:
+                            with contextlib.suppress(Exception):
                                 quality_after = RepairQualityScore(**quality_after_data)
-                            except Exception:
-                                pass
 
                         logger.info(
                             "proactive_correction_applied",
@@ -934,7 +939,7 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
             return NoteCorrectionResult(
                 needs_correction=False,
                 quality_score=0.5,
-                issues_found=[f"Analysis failed: {str(e)}"],
+                issues_found=[f"Analysis failed: {e!s}"],
                 corrections_applied=[],
                 confidence=0.0,
                 correction_time=time.time() - start_time,
@@ -1191,9 +1196,7 @@ If the section cannot be fixed, mark it as unrepairable.
                 )
                 sections_failed.append(section_name)
                 section_confidence[section_name] = 0.0
-                repair_report_parts.append(
-                    f"Section '{section_name}': Error - {str(e)}"
-                )
+                repair_report_parts.append(f"Section '{section_name}': Error - {e!s}")
 
         is_complete = len(sections_failed) == 0
         repair_report = "\n".join(repair_report_parts)
@@ -1250,14 +1253,14 @@ If the section cannot be fixed, mark it as unrepairable.
         current_section = None
         current_section_lines = []
 
-        for i, line in enumerate(lines):
+        for line in lines:
             if line.strip().startswith("# Question") or line.strip().startswith(
                 "# Вопрос"
             ):
                 if current_section:
                     sections[current_section] = "\n".join(current_section_lines)
                 current_section = "question_" + str(
-                    len([k for k in sections.keys() if k.startswith("question")])
+                    len([k for k in sections if k.startswith("question")])
                 )
                 current_section_lines = [line]
             elif line.strip().startswith("## Answer") or line.strip().startswith(
@@ -1266,7 +1269,7 @@ If the section cannot be fixed, mark it as unrepairable.
                 if current_section:
                     sections[current_section] = "\n".join(current_section_lines)
                 current_section = "answer_" + str(
-                    len([k for k in sections.keys() if k.startswith("answer")])
+                    len([k for k in sections if k.startswith("answer")])
                 )
                 current_section_lines = [line]
             elif current_section:

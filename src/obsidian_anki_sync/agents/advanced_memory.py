@@ -16,8 +16,9 @@ from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .agent_memory import AgentMemoryStore
 
 logger = get_logger(__name__)
@@ -187,13 +188,13 @@ class AdvancedMemoryStore:
             # Create indexes for performance
             await self._create_indexes()
 
-            logger.info("mongodb_connection_established", db_name=self.db_name)
-            return True
-
         except Exception as e:
             logger.error("mongodb_connection_failed", error=str(e))
             self.connected = False
             return False
+        else:
+            logger.info("mongodb_connection_established", db_name=self.db_name)
+            return True
 
     async def disconnect(self):
         """Close MongoDB connection."""
@@ -308,18 +309,17 @@ class AdvancedMemoryStore:
                 doc.pop("_id", None)
                 experiences.append(AgentExperience(**doc))
 
+        except Exception as e:
+            logger.error("failed_to_retrieve_experiences", error=str(e))
+            return []
+        else:
             logger.info(
                 "retrieved_similar_experiences",
                 agent=agent_name,
                 task_type=task_type,
                 count=len(experiences),
             )
-
             return experiences
-
-        except Exception as e:
-            logger.error("failed_to_retrieve_experiences", error=str(e))
-            return []
 
     async def store_knowledge(self, knowledge: AgentKnowledge) -> bool:
         """Store learned knowledge for future use.
@@ -356,12 +356,12 @@ class AdvancedMemoryStore:
                 # Insert new knowledge
                 await self.knowledge_collection.insert_one(asdict(knowledge))
 
-            logger.info("knowledge_stored", topic=knowledge.topic)
-            return True
-
         except Exception as e:
             logger.error("failed_to_store_knowledge", error=str(e))
             return False
+        else:
+            logger.info("knowledge_stored", topic=knowledge.topic)
+            return True
 
     async def retrieve_knowledge(self, topic: str) -> AgentKnowledge | None:
         """Retrieve stored knowledge by topic.
@@ -380,10 +380,11 @@ class AdvancedMemoryStore:
             if doc:
                 doc.pop("_id", None)
                 return AgentKnowledge(**doc)
-            return None
 
         except Exception as e:
             logger.error("failed_to_retrieve_knowledge", error=str(e))
+            return None
+        else:
             return None
 
     async def store_user_pattern(self, pattern: UserPattern) -> bool:
@@ -424,16 +425,16 @@ class AdvancedMemoryStore:
                 # Insert new pattern
                 await self.patterns_collection.insert_one(asdict(pattern))
 
+        except Exception as e:
+            logger.error("failed_to_store_user_pattern", error=str(e))
+            return False
+        else:
             logger.info(
                 "user_pattern_stored",
                 user_id=pattern.user_id,
                 preference_type=pattern.preference_type,
             )
             return True
-
-        except Exception as e:
-            logger.error("failed_to_store_user_pattern", error=str(e))
-            return False
 
     async def get_user_preferences(self, user_id: str) -> dict[str, Any]:
         """Get all learned preferences for a user.
@@ -460,17 +461,16 @@ class AdvancedMemoryStore:
                     "observation_count": doc["observation_count"],
                 }
 
+        except Exception as e:
+            logger.error("failed_to_retrieve_user_preferences", error=str(e))
+            return {}
+        else:
             logger.info(
                 "retrieved_user_preferences",
                 user_id=user_id,
                 preference_count=len(preferences),
             )
-
             return preferences
-
-        except Exception as e:
-            logger.error("failed_to_retrieve_user_preferences", error=str(e))
-            return {}
 
     async def learn_from_pipeline_result(
         self,

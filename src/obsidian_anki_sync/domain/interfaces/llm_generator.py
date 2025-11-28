@@ -38,7 +38,6 @@ class IGenerator(ABC):
         Returns:
             Response with 'response' key containing generated text
         """
-        pass
 
     @abstractmethod
     def generate_json(
@@ -63,7 +62,6 @@ class IGenerator(ABC):
         Returns:
             Parsed JSON response as dictionary
         """
-        pass
 
     @abstractmethod
     def generate_async(
@@ -92,4 +90,3 @@ class IGenerator(ABC):
         Returns:
             Response with 'response' key containing generated text
         """
-        pass

@@ -38,35 +38,25 @@ def count_chars_before_after() -> int:
     base_path = Path.cwd() / "30-System-Design"
 
     if not base_path.exists():
-        print(f"Error: Directory not found: {base_path}")
         return 0
-
-    print("=" * 80)
-    print("BEFORE TRANSLATION - Russian Character Counts:")
-    print("=" * 80)
 
     total_before = 0
     for filename in FILES_TO_PROCESS:
         filepath = base_path / filename
         if not filepath.exists():
-            print(f"{filename}: FILE NOT FOUND")
             continue
 
         content = filepath.read_text(encoding="utf-8")
         russian_content = extract_russian_content(content)
         char_count = len(russian_content)
         total_before += char_count
-        print(f"{filename}: {char_count} chars")
 
-    print(f"\nTotal BEFORE: {total_before} chars")
-    print("=" * 80)
     return total_before
 
 
 def main() -> None:
     """Main entry point for translation utilities."""
     count_chars_before_after()
-    print("\nReady to translate...")
 
 
 if __name__ == "__main__":

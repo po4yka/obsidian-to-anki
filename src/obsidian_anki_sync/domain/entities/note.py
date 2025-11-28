@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..services.content_hash_service import ContentHashService
+from obsidian_anki_sync.domain.services.content_hash_service import ContentHashService
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -29,13 +32,17 @@ class Note:
     def __post_init__(self) -> None:
         """Validate entity invariants."""
         if not self.id:
-            raise ValueError("Note ID cannot be empty")
+            msg = "Note ID cannot be empty"
+            raise ValueError(msg)
         if not self.title:
-            raise ValueError("Note title cannot be empty")
+            msg = "Note title cannot be empty"
+            raise ValueError(msg)
         if not self.content:
-            raise ValueError("Note content cannot be empty")
+            msg = "Note content cannot be empty"
+            raise ValueError(msg)
         if not self.file_path.exists():
-            raise ValueError(f"Note file does not exist: {self.file_path}")
+            msg = f"Note file does not exist: {self.file_path}"
+            raise ValueError(msg)
 
     @property
     def content_hash(self) -> str:
@@ -109,11 +116,14 @@ class NoteMetadata:
     def __post_init__(self) -> None:
         """Validate metadata invariants."""
         if not self.topic:
-            raise ValueError("Topic cannot be empty")
+            msg = "Topic cannot be empty"
+            raise ValueError(msg)
         if not self.language_tags:
-            raise ValueError("At least one language tag required")
+            msg = "At least one language tag required"
+            raise ValueError(msg)
         if len(self.language_tags) > 2:
-            raise ValueError("Maximum 2 language tags allowed")
+            msg = "Maximum 2 language tags allowed"
+            raise ValueError(msg)
 
     @property
     def primary_language(self) -> str:
@@ -143,15 +153,20 @@ class QAPair:
     def __post_init__(self) -> None:
         """Validate Q&A pair invariants."""
         if self.card_index < 1:
-            raise ValueError("Card index must be positive")
+            msg = "Card index must be positive"
+            raise ValueError(msg)
         if not self.question_en.strip():
-            raise ValueError("English question cannot be empty")
+            msg = "English question cannot be empty"
+            raise ValueError(msg)
         if not self.question_ru.strip():
-            raise ValueError("Russian question cannot be empty")
+            msg = "Russian question cannot be empty"
+            raise ValueError(msg)
         if not self.answer_en.strip():
-            raise ValueError("English answer cannot be empty")
+            msg = "English answer cannot be empty"
+            raise ValueError(msg)
         if not self.answer_ru.strip():
-            raise ValueError("Russian answer cannot be empty")
+            msg = "Russian answer cannot be empty"
+            raise ValueError(msg)
 
     @property
     def content_hash(self) -> str:

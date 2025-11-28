@@ -7,8 +7,8 @@ from typing import Any
 
 import yaml
 
-from ..exceptions import DeckImportError
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import DeckImportError
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,12 +31,14 @@ def load_cards_from_file(input_path: Path) -> list[dict[str, Any]]:
         file_size = input_path.stat().st_size
         max_file_size = 50 * 1024 * 1024  # 50MB limit for import files
         if file_size > max_file_size:
-            raise DeckImportError(
+            msg = (
                 f"File too large: {input_path} ({file_size} bytes). "
                 f"Maximum allowed size is {max_file_size} bytes."
             )
+            raise DeckImportError(msg)
     except OSError as e:
-        raise DeckImportError(f"Cannot check file size: {e}")
+        msg = f"Cannot check file size: {e}"
+        raise DeckImportError(msg)
 
     file_format = input_path.suffix.lower()
 
@@ -44,7 +46,8 @@ def load_cards_from_file(input_path: Path) -> list[dict[str, Any]]:
         with input_path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             if not isinstance(data, list):
-                raise DeckImportError("YAML file must contain a list of cards")
+                msg = "YAML file must contain a list of cards"
+                raise DeckImportError(msg)
             return data
     elif file_format == ".csv":
         cards = []
@@ -54,7 +57,8 @@ def load_cards_from_file(input_path: Path) -> list[dict[str, Any]]:
                 cards.append(dict(row))
         return cards
     else:
-        raise DeckImportError(f"Unsupported file format: {file_format}")
+        msg = f"Unsupported file format: {file_format}"
+        raise DeckImportError(msg)
 
 
 def save_cards_to_file(
@@ -97,7 +101,7 @@ def save_cards_to_file(
             )
 
 
-def get_processed_slugs(output_path: Path, file_format: str) -> set[str]:  # noqa: ARG001
+def get_processed_slugs(output_path: Path, file_format: str) -> set[str]:
     """
     Get set of already processed card slugs from output file.
 
@@ -153,7 +157,10 @@ def process_card_with_llm(
     try:
         if hasattr(llm_client, "chat") and hasattr(llm_client.chat, "completions"):
             # OpenAI-style client
-            from ..utils.llm_logging import log_llm_request, log_llm_success
+            from obsidian_anki_sync.utils.llm_logging import (
+                log_llm_request,
+                log_llm_success,
+            )
 
             start_time = log_llm_request(
                 model=model,
@@ -187,7 +194,7 @@ def process_card_with_llm(
 
         # Extract result if required
         if require_result_tag:
-            from ..utils.result_extractor import extract_result_tag
+            from obsidian_anki_sync.utils.result_extractor import extract_result_tag
 
             result_text = extract_result_tag(result_text, require_tag=True)
 
@@ -203,13 +210,12 @@ def process_card_with_llm(
         elif field_name:
             # Update single field
             card[field_name] = result_text
+        # Default: update first field or add to a generic field
+        elif not card:
+            card["processed"] = result_text
         else:
-            # Default: update first field or add to a generic field
-            if not card:
-                card["processed"] = result_text
-            else:
-                first_key = next(iter(card.keys()))
-                card[first_key] = result_text
+            first_key = next(iter(card.keys()))
+            card[first_key] = result_text
 
     except (ValueError, KeyError, AttributeError, RuntimeError, TypeError) as e:
         logger.error("llm_processing_failed", error=str(e), slug=card.get("slug"))

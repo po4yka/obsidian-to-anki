@@ -1,6 +1,6 @@
 """Tests for Obsidian note parser (UNIT-parse-01, UNIT-parse-02, UNIT-yaml-01)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -84,8 +84,8 @@ def sample_note_metadata():
         title="Test Question",
         topic="Testing",
         language_tags=["en", "ru"],
-        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        updated=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        created=datetime(2024, 1, 1, tzinfo=UTC),
+        updated=datetime(2024, 1, 2, tzinfo=UTC),
     )
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ..services.slug_service import SlugService
+from obsidian_anki_sync.domain.services.slug_service import SlugService
 
 
 @dataclass(frozen=True)
@@ -27,13 +27,17 @@ class Card:
     def __post_init__(self) -> None:
         """Validate entity invariants."""
         if not self.slug:
-            raise ValueError("Card slug cannot be empty")
+            msg = "Card slug cannot be empty"
+            raise ValueError(msg)
         if len(self.language) != 2:
-            raise ValueError("Language must be 2-character code")
+            msg = "Language must be 2-character code"
+            raise ValueError(msg)
         if not self.apf_html.strip():
-            raise ValueError("APF HTML content cannot be empty")
+            msg = "APF HTML content cannot be empty"
+            raise ValueError(msg)
         if not self.note_type:
-            raise ValueError("Note type cannot be empty")
+            msg = "Note type cannot be empty"
+            raise ValueError(msg)
 
     @property
     def is_new(self) -> bool:
@@ -123,21 +127,29 @@ class CardManifest:
     def __post_init__(self) -> None:
         """Validate manifest invariants."""
         if not self.slug:
-            raise ValueError("Slug cannot be empty")
+            msg = "Slug cannot be empty"
+            raise ValueError(msg)
         if not self.slug_base:
-            raise ValueError("Slug base cannot be empty")
+            msg = "Slug base cannot be empty"
+            raise ValueError(msg)
         if len(self.lang) != 2:
-            raise ValueError("Language must be 2-character code")
+            msg = "Language must be 2-character code"
+            raise ValueError(msg)
         if not self.source_path:
-            raise ValueError("Source path cannot be empty")
+            msg = "Source path cannot be empty"
+            raise ValueError(msg)
         if not self.source_anchor:
-            raise ValueError("Source anchor cannot be empty")
+            msg = "Source anchor cannot be empty"
+            raise ValueError(msg)
         if not self.note_id:
-            raise ValueError("Note ID cannot be empty")
+            msg = "Note ID cannot be empty"
+            raise ValueError(msg)
         if not self.note_title:
-            raise ValueError("Note title cannot be empty")
+            msg = "Note title cannot be empty"
+            raise ValueError(msg)
         if self.card_index < 0:
-            raise ValueError("Card index cannot be negative")
+            msg = "Card index cannot be negative"
+            raise ValueError(msg)
 
     @property
     def is_linked_to_note(self) -> bool:
@@ -162,7 +174,8 @@ class SyncAction:
     def __post_init__(self) -> None:
         """Validate action invariants."""
         if not isinstance(self.action_type, SyncActionType):
-            raise ValueError("Invalid action type")
+            msg = "Invalid action type"
+            raise ValueError(msg)
 
     @property
     def is_create(self) -> bool:

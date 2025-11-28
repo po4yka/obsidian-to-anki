@@ -3,4 +3,4 @@
 from .error_categories import ErrorCategory
 from .validator import PostValidatorAgent
 
-__all__ = ["PostValidatorAgent", "ErrorCategory"]
+__all__ = ["ErrorCategory", "PostValidatorAgent"]

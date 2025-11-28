@@ -2,7 +2,8 @@ from typing import Literal
 
 from langgraph.graph import END, StateGraph
 
-from ...config import Config
+from obsidian_anki_sync.config import Config
+
 from .nodes import (
     card_splitting_node,
     context_enrichment_node,

@@ -18,7 +18,6 @@ class IAnkiConfig(ABC):
         Returns:
             URL for AnkiConnect API
         """
-        pass
 
     @property
     @abstractmethod
@@ -28,7 +27,6 @@ class IAnkiConfig(ABC):
         Returns:
             Name of the Anki deck to use
         """
-        pass
 
     @property
     @abstractmethod
@@ -38,7 +36,6 @@ class IAnkiConfig(ABC):
         Returns:
             Note type to use for new cards
         """
-        pass
 
     @property
     @abstractmethod
@@ -48,7 +45,6 @@ class IAnkiConfig(ABC):
         Returns:
             Dictionary mapping internal types to Anki model names
         """
-        pass
 
     @property
     @abstractmethod
@@ -58,7 +54,6 @@ class IAnkiConfig(ABC):
         Returns:
             'apply' or 'dry-run'
         """
-        pass
 
     @property
     @abstractmethod
@@ -68,7 +63,6 @@ class IAnkiConfig(ABC):
         Returns:
             'delete' or 'archive'
         """
-        pass
 
     @abstractmethod
     def get_model_name(self, internal_type: str) -> str:
@@ -80,7 +74,6 @@ class IAnkiConfig(ABC):
         Returns:
             Actual Anki model name
         """
-        pass
 
     @abstractmethod
     def validate_anki_connection(self) -> bool:
@@ -89,4 +82,3 @@ class IAnkiConfig(ABC):
         Returns:
             True if connection is valid, False otherwise
         """
-        pass

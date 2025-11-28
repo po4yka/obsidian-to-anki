@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...models import NoteMetadata, QAPair
+from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 
 class PreValidationOutput(BaseModel):

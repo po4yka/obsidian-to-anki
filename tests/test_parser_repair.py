@@ -312,7 +312,7 @@ class TestAttemptRepairHelper:
         )
 
         assert result is not None
-        metadata, qa_pairs = result
+        metadata, _qa_pairs = result
         assert metadata.language_tags == ["en", "ru"]
 
 

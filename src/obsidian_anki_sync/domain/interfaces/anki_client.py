@@ -18,7 +18,6 @@ class IAnkiClient(ABC):
         Returns:
             True if connection is successful, False otherwise
         """
-        pass
 
     @abstractmethod
     def get_deck_names(self) -> list[str]:
@@ -27,7 +26,6 @@ class IAnkiClient(ABC):
         Returns:
             List of deck names
         """
-        pass
 
     @abstractmethod
     def get_model_names(self) -> list[str]:
@@ -36,7 +34,6 @@ class IAnkiClient(ABC):
         Returns:
             List of model names
         """
-        pass
 
     @abstractmethod
     def get_model_field_names(self, model_name: str) -> list[str]:
@@ -48,7 +45,6 @@ class IAnkiClient(ABC):
         Returns:
             List of field names
         """
-        pass
 
     @abstractmethod
     def find_notes(self, query: str) -> list[int]:
@@ -60,7 +56,6 @@ class IAnkiClient(ABC):
         Returns:
             List of note IDs
         """
-        pass
 
     @abstractmethod
     def notes_info(self, note_ids: list[int]) -> list[dict[str, Any]]:
@@ -72,7 +67,6 @@ class IAnkiClient(ABC):
         Returns:
             List of note information dictionaries
         """
-        pass
 
     @abstractmethod
     def cards_info(self, card_ids: list[int]) -> list[dict[str, Any]]:
@@ -84,7 +78,6 @@ class IAnkiClient(ABC):
         Returns:
             List of card information dictionaries
         """
-        pass
 
     @abstractmethod
     def add_note(
@@ -107,7 +100,6 @@ class IAnkiClient(ABC):
         Returns:
             Note ID of the created note
         """
-        pass
 
     @abstractmethod
     def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
@@ -117,7 +109,6 @@ class IAnkiClient(ABC):
             note_id: ID of the note to update
             fields: Field name -> new value mapping
         """
-        pass
 
     @abstractmethod
     def delete_notes(self, note_ids: list[int]) -> None:
@@ -126,7 +117,6 @@ class IAnkiClient(ABC):
         Args:
             note_ids: List of note IDs to delete
         """
-        pass
 
     @abstractmethod
     def get_note_id_from_card_id(self, card_id: int) -> int:
@@ -138,7 +128,6 @@ class IAnkiClient(ABC):
         Returns:
             Note ID
         """
-        pass
 
     @abstractmethod
     def get_card_ids_from_note_id(self, note_id: int) -> list[int]:
@@ -150,7 +139,6 @@ class IAnkiClient(ABC):
         Returns:
             List of card IDs
         """
-        pass
 
     @abstractmethod
     def suspend_cards(self, card_ids: list[int]) -> None:
@@ -159,7 +147,6 @@ class IAnkiClient(ABC):
         Args:
             card_ids: List of card IDs to suspend
         """
-        pass
 
     @abstractmethod
     def unsuspend_cards(self, card_ids: list[int]) -> None:
@@ -168,7 +155,6 @@ class IAnkiClient(ABC):
         Args:
             card_ids: List of card IDs to unsuspend
         """
-        pass
 
     @abstractmethod
     def get_deck_stats(self, deck_name: str) -> dict[str, Any]:
@@ -180,4 +166,3 @@ class IAnkiClient(ABC):
         Returns:
             Deck statistics
         """
-        pass

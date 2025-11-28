@@ -15,8 +15,9 @@ from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 from langgraph_swarm import Swarm
 
-from ...config import Config
-from ...utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .state import PipelineState
 
 logger = get_logger(__name__)
@@ -89,7 +90,9 @@ class LangGraphSwarmOrchestrator:
 
     def _define_agent_expertise(self) -> dict[str, AgentExpertise]:
         """Define expertise profiles for each agent."""
-        from ...providers.pydantic_ai_models import PydanticAIModelFactory
+        from obsidian_anki_sync.providers.pydantic_ai_models import (
+            PydanticAIModelFactory,
+        )
 
         # Create models once for efficiency
         try:
@@ -334,7 +337,7 @@ Always focus on your core competencies and hand off when appropriate.
         # Convert to proper types for traditional processing
         from pathlib import Path
 
-        from ...models import NoteMetadata, QAPair
+        from obsidian_anki_sync.models import NoteMetadata, QAPair
 
         note_metadata = NoteMetadata(**metadata)
         qa_objects = [QAPair(**qa) for qa in qa_pairs]

@@ -9,10 +9,17 @@ import time
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata
-from ...utils.logging import get_logger
-from ..context_enrichment_prompts import CONTEXT_ENRICHMENT_PROMPT
-from ..models import ContextEnrichmentResult, EnrichmentAddition, GeneratedCard
+from obsidian_anki_sync.agents.context_enrichment_prompts import (
+    CONTEXT_ENRICHMENT_PROMPT,
+)
+from obsidian_anki_sync.agents.models import (
+    ContextEnrichmentResult,
+    EnrichmentAddition,
+    GeneratedCard,
+)
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import ContextEnrichmentDeps, ContextEnrichmentOutput
 
 logger = get_logger(__name__)
@@ -158,7 +165,7 @@ Provide your enrichment assessment."""
                 should_enrich=False,
                 enriched_card=None,
                 additions=[],
-                additions_summary=f"Enrichment failed: {str(e)}",
+                additions_summary=f"Enrichment failed: {e!s}",
                 enrichment_rationale="Agent encountered error",
                 enrichment_time=0.0,
             )

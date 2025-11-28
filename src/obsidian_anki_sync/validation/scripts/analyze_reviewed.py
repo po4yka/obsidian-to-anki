@@ -4,8 +4,8 @@
 from collections import defaultdict
 from pathlib import Path
 
-from ..base import Severity
-from ..orchestrator import NoteValidator
+from obsidian_anki_sync.validation.base import Severity
+from obsidian_anki_sync.validation.orchestrator import NoteValidator
 
 
 def main() -> None:
@@ -24,16 +24,13 @@ def main() -> None:
         except Exception:
             continue
 
-    print(f"Found {len(reviewed_notes)} notes with 'reviewed' status")
-    print("Validating...\n")
-
     # Validate all reviewed notes
     validator = NoteValidator(vault_root)
     results = []
 
     for i, note in enumerate(reviewed_notes, 1):
         if i % 10 == 0:
-            print(f"Progress: {i}/{len(reviewed_notes)}")
+            pass
         result = validator.validate_file(note)
         results.append(result)
 
@@ -92,59 +89,28 @@ def main() -> None:
                 issue_types[issue_msg] += 1
 
     # Print report
-    print("\n" + "=" * 80)
-    print("REVIEWED NOTES ANALYSIS - 40-Android")
-    print("=" * 80)
-    print()
-
-    print("SUMMARY")
-    print("-" * 80)
-    print(f"Total reviewed notes: {stats['total']}")
-    print(
-        f"Passed validation:    {stats['passed']} ({stats['passed'] / stats['total'] * 100:.1f}%)"
-    )
-    print(
-        f"With issues:          {stats['with_issues']} ({stats['with_issues'] / stats['total'] * 100:.1f}%)"
-    )
-    print()
-    print(f"Critical issues:      {stats['critical']}")
-    print(f"Errors:               {stats['errors']}")
-    print(f"Warnings:             {stats['warnings']}")
-    print(f"Info:                 {stats['info']}")
-    print()
 
     # Files with critical issues
     if files_by_severity[Severity.CRITICAL]:
-        print("FILES WITH CRITICAL ISSUES")
-        print("-" * 80)
         for filename, count in sorted(
             files_by_severity[Severity.CRITICAL], key=lambda x: -x[1]
         )[:10]:
-            print(f"  {filename}: {count} critical")
+            pass
         if len(files_by_severity[Severity.CRITICAL]) > 10:
-            print(f"  ... and {len(files_by_severity[Severity.CRITICAL]) - 10} more")
-        print()
+            pass
 
     # Files with errors
     if files_by_severity[Severity.ERROR]:
-        print("FILES WITH ERRORS")
-        print("-" * 80)
         for filename, count in sorted(
             files_by_severity[Severity.ERROR], key=lambda x: -x[1]
         )[:10]:
-            print(f"  {filename}: {count} errors")
+            pass
         if len(files_by_severity[Severity.ERROR]) > 10:
-            print(f"  ... and {len(files_by_severity[Severity.ERROR]) - 10} more")
-        print()
+            pass
 
     # Top issue types
-    print("TOP 10 ISSUE TYPES")
-    print("-" * 80)
     for issue_msg, count in sorted(issue_types.items(), key=lambda x: -x[1])[:10]:
-        print(f"  {count:3d}x - {issue_msg[:70]}")
-    print()
-
-    print("=" * 80)
+        pass
 
     # Pass rate assessment
     pass_rate = stats["passed"] / stats["total"] * 100
@@ -154,9 +120,6 @@ def main() -> None:
         status = "MODERATE"
     else:
         status = "NEEDS ATTENTION"
-
-    print(f"Overall status: {status} ({pass_rate:.1f}% pass rate)")
-    print("=" * 80)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,12 @@
 
 import re
 
-from ...models import NoteMetadata
-from ...providers.base import BaseLLMProvider
-from ...utils.logging import get_logger
-from ..json_schemas import get_post_validation_schema
-from ..models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.agents.json_schemas import get_post_validation_schema
+from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .prompts import SEMANTIC_VALIDATION_SYSTEM_PROMPT, build_semantic_prompt
 
 logger = get_logger(__name__)
@@ -80,24 +81,24 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
     removed_any = False
 
     for item in error_items:
-        item = item.strip()
-        if not item:
+        stripped_item = item.strip()
+        if not stripped_item:
             continue
 
         is_false_positive = False
         for pattern in FALSE_POSITIVE_PATTERNS:
-            if re.search(pattern, item, re.IGNORECASE):
+            if re.search(pattern, stripped_item, re.IGNORECASE):
                 is_false_positive = True
                 logger.debug(
                     "filtered_false_positive_error",
                     pattern=pattern,
-                    error_text=item[:100],
+                    error_text=stripped_item[:100],
                 )
                 removed_any = True
                 break
 
         if not is_false_positive:
-            filtered_items.append(item)
+            filtered_items.append(stripped_item)
 
     if not filtered_items:
         # All errors were false positives

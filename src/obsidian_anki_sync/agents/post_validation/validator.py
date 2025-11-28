@@ -2,11 +2,16 @@
 
 import time
 
-from ...models import NoteMetadata
-from ...providers.base import BaseLLMProvider
-from ...utils.logging import get_logger
-from ..llm_errors import categorize_llm_error, format_llm_error_for_user, log_llm_error
-from ..models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.agents.llm_errors import (
+    categorize_llm_error,
+    format_llm_error_for_user,
+    log_llm_error,
+)
+from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .auto_fix import AggressiveFixer, DeterministicFixer, RuleBasedHeaderFixer
 from .error_categories import ErrorCategory
 from .prompts import AUTOFIX_SYSTEM_PROMPT, build_autofix_prompt

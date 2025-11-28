@@ -20,7 +20,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             generator_model="custom/generator-model",
@@ -37,7 +37,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             generator_model="",
@@ -55,7 +55,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="invalid_preset",
             generator_model="",
@@ -72,7 +72,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             pre_validator_model="custom/pre-validator",
@@ -89,7 +89,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="high_quality",
             post_validator_model="custom/post-validator",
@@ -106,7 +106,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             context_enrichment_model="custom/enrichment",
@@ -123,7 +123,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             default_llm_model="qwen/qwen-2.5-72b-instruct",
@@ -139,7 +139,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             generator_temperature=0.7,
@@ -158,7 +158,7 @@ class TestModelSelection:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
             default_llm_model="qwen/qwen-2.5-72b-instruct",
@@ -176,7 +176,7 @@ class TestModelPresets:
     """Test different model preset configurations."""
 
     @pytest.mark.parametrize(
-        "preset,expected_generator",
+        ("preset", "expected_generator"),
         [
             # All presets now use x-ai/grok-4.1-fast (free, high quality, 2M context)
             ("cost_effective", "x-ai/grok-4.1-fast"),
@@ -192,7 +192,7 @@ class TestModelPresets:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset=preset,
             generator_model="",
@@ -203,7 +203,7 @@ class TestModelPresets:
         assert model == expected_generator
 
     @pytest.mark.parametrize(
-        "preset,task,expected_temp",
+        ("preset", "task", "expected_temp"),
         [
             ("cost_effective", "generation", 0.3),
             ("balanced", "generation", 0.3),
@@ -218,7 +218,7 @@ class TestModelPresets:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset=preset,
             default_llm_model="qwen/qwen-2.5-72b-instruct",
@@ -238,7 +238,7 @@ class TestConfigurationValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             llm_provider="ollama",
             llm_temperature=0.2,
@@ -254,8 +254,8 @@ class TestConfigurationValidation:
         """Test that empty vault_path resolves to current directory."""
         # Empty vault_path is allowed and resolves to current working directory
         config = Config(
-            vault_path=Path(""),
-            source_dir=Path("."),
+            vault_path=Path(),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
         # Empty string resolves to current directory (absolute path)
@@ -268,7 +268,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="Vault path does not exist"):
             Config(
                 vault_path=non_existent_path,
-                source_dir=Path("."),
+                source_dir=Path(),
             )
 
     def test_invalid_llm_provider(self, temp_dir):
@@ -279,7 +279,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="Invalid llm_provider"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_provider="invalid_provider",
             )
 
@@ -291,7 +291,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="OpenRouter API key is required"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_provider="openrouter",
                 openrouter_api_key="",
             )
@@ -304,7 +304,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="OpenAI API key is required"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_provider="openai",
                 openai_api_key="",
             )
@@ -317,7 +317,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="Anthropic API key is required"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_provider="anthropic",
                 anthropic_api_key="",
             )
@@ -330,7 +330,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="Invalid run_mode"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 run_mode="invalid_mode",
             )
 
@@ -342,7 +342,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="Invalid delete_mode"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 delete_mode="invalid_mode",
             )
 
@@ -354,7 +354,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="temperature must be 0-1"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_temperature=1.5,
             )
 
@@ -366,7 +366,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="temperature must be 0-1"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_temperature=-0.1,
             )
 
@@ -378,7 +378,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="top_p must be 0-1"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_top_p=1.5,
             )
 
@@ -390,7 +390,7 @@ class TestConfigurationValidation:
         with pytest.raises(ConfigurationError, match="top_p must be 0-1"):
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_top_p=-0.1,
             )
 
@@ -404,7 +404,7 @@ class TestConfigurationValidation:
         ) as exc_info:
             Config(
                 vault_path=vault_path,
-                source_dir=Path("."),
+                source_dir=Path(),
                 llm_provider="invalid_provider",
             )
 
@@ -422,7 +422,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -435,7 +435,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -464,7 +464,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=db_path,
         )
 
@@ -480,7 +480,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=db_path,
         )
 
@@ -503,7 +503,7 @@ class TestPathValidation:
             ):
                 Config(
                     vault_path=vault_path,
-                    source_dir=Path("."),
+                    source_dir=Path(),
                     db_path=db_path,
                 )
         finally:
@@ -516,7 +516,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             source_subdirs=["dir1", "dir2"],
         )
@@ -530,7 +530,7 @@ class TestPathValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             source_subdirs="single_dir",
         )
@@ -567,7 +567,7 @@ class TestProviderValidation:
 
         kwargs = {
             "vault_path": vault_path,
-            "source_dir": Path("."),
+            "source_dir": Path(),
             "db_path": temp_dir / "test.db",
             "llm_provider": provider,
         }
@@ -590,7 +590,7 @@ class TestProviderValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             llm_provider="ollama",
         )
@@ -604,7 +604,7 @@ class TestProviderValidation:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
             llm_provider="lm_studio",
         )
@@ -622,7 +622,7 @@ class TestConfigurationDefaults:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -637,7 +637,7 @@ class TestConfigurationDefaults:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -654,7 +654,7 @@ class TestConfigurationDefaults:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -667,7 +667,7 @@ class TestConfigurationDefaults:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 
@@ -682,7 +682,7 @@ class TestConfigurationDefaults:
 
         config = Config(
             vault_path=vault_path,
-            source_dir=Path("."),
+            source_dir=Path(),
             db_path=temp_dir / "test.db",
         )
 

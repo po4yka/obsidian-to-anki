@@ -5,7 +5,8 @@ from typing import Any, cast
 
 import httpx
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseLLMProvider
 
 logger = get_logger(__name__)
@@ -62,7 +63,8 @@ class AnthropicProvider(BaseLLMProvider):
         )
 
         if not api_key:
-            raise ValueError("Anthropic API key is required")
+            msg = "Anthropic API key is required"
+            raise ValueError(msg)
 
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -186,7 +188,8 @@ class AnthropicProvider(BaseLLMProvider):
             httpx.HTTPError: If request fails
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported")
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
 
         # Build messages
         messages = [{"role": "user", "content": prompt}]
@@ -269,7 +272,8 @@ class AnthropicProvider(BaseLLMProvider):
             # All retries failed
             if last_exception:
                 raise last_exception
-            raise RuntimeError("All retries failed")
+            msg = "All retries failed"
+            raise RuntimeError(msg)
 
         request_duration = time.time() - request_start_time
 
@@ -279,7 +283,8 @@ class AnthropicProvider(BaseLLMProvider):
             # Extract response text from content blocks
             content = data.get("content", [])
             if not content:
-                raise ValueError("No content in response")
+                msg = "No content in response"
+                raise ValueError(msg)
 
             # Combine all text blocks
             response_text = ""
@@ -316,7 +321,7 @@ class AnthropicProvider(BaseLLMProvider):
                 stop_reason=result["stop_reason"],
             )
 
-            return cast(dict[str, Any], result)
+            return cast("dict[str, Any]", result)
 
         except (KeyError, IndexError, TypeError, ValueError) as e:
             logger.error(
@@ -326,7 +331,8 @@ class AnthropicProvider(BaseLLMProvider):
                 response_data=str(data) if "data" in locals() else "N/A",
                 response_data_length=len(str(data)) if "data" in locals() else 0,
             )
-            raise ValueError(f"Failed to parse Anthropic response: {e}")
+            msg = f"Failed to parse Anthropic response: {e}"
+            raise ValueError(msg)
         except Exception as e:
             request_duration = time.time() - request_start_time
             logger.error(

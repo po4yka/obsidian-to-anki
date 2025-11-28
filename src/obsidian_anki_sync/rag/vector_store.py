@@ -14,8 +14,9 @@ from typing import Any
 import chromadb
 from chromadb.config import Settings
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .document_chunker import DocumentChunk, DocumentChunker
 from .embedding_provider import EmbeddingProvider
 

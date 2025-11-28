@@ -2,7 +2,7 @@
 
 import re
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -31,7 +31,8 @@ def extract_result_tag(content: str, require_tag: bool = False) -> str:
         return extracted
 
     if require_tag:
-        raise ValueError("No <result></result> tag found in response")
+        msg = "No <result></result> tag found in response"
+        raise ValueError(msg)
 
     # No tag found, return original content
     logger.debug("no_result_tag_found", returning_original=True)

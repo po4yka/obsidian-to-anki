@@ -3,16 +3,21 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ...domain.interfaces.anki_client import IAnkiClient
-from ...domain.interfaces.card_generator import ICardGenerator
-from ...domain.interfaces.note_parser import INoteParser
-from ...domain.interfaces.state_repository import IStateRepository
-from ...infrastructure.cache.cache_manager import CacheManager
-from ...utils.logging import get_logger
-from ..use_cases.apply_changes import ApplyChangesUseCase
-from ..use_cases.determine_sync_actions import DetermineSyncActionsUseCase
-from ..use_cases.generate_cards import GenerateCardsUseCase
-from ..use_cases.sync_notes import SyncNotesRequest, SyncNotesUseCase
+from obsidian_anki_sync.application.use_cases.apply_changes import ApplyChangesUseCase
+from obsidian_anki_sync.application.use_cases.determine_sync_actions import (
+    DetermineSyncActionsUseCase,
+)
+from obsidian_anki_sync.application.use_cases.generate_cards import GenerateCardsUseCase
+from obsidian_anki_sync.application.use_cases.sync_notes import (
+    SyncNotesRequest,
+    SyncNotesUseCase,
+)
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.infrastructure.cache.cache_manager import CacheManager
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

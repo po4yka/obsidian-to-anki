@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+from typing import TYPE_CHECKING
 
-from ..models import NoteMetadata
+if TYPE_CHECKING:
+    from obsidian_anki_sync.models import NoteMetadata
 
 _SLUG_CLEAN_RE = re.compile(r"[^a-z0-9-]+")
 

@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -94,7 +94,8 @@ class ModelConfig(BaseModel):
     def validate_temperature_range(cls, v: float | None) -> float | None:
         """Validate temperature and top_p are in valid range."""
         if v is not None and not (0.0 <= v <= 1.0):
-            raise ValueError(f"Value must be between 0.0 and 1.0: {v}")
+            msg = f"Value must be between 0.0 and 1.0: {v}"
+            raise ValueError(msg)
         return v
 
 

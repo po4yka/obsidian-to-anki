@@ -1,6 +1,6 @@
 """Tests for content hash computation."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -34,8 +34,8 @@ def sample_metadata():
         language_tags=["en", "ru"],
         subtopics=["unit_testing"],
         tags=["test"],
-        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created=datetime(2024, 1, 1, tzinfo=UTC),
+        updated=datetime(2024, 1, 1, tzinfo=UTC),
     )
 
 

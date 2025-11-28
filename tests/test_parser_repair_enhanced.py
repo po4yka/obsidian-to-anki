@@ -153,7 +153,7 @@ class TestEnhancedParserRepair:
         # Verify error diagnosis was parsed
         # Note: The agent doesn't return the diagnosis directly, but it's logged
         # We can verify the repair was successful
-        metadata, qa_pairs = result
+        metadata, _qa_pairs = result
         assert "ru" in metadata.language_tags
 
     def test_quality_scoring_improvement(

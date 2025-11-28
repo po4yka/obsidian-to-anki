@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass
 
-from ...domain.entities.card import Card
-from ...domain.entities.note import Note
-from ...domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.domain.entities.card import Card
+from obsidian_anki_sync.domain.entities.note import Note
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
 
 
 @dataclass

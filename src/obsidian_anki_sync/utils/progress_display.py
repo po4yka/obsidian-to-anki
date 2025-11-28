@@ -219,7 +219,7 @@ def extract_reasoning_from_response(response: dict[str, Any], model: str) -> str
         Reasoning text or None
     """
     # Check for reasoning field (thinking models)
-    if "reasoning" in response and response["reasoning"]:
+    if response.get("reasoning"):
         reasoning = response["reasoning"]
         return str(reasoning) if reasoning else None
 

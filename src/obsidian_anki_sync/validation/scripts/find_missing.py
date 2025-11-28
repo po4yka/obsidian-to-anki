@@ -116,7 +116,6 @@ class MissingSectionIdentifier:
             }
 
         except Exception as e:
-            print(f"Error analyzing {filepath.name}: {e}", file=sys.stderr)
             return None
 
     def analyze_directory(
@@ -184,22 +183,6 @@ class MissingSectionIdentifier:
 
     def print_summary(self) -> None:
         """Print summary statistics."""
-        print("\n" + "=" * 80)
-        print("MISSING SECTIONS SUMMARY")
-        print("=" * 80)
-        print(
-            f"Missing RU Question: {len(self.missing_sections['missing_ru_question'])} files"
-        )
-        print(
-            f"Missing EN Question: {len(self.missing_sections['missing_en_question'])} files"
-        )
-        print(
-            f"Missing RU Answer:   {len(self.missing_sections['missing_ru_answer'])} files"
-        )
-        print(
-            f"Missing EN Answer:   {len(self.missing_sections['missing_en_answer'])} files"
-        )
-        print("=" * 80)
 
     def save_batches(self, batches: list[dict], output_dir: Path) -> None:
         """Save batch files for agents."""
@@ -222,9 +205,6 @@ class MissingSectionIdentifier:
         }
         with open(summary_file, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
-
-        print(f"\nSaved {len(batches)} batch files to {output_dir}/")
-        print(f"Summary saved to {summary_file}")
 
 
 def main() -> None:
@@ -262,24 +242,20 @@ def main() -> None:
     dir_path = vault_root / args.path
 
     if not dir_path.exists():
-        print(f"Error: Directory not found: {dir_path}")
         sys.exit(1)
 
     identifier = MissingSectionIdentifier(vault_root)
 
-    print(f"Analyzing {args.path}...")
     if args.status:
-        print(f"Filtering by status: {args.status}")
-    print()
+        pass
 
     identifier.analyze_directory(dir_path, args.status)
     identifier.print_summary()
 
-    print(f"\nDistributing work across {args.num_agents} agents...")
     batches = identifier.distribute_work(args.num_agents)
 
     for batch in batches:
-        print(f"  Agent {batch['agent_id']}: {batch['count']} files")
+        pass
 
     identifier.save_batches(batches, args.output_dir)
 

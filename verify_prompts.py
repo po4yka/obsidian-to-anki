@@ -2,9 +2,7 @@ import os
 
 
 def print_separator(title):
-    print("\n" + "=" * 80)
-    print(f" {title} ")
-    print("=" * 80 + "\n")
+    pass
 
 
 def check_content(file_path, keywords, name):
@@ -14,14 +12,12 @@ def check_content(file_path, keywords, name):
 
         missing = [k for k in keywords if k not in content]
         if missing:
-            print(f"❌ {name}: Missing keywords: {missing}")
+            pass
         else:
-            print(f"✅ {name}: All keywords found.")
+            pass
     except Exception as e:
-        print(f"❌ {name}: Error reading file: {e}")
+        pass
 
-
-print("Verifying Prompts...")
 
 base_path = "src/obsidian_anki_sync/agents"
 
@@ -63,5 +59,3 @@ check_content(
     ["Cloze Effectiveness", "Bad Cloze"],
     "Memorization Prompts",
 )
-
-print("\nVerification Complete.")

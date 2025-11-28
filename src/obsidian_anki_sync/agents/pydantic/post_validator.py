@@ -6,11 +6,16 @@ Validates generated cards for quality, syntax, and accuracy.
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata
-from ...utils.logging import get_logger
-from ..exceptions import ModelError, PostValidationError, StructuredOutputError
-from ..improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
-from ..models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.agents.exceptions import (
+    ModelError,
+    PostValidationError,
+    StructuredOutputError,
+)
+from obsidian_anki_sync.agents.improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
+from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import PostValidationDeps, PostValidationOutput
 
 logger = get_logger(__name__)
@@ -123,17 +128,16 @@ Cards to validate:
 
         except ValueError as e:
             logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            msg = "Failed to parse post-validation output"
             raise StructuredOutputError(
-                "Failed to parse post-validation output",
+                msg,
                 details={"error": str(e), "cards_count": len(cards)},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_post_validation_timeout", error=str(e))
-            raise ModelError(
-                "Post-validation timed out", details={"cards_count": len(cards)}
-            ) from e
+            msg = "Post-validation timed out"
+            raise ModelError(msg, details={"cards_count": len(cards)}) from e
         except Exception as e:
             logger.error("pydantic_ai_post_validation_failed", error=str(e))
-            raise PostValidationError(
-                f"Post-validation failed: {str(e)}", details={"cards_count": len(cards)}
-            ) from e
+            msg = f"Post-validation failed: {e!s}"
+            raise PostValidationError(msg, details={"cards_count": len(cards)}) from e

@@ -1,6 +1,6 @@
 """Tests for note structure validator."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -53,8 +53,8 @@ def sample_metadata():
         title="Test Question",
         topic="Testing",
         language_tags=["en", "ru"],
-        created=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        updated=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        created=datetime(2024, 1, 1, tzinfo=UTC),
+        updated=datetime(2024, 1, 2, tzinfo=UTC),
     )
 
 

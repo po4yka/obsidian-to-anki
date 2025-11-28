@@ -8,24 +8,24 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..agents.agent_learning import AdaptiveRouter
-from ..agents.agent_monitoring import (
+from obsidian_anki_sync.agents.agent_learning import AdaptiveRouter
+from obsidian_anki_sync.agents.agent_monitoring import (
     AgentHealthMonitor,
     DatabaseMetricsStorage,
     InMemoryMetricsStorage,
     MetricsCollector,
     PerformanceTracker,
 )
-from ..agents.specialized import ProblemRouter
-from ..exceptions import ParserError
-from ..models import NoteMetadata, QAPair
-from ..obsidian.parser import parse_note
-from ..utils.logging import get_logger
-from ..utils.types import RecoveryResult
+from obsidian_anki_sync.agents.specialized import ProblemRouter
+from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.obsidian.parser import parse_note
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.types import RecoveryResult
 
 # Import memory store if available
 try:
-    from ..agents.agent_memory import AgentMemoryStore
+    from obsidian_anki_sync.agents.agent_memory import AgentMemoryStore
 except ImportError:
     AgentMemoryStore = None
 
@@ -391,7 +391,7 @@ class ErrorRecoveryManager:
         self, file_path: Path
     ) -> tuple[NoteMetadata, list[QAPair]]:
         """Create a minimal valid note structure when all else fails."""
-        from ..models import NoteMetadata, QAPair
+        from obsidian_anki_sync.models import NoteMetadata, QAPair
 
         # Extract basic info from filename
         filename = file_path.stem
@@ -577,14 +577,13 @@ class ErrorRecoveryManager:
                                     error_context, [domain]
                                 )
                             continue
-                    else:
-                        # Record failure for learning
-                        if self.enable_learning and hasattr(
-                            self.router, "failure_analyzer"
-                        ):
-                            self.router.failure_analyzer.analyze_failure(
-                                error_context, [domain]
-                            )
+                    # Record failure for learning
+                    elif self.enable_learning and hasattr(
+                        self.router, "failure_analyzer"
+                    ):
+                        self.router.failure_analyzer.analyze_failure(
+                            error_context, [domain]
+                        )
 
                 except Exception as agent_error:
                     duration = time.time() - start_time

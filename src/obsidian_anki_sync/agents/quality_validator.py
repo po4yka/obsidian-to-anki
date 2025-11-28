@@ -2,10 +2,11 @@
 
 import time
 
-from ..anki.client import AnkiClient
-from ..models import NoteMetadata
-from ..providers.base import BaseLLMProvider
-from ..utils.logging import get_logger
+from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .card_improver import CardImprover
 from .card_quality_agent import CardQualityAgent
 from .models import GeneratedCard, QualityReport
@@ -106,7 +107,7 @@ class QualityValidator:
         self,
         card: GeneratedCard,
         metadata: NoteMetadata,
-        context_cards: list[GeneratedCard | None] = None,
+        context_cards: list[GeneratedCard | None] | None = None,
         note_id: int | None = None,
     ) -> QualityValidationResult:
         """Perform comprehensive quality validation on a card.
@@ -177,7 +178,7 @@ class QualityValidator:
         self,
         cards: list[GeneratedCard],
         metadata: NoteMetadata,
-        note_ids: list[int | None] = None,
+        note_ids: list[int | None] | None = None,
     ) -> list[QualityValidationResult]:
         """Validate multiple cards in batch for efficiency.
 

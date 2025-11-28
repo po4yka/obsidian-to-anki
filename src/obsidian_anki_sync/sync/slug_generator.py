@@ -5,8 +5,8 @@ import re
 import unicodedata
 from pathlib import Path
 
-from ..models import Manifest, NoteMetadata
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import Manifest, NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -128,7 +128,8 @@ def generate_slug(
             slug = f"{slug_base}-{lang}"
             version += 1
             if version > 10:
-                raise ValueError(f"Excessive slug collision for {source_path}")
+                msg = f"Excessive slug collision for {source_path}"
+                raise ValueError(msg)
 
     logger.debug(
         "generated_slug",

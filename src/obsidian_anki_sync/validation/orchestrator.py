@@ -92,18 +92,21 @@ class NoteValidator:
 
         # Extract YAML frontmatter
         if not content.startswith("---"):
-            raise ValueError(f"No YAML frontmatter found in {filepath}")
+            msg = f"No YAML frontmatter found in {filepath}"
+            raise ValueError(msg)
 
         # Find closing ---
         parts = content.split("---", 2)
         if len(parts) < 3:
-            raise ValueError(f"Invalid YAML frontmatter in {filepath}")
+            msg = f"Invalid YAML frontmatter in {filepath}"
+            raise ValueError(msg)
 
         frontmatter_str = parts[1]
         try:
             frontmatter = yaml.safe_load(frontmatter_str)
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in {filepath}: {e}")
+            msg = f"Invalid YAML in {filepath}: {e}"
+            raise ValueError(msg)
 
         return content, frontmatter or {}
 
@@ -226,7 +229,6 @@ class NoteValidator:
                 applied_fixes.append(fix.description)
             except Exception as e:
                 # Skip this fix if it fails
-                print(f"Fix failed: {fix.description}: {e}")
                 continue
 
         # Only write if content changed
@@ -234,7 +236,6 @@ class NoteValidator:
             try:
                 filepath.write_text(current_content, encoding="utf-8")
             except Exception as e:
-                print(f"Write failed: {e}")
                 return 0, []
 
         return len(applied_fixes), applied_fixes

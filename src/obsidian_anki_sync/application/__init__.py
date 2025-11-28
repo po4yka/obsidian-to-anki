@@ -21,25 +21,25 @@ from .use_cases.process_notes import ProcessNotesUseCase
 from .use_cases.sync_notes import SyncNotesUseCase
 
 __all__ = [
-    # DI Container
-    "DependencyContainer",
-    "get_container",
-    "inject",
-    # Factories
-    "ComponentFactory",
     # Services
     "AgentPipelineOrchestrator",
+    # Use Cases
+    "ApplyChangesUseCase",
+    # Factories
+    "ComponentFactory",
+    # DI Container
+    "DependencyContainer",
+    "DetermineSyncActionsUseCase",
+    "GenerateCardsUseCase",
     "NoteDiscoveryService",
-    "RetryHandler",
+    "ProcessNotesUseCase",
     "RetryConfig",
+    "RetryHandler",
     "RetryResult",
+    "SyncNotesUseCase",
     "SyncOrchestrator",
     "SyncOrchestratorConfig",
     "SyncResult",
-    # Use Cases
-    "ApplyChangesUseCase",
-    "DetermineSyncActionsUseCase",
-    "GenerateCardsUseCase",
-    "ProcessNotesUseCase",
-    "SyncNotesUseCase",
+    "get_container",
+    "inject",
 ]

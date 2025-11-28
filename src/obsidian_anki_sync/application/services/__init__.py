@@ -8,8 +8,8 @@ from .sync_orchestrator import SyncOrchestrator, SyncOrchestratorConfig, SyncRes
 __all__ = [
     "AgentPipelineOrchestrator",
     "NoteDiscoveryService",
-    "RetryHandler",
     "RetryConfig",
+    "RetryHandler",
     "RetryResult",
     "SyncOrchestrator",
     "SyncOrchestratorConfig",

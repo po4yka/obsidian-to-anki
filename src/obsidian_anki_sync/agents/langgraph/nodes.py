@@ -16,12 +16,12 @@ import asyncio
 import time
 from pathlib import Path
 
-from ...apf.linter import validate_apf
-from ...models import NoteMetadata, QAPair
-from ...providers.pydantic_ai_models import create_openrouter_model_from_env
-from ...utils.logging import get_logger
-from ..exceptions import ModelError, PreValidationError, StructuredOutputError
-from ..models import (
+from obsidian_anki_sync.agents.exceptions import (
+    ModelError,
+    PreValidationError,
+    StructuredOutputError,
+)
+from obsidian_anki_sync.agents.models import (
     CardSplittingResult,
     ContextEnrichmentResult,
     GeneratedCard,
@@ -30,7 +30,7 @@ from ..models import (
     PostValidationResult,
     PreValidationResult,
 )
-from ..pydantic import (
+from obsidian_anki_sync.agents.pydantic import (
     CardSplittingAgentAI,
     ContextEnrichmentAgentAI,
     DuplicateDetectionAgentAI,
@@ -40,6 +40,13 @@ from ..pydantic import (
     PreValidatorAgentAI,
     SplitValidatorAgentAI,
 )
+from obsidian_anki_sync.apf.linter import validate_apf
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.providers.pydantic_ai_models import (
+    create_openrouter_model_from_env,
+)
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .node_helpers import increment_step_count
 from .state import PipelineState
 
@@ -89,8 +96,8 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     Returns:
         Updated state with corrected note content
     """
-    from ..models import NoteCorrectionResult
-    from ..parser_repair import ParserRepairAgent
+    from obsidian_anki_sync.agents.models import NoteCorrectionResult
+    from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent
 
     # Check step limit (best practice: cycle protection)
     if not increment_step_count(state, "note_correction"):
@@ -114,7 +121,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
             model_name = getattr(config, "parser_repair_model", "qwen3:8b")
 
         # Create provider for note correction (reuse parser repair infrastructure)
-        from ...providers.factory import ProviderFactory
+        from obsidian_anki_sync.providers.factory import ProviderFactory
 
         provider = ProviderFactory.create_from_config(config)
         correction_model = model_name
@@ -174,7 +181,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         fallback_result = NoteCorrectionResult(
             needs_correction=False,
             quality_score=0.5,
-            issues_found=[f"Correction failed: {str(e)}"],
+            issues_found=[f"Correction failed: {e!s}"],
             corrections_applied=[],
             confidence=0.0,
             correction_time=time.time() - start_time,
@@ -265,7 +272,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="format",
-            error_details=f"Model error: {str(e)}",
+            error_details=f"Model error: {e!s}",
             auto_fix_applied=False,
             fixed_content=None,
             validation_time=time.time() - start_time,
@@ -275,7 +282,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
-            error_details=f"Unexpected error: {str(e)}",
+            error_details=f"Unexpected error: {e!s}",
             auto_fix_applied=False,
             fixed_content=None,
             validation_time=time.time() - start_time,
@@ -522,7 +529,7 @@ async def split_validation_node(state: PipelineState) -> PipelineState:
     except Exception as e:
         logger.exception("split_validation_error", error=str(e))
         # Continue with original plan on error
-        state["messages"].append(f"Split validation failed: {str(e)}")
+        state["messages"].append(f"Split validation failed: {e!s}")
 
     state["stage_times"]["split_validation"] = time.time() - start_time
     state["current_stage"] = "generation"
@@ -734,22 +741,21 @@ async def generation_node(state: PipelineState) -> PipelineState:
                         error=str(res),
                     )
                     # We continue with partial results if some chunks fail
+                # Handle different result types
+                elif hasattr(res, "data") and hasattr(res.data, "cards"):
+                    # UnifiedAgentResult with GenerationResult data
+                    all_cards.extend(res.data.cards)
+                    total_gen_time = max(
+                        total_gen_time, getattr(res.data, "generation_time", 0)
+                    )
+                    if hasattr(res, "warnings") and res.warnings:
+                        all_warnings.extend(res.warnings)
                 else:
-                    # Handle different result types
-                    if hasattr(res, "data") and hasattr(res.data, "cards"):
-                        # UnifiedAgentResult with GenerationResult data
-                        all_cards.extend(res.data.cards)
-                        total_gen_time = max(
-                            total_gen_time, getattr(res.data, "generation_time", 0)
-                        )
-                        if hasattr(res, "warnings") and res.warnings:
-                            all_warnings.extend(res.warnings)
-                    else:
-                        # Legacy GenerationResult
-                        all_cards.extend(res.cards)
-                        total_gen_time = max(total_gen_time, res.generation_time)
-                        if hasattr(res, "warnings") and res.warnings:
-                            all_warnings.extend(res.warnings)
+                    # Legacy GenerationResult
+                    all_cards.extend(res.cards)
+                    total_gen_time = max(total_gen_time, res.generation_time)
+                    if hasattr(res, "warnings") and res.warnings:
+                        all_warnings.extend(res.warnings)
 
             # Create merged result
             gen_result = GenerationResult(
@@ -940,7 +946,7 @@ async def linter_validation_node(state: PipelineState) -> PipelineState:
                 {
                     "slug": card.slug,
                     "is_valid": False,
-                    "errors": [f"Linter exception: {str(e)}"],
+                    "errors": [f"Linter exception: {e!s}"],
                     "warnings": [],
                 }
             )
@@ -1045,7 +1051,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
         post_result = PostValidationResult(
             is_valid=False,
             error_type="syntax",
-            error_details=f"Post-validation failed: {str(e)}",
+            error_details=f"Post-validation failed: {e!s}",
             corrected_cards=None,
             validation_time=time.time() - start_time,
         )
@@ -1343,7 +1349,7 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
             memorization_score=0.7,
             issues=[],
             strengths=[],
-            suggested_improvements=[f"Assessment failed: {str(e)}"],
+            suggested_improvements=[f"Assessment failed: {e!s}"],
             assessment_time=time.time() - start_time,
         )
         state["memorization_quality"] = quality_result.model_dump()

@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ...domain.entities.card import Card
-from ...domain.entities.note import Note
-from ...domain.interfaces.anki_client import IAnkiClient
-from ...domain.interfaces.card_generator import ICardGenerator
-from ...domain.interfaces.note_parser import INoteParser
-from ...domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.domain.entities.card import Card
+from obsidian_anki_sync.domain.entities.note import Note
+from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.domain.interfaces.card_generator import ICardGenerator
+from obsidian_anki_sync.domain.interfaces.note_parser import INoteParser
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
 
 
 @dataclass

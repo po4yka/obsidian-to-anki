@@ -22,12 +22,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .progress import SyncProgress
 
-from ..domain.entities.card import Card as DomainCard
-from ..domain.entities.card import CardManifest
-from ..domain.entities.note import Note as DomainNote
-from ..domain.interfaces.state_repository import IStateRepository
-from ..models import Card as ModelCard
-from ..utils.logging import get_logger
+from obsidian_anki_sync.domain.entities.card import Card as DomainCard
+from obsidian_anki_sync.domain.entities.card import CardManifest
+from obsidian_anki_sync.domain.entities.note import Note as DomainNote
+from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.models import Card as ModelCard
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -1265,11 +1265,9 @@ class StateDB(IStateRepository):
 
     def save_note(self, note: DomainNote) -> None:
         """Save a note to the repository."""
-        pass
 
     def delete_note(self, note_id: str) -> None:
         """Delete a note from the repository."""
-        pass
 
     def get_card_by_slug(self, slug: str) -> DomainCard | None:
         """Retrieve a card by its slug."""
@@ -1284,7 +1282,6 @@ class StateDB(IStateRepository):
 
     def save_card(self, card: DomainCard) -> None:
         """Save a card to the repository."""
-        pass
 
     # delete_card is defined above at line 423 - removed duplicate
 
@@ -1315,7 +1312,6 @@ class StateDB(IStateRepository):
         self, session_id: str, progress_data: dict[str, Any]
     ) -> None:
         """Update sync progress for a session."""
-        pass
 
     def get_content_hash(self, resource_id: str) -> str | None:
         """Get stored content hash for a resource."""
@@ -1323,7 +1319,6 @@ class StateDB(IStateRepository):
 
     def save_content_hash(self, resource_id: str, hash_value: str) -> None:
         """Save content hash for a resource."""
-        pass
 
     def clear_expired_data(self, max_age_days: int) -> int:
         """Clear expired data from repository."""

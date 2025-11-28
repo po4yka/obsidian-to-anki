@@ -1,11 +1,11 @@
 """Debug artifact saving for LLM operations."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ..utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -64,14 +64,14 @@ class DebugArtifactSaver:
 
         try:
             # Create timestamp-based filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
             safe_operation = operation.replace("/", "_").replace(" ", "_")
             filename = f"{timestamp}_{safe_operation}_{model.replace(':', '_')}.json"
             filepath = self.artifacts_dir / filename
 
             # Build artifact data
             artifact = {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "operation": operation,
                 "model": model,
                 "error": {
@@ -93,7 +93,7 @@ class DebugArtifactSaver:
             }
 
             # Save to file
-            with open(filepath, "w", encoding="utf-8") as f:
+            with filepath.open("w", encoding="utf-8") as f:
                 json.dump(artifact, f, indent=2, ensure_ascii=False)
 
             logger.info(
@@ -127,7 +127,7 @@ class DebugArtifactSaver:
             return 0
 
         deleted = 0
-        cutoff_timestamp = datetime.now().timestamp() - (max_age_days * 86400)
+        cutoff_timestamp = datetime.now(UTC).timestamp() - (max_age_days * 86400)
 
         try:
             for filepath in self.artifacts_dir.glob("*.json"):

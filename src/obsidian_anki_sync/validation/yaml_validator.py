@@ -304,14 +304,13 @@ class YAMLValidator(BaseValidator):
         moc = self.frontmatter["moc"]
 
         # Check for brackets (FORBIDDEN)
-        if isinstance(moc, str):
-            if "[[" in moc or "]]" in moc:
-                self.add_issue(
-                    Severity.CRITICAL,
-                    f"MOC field contains brackets: '{moc}'. "
-                    "Use plain text without brackets.",
-                )
-                return
+        if isinstance(moc, str) and ("[[" in moc or "]]" in moc):
+            self.add_issue(
+                Severity.CRITICAL,
+                f"MOC field contains brackets: '{moc}'. "
+                "Use plain text without brackets.",
+            )
+            return
 
         # Check if it's a list (should be single value)
         if isinstance(moc, list):

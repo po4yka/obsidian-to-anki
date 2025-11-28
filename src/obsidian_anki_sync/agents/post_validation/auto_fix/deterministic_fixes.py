@@ -3,8 +3,8 @@
 import json
 import re
 
-from ....utils.logging import get_logger
-from ...models import GeneratedCard
+from obsidian_anki_sync.agents.models import GeneratedCard
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -285,7 +285,7 @@ class DeterministicFixer:
         if not header_match:
             return html, False
 
-        card_num, extracted_slug, card_type, tags_str = header_match.groups()
+        _card_num, extracted_slug, card_type, tags_str = header_match.groups()
         tags = tags_str.strip().split()
 
         # Create manifest JSON
@@ -627,9 +627,7 @@ class DeterministicFixer:
         for card in cards:
             # Extract base slug by removing language suffix (e.g., "card-slug-en" -> "card-slug")
             base_slug = card.slug
-            if base_slug.endswith("-en") or base_slug.endswith("-ru"):
-                base_slug = base_slug[:-3]
-            elif base_slug.endswith("_en") or base_slug.endswith("_ru"):
+            if base_slug.endswith(("-en", "-ru", "_en", "_ru")):
                 base_slug = base_slug[:-3]
 
             if base_slug not in card_groups:
@@ -692,14 +690,13 @@ class DeterministicFixer:
                             card_html = card_html.replace(
                                 "<!-- manifest:", section_template + "<!-- manifest:", 1
                             )
-                        else:
-                            # Fallback: add at end before END_CARDS
-                            if "<!-- END_CARDS -->" in card_html:
-                                card_html = card_html.replace(
-                                    "<!-- END_CARDS -->",
-                                    section_template + "<!-- END_CARDS -->",
-                                    1,
-                                )
+                        # Fallback: add at end before END_CARDS
+                        elif "<!-- END_CARDS -->" in card_html:
+                            card_html = card_html.replace(
+                                "<!-- END_CARDS -->",
+                                section_template + "<!-- END_CARDS -->",
+                                1,
+                            )
 
                         logger.debug(
                             "deterministic_fix_added_optional_section",

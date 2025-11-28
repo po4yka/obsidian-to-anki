@@ -2,27 +2,27 @@
 
 import json
 from collections import defaultdict
-from contextlib import nullcontext
+from contextlib import nullcontext, suppress
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
 if TYPE_CHECKING:
-    from ..anki.client import AnkiClient
+    from obsidian_anki_sync.anki.client import AnkiClient
 
-from ..config import Config
-from ..models import ManifestData
-from ..obsidian.parser import (
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.models import ManifestData
+from obsidian_anki_sync.obsidian.parser import (
     ParserError,
     discover_notes,
     parse_note,
     parse_note_with_repair,
     temporarily_disable_llm_extraction,
 )
-from ..sync.state_db import StateDB
-from ..utils.logging import get_logger
-from ..utils.problematic_notes import ProblematicNotesArchiver
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
 logger = get_logger(__name__)
 
@@ -127,7 +127,9 @@ class VaultIndexer:
                         # Try to get LLM provider for repair
                         llm_provider_for_repair = None
                         try:
-                            from ..providers.factory import ProviderFactory
+                            from obsidian_anki_sync.providers.factory import (
+                                ProviderFactory,
+                            )
 
                             llm_provider_for_repair = (
                                 ProviderFactory.create_from_config(self.config)
@@ -231,10 +233,8 @@ class VaultIndexer:
                     # Archive problematic note
                     try:
                         note_content = ""
-                        try:
+                        with suppress(Exception):
                             note_content = file_path.read_text(encoding="utf-8")
-                        except Exception:
-                            pass
 
                         self.archiver.archive_note(
                             note_path=file_path,
@@ -567,7 +567,7 @@ def build_full_index(
 
     # Index vault notes
     # Create archiver for problematic notes
-    from ..utils.problematic_notes import ProblematicNotesArchiver
+    from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
     archiver = ProblematicNotesArchiver(
         archive_dir=config.problematic_notes_dir,

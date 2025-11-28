@@ -9,8 +9,13 @@ from typing import Any
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...models import GeneratedCard, PostValidationResult, PreValidationResult
-from ...utils.logging import get_logger
+from obsidian_anki_sync.models import (
+    GeneratedCard,
+    PostValidationResult,
+    PreValidationResult,
+)
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import LangChainAgentResult
 from .tool_calling_agent import ToolCallingAgent
 

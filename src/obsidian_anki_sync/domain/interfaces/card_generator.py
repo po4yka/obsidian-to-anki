@@ -2,8 +2,8 @@
 
 from abc import ABC, abstractmethod
 
-from ..entities.card import Card
-from ..entities.note import Note, QAPair
+from obsidian_anki_sync.domain.entities.card import Card
+from obsidian_anki_sync.domain.entities.note import Note, QAPair
 
 
 class ICardGenerator(ABC):
@@ -23,7 +23,6 @@ class ICardGenerator(ABC):
         Returns:
             List of generated cards
         """
-        pass
 
     @abstractmethod
     def generate_card_from_qa_pair(
@@ -39,7 +38,6 @@ class ICardGenerator(ABC):
         Returns:
             Generated card
         """
-        pass
 
     @abstractmethod
     def generate_apf_html(
@@ -56,7 +54,6 @@ class ICardGenerator(ABC):
         Returns:
             APF-formatted HTML string
         """
-        pass
 
     @abstractmethod
     def validate_card_content(self, card: Card) -> list[str]:
@@ -68,7 +65,6 @@ class ICardGenerator(ABC):
         Returns:
             List of validation error messages
         """
-        pass
 
     @abstractmethod
     def get_supported_languages(self) -> list[str]:
@@ -77,7 +73,6 @@ class ICardGenerator(ABC):
         Returns:
             List of language codes (e.g., ['en', 'ru'])
         """
-        pass
 
     @abstractmethod
     def get_note_type_for_card(self, card: Card) -> str:
@@ -89,7 +84,6 @@ class ICardGenerator(ABC):
         Returns:
             Anki note type name
         """
-        pass
 
     @abstractmethod
     def create_manifest(
@@ -107,4 +101,3 @@ class ICardGenerator(ABC):
         Returns:
             Manifest dictionary
         """
-        pass

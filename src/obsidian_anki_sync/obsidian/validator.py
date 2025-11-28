@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from ..models import NoteMetadata, QAPair
-from ..utils.logging import get_logger
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -23,7 +23,6 @@ class ILLMProvider(IGenerator, IConnectionChecker, IModelProvider, ABC):
         Returns:
             Provider name (e.g., "OpenAI", "Anthropic")
         """
-        pass
 
     @abstractmethod
     def get_provider_info(self) -> dict[str, Any]:
@@ -32,4 +31,3 @@ class ILLMProvider(IGenerator, IConnectionChecker, IModelProvider, ABC):
         Returns:
             Dictionary with provider metadata
         """
-        pass

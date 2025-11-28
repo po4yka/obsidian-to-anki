@@ -1,9 +1,9 @@
 """Syntax validation for APF cards."""
 
-from ...apf.html_validator import validate_card_html
-from ...apf.linter import validate_apf
-from ...utils.logging import get_logger
-from ..models import GeneratedCard
+from obsidian_anki_sync.agents.models import GeneratedCard
+from obsidian_anki_sync.apf.html_validator import validate_card_html
+from obsidian_anki_sync.apf.linter import validate_apf
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

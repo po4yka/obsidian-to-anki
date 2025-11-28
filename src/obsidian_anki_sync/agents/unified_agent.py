@@ -9,8 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -47,7 +47,6 @@ class UnifiedAgentInterface(ABC):
         slug_base: str,
     ) -> UnifiedAgentResult:
         """Generate APF cards from Q/A pairs."""
-        pass
 
     @abstractmethod
     async def validate_pre(
@@ -57,7 +56,6 @@ class UnifiedAgentInterface(ABC):
         qa_pairs: list[dict[str, Any]],
     ) -> UnifiedAgentResult:
         """Run pre-validation on note content."""
-        pass
 
     @abstractmethod
     async def validate_post(
@@ -67,7 +65,6 @@ class UnifiedAgentInterface(ABC):
         strict_mode: bool = True,
     ) -> UnifiedAgentResult:
         """Run post-validation on generated cards."""
-        pass
 
     @abstractmethod
     async def enrich_content(
@@ -77,12 +74,10 @@ class UnifiedAgentInterface(ABC):
         enrichment_type: str = "general",
     ) -> UnifiedAgentResult:
         """Enrich content with additional context."""
-        pass
 
     @abstractmethod
     def get_agent_info(self) -> dict[str, Any]:
         """Get information about the underlying agent."""
-        pass
 
 
 class PydanticAIUnifiedAgent(UnifiedAgentInterface):
@@ -134,7 +129,8 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                     model = get_model_for_agent(self.config, "context_enrichment")
                     self._agents[agent_type] = ContextEnrichmentAgentAI(model)
                 else:
-                    raise ValueError(f"Unknown PydanticAI agent type: {agent_type}")
+                    msg = f"Unknown PydanticAI agent type: {agent_type}"
+                    raise ValueError(msg)
             except Exception as e:
                 logger.warning(
                     "pydantic_ai_agent_creation_failed",
@@ -216,7 +212,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                     else "Pre-validation passed"
                 ),
                 data=result,
-                warnings=[fix for fix in result.suggested_fixes],
+                warnings=list(result.suggested_fixes),
                 confidence=result.confidence,
                 agent_framework=self.agent_framework,
                 agent_type="pre_validator",
@@ -622,7 +618,8 @@ class UnifiedAgentSelector:
             elif framework == "langchain":
                 self._agents[cache_key] = LangChainUnifiedAgent(self.config)
             else:
-                raise ValueError(f"Unknown agent framework: {framework}")
+                msg = f"Unknown agent framework: {framework}"
+                raise ValueError(msg)
 
         return self._agents[cache_key]  # type: ignore[no-any-return]
 

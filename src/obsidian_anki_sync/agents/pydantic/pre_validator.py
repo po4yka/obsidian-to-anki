@@ -8,11 +8,16 @@ from pathlib import Path
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ...models import NoteMetadata, QAPair
-from ...utils.logging import get_logger
-from ..exceptions import ModelError, PreValidationError, StructuredOutputError
-from ..improved_prompts import PRE_VALIDATION_SYSTEM_PROMPT
-from ..models import PreValidationResult
+from obsidian_anki_sync.agents.exceptions import (
+    ModelError,
+    PreValidationError,
+    StructuredOutputError,
+)
+from obsidian_anki_sync.agents.improved_prompts import PRE_VALIDATION_SYSTEM_PROMPT
+from obsidian_anki_sync.agents.models import PreValidationResult
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import PreValidationDeps, PreValidationOutput
 
 logger = get_logger(__name__)
@@ -115,17 +120,16 @@ Validate the structure, frontmatter, and content quality."""
 
         except ValueError as e:
             logger.error("pydantic_ai_pre_validation_parse_error", error=str(e))
+            msg = "Failed to parse pre-validation output"
             raise StructuredOutputError(
-                "Failed to parse pre-validation output",
+                msg,
                 details={"error": str(e), "title": metadata.title},
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_pre_validation_timeout", error=str(e))
-            raise ModelError(
-                "Pre-validation timed out", details={"title": metadata.title}
-            ) from e
+            msg = "Pre-validation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
         except Exception as e:
             logger.error("pydantic_ai_pre_validation_failed", error=str(e))
-            raise PreValidationError(
-                f"Pre-validation failed: {str(e)}", details={"title": metadata.title}
-            ) from e
+            msg = f"Pre-validation failed: {e!s}"
+            raise PreValidationError(msg, details={"title": metadata.title}) from e

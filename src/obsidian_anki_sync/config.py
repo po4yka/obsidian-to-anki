@@ -32,13 +32,13 @@ class Config(BaseSettings):
     # Obsidian paths - vault_path can be empty string from env, will be validated
     vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
-        default=Path("."), description="Source directory within vault"
+        default=Path(), description="Source directory within vault"
     )
 
     # Data storage directory - all processing data stored here (not in vault)
     # Default: repo root directory (where config.yaml lives)
     data_dir: Path = Field(
-        default=Path("."),
+        default=Path(),
         description="Directory for all data files (chroma_db, logs, cache, sync_state). "
         "Keeps vault clean of processing artifacts.",
     )
@@ -50,7 +50,7 @@ class Config(BaseSettings):
         if isinstance(v, str):
             if not v:
                 # Empty string means not set - will be caught by validation
-                return Path("")
+                return Path()
             # type: ignore[no-any-return]
             return Path(v).expanduser().resolve()
         if isinstance(v, Path):
@@ -551,9 +551,8 @@ class Config(BaseSettings):
         """Validate agent framework selection."""
         valid_frameworks = ["pydantic_ai", "langchain"]
         if v not in valid_frameworks:
-            raise ValueError(
-                f"agent_framework must be one of {valid_frameworks}, got '{v}'"
-            )
+            msg = f"agent_framework must be one of {valid_frameworks}, got '{v}'"
+            raise ValueError(msg)
         return v
 
     # LangChain Agent Type Configuration
@@ -586,9 +585,8 @@ class Config(BaseSettings):
         """Validate LangChain agent type selection."""
         valid_types = ["tool_calling", "react", "structured_chat", "json_chat"]
         if v not in valid_types:
-            raise ValueError(
-                f"LangChain agent type must be one of {valid_types}, got '{v}'"
-            )
+            msg = f"LangChain agent type must be one of {valid_types}, got '{v}'"
+            raise ValueError(msg)
         return v
 
     # Agent Framework Fallback Configuration
@@ -803,8 +801,9 @@ class Config(BaseSettings):
         vault_path = self.vault_path
         if isinstance(vault_path, str):
             if not vault_path:
+                msg = "vault_path is required"
                 raise ConfigurationError(
-                    "vault_path is required",
+                    msg,
                     suggestion="Set VAULT_PATH environment variable or vault_path in config.yaml",
                 )
             vault_path = Path(vault_path).expanduser().resolve()
@@ -818,26 +817,30 @@ class Config(BaseSettings):
             try:
                 parent_dir.mkdir(parents=True, exist_ok=True)
             except OSError as e:
+                msg = f"Cannot create database directory: {parent_dir}"
                 raise ConfigurationError(
-                    f"Cannot create database directory: {parent_dir}",
+                    msg,
                     suggestion=f"Ensure you have write permissions to {parent_dir.parent}. Error: {e}",
                 )
 
         if not os.access(parent_dir, os.W_OK):
+            msg = f"Database directory is not writable: {parent_dir}"
             raise ConfigurationError(
-                f"Database directory is not writable: {parent_dir}",
+                msg,
                 suggestion=f"Check directory permissions: chmod 755 {parent_dir}",
             )
 
         if validated_db.exists():
             if not os.access(validated_db, os.R_OK):
+                msg = f"Database file exists but is not readable: {validated_db}"
                 raise ConfigurationError(
-                    f"Database file exists but is not readable: {validated_db}",
+                    msg,
                     suggestion=f"Check file permissions: chmod 644 {validated_db}",
                 )
             if not os.access(validated_db, os.W_OK):
+                msg = f"Database file exists but is not writable: {validated_db}"
                 raise ConfigurationError(
-                    f"Database file exists but is not writable: {validated_db}",
+                    msg,
                     suggestion=f"Check file permissions: chmod 644 {validated_db}",
                 )
 
@@ -851,55 +854,65 @@ class Config(BaseSettings):
             "claude",
         ]
         if self.llm_provider.lower() not in valid_providers:
-            raise ConfigurationError(
+            msg = (
                 f"Invalid llm_provider: {self.llm_provider}. "
-                f"Must be one of: {', '.join(valid_providers)}",
+                f"Must be one of: {', '.join(valid_providers)}"
+            )
+            raise ConfigurationError(
+                msg,
                 suggestion=f"Set llm_provider to one of: {', '.join(valid_providers)}",
             )
 
         provider_lower = self.llm_provider.lower()
 
         if provider_lower == "openrouter" and not self.openrouter_api_key:
+            msg = "OpenRouter API key is required when using OpenRouter provider."
             raise ConfigurationError(
-                "OpenRouter API key is required when using OpenRouter provider.",
+                msg,
                 suggestion="Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config.yaml",
             )
 
         if provider_lower == "openai" and not self.openai_api_key:
+            msg = "OpenAI API key is required when using OpenAI provider."
             raise ConfigurationError(
-                "OpenAI API key is required when using OpenAI provider.",
+                msg,
                 suggestion="Set OPENAI_API_KEY environment variable or openai_api_key in config.yaml. "
                 "Get your API key from https://platform.openai.com/api-keys",
             )
 
         if provider_lower in ("anthropic", "claude") and not self.anthropic_api_key:
+            msg = "Anthropic API key is required when using Anthropic/Claude provider."
             raise ConfigurationError(
-                "Anthropic API key is required when using Anthropic/Claude provider.",
+                msg,
                 suggestion="Set ANTHROPIC_API_KEY environment variable or anthropic_api_key in config.yaml. "
                 "Get your API key from https://console.anthropic.com/",
             )
 
         if self.run_mode not in ("apply", "dry-run"):
+            msg = f"Invalid run_mode: {self.run_mode}"
             raise ConfigurationError(
-                f"Invalid run_mode: {self.run_mode}",
+                msg,
                 suggestion="Set run_mode to either 'apply' or 'dry-run'",
             )
 
         if self.delete_mode not in ("delete", "archive"):
+            msg = f"Invalid delete_mode: {self.delete_mode}"
             raise ConfigurationError(
-                f"Invalid delete_mode: {self.delete_mode}",
+                msg,
                 suggestion="Set delete_mode to either 'delete' or 'archive'",
             )
 
         if not (0 <= self.llm_temperature <= 1):
+            msg = f"LLM temperature must be 0-1: {self.llm_temperature}"
             raise ConfigurationError(
-                f"LLM temperature must be 0-1: {self.llm_temperature}",
+                msg,
                 suggestion="Set llm_temperature to a value between 0.0 and 1.0",
             )
 
         if not (0 <= self.llm_top_p <= 1):
+            msg = f"LLM top_p must be 0-1: {self.llm_top_p}"
             raise ConfigurationError(
-                f"LLM top_p must be 0-1: {self.llm_top_p}",
+                msg,
                 suggestion="Set llm_top_p to a value between 0.0 and 1.0",
             )
 

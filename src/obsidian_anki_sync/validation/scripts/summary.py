@@ -27,13 +27,7 @@ def main() -> None:
     base_path = Path.cwd() / "30-System-Design"
 
     if not base_path.exists():
-        print(f"Error: Directory not found: {base_path}")
         return
-
-    print("=" * 80)
-    print("RUSSIAN TRANSLATION SUMMARY")
-    print("=" * 80)
-    print()
 
     total_before = 0
     total_after = 0
@@ -43,7 +37,6 @@ def main() -> None:
         filepath = base_path / filename
 
         if not filepath.exists():
-            print(f"Warning: File not found: {filename}")
             continue
 
         content = filepath.read_text(encoding="utf-8")
@@ -69,9 +62,6 @@ def main() -> None:
                 }
             )
 
-    print(f"{'File':<60} {'Before':>10} {'After':>10} {'Added':>10}")
-    print("-" * 95)
-
     for r in results:
         short_name = (
             r["file"]
@@ -80,18 +70,6 @@ def main() -> None:
             .replace("--", " ")
             + ")"
         )
-        print(f"{short_name:<60} {r['before']:>10} {r['after']:>10} {r['added']:>10}")
-
-    print("-" * 95)
-    print(
-        f"{'TOTAL':<60} {total_before:>10} {total_after:>10} {total_after - total_before:>10}"
-    )
-    print()
-    print("=" * 80)
-    print(f"Total Russian characters BEFORE: {total_before:,}")
-    print(f"Total Russian characters AFTER:  {total_after:,}")
-    print(f"Total characters ADDED:          {total_after - total_before:,}")
-    print("=" * 80)
 
 
 if __name__ == "__main__":

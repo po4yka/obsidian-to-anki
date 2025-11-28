@@ -1,8 +1,8 @@
 """Prompt templates for post-validation and auto-fix."""
 
-from ...models import NoteMetadata
-from ...utils.logging import get_logger
-from ..models import GeneratedCard
+from obsidian_anki_sync.agents.models import GeneratedCard
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

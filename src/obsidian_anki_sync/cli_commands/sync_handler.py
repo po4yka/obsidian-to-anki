@@ -6,14 +6,15 @@ from typing import Any
 import typer
 from rich.table import Table
 
-from ..anki.client import AnkiClient
-from ..config import Config
-from ..sync.engine import SyncEngine
-from ..sync.progress import ProgressTracker
-from ..sync.state_db import StateDB
-from ..utils.llm_logging import session_context
-from ..utils.preflight import run_preflight_checks
-from ..utils.progress_display import ProgressDisplay
+from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.sync.engine import SyncEngine
+from obsidian_anki_sync.sync.progress import ProgressTracker
+from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.llm_logging import session_context
+from obsidian_anki_sync.utils.preflight import run_preflight_checks
+from obsidian_anki_sync.utils.progress_display import ProgressDisplay
+
 from .shared import console
 
 
@@ -57,7 +58,7 @@ def run_sync(
     check_anki = not dry_run
     check_llm = True
 
-    passed, results = run_preflight_checks(
+    _passed, results = run_preflight_checks(
         config, check_anki=check_anki, check_llm=check_llm
     )
 

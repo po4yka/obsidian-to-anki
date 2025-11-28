@@ -7,8 +7,9 @@ from typing import Any
 
 import yaml
 
-from ..exceptions import AnkiError, DeckImportError
-from ..utils.logging import get_logger
+from obsidian_anki_sync.exceptions import AnkiError, DeckImportError
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .client import AnkiClient
 
 logger = get_logger(__name__)
@@ -40,14 +41,16 @@ def import_cards_from_yaml(
     try:
         input_path = Path(input_path)
         if not input_path.exists():
-            raise DeckImportError(f"Input file not found: {input_path}")
+            msg = f"Input file not found: {input_path}"
+            raise DeckImportError(msg)
 
         # Load YAML data
         with input_path.open("r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
 
         if not isinstance(yaml_data, list):
-            raise DeckImportError("YAML file must contain a list of cards")
+            msg = "YAML file must contain a list of cards"
+            raise DeckImportError(msg)
 
         return _import_cards(
             client=client,
@@ -58,9 +61,11 @@ def import_cards_from_yaml(
         )
 
     except yaml.YAMLError as e:
-        raise DeckImportError(f"Failed to parse YAML: {e}") from e
+        msg = f"Failed to parse YAML: {e}"
+        raise DeckImportError(msg) from e
     except Exception as e:
-        raise DeckImportError(f"Failed to import from YAML: {e}") from e
+        msg = f"Failed to import from YAML: {e}"
+        raise DeckImportError(msg) from e
 
 
 def import_cards_from_csv(
@@ -89,7 +94,8 @@ def import_cards_from_csv(
     try:
         input_path = Path(input_path)
         if not input_path.exists():
-            raise DeckImportError(f"Input file not found: {input_path}")
+            msg = f"Input file not found: {input_path}"
+            raise DeckImportError(msg)
 
         # Load CSV data
         cards_data = []
@@ -123,7 +129,8 @@ def import_cards_from_csv(
         )
 
     except Exception as e:
-        raise DeckImportError(f"Failed to import from CSV: {e}") from e
+        msg = f"Failed to import from CSV: {e}"
+        raise DeckImportError(msg) from e
 
 
 def _import_cards(

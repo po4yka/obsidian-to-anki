@@ -41,7 +41,8 @@ class ContentHashService:
         elif algorithm == "md5":
             hash_obj = hashlib.md5(normalized.encode("utf-8"))
         else:
-            raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+            msg = f"Unsupported hash algorithm: {algorithm}"
+            raise ValueError(msg)
 
         hash_value = hash_obj.hexdigest()[:length]
 

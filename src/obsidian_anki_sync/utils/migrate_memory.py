@@ -7,9 +7,9 @@ to the persistent ChromaDB memory store.
 import json
 from pathlib import Path
 
-from ..agents.agent_memory import AgentMemoryStore
-from ..agents.specialized import ProblemDomain
-from ..utils.logging import get_logger
+from obsidian_anki_sync.agents.agent_memory import AgentMemoryStore
+from obsidian_anki_sync.agents.specialized import ProblemDomain
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -34,7 +34,7 @@ def migrate_in_memory_patterns(
     migrated_count = 0
 
     # Migrate success patterns
-    for pattern, count in success_patterns.items():
+    for pattern in success_patterns:
         try:
             # Parse pattern to extract error context
             parts = pattern.split(":")

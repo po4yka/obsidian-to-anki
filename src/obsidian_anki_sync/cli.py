@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
@@ -18,6 +18,9 @@ from .obsidian.parser import parse_frontmatter
 from .utils.log_analyzer import LogAnalyzer
 from .utils.preflight import run_preflight_checks
 from .utils.problematic_notes import ProblematicNotesArchiver
+
+if TYPE_CHECKING:
+    from .models import Card
 
 app = typer.Typer(
     name="obsidian-anki-sync",
@@ -169,7 +172,7 @@ def test_run(
     # Run pre-flight checks (skip Anki if dry-run)
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    passed, results = run_preflight_checks(
+    _passed, results = run_preflight_checks(
         config, check_anki=not dry_run, check_llm=True
     )
 
@@ -329,7 +332,7 @@ def validate(
     ] = "INFO",
 ) -> None:
     """Validate note structure and APF compliance."""
-    config, logger = get_config_and_logger(config_path, log_level)
+    _config, logger = get_config_and_logger(config_path, log_level)
 
     logger.info("validate_started", note_path=str(note_path))
 
@@ -607,7 +610,7 @@ def export(
     # Run pre-flight checks (skip Anki since we're exporting to file)
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
+    _passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
 
     # Display results
     for result in results:
@@ -663,7 +666,6 @@ def export(
 
             # Generate cards using the sync engine's generation logic
             from .apf.generator import APFGenerator
-            from .models import Card
 
             cards: list[Card] = []
 
@@ -830,7 +832,9 @@ def export_deck(
     try:
         # Run pre-flight checks
         console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
+        _passed, results = run_preflight_checks(
+            config, check_anki=True, check_llm=False
+        )
 
         for result in results:
             icon = "[green]✓[/green]" if result.passed else "[red]✗[/red]"
@@ -926,7 +930,9 @@ def import_deck(
     try:
         # Run pre-flight checks
         console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
+        _passed, results = run_preflight_checks(
+            config, check_anki=True, check_llm=False
+        )
 
         for result in results:
             icon = "[green]✓[/green]" if result.passed else "[red]✗[/red]"
@@ -1262,7 +1268,9 @@ def query_anki(
 
         # Run pre-flight checks
         console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-        passed, results = run_preflight_checks(config, check_anki=True, check_llm=False)
+        _passed, results = run_preflight_checks(
+            config, check_anki=True, check_llm=False
+        )
 
         errors = [r for r in results if not r.passed and r.severity == "error"]
         if errors:
@@ -1884,7 +1892,7 @@ def check_setup(
 
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    passed, results = run_preflight_checks(
+    _passed, results = run_preflight_checks(
         config, check_anki=not skip_anki, check_llm=not skip_llm
     )
 
@@ -2134,7 +2142,7 @@ def format(
     ] = "INFO",
 ) -> None:
     """Run code formatters (ruff + isort)."""
-    config, logger = get_config_and_logger(config_path, log_level)
+    _config, logger = get_config_and_logger(config_path, log_level)
     logger.info("format_started", check=check)
 
     paths = ["src", "tests"]

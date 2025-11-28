@@ -17,7 +17,6 @@ class IConnectionChecker(ABC):
         Returns:
             True if connection is successful, False otherwise
         """
-        pass
 
     @abstractmethod
     def get_connection_status(self) -> dict:
@@ -30,7 +29,6 @@ class IConnectionChecker(ABC):
             - last_check: datetime (optional)
             - error: str (optional)
         """
-        pass
 
     @abstractmethod
     def validate_credentials(self) -> bool:
@@ -39,4 +37,3 @@ class IConnectionChecker(ABC):
         Returns:
             True if credentials are valid, False otherwise
         """
-        pass

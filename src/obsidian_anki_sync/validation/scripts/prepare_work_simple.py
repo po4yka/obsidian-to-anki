@@ -117,7 +117,6 @@ def analyze_file(
         return None
 
     except Exception as e:
-        print(f"Error analyzing {filepath.name}: {e}", file=sys.stderr)
         return None
 
 
@@ -172,7 +171,6 @@ def load_android_subtopics(vault_root: Path) -> list[str]:
 
         return subtopics
     except Exception as e:
-        print(f"Error loading Android subtopics: {e}", file=sys.stderr)
         return []
 
 
@@ -181,12 +179,8 @@ def main() -> None:
     vault_root = Path.cwd()
     android_dir = vault_root / "40-Android"
 
-    print("Loading Android subtopics from TAXONOMY.md...")
     android_subtopics = load_android_subtopics(vault_root)
-    print(f"Loaded {len(android_subtopics)} valid Android subtopics")
-    print()
 
-    print("Analyzing reviewed Android notes...")
     work_packages: dict[str, list[dict]] = {
         "invalid_subtopics": [],
         "missing_concept_links": [],
@@ -222,21 +216,7 @@ def main() -> None:
                         )
 
         except Exception as e:
-            print(f"Error processing {filepath.name}: {e}", file=sys.stderr)
-
-    print(f"Analyzed {analyzed} reviewed files")
-    print()
-    print("=" * 80)
-    print("ISSUES FOUND")
-    print("=" * 80)
-    print(f"Invalid Android subtopics: {len(work_packages['invalid_subtopics'])} files")
-    print(
-        f"Missing concept links:     {len(work_packages['missing_concept_links'])} files"
-    )
-    print(f"Broken wikilinks:          {len(work_packages['broken_wikilinks'])} files")
-    print(f"Wrong folder placement:    {len(work_packages['wrong_folder'])} files")
-    print("=" * 80)
-    print()
+            pass
 
     # Distribute work
     agents: list[dict] = []
@@ -297,15 +277,8 @@ def main() -> None:
                     }
                 )
 
-    print("WORK DISTRIBUTION")
-    print("=" * 80)
     for agent in agents:
-        print(
-            f"{agent['agent_id']:20} - {agent['count']:3} files - {agent['description']}"
-        )
-    print("=" * 80)
-    print(f"Total: {sum(a['count'] for a in agents)} files across {len(agents)} agents")
-    print()
+        pass
 
     # Save work packages
     output_dir = vault_root / "subagent_work_packages"
@@ -328,9 +301,6 @@ def main() -> None:
     summary_file = output_dir / "summary.json"
     with open(summary_file, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
-
-    print(f"Saved {len(agents)} work packages to {output_dir}/")
-    print(f"Summary: {summary_file}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """OpenRouter provider implementation."""
 
+import contextlib
 import json
 import os
 import time
@@ -8,14 +9,15 @@ from typing import Any, Literal, cast
 
 import httpx
 
-from ...utils.llm_logging import (
+from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.llm_logging import (
     log_llm_error,
     log_llm_request,
     log_llm_retry,
     log_llm_success,
 )
-from ...utils.logging import get_logger
-from ..base import BaseLLMProvider
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .error_handler import parse_api_error_response, should_fallback_to_basic_json
 from .json_utils import clean_json_response, repair_truncated_json
 from .models import (
@@ -81,10 +83,11 @@ class OpenRouterProvider(BaseLLMProvider):
             api_key = os.environ.get("OPENROUTER_API_KEY")
 
         if not api_key:
-            raise ValueError(
+            msg = (
                 "OpenRouter API key is required. Provide it via the api_key parameter "
                 "or set the OPENROUTER_API_KEY environment variable."
             )
+            raise ValueError(msg)
 
         # Ensure max_tokens has a default value
         if max_tokens is None:
@@ -224,10 +227,8 @@ class OpenRouterProvider(BaseLLMProvider):
 
     def __del__(self) -> None:
         """Cleanup on deletion."""
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     def check_connection(self) -> bool:
         """Check if OpenRouter is accessible.
@@ -295,7 +296,8 @@ class OpenRouterProvider(BaseLLMProvider):
             httpx.HTTPError: If request fails after retries
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported")
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
 
         # Build messages
         messages = build_messages(prompt, system)
@@ -407,7 +409,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 raise
 
         # Should not reach here, but satisfy type checker
-        raise RuntimeError("Unexpected retry loop exit")
+        msg = "Unexpected retry loop exit"
+        raise RuntimeError(msg)
 
     def _log_token_calculations(
         self,
@@ -535,7 +538,8 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             raise last_exception
 
-        raise RuntimeError("Unexpected retry loop exit")
+        msg = "Unexpected retry loop exit"
+        raise RuntimeError(msg)
 
     def _log_400_error(
         self, error: httpx.HTTPStatusError, model: str, payload: dict[str, Any]
@@ -589,9 +593,8 @@ class OpenRouterProvider(BaseLLMProvider):
             # Validate response structure
             choices = result.get("choices", [])
             if not choices:
-                raise ValueError(
-                    f"OpenRouter returned empty choices array. Response: {str(result)[:500]}"
-                )
+                msg = f"OpenRouter returned empty choices array. Response: {str(result)[:500]}"
+                raise ValueError(msg)
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
@@ -700,9 +703,9 @@ class OpenRouterProvider(BaseLLMProvider):
 
         if completion is None or completion == "":
             # Try alternative fields
-            if "reasoning" in message and message["reasoning"]:
+            if message.get("reasoning"):
                 completion = message["reasoning"]
-            elif "refusal" in message and message["refusal"]:
+            elif message.get("refusal"):
                 completion = message["refusal"]
             else:
                 finish_reason = result["choices"][0].get("finish_reason", "unknown")
@@ -716,10 +719,11 @@ class OpenRouterProvider(BaseLLMProvider):
 
                 if json_schema:
                     # Retry without schema
-                    raise ValueError(
+                    msg = (
                         f"Model {model} returned empty completion. "
                         f"This may indicate structured output issues."
                     )
+                    raise ValueError(msg)
                 completion = ""
 
         return completion
@@ -751,10 +755,11 @@ class OpenRouterProvider(BaseLLMProvider):
         max_retry_tokens = model_max_output
 
         if effective_max_tokens >= max_retry_tokens:
-            raise ValueError(
+            msg = (
                 f"Response truncated at {effective_max_tokens} tokens. "
                 f"Cannot increase further."
             )
+            raise ValueError(msg)
 
         retry_max_tokens = min(effective_max_tokens * 2, max_retry_tokens)
         log_llm_retry(
@@ -780,9 +785,8 @@ class OpenRouterProvider(BaseLLMProvider):
         # Validate retry response structure
         retry_choices = retry_result.get("choices", [])
         if not retry_choices:
-            raise ValueError(
-                f"OpenRouter retry returned empty choices. Response: {str(retry_result)[:500]}"
-            )
+            msg = f"OpenRouter retry returned empty choices. Response: {str(retry_result)[:500]}"
+            raise ValueError(msg)
 
         retry_message = retry_choices[0].get("message", {})
         retry_completion: str = retry_message.get("content", "")
@@ -946,9 +950,8 @@ class OpenRouterProvider(BaseLLMProvider):
                     # Check if reasoning fallback also returned empty
                     response_text = result.get("response", "")
                     if not response_text or response_text.strip() == "":
-                        raise ValueError(
-                            f"Model {model} returned empty completion even with reasoning enabled."
-                        ) from e
+                        msg = f"Model {model} returned empty completion even with reasoning enabled."
+                        raise ValueError(msg) from e
                 except Exception as reasoning_error:
                     logger.warning(
                         "grok_reasoning_fallback_failed_in_generate_json",
@@ -976,10 +979,11 @@ class OpenRouterProvider(BaseLLMProvider):
                 # Check if fallback also returned empty
                 response_text = result.get("response", "")
                 if not response_text or response_text.strip() == "":
-                    raise ValueError(
+                    msg = (
                         f"Model {model} returned empty completion. "
                         f"This may indicate structured output issues."
-                    ) from e
+                    )
+                    raise ValueError(msg) from e
             else:
                 raise
 
@@ -987,13 +991,13 @@ class OpenRouterProvider(BaseLLMProvider):
         cleaned_text = clean_json_response(response_text, model)
 
         try:
-            return cast(dict[str, Any], json.loads(cleaned_text))
+            return cast("dict[str, Any]", json.loads(cleaned_text))
         except json.JSONDecodeError as e:
             # Try repair
             if "Unterminated" in str(e) or "Expecting" in str(e):
                 repaired_text = repair_truncated_json(cleaned_text)
                 try:
-                    return cast(dict[str, Any], json.loads(repaired_text))
+                    return cast("dict[str, Any]", json.loads(repaired_text))
                 except json.JSONDecodeError:
                     pass
 
@@ -1032,7 +1036,8 @@ class OpenRouterProvider(BaseLLMProvider):
             Response dictionary
         """
         if stream:
-            raise NotImplementedError("Streaming is not yet supported in async mode")
+            msg = "Streaming is not yet supported in async mode"
+            raise NotImplementedError(msg)
 
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
@@ -1095,9 +1100,8 @@ class OpenRouterProvider(BaseLLMProvider):
             # Validate response structure
             choices = result.get("choices", [])
             if not choices:
-                raise ValueError(
-                    f"OpenRouter async returned empty choices. Response: {str(result)[:500]}"
-                )
+                msg = f"OpenRouter async returned empty choices. Response: {str(result)[:500]}"
+                raise ValueError(msg)
 
             first_choice = choices[0]
             message = first_choice.get("message", {})

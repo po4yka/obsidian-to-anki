@@ -9,7 +9,8 @@ from typing import Any
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 
-from ...utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import LangChainAgentResult
 from .react_agent import ReActAgent
 
@@ -226,9 +227,9 @@ class ReActRepairAgent:
 
         # Fallback: first meaningful line
         for line in lines:
-            line = line.strip()
-            if len(line) > 10 and not line.startswith("Thought:"):
-                return line
+            stripped_line = line.strip()
+            if len(stripped_line) > 10 and not stripped_line.startswith("Thought:"):
+                return stripped_line
 
         return "Diagnosis completed"
 
@@ -309,9 +310,9 @@ class ReActRepairAgent:
 
         # First substantial line
         for line in lines:
-            line = line.strip()
-            if len(line) > 15 and not line.startswith("Thought:"):
-                return line
+            stripped_line = line.strip()
+            if len(stripped_line) > 15 and not stripped_line.startswith("Thought:"):
+                return stripped_line
 
         return "Analysis completed"
 

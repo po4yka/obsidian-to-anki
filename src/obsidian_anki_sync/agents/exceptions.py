@@ -30,61 +30,41 @@ class AgentError(Exception):
 class ValidationError(AgentError):
     """Raised when validation fails."""
 
-    pass
-
 
 class PreValidationError(ValidationError):
     """Raised when pre-validation fails."""
-
-    pass
 
 
 class PostValidationError(ValidationError):
     """Raised when post-validation fails."""
 
-    pass
-
 
 class GenerationError(AgentError):
     """Raised when card generation fails."""
-
-    pass
 
 
 class ModelError(AgentError):
     """Raised when LLM model operations fail."""
 
-    pass
-
 
 class ModelNotAvailableError(ModelError):
     """Raised when a required model is not available."""
-
-    pass
 
 
 class ModelTimeoutError(ModelError):
     """Raised when model request times out."""
 
-    pass
-
 
 class StructuredOutputError(AgentError):
     """Raised when structured output parsing fails."""
-
-    pass
 
 
 class ConfigurationError(AgentError):
     """Raised when agent configuration is invalid."""
 
-    pass
-
 
 class WorkflowError(AgentError):
     """Raised when LangGraph workflow execution fails."""
-
-    pass
 
 
 class RetryExhaustedError(AgentError):

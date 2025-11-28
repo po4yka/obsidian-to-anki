@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from ..exceptions import ConfigurationError
+from obsidian_anki_sync.exceptions import ConfigurationError
 
 
 def validate_vault_path(vault_path: Path, allow_symlinks: bool = False) -> Path:
@@ -23,15 +23,17 @@ def validate_vault_path(vault_path: Path, allow_symlinks: bool = False) -> Path:
 
     # Check if path exists
     if not vault_path.exists():
+        msg = f"Vault path does not exist: {vault_path}"
         raise ConfigurationError(
-            f"Vault path does not exist: {vault_path}",
+            msg,
             suggestion="Verify the vault_path in your configuration points to an existing directory",
         )
 
     # Check if it's a directory
     if not vault_path.is_dir():
+        msg = f"Vault path is not a directory: {vault_path}"
         raise ConfigurationError(
-            f"Vault path is not a directory: {vault_path}",
+            msg,
             suggestion="vault_path must point to a directory, not a file",
         )
 
@@ -39,14 +41,14 @@ def validate_vault_path(vault_path: Path, allow_symlinks: bool = False) -> Path:
     try:
         resolved_path = vault_path.resolve(strict=True)
     except (OSError, RuntimeError) as e:
-        raise ConfigurationError(
-            f"Cannot resolve vault path: {vault_path}", suggestion=f"Error: {e}"
-        )
+        msg = f"Cannot resolve vault path: {vault_path}"
+        raise ConfigurationError(msg, suggestion=f"Error: {e}")
 
     # Check for symlink traversal attacks
     if not allow_symlinks and vault_path.is_symlink():
+        msg = f"Vault path is a symlink: {vault_path}"
         raise ConfigurationError(
-            f"Vault path is a symlink: {vault_path}",
+            msg,
             suggestion="For security, symlinks are not allowed. Use the actual directory path or set allow_symlinks=True",
         )
 
@@ -73,22 +75,25 @@ def validate_source_dir(vault_path: Path, source_dir: Path) -> Path:
     try:
         full_source_path.relative_to(vault_path)
     except ValueError:
+        msg = f"Source directory is outside vault: {source_dir}"
         raise ConfigurationError(
-            f"Source directory is outside vault: {source_dir}",
+            msg,
             suggestion="source_dir must be a relative path within the vault (no .. allowed)",
         )
 
     # Check if it exists
     if not full_source_path.exists():
+        msg = f"Source directory does not exist: {full_source_path}"
         raise ConfigurationError(
-            f"Source directory does not exist: {full_source_path}",
+            msg,
             suggestion=f"Create directory '{source_dir}' in your vault or update source_dir in config",
         )
 
     # Check if it's a directory
     if not full_source_path.is_dir():
+        msg = f"Source path is not a directory: {full_source_path}"
         raise ConfigurationError(
-            f"Source path is not a directory: {full_source_path}",
+            msg,
             suggestion="source_dir must point to a directory",
         )
 
@@ -118,16 +123,16 @@ def validate_note_path(vault_path: Path, note_path: Path) -> Path:
             strict=False
         )  # Allow non-existent for future creation
     except (OSError, RuntimeError) as e:
-        raise ConfigurationError(
-            f"Cannot resolve note path: {note_path}", suggestion=f"Error: {e}"
-        )
+        msg = f"Cannot resolve note path: {note_path}"
+        raise ConfigurationError(msg, suggestion=f"Error: {e}")
 
     # Security: Ensure note is within vault (prevent path traversal)
     try:
         resolved_note.relative_to(vault_path)
     except ValueError:
+        msg = f"Note path is outside vault: {note_path}"
         raise ConfigurationError(
-            f"Note path is outside vault: {note_path}",
+            msg,
             suggestion="Note files must be within the vault directory",
         )
 
@@ -154,14 +159,14 @@ def validate_db_path(db_path: Path, vault_path: Path | None = None) -> Path:
     try:
         resolved_db = db_path.resolve(strict=False)  # Allow non-existent
     except (OSError, RuntimeError) as e:
-        raise ConfigurationError(
-            f"Cannot resolve database path: {db_path}", suggestion=f"Error: {e}"
-        )
+        msg = f"Cannot resolve database path: {db_path}"
+        raise ConfigurationError(msg, suggestion=f"Error: {e}")
 
     # Check parent directory exists
     if not resolved_db.parent.exists():
+        msg = f"Database directory does not exist: {resolved_db.parent}"
         raise ConfigurationError(
-            f"Database directory does not exist: {resolved_db.parent}",
+            msg,
             suggestion=f"Create directory {resolved_db.parent} first",
         )
 

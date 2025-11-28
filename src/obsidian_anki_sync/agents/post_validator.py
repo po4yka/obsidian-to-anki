@@ -13,4 +13,4 @@ This agent validates generated APF cards for:
 # Re-export from new modular structure for backward compatibility
 from .post_validation import ErrorCategory, PostValidatorAgent
 
-__all__ = ["PostValidatorAgent", "ErrorCategory"]
+__all__ = ["ErrorCategory", "PostValidatorAgent"]

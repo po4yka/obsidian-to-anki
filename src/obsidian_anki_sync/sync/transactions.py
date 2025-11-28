@@ -10,7 +10,8 @@ or both are rolled back to maintain consistency.
 import logging
 from typing import Any
 
-from ..anki.client import AnkiClient
+from obsidian_anki_sync.anki.client import AnkiClient
+
 from .state_db import StateDB
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 class CardOperationError(Exception):
     """Error during card operation."""
-
-    pass
 
 
 class CardTransaction:

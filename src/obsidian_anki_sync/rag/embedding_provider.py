@@ -16,8 +16,8 @@ from typing import Any
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -118,16 +118,18 @@ class EmbeddingProvider:
                     base_url=self.config.ollama_base_url,
                 )
             except ImportError:
-                raise ValueError(
+                msg = (
                     "Ollama embeddings require langchain-community. "
                     "Install with: pip install langchain-community"
                 )
+                raise ValueError(msg)
 
         else:
-            raise ValueError(
+            msg = (
                 f"Provider '{self.provider}' does not support embeddings. "
                 f"Supported providers: openrouter, openai, ollama"
             )
+            raise ValueError(msg)
 
     @property
     def embeddings(self) -> Embeddings:
@@ -319,7 +321,7 @@ def get_embedding_provider(
     Returns:
         EmbeddingProvider instance
     """
-    from ..config import get_config
+    from obsidian_anki_sync.config import get_config
 
     config = get_config()
     return EmbeddingProvider(config, model_name)

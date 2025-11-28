@@ -27,28 +27,28 @@ from .taxonomy_loader import TaxonomyLoader
 from .yaml_validator import YAMLValidator
 
 __all__ = [
-    # Base types
-    "Severity",
-    "ValidationIssue",
-    "AutoFix",
-    "BaseValidator",
-    # Validators
-    "YAMLValidator",
-    "ContentValidator",
-    "FormatValidator",
-    "LinkValidator",
-    "AndroidValidator",
-    "AIFixerValidator",
     # AI System
     "AIFixer",
+    "AIFixerValidator",
+    "AndroidValidator",
+    "AutoFix",
+    "BaseValidator",
+    "ContentValidator",
+    "FormatValidator",
+    "HashTracker",
+    "LinkValidator",
     # Orchestrator
     "NoteValidator",
     # Parallel Processing
     "ParallelConfig",
     "ParallelValidator",
-    "validate_directory_parallel",
+    "ReportGenerator",
+    # Base types
+    "Severity",
     # Utilities
     "TaxonomyLoader",
-    "ReportGenerator",
-    "HashTracker",
+    "ValidationIssue",
+    # Validators
+    "YAMLValidator",
+    "validate_directory_parallel",
 ]

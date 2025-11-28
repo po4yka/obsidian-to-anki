@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal, TypedDict
 
 from langgraph.graph.message import add_messages
 
-from ...config import Config
+from obsidian_anki_sync.config import Config
 
 
 class PipelineState(TypedDict):

@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING
 
 from langgraph.checkpoint.memory import MemorySaver
 
-from ...config import Config
-from ...models import NoteMetadata, QAPair
-
 if TYPE_CHECKING:
-    from ..models import Card
+    from obsidian_anki_sync.agents.models import Card
+    from obsidian_anki_sync.config import Config
+    from obsidian_anki_sync.models import NoteMetadata, QAPair
 
-from ...utils.logging import get_logger
-from ..models import (
+    from .state import PipelineState
+
+from obsidian_anki_sync.agents.models import (
     AgentPipelineResult,
     CardSplittingResult,
     ContextEnrichmentResult,
@@ -30,19 +30,24 @@ from ..models import (
     PostValidationResult,
     PreValidationResult,
 )
-from ..slug_utils import generate_agent_slug_base
-from ..unified_agent import UnifiedAgentSelector
+from obsidian_anki_sync.agents.slug_utils import generate_agent_slug_base
+from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .model_factory import ModelFactory
-from .state import PipelineState
 from .workflow_builder import WorkflowBuilder
 
 # Optional agent memory and observability (requires chromadb, motor, langsmith)
 try:
-    from ..advanced_memory import AdvancedMemoryStore  # NEW: Advanced memory system
-    from ..agent_memory import AgentMemoryStore
+    from obsidian_anki_sync.agents.advanced_memory import (
+        AdvancedMemoryStore,  # NEW: Advanced memory system
+    )
+    from obsidian_anki_sync.agents.agent_memory import AgentMemoryStore
 
     # NEW: Enhanced observability
-    from ..enhanced_observability import EnhancedObservabilitySystem
+    from obsidian_anki_sync.agents.enhanced_observability import (
+        EnhancedObservabilitySystem,
+    )
 except ImportError:
     AgentMemoryStore = None
     AdvancedMemoryStore = None
@@ -50,7 +55,7 @@ except ImportError:
 
 # Optional RAG integration
 try:
-    from ...rag.integration import RAGIntegration, get_rag_integration
+    from obsidian_anki_sync.rag.integration import RAGIntegration, get_rag_integration
 except ImportError:
     RAGIntegration = None
     get_rag_integration = None
@@ -284,8 +289,8 @@ class LangGraphOrchestrator:
         """
         import hashlib
 
-        from ..models import Card, Manifest
-        from ..sync.slug_generator import compute_content_hash
+        from obsidian_anki_sync.agents.models import Card, Manifest
+        from obsidian_anki_sync.agents.sync.slug_generator import compute_content_hash
 
         cards: list[Card] = []
         qa_lookup = {qa.card_index: qa for qa in qa_pairs}
@@ -342,7 +347,7 @@ class LangGraphOrchestrator:
         if self._provider is None:
             # Create a minimal provider for compatibility
             # This is only used by the sync engine to access provider name/check_connection
-            from ..providers.base import BaseLLMProvider
+            from obsidian_anki_sync.agents.providers.base import BaseLLMProvider
 
             class LangGraphCompatibilityProvider(BaseLLMProvider):
                 def get_provider_name(self) -> str:
@@ -352,14 +357,12 @@ class LangGraphOrchestrator:
                     return True  # LangGraph handles its own connection checks
 
                 async def generate(self, prompt: str, **kwargs) -> str:
-                    raise NotImplementedError(
-                        "LangGraph orchestrator handles generation internally"
-                    )
+                    msg = "LangGraph orchestrator handles generation internally"
+                    raise NotImplementedError(msg)
 
                 def generate_sync(self, prompt: str, **kwargs) -> str:
-                    raise NotImplementedError(
-                        "LangGraph orchestrator handles generation internally"
-                    )
+                    msg = "LangGraph orchestrator handles generation internally"
+                    raise NotImplementedError(msg)
 
             self._provider = LangGraphCompatibilityProvider()
 
@@ -709,7 +712,9 @@ class LangGraphOrchestrator:
         # NEW: Record observability metrics
         if self.observability:
             try:
-                from ..enhanced_observability import AgentMetrics
+                from obsidian_anki_sync.agents.enhanced_observability import (
+                    AgentMetrics,
+                )
 
                 metrics = AgentMetrics(
                     agent_name="langgraph_orchestrator",
@@ -802,7 +807,7 @@ class LangGraphOrchestrator:
         try:
             import time
 
-            from ..advanced_memory import UserCardPreferences
+            from obsidian_anki_sync.agents.advanced_memory import UserCardPreferences
 
             user_id = getattr(metadata, "user_id", "default")
             topic = getattr(metadata, "topic", "general")
@@ -908,7 +913,7 @@ class LangGraphOrchestrator:
         try:
             import time
 
-            from ..advanced_memory import MemorizationFeedback
+            from obsidian_anki_sync.agents.advanced_memory import MemorizationFeedback
 
             # Store feedback for each card
             if generation.cards:

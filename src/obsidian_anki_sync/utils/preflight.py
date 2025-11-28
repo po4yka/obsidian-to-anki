@@ -6,8 +6,8 @@ from pathlib import Path
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..config import Config
-from ..utils.logging import get_logger
+from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -331,7 +331,7 @@ class PreflightChecker:
 
             # Try to connect to OpenRouter
             try:
-                from ..providers.factory import ProviderFactory
+                from obsidian_anki_sync.providers.factory import ProviderFactory
 
                 provider = ProviderFactory.create_from_config(self.config)
 
@@ -363,7 +363,7 @@ class PreflightChecker:
                     CheckResult(
                         name="LLM Provider (OpenRouter)",
                         passed=False,
-                        message=f"Failed to connect to OpenRouter: {str(e)}",
+                        message=f"Failed to connect to OpenRouter: {e!s}",
                         severity="error",
                         fixable=True,
                         fix_suggestion="Check your internet connection and API key",
@@ -373,7 +373,7 @@ class PreflightChecker:
         elif provider_name == "ollama":
             # Check Ollama connectivity
             try:
-                from ..providers.factory import ProviderFactory
+                from obsidian_anki_sync.providers.factory import ProviderFactory
 
                 provider = ProviderFactory.create_from_config(self.config)
 
@@ -404,7 +404,7 @@ class PreflightChecker:
                     CheckResult(
                         name="LLM Provider (Ollama)",
                         passed=False,
-                        message=f"Failed to connect to Ollama: {str(e)}",
+                        message=f"Failed to connect to Ollama: {e!s}",
                         severity="error",
                         fixable=True,
                         fix_suggestion="Start Ollama: ollama serve",
@@ -414,7 +414,7 @@ class PreflightChecker:
         elif provider_name == "lm_studio":
             # Check LM Studio connectivity
             try:
-                from ..providers.factory import ProviderFactory
+                from obsidian_anki_sync.providers.factory import ProviderFactory
 
                 provider = ProviderFactory.create_from_config(self.config)
 
@@ -444,7 +444,7 @@ class PreflightChecker:
                     CheckResult(
                         name="LLM Provider (LM Studio)",
                         passed=False,
-                        message=f"Failed to connect to LM Studio: {str(e)}",
+                        message=f"Failed to connect to LM Studio: {e!s}",
                         severity="error",
                         fixable=True,
                         fix_suggestion="Start LM Studio and ensure the server is running",
@@ -454,7 +454,7 @@ class PreflightChecker:
     def _check_anki_connectivity(self) -> None:
         """Check Anki/AnkiConnect connectivity."""
         try:
-            from ..anki.client import AnkiClient
+            from obsidian_anki_sync.anki.client import AnkiClient
 
             with AnkiClient(self.config.anki_connect_url) as anki:
                 # Try to get deck names
@@ -472,7 +472,7 @@ class PreflightChecker:
                 CheckResult(
                     name="Anki Connectivity",
                     passed=False,
-                    message=f"Cannot connect to AnkiConnect: {str(e)}",
+                    message=f"Cannot connect to AnkiConnect: {e!s}",
                     severity="error",
                     fixable=True,
                     fix_suggestion="1. Start Anki\n2. Install AnkiConnect add-on (2055492159)\n3. Restart Anki",
@@ -483,7 +483,7 @@ class PreflightChecker:
                 CheckResult(
                     name="Anki Connectivity",
                     passed=False,
-                    message=f"Anki connectivity check failed: {str(e)}",
+                    message=f"Anki connectivity check failed: {e!s}",
                     severity="error",
                     fixable=True,
                     fix_suggestion="Ensure Anki is running and AnkiConnect is installed",
@@ -512,7 +512,7 @@ class PreflightChecker:
             return
 
         try:
-            from ..anki.client import AnkiClient
+            from obsidian_anki_sync.anki.client import AnkiClient
 
             with AnkiClient(self.config.anki_connect_url) as anki:
                 model_names = anki.get_model_names()
@@ -563,7 +563,7 @@ class PreflightChecker:
             return
 
         try:
-            from ..anki.client import AnkiClient
+            from obsidian_anki_sync.anki.client import AnkiClient
 
             with AnkiClient(self.config.anki_connect_url) as anki:
                 deck_names = anki.get_deck_names()
@@ -667,7 +667,7 @@ class PreflightChecker:
             checked_paths.add(resolved)
 
             try:
-                total, used, free = shutil.disk_usage(path)
+                _total, _used, free = shutil.disk_usage(path)
                 free_mb = free / (1024 * 1024)
 
                 if free_mb < 100:
@@ -744,7 +744,7 @@ class PreflightChecker:
         if check_anki:
             try:
                 start = time.time()
-                from ..anki.client import AnkiClient
+                from obsidian_anki_sync.anki.client import AnkiClient
 
                 with AnkiClient(self.config.anki_connect_url) as anki:
                     anki.invoke("version")

@@ -23,7 +23,6 @@ def main() -> None:
     base_path = Path.cwd() / "30-System-Design"
 
     if not base_path.exists():
-        print(f"Error: Directory not found: {base_path}")
         return
 
     results: list[tuple[str, int]] = []
@@ -31,7 +30,6 @@ def main() -> None:
     for file in FILES:
         filepath = base_path / file
         if not filepath.exists():
-            print(f"{file}: FILE NOT FOUND")
             continue
 
         content = filepath.read_text(encoding="utf-8")
@@ -44,20 +42,14 @@ def main() -> None:
             russian_content = match.group(1).strip()
             char_count = len(russian_content)
             results.append((file, char_count))
-            print(f"{file}: {char_count} chars")
         else:
-            print(f"{file}: NO RUSSIAN SECTION FOUND")
+            pass
 
     # Sort by character count (ascending)
     results.sort(key=lambda x: x[1])
 
-    print("\n" + "=" * 80)
-    print("TOP 5 SHORTEST RUSSIAN TRANSLATIONS:")
-    print("=" * 80)
     for i, (file, chars) in enumerate(results[:5], 1):
-        print(f"{i}. {file}")
-        print(f"   Russian chars: {chars}")
-        print()
+        pass
 
 
 if __name__ == "__main__":
