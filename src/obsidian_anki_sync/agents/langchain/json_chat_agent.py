@@ -8,7 +8,7 @@ from typing import Any
 
 from langchain.agents import create_json_chat_agent
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 
 from obsidian_anki_sync.utils.logging import get_logger
@@ -87,7 +87,7 @@ Always work with structured data and provide clear, parseable results."""
             [
                 ("system", self.system_prompt),
                 ("human", "{input}"),
-                ("placeholder", "{agent_scratchpad}"),
+                MessagesPlaceholder("agent_scratchpad"),
             ]
         )
 

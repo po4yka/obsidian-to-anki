@@ -37,7 +37,7 @@ from .reflection_prompts import (
     get_revision_prompt_enrichment,
     get_revision_prompt_generation,
 )
-from .state import PipelineState
+from .state import PipelineState, get_model
 
 logger = get_logger(__name__)
 
@@ -398,7 +398,7 @@ async def reflect_after_generation_node(state: PipelineState) -> PipelineState:
     logger.info("self_reflection_domain_detected", stage=stage, domain=domain)
 
     # Get reflection model from state
-    model = state.get("reflection_model")
+    model = get_model(state, "reflection")
     if model is None:
         logger.warning("self_reflection_model_not_available", stage=stage)
         return state
@@ -543,7 +543,7 @@ async def reflect_after_enrichment_node(state: PipelineState) -> PipelineState:
     domain = detect_domain(state)
     logger.info("self_reflection_domain_detected", stage=stage, domain=domain)
 
-    model = state.get("reflection_model")
+    model = get_model(state, "reflection")
     if model is None:
         logger.warning("self_reflection_model_not_available", stage=stage)
         return state
@@ -688,7 +688,7 @@ async def revise_generation_node(state: PipelineState) -> PipelineState:
         revision_needed=current_reflection.get("revision_needed"),
     )
 
-    model = state.get("reflection_model")  # Use same model as reflection
+    model = get_model(state, "reflection")  # Use same model as reflection
     if model is None:
         logger.warning("revision_model_not_available", stage=stage)
         return state
@@ -812,7 +812,7 @@ async def revise_enrichment_node(state: PipelineState) -> PipelineState:
         revision_needed=current_reflection.get("revision_needed"),
     )
 
-    model = state.get("reflection_model")
+    model = get_model(state, "reflection")
     if model is None:
         logger.warning("revision_model_not_available", stage=stage)
         return state
