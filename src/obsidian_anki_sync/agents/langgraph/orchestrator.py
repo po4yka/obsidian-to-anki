@@ -51,7 +51,7 @@ class LangGraphOrchestrator:
     and state persistence via checkpoints.
     """
 
-    async def __init__(  # CHANGED: Made async for MongoDB connection
+    def __init__(
         self,
         config: Config,
         max_retries: int | None = None,
@@ -158,7 +158,8 @@ class LangGraphOrchestrator:
                 logger.warning(
                     "langgraph_memory_store_init_failed", error=str(e))
 
-        # NEW: Advanced MongoDB memory store
+        # NEW: Advanced MongoDB memory store (deferred connection)
+        self.advanced_memory_store = None
         if getattr(config, "use_advanced_memory", False) and AdvancedMemoryStore:
             try:
                 mongodb_url = getattr(
@@ -174,38 +175,7 @@ class LangGraphOrchestrator:
                     db_name=memory_db_name,
                     embedding_store=self.memory_store,  # Link to ChromaDB for embeddings
                 )
-
-                # Connect to MongoDB (synchronous wrapper for async connect)
-                import asyncio
-
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # If already in async context, schedule the coroutine
-                        # Connection will be established on first use
-                        logger.info(
-                            "advanced_memory_store_deferred_connection",
-                            mongodb_url=mongodb_url,
-                            db_name=memory_db_name,
-                        )
-                    else:
-                        connected = loop.run_until_complete(
-                            self.advanced_memory_store.connect()
-                        )
-                        if connected:
-                            logger.info(
-                                "advanced_memory_store_initialized",
-                                mongodb_url=mongodb_url,
-                                db_name=memory_db_name,
-                            )
-                        else:
-                            logger.warning(
-                                "advanced_memory_store_connection_failed")
-                            self.advanced_memory_store = None
-                except RuntimeError:
-                    # No event loop available, will connect on first use
-                    logger.info("advanced_memory_store_lazy_connection")
-
+                logger.info("advanced_memory_store_deferred_connection")
             except Exception as e:
                 logger.warning(
                     "advanced_memory_store_init_failed", error=str(e))
@@ -232,6 +202,10 @@ class LangGraphOrchestrator:
         # Compile the graph
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
 
+        # Provider compatibility - create a dummy provider for compatibility
+        # The LangGraph orchestrator uses PydanticAI models internally
+        self._provider = None  # Will be set up async if needed
+
         logger.info(
             "langgraph_orchestrator_initialized",
             max_retries=self.max_retries,
@@ -242,6 +216,119 @@ class LangGraphOrchestrator:
             memorization_quality=self.enable_memorization_quality,
             duplicate_detection=self.enable_duplicate_detection,
         )
+
+    async def setup_async(self):
+        """Async setup for components that need async initialization (e.g., MongoDB)."""
+        # Connect to MongoDB if advanced memory is enabled
+        if self.advanced_memory_store and hasattr(self.advanced_memory_store, 'connect'):
+            try:
+                connected = await self.advanced_memory_store.connect()
+                if connected:
+                    logger.info("advanced_memory_store_connected")
+                else:
+                    logger.warning("advanced_memory_store_connection_failed")
+                    self.advanced_memory_store = None
+            except Exception as e:
+                logger.warning(
+                    "advanced_memory_store_async_setup_failed", error=str(e))
+                self.advanced_memory_store = None
+
+    def convert_to_cards(
+        self,
+        generated_cards: list[GeneratedCard],
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+        file_path: Path | None = None,
+    ) -> list[Card]:
+        """Convert GeneratedCard instances to Card instances.
+
+        This method replicates the legacy orchestrator's card conversion logic.
+        """
+        import hashlib
+        from ..models import Card, Manifest
+        from ..sync.slug_generator import compute_content_hash
+
+        cards: list[Card] = []
+        qa_lookup = {qa.card_index: qa for qa in qa_pairs}
+
+        for gen_card in generated_cards:
+            # Create manifest
+            # Safely extract slug_base by removing -index-lang suffix
+            parts = gen_card.slug.rsplit("-", 2)
+            slug_base = parts[0] if len(parts) >= 3 else gen_card.slug
+
+            manifest = Manifest(
+                slug=gen_card.slug,
+                slug_base=slug_base,
+                lang=gen_card.lang,
+                source_path=str(file_path) if file_path else "unknown",
+                source_anchor=f"qa-{gen_card.card_index}",
+                note_id=metadata.id,
+                note_title=metadata.title,
+                card_index=gen_card.card_index,
+                guid=gen_card.slug,  # Use slug as GUID for now
+                hash6=None,
+            )
+
+            qa_pair = qa_lookup.get(gen_card.card_index)
+            content_hash = gen_card.content_hash
+            if not content_hash and qa_pair:
+                content_hash = compute_content_hash(
+                    qa_pair, metadata, gen_card.lang)
+            elif not content_hash:
+                content_hash = hashlib.sha256(
+                    gen_card.apf_html.encode("utf-8")
+                ).hexdigest()
+
+            cards.append(
+                Card(
+                    slug=gen_card.slug,
+                    lang=gen_card.lang,
+                    apf_html=gen_card.apf_html,
+                    manifest=manifest,
+                    content_hash=content_hash,
+                    note_type="APF::Simple",  # Default, can be detected from HTML
+                    tags=[],  # Extract from manifest in HTML
+                    guid=gen_card.slug,
+                )
+            )
+
+        return cards
+
+    @property
+    def provider(self):
+        """Provider compatibility property for sync engine access.
+
+        Returns a dummy provider for compatibility with sync engine expectations.
+        """
+        if self._provider is None:
+            # Create a minimal provider for compatibility
+            # This is only used by the sync engine to access provider name/check_connection
+            from ..providers.base import BaseLLMProvider
+
+            class LangGraphCompatibilityProvider(BaseLLMProvider):
+                def get_provider_name(self) -> str:
+                    return "langgraph_pydantic_ai"
+
+                def check_connection(self) -> bool:
+                    return True  # LangGraph handles its own connection checks
+
+                async def generate(self, prompt: str, **kwargs) -> str:
+                    raise NotImplementedError(
+                        "LangGraph orchestrator handles generation internally")
+
+                def generate_sync(self, prompt: str, **kwargs) -> str:
+                    raise NotImplementedError(
+                        "LangGraph orchestrator handles generation internally")
+
+            self._provider = LangGraphCompatibilityProvider()
+
+        return self._provider
+
+    @provider.setter
+    def provider(self, value):
+        """Allow setting provider for compatibility."""
+        self._provider = value
 
     async def _determine_optimal_agent_framework(
         self,
@@ -416,6 +503,7 @@ class LangGraphOrchestrator:
             "duplicate_detection_model": self.model_factory.get_model(
                 "duplicate_detection"
             ),
+            "split_validator_model": self.model_factory.get_model("split_validator"),
             # Chain of Thought (CoT) configuration
             "enable_cot_reasoning": getattr(self.config, "enable_cot_reasoning", False),
             "store_reasoning_traces": getattr(

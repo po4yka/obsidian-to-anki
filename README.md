@@ -100,7 +100,8 @@ anki_deck_name: "My Deck"
 llm_provider: "ollama" # or "openai", "anthropic", "openrouter", "lm_studio"
 
 # For Ollama
-use_agent_system: true
+use_langgraph: true
+use_pydantic_ai: true
 pre_validator_model: "qwen3:8b"
 generator_model: "qwen3:32b"
 post_validator_model: "qwen3:14b"
@@ -119,8 +120,8 @@ obsidian-anki-sync sync
 # Dry run (preview changes)
 obsidian-anki-sync sync --dry-run
 
-# With agents
-obsidian-anki-sync sync --use-agents
+# With LangGraph agents
+obsidian-anki-sync sync --use-langgraph
 
 # Test run (5 random notes)
 obsidian-anki-sync test-run --count 5

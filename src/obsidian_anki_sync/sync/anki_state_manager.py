@@ -5,7 +5,7 @@ Handles fetching Anki state and determining sync actions.
 
 from ..anki.client import AnkiClient
 from ..config import Config
-from ..models import Card, SyncAction
+from ..models import Card, SyncAction, GeneratedCard
 from ..sync.state_db import StateDB
 from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
@@ -48,7 +48,8 @@ class AnkiStateManager:
         try:
             from ..exceptions import AnkiConnectError
 
-            note_ids = self.anki.find_notes(f"deck:{self.config.anki_deck_name}")
+            note_ids = self.anki.find_notes(
+                f"deck:{self.config.anki_deck_name}")
         except AnkiConnectError as e:
             elapsed = time.time() - start_time
             logger.error(
@@ -99,7 +100,8 @@ class AnkiStateManager:
                 notes_info = self.anki.notes_info(batch_note_ids)
 
                 for note_info in notes_info:
-                    manifest_field = note_info.get("fields", {}).get("Manifest", {})
+                    manifest_field = note_info.get(
+                        "fields", {}).get("Manifest", {})
                     if isinstance(manifest_field, dict):
                         manifest_field = manifest_field.get("value", "")
 
@@ -193,7 +195,8 @@ class AnkiStateManager:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get("anki_guid") if db_card else None,
+                        anki_guid=db_card.get(
+                            "anki_guid") if db_card else None,
                         reason="No changes detected",
                     )
                 )
@@ -313,3 +316,92 @@ class AnkiStateManager:
                 errors=e.errors(),
             )
             return None
+
+    def fetch_existing_cards_for_duplicate_detection(self) -> list[GeneratedCard]:
+        """Fetch existing cards from Anki for duplicate detection.
+
+        Returns:
+            List of GeneratedCard instances from Anki
+        """
+        import time
+
+        start_time = time.time()
+        logger.info("fetching_existing_cards_for_duplicate_detection",
+                    deck=self.config.anki_deck_name)
+
+        try:
+            # Find all notes in target deck
+            note_ids = self.anki.find_notes(
+                f"deck:{self.config.anki_deck_name}")
+
+            if not note_ids:
+                logger.info("no_existing_cards_found",
+                            deck=self.config.anki_deck_name)
+                return []
+
+            # Get note info for all notes
+            notes_info = self.anki.notes_info(note_ids)
+
+            existing_cards: list[GeneratedCard] = []
+
+            for note_info in notes_info:
+                try:
+                    # Extract fields from note
+                    fields = note_info.get("fields", {})
+
+                    # Try to get APF HTML from fields
+                    apf_html = ""
+                    for field_name, field_data in fields.items():
+                        if "apf" in field_name.lower() or "html" in field_name.lower():
+                            apf_html = field_data.get("value", "")
+                            break
+
+                    if not apf_html:
+                        continue
+
+                    # Extract slug from manifest or generate from note ID
+                    slug = f"anki-{note_info['noteId']}"
+
+                    # Try to parse manifest from HTML
+                    manifest_data = self._extract_manifest_from_html(apf_html)
+                    if manifest_data and hasattr(manifest_data, 'slug'):
+                        slug = manifest_data.slug
+
+                    # Create GeneratedCard
+                    card = GeneratedCard(
+                        slug=slug,
+                        lang="en",  # Default, could be detected
+                        apf_html=apf_html,
+                        card_index=0,  # Default for existing cards
+                        content_hash="",  # Will be computed if needed
+                    )
+
+                    existing_cards.append(card)
+
+                except Exception as e:
+                    logger.warning(
+                        "failed_to_process_existing_card",
+                        note_id=note_info.get('noteId'),
+                        error=str(e)
+                    )
+                    continue
+
+            elapsed = time.time() - start_time
+            logger.info(
+                "fetched_existing_cards_for_duplicate_detection",
+                deck=self.config.anki_deck_name,
+                card_count=len(existing_cards),
+                elapsed_seconds=round(elapsed, 2),
+            )
+
+            return existing_cards
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(
+                "failed_to_fetch_existing_cards_for_duplicate_detection",
+                deck=self.config.anki_deck_name,
+                error=str(e),
+                elapsed_seconds=round(elapsed, 2),
+            )
+            return []

@@ -106,22 +106,39 @@ class SyncEngine:
             "sync_engine_configuration",
             llm_provider=config.llm_provider,
             llm_timeout=config.llm_timeout,
-            use_agent_system=config.use_agent_system,
+            use_langgraph=config.use_langgraph,
+            use_pydantic_ai=config.use_pydantic_ai,
+            use_agent_system=config.use_agent_system,  # Legacy
             vault_path=str(config.vault_path),
             anki_deck=config.anki_deck_name,
             run_mode=config.run_mode,
             delete_mode=config.delete_mode,
         )
 
-        # Initialize card generator (APFGenerator or AgentOrchestrator)
-        if config.use_agent_system:
+        # Initialize card generator (APFGenerator or LangGraphOrchestrator)
+        if config.use_langgraph or config.use_pydantic_ai:
+            if not AGENTS_AVAILABLE:
+                raise RuntimeError(
+                    "LangGraph agent system requested but not available. "
+                    "Please ensure agent dependencies are installed."
+                )
+            logger.info("initializing_langgraph_orchestrator")
+            from ..agents.langgraph import LangGraphOrchestrator
+            self.agent_orchestrator = LangGraphOrchestrator(
+                config
+            )  # type: ignore
+            # Still keep for backward compat
+            self.apf_gen = APFGenerator(config)
+            self.use_agents = True
+        elif config.use_agent_system:
+            # Legacy fallback for backward compatibility
             if not AGENTS_AVAILABLE:
                 raise RuntimeError(
                     "Agent system requested but not available. "
                     "Please ensure agent dependencies are installed."
                 )
-            logger.info("initializing_agent_orchestrator")
-            self.agent_orchestrator: AgentOrchestrator | None = AgentOrchestrator(
+            logger.warning("using_legacy_agent_system_deprecated")
+            self.agent_orchestrator = AgentOrchestrator(
                 config
             )  # type: ignore
             # Still keep for backward compat
@@ -132,10 +149,12 @@ class SyncEngine:
             # Use the same provider as the orchestrator
             # Resolve model from config (handles empty strings and presets)
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
+            qa_extractor_temp = getattr(
+                config, "qa_extractor_temperature", None)
             if qa_extractor_temp is None:
                 # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task("qa_extraction")
+                model_config = config.get_model_config_for_task(
+                    "qa_extraction")
                 qa_extractor_temp = model_config.get("temperature", 0.0)
             reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
@@ -281,7 +300,8 @@ class SyncEngine:
             and self.agent_orchestrator
         ):
             if hasattr(self.agent_orchestrator, "set_progress_display"):
-                self.agent_orchestrator.set_progress_display(self.progress_display)
+                self.agent_orchestrator.set_progress_display(
+                    self.progress_display)
 
     def _get_anki_model_name(self, internal_note_type: str) -> str:
         """Get the actual Anki model name from internal note type.
@@ -442,7 +462,8 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(
+            f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -532,7 +553,18 @@ class SyncEngine:
                 if self.progress and self.progress.is_interrupted():
                     return self.progress.get_stats()
 
-            # Step 1: Scan Obsidian notes and generate cards
+            # Step 1: Fetch existing cards for duplicate detection (if needed)
+            existing_cards = []
+            if self.use_agents and getattr(self.config, "enable_duplicate_detection", False):
+                logger.info("fetching_existing_cards_for_duplicate_detection")
+                existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
+                logger.info("fetched_existing_cards",
+                            count=len(existing_cards))
+                # Pass existing cards to card generator
+                self.card_generator.set_existing_cards_for_duplicate_detection(
+                    existing_cards)
+
+            # Step 2: Scan Obsidian notes and generate cards
             if self.progress:
                 from .progress import SyncPhase
 
@@ -542,6 +574,7 @@ class SyncEngine:
                 sample_size=sample_size,
                 incremental=incremental,
                 qa_extractor=self.qa_extractor,
+                existing_cards_for_duplicate_detection=existing_cards,
             )
 
             # Check for interruption
@@ -619,7 +652,8 @@ class SyncEngine:
             from ..utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(session_id=self.progress.progress.session_id)
+                log_session_summary(
+                    session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:

@@ -21,7 +21,7 @@ from ..utils.guid import deterministic_guid
 from ..utils.logging import get_logger
 
 if TYPE_CHECKING:
-    from ..agents.orchestrator import AgentOrchestrator
+    from ..agents.langgraph import LangGraphOrchestrator
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,7 @@ class CardGenerator:
         self,
         config: Config,
         apf_gen: APFGenerator,
-        agent_orchestrator: "AgentOrchestrator | None" = None,
+        agent_orchestrator: "LangGraphOrchestrator | None" = None,
         use_agents: bool = False,
         agent_card_cache: diskcache.Cache | None = None,
         apf_card_cache: diskcache.Cache | None = None,
@@ -43,6 +43,7 @@ class CardGenerator:
         slug_counters: dict[str, int] | None = None,
         slug_counter_lock: Any = None,
         stats: dict[str, Any] | None = None,
+        existing_cards_for_duplicate_detection: list | None = None,
     ):
         """Initialize card generator.
 
@@ -59,6 +60,7 @@ class CardGenerator:
             slug_counters: Thread-safe slug counters dict
             slug_counter_lock: Lock for slug counters
             stats: Statistics dictionary to update
+            existing_cards_for_duplicate_detection: Existing cards from Anki for duplicate detection
         """
         self.config = config
         self.apf_gen = apf_gen
@@ -76,6 +78,15 @@ class CardGenerator:
         self._slug_counters = slug_counters or {}
         self._slug_counter_lock = slug_counter_lock
         self.stats = stats or {}
+        self.existing_cards_for_duplicate_detection = existing_cards_for_duplicate_detection
+
+    def set_existing_cards_for_duplicate_detection(self, existing_cards: list | None):
+        """Set existing cards for duplicate detection.
+
+        Args:
+            existing_cards: List of existing cards from Anki
+        """
+        self.existing_cards_for_duplicate_detection = existing_cards
 
     def generate_with_agents(
         self,
@@ -163,7 +174,9 @@ class CardGenerator:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(file_path) if file_path.exists() else None,
+                        file_path=Path(
+                            file_path) if file_path.exists() else None,
+                        existing_cards=self.existing_cards_for_duplicate_detection,
                     )
                 )
             else:
@@ -172,9 +185,11 @@ class CardGenerator:
                     metadata=metadata,
                     qa_pairs=qa_pairs,
                     file_path=Path(file_path) if file_path.exists() else None,
+                    existing_cards=self.existing_cards_for_duplicate_detection,
                 )
         else:
-            raise RuntimeError("Orchestrator does not have process_note method")
+            raise RuntimeError(
+                "Orchestrator does not have process_note method")
 
         # Track metrics
         if result.post_validation:
@@ -296,7 +311,8 @@ class CardGenerator:
                 cached_card = self._apf_card_cache.get(cache_key)
                 if cached_card is not None:
                     if cached_card.content_hash == content_hash:
-                        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                        elapsed_ms = round(
+                            (time.time() - start_time) * 1000, 2)
                         self._cache_hits += 1
                         self._cache_stats["hits"] += 1
                         logger.debug(
@@ -324,8 +340,10 @@ class CardGenerator:
             slug_parts = []
             for part in path_parts:
                 normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
+                ascii_segment = normalized.encode(
+                    "ascii", "ignore").decode("ascii")
+                ascii_segment = re.sub(
+                    r"[^a-z0-9-]", "-", ascii_segment.lower())
                 ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
                 if ascii_segment:
                     slug_parts.append(ascii_segment)
@@ -368,7 +386,8 @@ class CardGenerator:
         )
 
         # Generate APF card via LLM
-        card = cast(Card, self.apf_gen.generate_card(qa_pair, metadata, manifest, lang))
+        card = cast(Card, self.apf_gen.generate_card(
+            qa_pair, metadata, manifest, lang))
 
         # Ensure content hash is set
         if not card.content_hash:
@@ -380,7 +399,8 @@ class CardGenerator:
             self.stats["validation_errors"] = self.stats.get(
                 "validation_errors", 0
             ) + len(validation.errors)
-            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
+            logger.error("apf_validation_errors", slug=slug,
+                         errors=validation.errors)
             raise ValueError(
                 f"APF validation failed for {slug}: {validation.errors[0]}"
             )
@@ -392,7 +412,8 @@ class CardGenerator:
         html_errors = validate_card_html(card.apf_html)
         if html_errors:
             logger.error("apf_html_invalid", slug=slug, errors=html_errors)
-            raise ValueError(f"Invalid HTML formatting for {slug}: {html_errors[0]}")
+            raise ValueError(
+                f"Invalid HTML formatting for {slug}: {html_errors[0]}")
 
         # Cache the generated card
         try:
@@ -414,6 +435,7 @@ class CardGenerator:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
+        logger.info("card_generated", slug=slug,
+                    elapsed_seconds=round(elapsed, 2))
 
         return card
