@@ -4,10 +4,12 @@ Provides persistent memory storage for agent learning, pattern recognition,
 and adaptive routing based on historical performance.
 """
 
+from __future__ import annotations
+
 import json
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import chromadb
 import numpy as np
@@ -17,6 +19,9 @@ from openai import OpenAI
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .specialized import ProblemDomain
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = get_logger(__name__)
 
@@ -68,6 +73,16 @@ class OpenAIEmbeddings:
         return [item.embedding for item in response.data]
 
 
+class DummyEmbeddingFunction:
+    """Minimal embedding function to avoid external downloads during tests."""
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return [[0.0] for _ in input]
+
+    def name(self) -> str:  # pragma: no cover - simple identifier
+        return "default"
+
+
 class AgentMemoryStore:
     """Persistent memory store for agent learning using ChromaDB."""
 
@@ -96,10 +111,14 @@ class AgentMemoryStore:
         # Initialize embeddings
         self.enable_semantic_search = enable_semantic_search
         self.embeddings: OpenAIEmbeddings | None = None
+        self.embedding_function: Callable[[list[str]], list[list[float]]] | None = None
         if enable_semantic_search:
             model = embedding_model or "text-embedding-3-small"
             try:
                 self.embeddings = OpenAIEmbeddings(model=model)
+                self.embedding_function = lambda texts: [
+                    self.embeddings.embed_query(text) for text in texts
+                ]
             except Exception as e:
                 logger.warning(
                     "openai_embeddings_unavailable",
@@ -108,6 +127,10 @@ class AgentMemoryStore:
                 )
                 self.embeddings = None
                 self.enable_semantic_search = False
+
+        if not self.embedding_function:
+            # Prevent ChromaDB from downloading default embedding models during tests
+            self.embedding_function = DummyEmbeddingFunction()
 
         # Initialize collections
         self._initialize_collections()
@@ -128,6 +151,7 @@ class AgentMemoryStore:
                 collection = self.client.get_or_create_collection(
                     name=memory_type,
                     metadata={"description": f"Memory store for {memory_type}"},
+                    embedding_function=self.embedding_function,
                 )
                 self.collections[memory_type] = collection
             except Exception as e:
