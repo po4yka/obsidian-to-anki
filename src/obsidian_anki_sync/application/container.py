@@ -175,7 +175,8 @@ def setup_container(container: DependencyContainer) -> None:
         ),
     )
 
-    container.register_factory(IStateRepository, lambda: StateDB(config.db_path))
+    container.register_factory(
+        IStateRepository, lambda: StateDB(config.db_path))
 
     container.register_factory(
         ILLMProvider, lambda: ProviderFactory.create_from_config(config)
