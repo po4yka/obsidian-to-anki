@@ -56,7 +56,7 @@ class SlugService:
 
     @staticmethod
     def generate_full_slug(
-        base_slug: str, language: str, existing_slugs: set[str | None] = None
+        base_slug: str, language: str, existing_slugs: set[str | None] | None = None
     ) -> str:
         """Generate full slug with language and collision resolution.
 

@@ -132,8 +132,6 @@ def example_with_ai_enabled():
     print("=" * 60)
 
     try:
-        from obsidian_anki_sync.providers.factory import ProviderFactory
-
         # Create config with AI enabled
         config = Config(
             vault_path=Path.home() / "Documents" / "InterviewQuestions",

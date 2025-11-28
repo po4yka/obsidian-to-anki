@@ -1,6 +1,7 @@
 """Use case for determining sync actions between Obsidian and Anki."""
 
 from dataclasses import dataclass
+from typing import Any
 
 from ...domain.entities.card import Card, SyncAction, SyncActionType
 from ...domain.services.content_hash_service import ContentHashService
@@ -21,7 +22,7 @@ class DetermineSyncActionsResponse:
     """Response data from determine sync actions use case."""
 
     sync_actions: list[SyncAction]
-    conflicts: list[dict[str, any]]
+    conflicts: list[dict[str, Any]]
     stats: dict[str, int]
 
 
@@ -32,7 +33,7 @@ class DetermineSyncActionsUseCase:
     and determines what create, update, or delete operations are needed.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize use case."""
         pass
 
@@ -66,10 +67,12 @@ class DetermineSyncActionsUseCase:
         common_slugs = set(obsidian_by_slug.keys()) & set(anki_by_slug.keys())
 
         # Find cards that only exist in Obsidian (need to be created)
-        obsidian_only_slugs = set(obsidian_by_slug.keys()) - set(anki_by_slug.keys())
+        obsidian_only_slugs = set(
+            obsidian_by_slug.keys()) - set(anki_by_slug.keys())
 
         # Find cards that only exist in Anki (may need to be deleted)
-        anki_only_slugs = set(anki_by_slug.keys()) - set(obsidian_by_slug.keys())
+        anki_only_slugs = set(anki_by_slug.keys()) - \
+            set(obsidian_by_slug.keys())
 
         # Process cards that exist in both systems
         for slug in common_slugs:

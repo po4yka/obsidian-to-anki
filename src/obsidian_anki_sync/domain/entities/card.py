@@ -61,7 +61,7 @@ class Card:
 
     def has_valid_manifest(self) -> bool:
         """Check if manifest is valid."""
-        return (
+        return bool(
             self.manifest.slug == self.slug
             and self.manifest.lang == self.language
             and self.manifest.note_id

@@ -19,9 +19,7 @@ FILES_TO_PROCESS = [
 
 def extract_english_content(content: str) -> str:
     """Extract English answer section."""
-    match = re.search(
-        r"## Answer \(EN\)(.*?)(?=## Ответ \(RU\)|$)", content, re.DOTALL
-    )
+    match = re.search(r"## Answer \(EN\)(.*?)(?=## Ответ \(RU\)|$)", content, re.DOTALL)
     if match:
         return match.group(1).strip()
     return ""

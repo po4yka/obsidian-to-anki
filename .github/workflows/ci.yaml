@@ -205,10 +205,11 @@ jobs:
 
       - name: Run pip-audit (security scan)
         run: |
-          uv run pip-audit --desc --fail-on critical high || {
-            echo "::error::Critical or high severity vulnerabilities found!"
-            exit 1
-          }
+          # Run security audit
+          # pip-audit exits with non-zero if vulnerabilities are found
+          # For now, we'll fail on any vulnerabilities
+          # TODO: Add severity filtering when pip-audit supports it
+          uv run pip-audit --desc
 
       - name: Run pip-audit with JSON output
         run: uv run pip-audit --format json --output pip-audit-report.json

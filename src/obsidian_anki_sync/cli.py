@@ -29,7 +29,9 @@ app = typer.Typer(
 app.add_typer(rag_app, name="rag", help="RAG (Retrieval-Augmented Generation) commands")
 
 # Add validation subcommand group
-app.add_typer(validate_app, name="validate", help="Vault validation commands for Q&A notes")
+app.add_typer(
+    validate_app, name="validate", help="Vault validation commands for Q&A notes"
+)
 
 console = Console()
 

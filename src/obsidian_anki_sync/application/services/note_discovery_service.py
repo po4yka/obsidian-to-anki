@@ -43,7 +43,7 @@ class NoteDiscoveryService:
         self,
         sample_size: int | None = None,
         incremental: bool = False,
-        exclude_patterns: list[str | None] = None,
+        exclude_patterns: list[str | None] | None = None,
     ) -> list[Note]:
         """Discover notes in the vault.
 
@@ -75,7 +75,8 @@ class NoteDiscoveryService:
         # Filter for incremental processing
         if incremental:
             processed_paths = self._get_processed_paths()
-            note_files = [f for f in note_files if str(f) not in processed_paths]
+            note_files = [f for f in note_files if str(
+                f) not in processed_paths]
             logger.debug("filtered_incremental", remaining=len(note_files))
 
         # Apply sampling

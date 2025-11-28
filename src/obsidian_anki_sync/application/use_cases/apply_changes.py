@@ -1,6 +1,7 @@
 """Use case for applying sync changes to Anki."""
 
 from dataclasses import dataclass
+from typing import Any
 
 from ...domain.entities.card import SyncAction
 from ...domain.interfaces.anki_client import IAnkiClient
@@ -20,8 +21,8 @@ class ApplyChangesRequest:
 class ApplyChangesResponse:
     """Response data from apply changes use case."""
 
-    applied_actions: list[dict[str, any]]
-    failed_actions: list[dict[str, any]]
+    applied_actions: list[dict[str, Any]]
+    failed_actions: list[dict[str, Any]]
     success: bool
     errors: list[str]
     stats: dict[str, int]
@@ -57,9 +58,9 @@ class ApplyChangesUseCase:
         Returns:
             Apply changes response
         """
-        applied_actions = []
-        failed_actions = []
-        errors = []
+        applied_actions: list[dict[str, Any]] = []
+        failed_actions: list[dict[str, Any]] = []
+        errors: list[str] = []
         stats = {
             "total_actions": len(request.sync_actions),
             "successful": 0,
@@ -131,7 +132,7 @@ class ApplyChangesUseCase:
                 failed_actions=failed_actions
                 + [
                     {"action": action, "error": str(e)}
-                    for action in request.sync_actions[len(applied_actions) :]
+                    for action in request.sync_actions[len(applied_actions):]
                 ],
                 success=False,
                 errors=errors,
@@ -149,7 +150,7 @@ class ApplyChangesUseCase:
         Returns:
             Dictionary mapping action types to action lists
         """
-        grouped = {
+        grouped: dict[str, list[SyncAction]] = {
             "create": [],
             "update": [],
             "delete": [],
@@ -167,7 +168,7 @@ class ApplyChangesUseCase:
 
     def _apply_create_actions(
         self, actions: list[SyncAction], batch_size: int
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """Apply create actions in batches.
 
         Args:
@@ -182,14 +183,15 @@ class ApplyChangesUseCase:
         errors = []
 
         for i in range(0, len(actions), batch_size):
-            batch = actions[i : i + batch_size]
+            batch = actions[i: i + batch_size]
 
             try:
                 # Create cards in batch
                 for action in batch:
                     try:
                         # Simulate card creation
-                        created_card = action.card.with_guid(f"anki_{action.card.slug}")
+                        created_card = action.card.with_guid(
+                            f"anki_{action.card.slug}")
                         applied.append(
                             {
                                 "action": action,
@@ -203,11 +205,13 @@ class ApplyChangesUseCase:
                                 "error": str(e),
                             }
                         )
-                        errors.append(f"Failed to create card {action.card.slug}: {e}")
+                        errors.append(
+                            f"Failed to create card {action.card.slug}: {e}")
 
             except Exception as e:
                 # Batch failure
-                failed.extend([{"action": action, "error": str(e)} for action in batch])
+                failed.extend([{"action": action, "error": str(e)}
+                              for action in batch])
                 errors.append(f"Batch create failed: {e}")
 
         return {
@@ -218,7 +222,7 @@ class ApplyChangesUseCase:
 
     def _apply_update_actions(
         self, actions: list[SyncAction], batch_size: int
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """Apply update actions in batches.
 
         Args:
@@ -257,7 +261,7 @@ class ApplyChangesUseCase:
 
     def _apply_delete_actions(
         self, actions: list[SyncAction], batch_size: int
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """Apply delete actions in batches.
 
         Args:
@@ -294,7 +298,7 @@ class ApplyChangesUseCase:
             "errors": errors,
         }
 
-    def _update_state_repository(self, applied_actions: list[dict[str, any]]) -> None:
+    def _update_state_repository(self, applied_actions: list[dict[str, Any]]) -> None:
         """Update state repository with successful changes.
 
         Args:
