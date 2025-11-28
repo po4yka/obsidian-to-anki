@@ -20,8 +20,10 @@ class CheckResult(BaseModel):
     name: str = Field(min_length=1, description="Check name")
     passed: bool = Field(description="Whether the check passed")
     message: str = Field(min_length=1, description="Result message")
-    severity: str = Field(description="Severity level: 'error', 'warning', 'info'")
-    fixable: bool = Field(default=False, description="Whether the issue is fixable")
+    severity: str = Field(
+        description="Severity level: 'error', 'warning', 'info'")
+    fixable: bool = Field(
+        default=False, description="Whether the issue is fixable")
     fix_suggestion: str | None = Field(
         default=None, description="Suggestion for fixing the issue"
     )
@@ -84,7 +86,8 @@ class PreflightChecker:
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
+        warnings = [
+            r for r in self.results if not r.passed and r.severity == "warning"]
 
         all_passed = len(errors) == 0
 
@@ -295,12 +298,13 @@ class PreflightChecker:
         provider_name = self.config.llm_provider
 
         # Skip check if using agent system (will be checked separately)
-        if self.config.use_agent_system:
+        if self.config.use_agent_system or self.config.use_langgraph or self.config.use_pydantic_ai:
+            provider_type = "LangGraph" if self.config.use_langgraph else "legacy agent system"
             self.results.append(
                 CheckResult(
                     name="LLM Provider",
                     passed=True,
-                    message="Using agent system (Ollama will be checked during sync)",
+                    message=f"Using {provider_type} (OpenRouter/PydanticAI will be checked during sync)",
                     severity="info",
                 )
             )
@@ -695,7 +699,8 @@ class PreflightChecker:
                         )
                     )
             except Exception as e:
-                logger.warning("disk_space_check_failed", path=str(path), error=str(e))
+                logger.warning("disk_space_check_failed",
+                               path=str(path), error=str(e))
 
     def _check_memory(self) -> None:
         """Check system memory."""

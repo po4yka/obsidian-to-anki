@@ -106,10 +106,35 @@ class TestSyncEngineInitialization:
         assert engine.use_agents is False
         assert engine.apf_gen is not None
 
-    def test_init_with_agent_system_enabled(
+    def test_init_with_langgraph_enabled(
         self, mock_config, mock_state_db, mock_anki_client, temp_cache_dir
     ):
-        """SyncEngine should initialize agent orchestrator when enabled."""
+        """SyncEngine should initialize LangGraph orchestrator when enabled."""
+        mock_config.use_langgraph = True
+        mock_config.use_pydantic_ai = True
+        mock_config.db_path = temp_cache_dir / "test.db"
+
+        with (
+            patch("obsidian_anki_sync.sync.engine.AGENTS_AVAILABLE", True),
+            patch(
+                "obsidian_anki_sync.sync.engine.LangGraphOrchestrator"
+            ) as mock_orchestrator_class,
+            patch("obsidian_anki_sync.sync.engine.create_qa_extractor"),
+        ):
+            mock_orchestrator = MagicMock()
+            mock_orchestrator.provider = MagicMock()
+            mock_orchestrator_class.return_value = mock_orchestrator
+
+            engine = SyncEngine(mock_config, mock_state_db, mock_anki_client)
+
+            assert engine.use_agents is True
+            assert engine.agent_orchestrator is not None
+            mock_orchestrator_class.assert_called_once_with(mock_config)
+
+    def test_init_with_legacy_agent_system_enabled(
+        self, mock_config, mock_state_db, mock_anki_client, temp_cache_dir
+    ):
+        """SyncEngine should initialize legacy agent orchestrator when enabled (backward compatibility)."""
         mock_config.use_agent_system = True
         mock_config.db_path = temp_cache_dir / "test.db"
 

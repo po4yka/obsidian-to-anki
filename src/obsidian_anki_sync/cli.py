@@ -71,11 +71,11 @@ def sync(
             "--no-resume", help="Disable automatic resume of incomplete syncs"
         ),
     ] = False,
-    use_agents: Annotated[
+    use_langgraph: Annotated[
         bool | None,
         typer.Option(
-            "--use-agents/--no-agents",
-            help="Use multi-agent system for card generation (requires Ollama)",
+            "--use-langgraph/--no-langgraph",
+            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
         ),
     ] = None,
     config_path: Annotated[
@@ -91,10 +91,12 @@ def sync(
     """Synchronize Obsidian notes to Anki cards."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    # Override agent system setting if CLI flag is provided
-    if use_agents is not None:
-        config.use_agent_system = use_agents
-        logger.info("agent_system_override", use_agents=use_agents)
+    # Override LangGraph setting if CLI flag is provided
+    if use_langgraph is not None:
+        config.use_langgraph = use_langgraph
+        # Enable PydanticAI when using LangGraph
+        config.use_pydantic_ai = use_langgraph
+        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
     # Delegate to sync handler
     run_sync(
@@ -126,11 +128,11 @@ def test_run(
             help="Preview changes without applying (default: --dry-run)",
         ),
     ] = True,
-    use_agents: Annotated[
+    use_langgraph: Annotated[
         bool | None,
         typer.Option(
-            "--use-agents/--no-agents",
-            help="Use multi-agent system for card generation (requires Ollama)",
+            "--use-langgraph/--no-langgraph",
+            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
         ),
     ] = None,
     config_path: Annotated[
@@ -153,10 +155,12 @@ def test_run(
     """Run a sample by processing N random notes."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    # Override agent system setting if CLI flag is provided
-    if use_agents is not None:
-        config.use_agent_system = use_agents
-        logger.info("agent_system_override", use_agents=use_agents)
+    # Override LangGraph setting if CLI flag is provided
+    if use_langgraph is not None:
+        config.use_langgraph = use_langgraph
+        # Enable PydanticAI when using LangGraph
+        config.use_pydantic_ai = use_langgraph
+        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
     logger.info("test_run_started", sample_count=count, dry_run=dry_run)
 
@@ -560,11 +564,11 @@ def export(
         str,
         typer.Option("--deck-description", help="Description for the deck"),
     ] = "",
-    use_agents: Annotated[
+    use_langgraph: Annotated[
         bool | None,
         typer.Option(
-            "--use-agents/--no-agents",
-            help="Use multi-agent system for card generation (requires Ollama)",
+            "--use-langgraph/--no-langgraph",
+            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
         ),
     ] = None,
     sample_size: Annotated[
@@ -585,10 +589,12 @@ def export(
     """Export Obsidian notes to Anki deck file (.apkg)."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    # Override agent system setting if CLI flag is provided
-    if use_agents is not None:
-        config.use_agent_system = use_agents
-        logger.info("agent_system_override", use_agents=use_agents)
+    # Override LangGraph setting if CLI flag is provided
+    if use_langgraph is not None:
+        config.use_langgraph = use_langgraph
+        # Enable PydanticAI when using LangGraph
+        config.use_pydantic_ai = use_langgraph
+        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
     # Determine output path
     output_path = output or config.export_output_path or Path("output.apkg")
@@ -671,15 +677,15 @@ def export(
 
             cards: list[Card] = []
 
-            if config.use_agent_system:
+            if config.use_langgraph or config.use_pydantic_ai:
                 console.print(
-                    "[cyan]Using multi-agent system for generation...[/cyan]")
+                    "[cyan]Using LangGraph agent system for generation...[/cyan]")
                 import asyncio
                 import inspect
 
-                from .agents.orchestrator import AgentOrchestrator
+                from .agents.langgraph import LangGraphOrchestrator
 
-                orchestrator = AgentOrchestrator(config)
+                orchestrator = LangGraphOrchestrator(config)
 
                 for note_path_tuple in note_paths:
                     try:
