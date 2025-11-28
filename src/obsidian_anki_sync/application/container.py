@@ -1,6 +1,6 @@
 """Dependency injection container for the application."""
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
 from obsidian_anki_sync.domain.interfaces.anki_config import IAnkiConfig
@@ -188,7 +188,7 @@ def setup_container(container: DependencyContainer) -> None:
     logger.info("container_setup_completed")
 
 
-def inject(interface: type[T]) -> T:
+def inject[T](interface: type[T]) -> T:
     """Dependency injection decorator/helper.
 
     Args:
