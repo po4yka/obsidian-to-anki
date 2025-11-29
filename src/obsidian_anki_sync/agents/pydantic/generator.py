@@ -131,7 +131,7 @@ Slug Base: {slug_base}
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: CardGenerationOutput = result.data
+            output: CardGenerationOutput = result.output
 
             # Convert cards to GeneratedCard instances
             generated_cards: list[GeneratedCard] = []

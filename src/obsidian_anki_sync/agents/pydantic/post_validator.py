@@ -95,7 +95,7 @@ Cards to validate:
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: PostValidationOutput = result.data
+            output: PostValidationOutput = result.output
 
             # Convert suggested corrections to GeneratedCard list
             corrected_cards: list[GeneratedCard] | None = None

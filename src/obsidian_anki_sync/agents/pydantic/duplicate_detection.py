@@ -100,7 +100,7 @@ Analyze similarity and provide your assessment."""
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: DuplicateDetectionOutput = result.data
+            output: DuplicateDetectionOutput = result.output
 
             elapsed = time.time() - start_time
 

@@ -39,7 +39,7 @@ async def test_validate_valid_split(split_validator):
     """Test validation of a valid split plan."""
     # Mock agent run result
     mock_result = MagicMock()
-    mock_result.data = SplitValidationResult(
+    mock_result.output = SplitValidationResult(
         is_valid=True,
         validation_score=0.9,
         feedback="Good split",
@@ -91,7 +91,7 @@ async def test_validate_invalid_split(split_validator):
     """Test validation of an invalid split plan."""
     # Mock agent run result
     mock_result = MagicMock()
-    mock_result.data = SplitValidationResult(
+    mock_result.output = SplitValidationResult(
         is_valid=False,
         validation_score=0.2,
         feedback="Over-fragmentation",

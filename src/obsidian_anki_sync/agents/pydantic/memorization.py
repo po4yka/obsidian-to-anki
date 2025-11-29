@@ -88,7 +88,7 @@ Cards to assess:
         try:
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: MemorizationQualityOutput = result.data
+            output: MemorizationQualityOutput = result.output
 
             # Convert to MemorizationQualityResult
             issues_list = [issue.model_dump() for issue in output.issues]

@@ -103,7 +103,7 @@ Provide your enrichment assessment."""
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: ContextEnrichmentOutput = result.data
+            output: ContextEnrichmentOutput = result.output
 
             # If enrichment recommended, create enriched card
             enriched_card = None

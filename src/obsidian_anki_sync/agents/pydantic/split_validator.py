@@ -94,7 +94,7 @@ Original Note Content:
 
             # Run agent
             result = await self.agent.run(prompt)
-            output: SplitValidationResult = result.data
+            output: SplitValidationResult = result.output
             output.validation_time = time.time() - start_time
 
             logger.info(

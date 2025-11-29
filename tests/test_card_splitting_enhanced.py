@@ -64,11 +64,11 @@ class TestCardSplittingEnhanced:
         """Test high confidence scoring for clear split decision."""
         # Mock agent response with high confidence
         mock_result = MagicMock()
-        mock_result.data = MagicMock()
-        mock_result.data.should_split = True
-        mock_result.data.card_count = 3
-        mock_result.data.splitting_strategy = "list"
-        mock_result.data.split_plan = [
+        mock_result.output = MagicMock()
+        mock_result.output.should_split = True
+        mock_result.output.card_count = 3
+        mock_result.output.splitting_strategy = "list"
+        mock_result.output.split_plan = [
             MagicMock(
                 card_number=1,
                 concept="Overview",
@@ -91,9 +91,9 @@ class TestCardSplittingEnhanced:
                 rationale="Individual item",
             ),
         ]
-        mock_result.data.reasoning = "Clear list pattern with 3 items"
-        mock_result.data.confidence = 0.95
-        mock_result.data.fallback_strategy = None
+        mock_result.output.reasoning = "Clear list pattern with 3 items"
+        mock_result.output.confidence = 0.95
+        mock_result.output.fallback_strategy = None
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
@@ -116,11 +116,11 @@ class TestCardSplittingEnhanced:
         """Test low confidence scoring triggers fallback."""
         # Mock agent response with low confidence
         mock_result = MagicMock()
-        mock_result.data = MagicMock()
-        mock_result.data.should_split = True
-        mock_result.data.card_count = 2
-        mock_result.data.splitting_strategy = "concept"
-        mock_result.data.split_plan = [
+        mock_result.output = MagicMock()
+        mock_result.output.should_split = True
+        mock_result.output.card_count = 2
+        mock_result.output.splitting_strategy = "concept"
+        mock_result.output.split_plan = [
             MagicMock(
                 card_number=1,
                 concept="Concept 1",
@@ -136,9 +136,9 @@ class TestCardSplittingEnhanced:
                 rationale="",
             ),
         ]
-        mock_result.data.reasoning = "Uncertain - could be split or kept together"
-        mock_result.data.confidence = 0.5
-        mock_result.data.fallback_strategy = "none"
+        mock_result.output.reasoning = "Uncertain - could be split or kept together"
+        mock_result.output.confidence = 0.5
+        mock_result.output.fallback_strategy = "none"
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
@@ -158,11 +158,11 @@ class TestCardSplittingEnhanced:
     ):
         """Test difficulty-based splitting strategy."""
         mock_result = MagicMock()
-        mock_result.data = MagicMock()
-        mock_result.data.should_split = True
-        mock_result.data.card_count = 3
-        mock_result.data.splitting_strategy = "difficulty"
-        mock_result.data.split_plan = [
+        mock_result.output = MagicMock()
+        mock_result.output.should_split = True
+        mock_result.output.card_count = 3
+        mock_result.output.splitting_strategy = "difficulty"
+        mock_result.output.split_plan = [
             MagicMock(
                 card_number=1,
                 concept="Easy concept",
@@ -185,11 +185,11 @@ class TestCardSplittingEnhanced:
                 rationale="Hard difficulty",
             ),
         ]
-        mock_result.data.reasoning = (
+        mock_result.output.reasoning = (
             "Concepts ordered by difficulty: easy -> medium -> hard"
         )
-        mock_result.data.confidence = 0.88
-        mock_result.data.fallback_strategy = None
+        mock_result.output.confidence = 0.88
+        mock_result.output.fallback_strategy = None
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 
@@ -210,11 +210,11 @@ class TestCardSplittingEnhanced:
     ):
         """Test prerequisite-aware splitting strategy."""
         mock_result = MagicMock()
-        mock_result.data = MagicMock()
-        mock_result.data.should_split = True
-        mock_result.data.card_count = 3
-        mock_result.data.splitting_strategy = "prerequisite"
-        mock_result.data.split_plan = [
+        mock_result.output = MagicMock()
+        mock_result.output.should_split = True
+        mock_result.output.card_count = 3
+        mock_result.output.splitting_strategy = "prerequisite"
+        mock_result.output.split_plan = [
             MagicMock(
                 card_number=1,
                 concept="Foundation",
@@ -237,11 +237,11 @@ class TestCardSplittingEnhanced:
                 rationale="Requires intermediate",
             ),
         ]
-        mock_result.data.reasoning = (
+        mock_result.output.reasoning = (
             "Ordered by prerequisites: foundation -> intermediate -> advanced"
         )
-        mock_result.data.confidence = 0.9
-        mock_result.data.fallback_strategy = None
+        mock_result.output.confidence = 0.9
+        mock_result.output.fallback_strategy = None
 
         card_splitting_agent.agent.run = AsyncMock(return_value=mock_result)
 

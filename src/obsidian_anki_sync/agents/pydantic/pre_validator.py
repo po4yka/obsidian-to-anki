@@ -100,7 +100,7 @@ Validate the structure, frontmatter, and content quality."""
             result = await self.agent.run(prompt, deps=deps)
 
             # Convert to PreValidationResult
-            output: PreValidationOutput = result.data
+            output: PreValidationOutput = result.output
             validation_result = PreValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,

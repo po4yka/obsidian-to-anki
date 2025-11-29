@@ -98,7 +98,7 @@ Questions:
 
             # Run agent
             result = await self.agent.run(prompt, deps=deps)
-            output: CardSplittingOutput = result.data
+            output: CardSplittingOutput = result.output
 
             # Convert split plan
             split_plans = []
