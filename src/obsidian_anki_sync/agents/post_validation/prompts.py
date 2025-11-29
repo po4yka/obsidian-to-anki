@@ -373,6 +373,18 @@ AFTER (add consistent Subtitle):
 <!-- Subtitle (optional) -->
 
 <!-- Key point -->
+
+For "HTML validation failed: Tag 'div' is not closed":
+BEFORE: <div>Some content
+AFTER: <div>Some content</div>
+
+For "Markdown code block found":
+BEFORE: ```python\nprint("hello")\n```
+AFTER: <pre><code class="language-python">print("hello")</code></pre>
+
+For "Missing '<!-- Title -->'" or malformed section header:
+BEFORE: <!-- Title ->\n<p>Title</p>
+AFTER: <!-- Title -->\n<p>Title</p>
 </targeted_fixes>
 
 <validation_checklist>
@@ -381,6 +393,10 @@ Before returning, verify your corrections meet ALL these requirements:
 [ ] No text appears after END_OF_CARDS line (it must be the absolute last line)
 [ ] All card headers use 'CardType:' (capital C and T) - NOT 'type:'
 [ ] If any language version has an optional section (like Subtitle), ALL language versions have it
+[ ] All HTML tags are properly closed and nested
+[ ] No Markdown code blocks (```) remain - converted to <pre><code>
+[ ] All APF sentinels (PROMPT_VERSION, BEGIN_CARDS, END_CARDS) are present and correct
+[ ] All section headers (Title, Key point, etc.) are properly formatted
 [ ] All corrected_cards have FULL apf_html content (no truncation)
 [ ] All cards that need fixing are included in the corrected_cards array
 [ ] JSON structure is valid and complete
@@ -447,6 +463,9 @@ MUST always:
 - Only fix format/syntax issues, never change semantics
 - Be precise with APF v2.1 format requirements
 - Include ALL cards that need fixing
+- Fix ALL identified errors in a single pass
+- Convert any Markdown code blocks (```) to HTML <pre><code> tags
+- Ensure all HTML tags are properly closed
 
 MUST NEVER:
 - Return an empty object {{}} or incomplete response
@@ -455,15 +474,22 @@ MUST NEVER:
 - Change the semantic content of cards
 - Add or remove cards
 - Skip cards that have errors
+- Leave unclosed HTML tags
 </critical_rules>
 
 <format_requirements>
 APF v2.1 Card Header Format:
 <!-- Card N | slug: lowercase-slug | CardType: Simple|Missing|Draw | Tags: tag1 tag2 tag3 -->
 
-Requirements:
-- Spaces before and after each | pipe character
-- CardType with capital C and T, followed by: Simple, Missing, or Draw
-- Slug: lowercase, letters/numbers/hyphens only
-- Tags: space-separated (not comma-separated)
+HTML Requirements:
+- Valid HTML5 syntax
+- No Markdown syntax (like ``` or **bold**) inside HTML
+- All tags properly closed
+- Classes used for styling (e.g., class="language-python")
+
+Sentinel Requirements:
+- <!-- PROMPT_VERSION: apf-v2.1 --> at start
+- <!-- BEGIN_CARDS --> before first card
+- <!-- END_CARDS --> after last card
+- END_OF_CARDS as absolute last line
 </format_requirements>"""

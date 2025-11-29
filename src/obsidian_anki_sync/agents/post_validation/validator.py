@@ -243,6 +243,16 @@ class PostValidatorAgent:
                     )
                     return fixed_cards
 
+            elif error_classification in ["html_syntax", "apf_sentinel", "section_header"]:
+                # Complex syntax/structure issues - use LLM
+                logger.debug(f"auto_fix_classified_{error_classification}")
+                fixed_cards = self._llm_based_fix(cards, error_details)
+                if fixed_cards:
+                    logger.info(
+                        f"auto_fix_{error_classification}_success", cards_fixed=len(fixed_cards)
+                    )
+                    return fixed_cards
+
             # Fallback: Progressive recovery strategy for unclassified or complex errors
             logger.debug("auto_fix_fallback_progressive_recovery")
 
@@ -324,16 +334,46 @@ class PostValidatorAgent:
         if any(indicator in error_details for indicator in header_indicators):
             return "template_header"
 
-        # Template structure issues (missing/extra sentinels, fields)
-        structure_indicators = [
-            "Missing required field header",
-            "Missing '<!--",
+        # HTML syntax issues
+        html_indicators = [
+            "HTML validation failed",
+            "Tag '",
+            "is not closed",
+            "Unclosed tag",
+            "Unexpected close tag",
+            "Malformed tag",
+        ]
+
+        if any(indicator in error_details for indicator in html_indicators):
+            return "html_syntax"
+
+        # APF sentinel issues
+        sentinel_indicators = [
             "Missing '<!-- PROMPT_VERSION:",
             "Missing '<!-- BEGIN_CARDS -->'",
             "Missing '<!-- END_CARDS -->'",
             "Missing final 'END_OF_CARDS' line",
             "Extra 'END_OF_CARDS' text",
             "Missing manifest",
+        ]
+
+        if any(indicator in error_details for indicator in sentinel_indicators):
+            return "apf_sentinel"
+
+        # Section header issues
+        section_indicators = [
+            "Missing '<!-- Title -->'",
+            "Missing '<!-- Key point -->'",
+            "Missing '<!--",
+            "Section header format",
+        ]
+
+        if any(indicator in error_details for indicator in section_indicators):
+            return "section_header"
+
+        # Template structure issues (remaining)
+        structure_indicators = [
+            "Missing required field header",
             "Tag '",
             "not in snake_case format",
         ]
@@ -362,6 +402,7 @@ class PostValidatorAgent:
             "Sample (code block)",
             "wrong section",
             "APF v2.1 requires",
+            "Markdown code block found",
         ]
 
         if any(indicator in error_details for indicator in content_indicators):
