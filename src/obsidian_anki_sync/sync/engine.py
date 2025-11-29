@@ -178,7 +178,7 @@ class SyncEngine:
                 progress.update(
                     task, description="Creating QA extraction provider...")
                 qa_provider = ProviderFactory.create_from_config(
-                    config, verbose_logging=True)
+                    config, verbose_logging=False)
                 progress.update(task, advance=1,
                                 description="QA extraction provider ready")
 
