@@ -105,25 +105,25 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
         if agent_type not in self._agents:
             try:
                 if agent_type == "generator":
-                    from ...domain.interfaces.llm_config import get_model_for_agent
+                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.generator import GeneratorAgentAI
 
                     model = get_model_for_agent(self.config, "generator")
                     self._agents[agent_type] = GeneratorAgentAI(model)
                 elif agent_type == "pre_validator":
-                    from ...domain.interfaces.llm_config import get_model_for_agent
+                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.pre_validator import PreValidatorAgentAI
 
                     model = get_model_for_agent(self.config, "pre_validator")
                     self._agents[agent_type] = PreValidatorAgentAI(model)
                 elif agent_type == "post_validator":
-                    from ...domain.interfaces.llm_config import get_model_for_agent
+                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.post_validator import PostValidatorAgentAI
 
                     model = get_model_for_agent(self.config, "post_validator")
                     self._agents[agent_type] = PostValidatorAgentAI(model)
                 elif agent_type == "context_enrichment":
-                    from ...domain.interfaces.llm_config import get_model_for_agent
+                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.context_enrichment import ContextEnrichmentAgentAI
 
                     model = get_model_for_agent(self.config, "context_enrichment")
@@ -150,7 +150,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     ) -> UnifiedAgentResult:
         """Generate APF cards using PydanticAI."""
         try:
-            from ...models import NoteMetadata, QAPair
+            from ..models import NoteMetadata, QAPair
 
             # Convert to PydanticAI expected types
             note_metadata = NoteMetadata(**metadata)
@@ -196,7 +196,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     ) -> UnifiedAgentResult:
         """Run pre-validation using PydanticAI."""
         try:
-            from ...models import NoteMetadata, QAPair
+            from ..models import NoteMetadata, QAPair
 
             note_metadata = NoteMetadata(**metadata)
             qa_list = [QAPair(**qa) for qa in qa_pairs]
@@ -237,7 +237,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     ) -> UnifiedAgentResult:
         """Run post-validation using PydanticAI."""
         try:
-            from ...models import GeneratedCard
+            from ..models import GeneratedCard
 
             # Convert to PydanticAI expected types
             card_list = [GeneratedCard(**card) for card in cards]

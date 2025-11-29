@@ -7,9 +7,9 @@ to create higher-quality Anki cards based on learned patterns and user preferenc
 import time
 from typing import Any
 
-from ...config import Config
-from ...models import GeneratedCard
-from ...utils.logging import get_logger
+from ..config import Config
+from ..models import GeneratedCard
+from ..utils.logging import get_logger
 from .advanced_memory import (
     AdvancedMemoryStore,
     CardGenerationPattern,
