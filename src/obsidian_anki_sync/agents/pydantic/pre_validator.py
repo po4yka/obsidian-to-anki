@@ -14,9 +14,11 @@ from obsidian_anki_sync.agents.exceptions import (
     StructuredOutputError,
 )
 from obsidian_anki_sync.agents.improved_prompts import PRE_VALIDATION_SYSTEM_PROMPT
+from obsidian_anki_sync.agents.autofix.registry import AutoFixRegistry
 from obsidian_anki_sync.agents.models import PreValidationResult
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.validation.ai_fixer import AIFixer
 
 from .models import PreValidationDeps, PreValidationOutput
 
@@ -30,15 +32,30 @@ class PreValidatorAgentAI:
     Uses structured outputs for type-safe validation results.
     """
 
-    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
+    def __init__(
+        self,
+        model: OpenAIChatModel,
+        temperature: float = 0.0,
+        enable_autofix: bool = False,
+        ai_fixer: AIFixer | None = None,
+    ):
         """Initialize pre-validator agent.
 
         Args:
             model: PydanticAI model instance
             temperature: Sampling temperature (0.0 for deterministic)
+            enable_autofix: Whether to enable auto-fixing loop
+            ai_fixer: Optional AIFixer instance for AI fixes
         """
         self.model = model
         self.temperature = temperature
+        self.enable_autofix = enable_autofix
+        self.ai_fixer = ai_fixer
+
+        # Initialize fix registry if enabled
+        self.fix_registry = (
+            AutoFixRegistry(ai_fixer=ai_fixer) if enable_autofix else None
+        )
 
         # Create PydanticAI agent with structured output
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
@@ -47,7 +64,11 @@ class PreValidatorAgentAI:
             system_prompt=self._get_system_prompt(),
         )
 
-        logger.info("pydantic_ai_pre_validator_initialized", model=str(model))
+        logger.info(
+            "pydantic_ai_pre_validator_initialized",
+            model=str(model),
+            autofix=enable_autofix,
+        )
 
     def _get_system_prompt(self) -> str:
         """Get system prompt for pre-validation with few-shot examples."""
@@ -72,6 +93,23 @@ class PreValidatorAgentAI:
             PreValidationResult with validation outcome
         """
         logger.info("pydantic_ai_pre_validation_start", title=metadata.title)
+
+        # Run auto-fix loop first if enabled
+        fixed_content = None
+        auto_fix_applied = False
+
+        if self.enable_autofix and self.fix_registry:
+            fix_result = self.fix_registry.fix_until_valid(
+                note_content, max_retries=3, file_path=file_path
+            )
+            if fix_result.file_modified:
+                note_content = fix_result.fixed_content or note_content
+                fixed_content = note_content
+                auto_fix_applied = True
+                logger.info(
+                    "pre_validation_autofix_applied",
+                    issues_fixed=fix_result.issues_fixed,
+                )
 
         # Create dependencies
         deps = PreValidationDeps(
@@ -105,8 +143,8 @@ Validate the structure, frontmatter, and content quality."""
                 is_valid=output.is_valid,
                 error_type=output.error_type,
                 error_details=output.error_details,
-                auto_fix_applied=False,
-                fixed_content=None,
+                auto_fix_applied=auto_fix_applied,
+                fixed_content=fixed_content,
                 validation_time=0.0,
             )
 

@@ -24,6 +24,8 @@ from obsidian_anki_sync.utils.logging import get_logger
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from obsidian_anki_sync.validation.ai_fixer import AIFixer
+
 logger = get_logger(__name__)
 
 
@@ -38,6 +40,7 @@ class AutoFixRegistry:
         note_index: set[str] | None = None,
         enabled_handlers: list[str] | None = None,
         write_back: bool = False,
+        ai_fixer: "AIFixer | None" = None,
     ):
         """Initialize the registry.
 
@@ -45,9 +48,11 @@ class AutoFixRegistry:
             note_index: Set of existing note IDs for link validation
             enabled_handlers: List of handler types to enable (None = all)
             write_back: Whether to write fixes back to source files
+            ai_fixer: Optional AIFixer instance for AI-powered fixes
         """
         self.note_index = note_index or set()
         self.write_back = write_back
+        self.ai_fixer = ai_fixer
 
         # Initialize all handlers
         self._handlers: dict[str, AutoFixHandler] = {
@@ -55,7 +60,7 @@ class AutoFixRegistry:
             "empty_references": EmptyReferencesHandler(),
             "title_format": TitleFormatHandler(),
             "moc_mismatch": MocMismatchHandler(),
-            "section_order": SectionOrderHandler(),
+            "section_order": SectionOrderHandler(ai_fixer=ai_fixer),
             "missing_related_questions": MissingRelatedQuestionsHandler(),
             "broken_wikilink": BrokenWikilinkHandler(note_index=self.note_index),
             "broken_related_entry": BrokenRelatedEntryHandler(note_index=self.note_index),
@@ -261,6 +266,65 @@ class AutoFixRegistry:
             Handler instance or None
         """
         return self._handlers.get(handler_type)
+
+    def fix_until_valid(
+        self,
+        content: str,
+        max_retries: int = 3,
+        file_path: Path | None = None,
+    ) -> AutoFixResult:
+        """Loop fixes until no more issues are found or max retries reached.
+
+        Args:
+            content: Note content
+            max_retries: Maximum number of fix iterations
+            file_path: Optional file path for logging/writing
+
+        Returns:
+            Final AutoFixResult
+        """
+        original_content = content
+        current_content = content
+        all_issues = []
+        total_fixed = 0
+
+        for i in range(max_retries):
+            logger.debug(
+                "fix_loop_iteration",
+                iteration=i + 1,
+                max_retries=max_retries,
+            )
+
+            # Run detection first to see if we're done
+            current_issues = self.detect_all(current_content, file_path)
+            if not current_issues:
+                logger.debug("fix_loop_complete_no_issues")
+                break
+
+            # Run fix pass
+            result = self.fix_all(current_content, file_path)
+            current_content = result.fixed_content or current_content
+            total_fixed += result.issues_fixed
+            all_issues.extend(result.issues_found)
+
+            if not result.file_modified:
+                logger.debug("fix_loop_stopped_no_changes")
+                break
+
+        # Final check
+        final_issues = self.detect_all(current_content, file_path)
+        file_modified = current_content != original_content
+
+        return AutoFixResult(
+            file_modified=file_modified,
+            issues_found=final_issues,
+            issues_fixed=total_fixed,
+            issues_skipped=len(final_issues),
+            original_content=original_content if file_modified else None,
+            fixed_content=current_content if file_modified else None,
+            fix_time=0.0,  # Accumulation not tracked precisely
+            write_back_enabled=self.write_back,
+        )
 
     def list_handlers(self) -> list[dict]:
         """List all available handlers.
