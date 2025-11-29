@@ -348,7 +348,7 @@ class LangGraphOrchestrator:
         if self._provider is None:
             # Create a minimal provider for compatibility
             # This is only used by the sync engine to access provider name/check_connection
-            from obsidian_anki_sync.agents.providers.base import BaseLLMProvider
+            from obsidian_anki_sync.providers.base import BaseLLMProvider
 
             class LangGraphCompatibilityProvider(BaseLLMProvider):
                 def get_provider_name(self) -> str:
