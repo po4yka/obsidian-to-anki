@@ -7,7 +7,7 @@ from typing import Any
 from arq.connections import RedisSettings
 
 from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
-from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.config import load_config
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.obsidian.parser import parse_note
 from obsidian_anki_sync.utils.logging import get_logger
@@ -20,7 +20,7 @@ async def startup(ctx: dict[str, Any]) -> None:
     logger.info("worker_startup")
 
     try:
-        config = Config()
+        config = load_config()
         ctx["config"] = config
 
         # Initialize orchestrator
@@ -69,7 +69,7 @@ async def process_note_job(
 
     if config is None or orchestrator is None:
         # Initialize config and orchestrator for this job
-        config = Config()
+        config = load_config()
         orchestrator = LangGraphOrchestrator(config)
         if hasattr(orchestrator, "setup_async"):
             await orchestrator.setup_async()
@@ -82,7 +82,7 @@ async def process_note_job(
             return {
                 "success": False,
                 "error": f"File not found: {file_path}",
-                "cards": []
+                "cards": [],
             }
 
         # Read content
@@ -99,6 +99,7 @@ async def process_note_job(
         existing_cards = None
         if existing_cards_dicts:
             from obsidian_anki_sync.agents.models import GeneratedCard
+
             existing_cards = [GeneratedCard(**c) for c in existing_cards_dicts]
 
         # Process note
@@ -114,34 +115,23 @@ async def process_note_job(
             return {
                 "success": False,
                 "error": "Pipeline failed to generate cards",
-                "cards": []
+                "cards": [],
             }
 
         # Convert to cards
         cards = orchestrator.convert_to_cards(
-            result.generation.cards,
-            metadata,
-            qa_pairs,
-            path_obj
+            result.generation.cards, metadata, qa_pairs, path_obj
         )
 
         # Serialize cards for return
         # We return dicts because Card objects might not be pickleable or we want to be safe
         cards_dicts = [card.model_dump() for card in cards]
 
-        return {
-            "success": True,
-            "cards": cards_dicts,
-            "slugs": [c.slug for c in cards]
-        }
+        return {"success": True, "cards": cards_dicts, "slugs": [c.slug for c in cards]}
 
     except Exception as e:
         logger.exception("worker_job_failed", file=relative_path, error=str(e))
-        return {
-            "success": False,
-            "error": str(e),
-            "cards": []
-        }
+        return {"success": False, "error": str(e), "cards": []}
 
 
 class WorkerSettings:
@@ -154,6 +144,6 @@ class WorkerSettings:
 
     # Use environment variables with defaults
     redis_settings = RedisSettings.from_dsn(
-        os.getenv('REDIS_URL', 'redis://localhost:6379')
+        os.getenv("REDIS_URL", "redis://localhost:6379")
     )
-    max_jobs = int(os.getenv('MAX_CONCURRENT_GENERATIONS', '5'))
+    max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "5"))
