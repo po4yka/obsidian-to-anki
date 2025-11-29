@@ -3,9 +3,9 @@
 Handles discovery, parsing, and processing of Obsidian notes.
 """
 
+import errno
 import random
 import time
-import errno
 from collections import defaultdict
 from collections.abc import Collection
 from pathlib import Path
@@ -21,12 +21,11 @@ try:
 except ImportError:
     psutil = None  # type: ignore
 
+import asyncio
+
 import yaml  # type: ignore
 from arq import create_pool
 from arq.connections import RedisSettings
-import asyncio
-
-
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ParserError
@@ -686,21 +685,32 @@ class NoteScanner:
 
         job_map = {}  # job_id -> (file_path, relative_path)
 
+        logger.info("submitting_jobs", total_files=len(note_files))
+
         # Submit all jobs
         for file_path, relative_path in note_files:
             try:
+                # Sanitize job ID to avoid issues with slashes
+                job_id = f"note-{relative_path.replace('/', '_').replace('\\', '_')}"
+
                 # We pass minimal data to keep payload small
                 # The worker will re-parse the file
                 job = await pool.enqueue_job(
                     "process_note_job",
                     str(file_path),
                     relative_path,
-                    _job_id=f"note-{relative_path}"
+                    _job_id=job_id
                 )
                 if job:
                     job_map[job.job_id] = (file_path, relative_path)
+                    logger.debug("job_enqueued", job_id=job.job_id,
+                                 file=relative_path)
+                else:
+                    logger.warning("job_enqueue_returned_none",
+                                   file=relative_path, job_id=job_id)
             except Exception as e:
-                logger.error("queue_submission_failed", file=relative_path, error=str(e))
+                logger.error("queue_submission_failed",
+                             file=relative_path, error=str(e))
                 self.stats["errors"] = self.stats.get("errors", 0) + 1
 
         logger.info("jobs_submitted", count=len(job_map))
@@ -735,16 +745,20 @@ class NoteScanner:
                                 obsidian_cards[card.slug] = card
                                 existing_slugs.add(card.slug)
                             except Exception as e:
-                                logger.error("card_rehydration_failed", slug=card_dict.get("slug"), error=str(e))
+                                logger.error("card_rehydration_failed", slug=card_dict.get(
+                                    "slug"), error=str(e))
 
-                        self.stats["processed"] = self.stats.get("processed", 0) + 1
+                        self.stats["processed"] = self.stats.get(
+                            "processed", 0) + 1
                     else:
                         error_msg = result.get("error", "Unknown error")
-                        logger.warning("job_failed_result", file=relative_path, error=error_msg)
+                        logger.warning("job_failed_result",
+                                       file=relative_path, error=error_msg)
                         self.stats["errors"] = self.stats.get("errors", 0) + 1
                         error_by_type["queue_error"] += 1
                         if len(error_samples["queue_error"]) < 3:
-                            error_samples["queue_error"].append(f"{relative_path}: {error_msg}")
+                            error_samples["queue_error"].append(
+                                f"{relative_path}: {error_msg}")
 
                     done_this_loop.add(job_id)
                     completed_jobs += 1
@@ -752,7 +766,8 @@ class NoteScanner:
                 elif status in ("failed", "not_found"):
                     # Job failed at worker level (exception raised)
                     file_path, relative_path = job_map[job_id]
-                    logger.error("job_execution_failed", file=relative_path, status=status)
+                    logger.error("job_execution_failed",
+                                 file=relative_path, status=status)
                     self.stats["errors"] = self.stats.get("errors", 0) + 1
                     done_this_loop.add(job_id)
                     completed_jobs += 1
@@ -760,7 +775,8 @@ class NoteScanner:
             pending_jobs -= done_this_loop
 
             if done_this_loop:
-                logger.info("queue_progress", completed=completed_jobs, total=len(job_map))
+                logger.info("queue_progress",
+                            completed=completed_jobs, total=len(job_map))
 
         await pool.close()
         return obsidian_cards

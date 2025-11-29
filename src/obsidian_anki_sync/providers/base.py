@@ -17,18 +17,20 @@ class BaseLLMProvider(ABC):
     OpenRouter, etc.) while maintaining consistent behavior.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, verbose_logging: bool = False, **kwargs: Any):
         """Initialize the provider with configuration parameters.
 
         Args:
+            verbose_logging: Whether to log detailed initialization info
             **kwargs: Provider-specific configuration options
         """
         self.config = kwargs
-        logger.info(
-            "provider_initialized",
-            provider=self.__class__.__name__,
-            config=self._safe_config_for_logging(),
-        )
+        if verbose_logging:
+            logger.info(
+                "provider_initialized",
+                provider=self.__class__.__name__,
+                config=self._safe_config_for_logging(),
+            )
 
     def _safe_config_for_logging(self) -> dict[str, Any]:
         """Return config with sensitive data redacted for logging.

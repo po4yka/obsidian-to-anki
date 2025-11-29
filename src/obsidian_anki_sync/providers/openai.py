@@ -38,6 +38,7 @@ class OpenAIProvider(BaseLLMProvider):
         organization: str | None = None,
         timeout: float = 120.0,
         max_retries: int = 3,
+        verbose_logging: bool = False,
         **kwargs: Any,
     ):
         """Initialize OpenAI provider.
@@ -48,9 +49,11 @@ class OpenAIProvider(BaseLLMProvider):
             organization: Organization ID (optional)
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries
+            verbose_logging: Whether to log detailed initialization info
             **kwargs: Additional configuration options
         """
         super().__init__(
+            verbose_logging=verbose_logging,
             api_key=api_key,
             base_url=base_url,
             organization=organization,
@@ -82,12 +85,14 @@ class OpenAIProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 

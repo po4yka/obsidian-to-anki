@@ -31,7 +31,7 @@ def get_open_file_count() -> int | None:
     """Return the current number of open file descriptors for this process."""
     if psutil is not None:
         try:  # pragma: no cover - depends on psutil availability
-            return psutil.Process().num_fds()
+            return int(psutil.Process().num_fds())
         except (AttributeError, psutil.Error):
             pass
 

@@ -2,9 +2,10 @@
 
 import os
 import tempfile
-from contextlib import contextmanager
+from collections.abc import Generator
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -17,7 +18,7 @@ def atomic_write(
     mode: str = "w",
     encoding: str | None = "utf-8",
     **kwargs: Any,
-) -> Generator[Any, None, None]:
+) -> Generator[Any]:
     """
     Context manager for atomic file writing.
 
@@ -70,10 +71,8 @@ def atomic_write(
         except Exception:
             # Cleanup temp file on error
             if temp_path_obj.exists():
-                try:
+                with suppress(OSError):
                     temp_path_obj.unlink()
-                except OSError:
-                    pass
             raise
 
     except Exception as e:

@@ -1,6 +1,7 @@
 """Performance timing utilities for logging."""
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -9,8 +10,10 @@ from obsidian_anki_sync.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+
+
 @contextmanager
-def log_duration(operation: str, **context: Any):
+def log_duration(operation: str, **context: Any) -> Generator[None]:
     """Context manager to log operation duration.
 
     Args:
