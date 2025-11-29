@@ -11,10 +11,11 @@ All agents use structured outputs and proper type validation.
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
+from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
 from obsidian_anki_sync.utils.logging import get_logger
@@ -84,6 +85,26 @@ class CardGenerationOutput(BaseModel):
         default="", description="Notes about the generation process"
     )
     confidence: float = Field(default=0.5, description="Overall generation confidence")
+
+    @field_validator("cards")
+    @classmethod
+    def validate_apf_format(cls, cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Validate that generated cards comply with APF format."""
+        errors = []
+        for i, card in enumerate(cards):
+            apf_html = card.get("apf_html", "")
+            slug = card.get("slug")
+
+            # Run deterministic linter
+            result = validate_apf(apf_html, slug)
+
+            if result.errors:
+                errors.append(f"Card {i+1} ({slug}): {'; '.join(result.errors)}")
+
+        if errors:
+            raise ValueError(f"APF Validation Failed: {'; '.join(errors)}")
+
+        return cards
 
 
 class PostValidationOutput(BaseModel):
