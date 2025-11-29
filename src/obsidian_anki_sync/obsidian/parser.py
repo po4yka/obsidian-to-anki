@@ -892,7 +892,16 @@ def parse_qa_pairs(
             in_answer_section = False
 
         # Check if we're entering answer section
-        if stripped.startswith("## "):
+        # Only recognize specific answer/post-answer headers, not arbitrary ## headers
+        # This prevents internal headers like "## Краткая Версия" from triggering block splits
+        answer_section_headers = (
+            "## Answer (EN)",
+            "## Ответ (RU)",
+            "## Follow-ups",
+            "## References",
+            "## Related Questions",
+        )
+        if stripped in answer_section_headers:
             in_answer_section = True
 
         current_block_lines.append(line)

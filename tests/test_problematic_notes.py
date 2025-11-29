@@ -93,13 +93,11 @@ class TestProblematicNotesArchiver:
 
         assert archived_path is not None
         assert archived_path.exists()
-        assert archived_path.name == "test_note.md"
+        # archive_note now returns metadata path directly (no note copy)
+        assert archived_path.name == "test_note.md.meta.json"
 
-        # Check metadata file
-        metadata_path = archived_path.with_suffix(".meta.json")
-        assert metadata_path.exists()
-
-        with open(metadata_path, encoding="utf-8") as f:
+        # archived_path IS the metadata file
+        with open(archived_path, encoding="utf-8") as f:
             metadata = json.load(f)
 
         assert metadata["error_type"] == "ParserError"
@@ -133,8 +131,8 @@ class TestProblematicNotesArchiver:
 
         assert archived_path is not None
 
-        metadata_path = archived_path.with_suffix(".meta.json")
-        with open(metadata_path, encoding="utf-8") as f:
+        # archived_path IS the metadata file (no note copy anymore)
+        with open(archived_path, encoding="utf-8") as f:
             metadata = json.load(f)
 
         assert metadata["card_index"] == 1
@@ -218,36 +216,33 @@ class TestProblematicNotesArchiver:
     def test_archive_note_prefers_provided_content(
         self, temp_dir, sample_note_content, monkeypatch
     ):
-        """Ensure we do not reopen the source file when content is already available."""
+        """Ensure provided content is used for hashing without re-reading the file."""
+        import hashlib
+
         archive_dir = temp_dir / "problematic_notes"
         archiver = ProblematicNotesArchiver(
             archive_dir=archive_dir, enabled=True)
         note_path = temp_dir / "prefetched.md"
+        # Write different content to file
         note_path.write_text("stale content", encoding="utf-8")
 
-        captured: dict[str, str | None] = {}
-
-        def fake_write(self, source_path, destination_path, note_content):
-            captured["note_content"] = note_content
-            destination_path.write_text(note_content or "", encoding="utf-8")
-            return True
-
-        monkeypatch.setattr(
-            ProblematicNotesArchiver,
-            "_write_archived_note",
-            fake_write,
-            raising=False,
-        )
-
         error = ParserError("prefetch test")
-        archiver.archive_note(
+        # Provide different content than what's in the file
+        archived_path = archiver.archive_note(
             note_path=note_path,
             error=error,
             processing_stage="testing",
             note_content=sample_note_content,
         )
 
-        assert captured["note_content"] == sample_note_content
+        # Verify the hash is based on provided content, not file content
+        assert archived_path is not None
+        with open(archived_path, encoding="utf-8") as f:
+            metadata = json.load(f)
+
+        expected_hash = hashlib.sha256(
+            sample_note_content.encode("utf-8")).hexdigest()
+        assert metadata["content_hash"] == expected_hash
 
     @pytest.mark.skipif(resource is None, reason="resource module unavailable")
     def test_archiver_handles_low_fd_headroom(

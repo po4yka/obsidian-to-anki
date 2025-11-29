@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 from pydantic import Field
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from obsidian_anki_sync.config import Config
@@ -71,16 +72,20 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             reasoning_enabled: Enable reasoning for this model
             **kwargs: Additional OpenAIChatModel arguments
         """
-        # Initialize with basic config first
-        super().__init__(
-            model_name,
+        # Initialize with OpenAIProvider for custom base_url support
+        provider = OpenAIProvider(
             base_url=base_url,
             api_key=api_key or "dummy",  # Will be overridden
+        )
+        super().__init__(
+            model_name,
+            provider=provider,
             **kwargs,
         )
 
-        # Create OpenRouter provider instance
-        self.provider = OpenRouterProvider(
+        # Create our custom OpenRouter provider instance for reasoning support
+        # Use different name to avoid conflict with parent's provider attribute
+        self._openrouter_provider = OpenRouterProvider(
             api_key=api_key,
             base_url=base_url,
             site_url=site_url,
@@ -134,8 +139,8 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
         # Combine user messages (PydanticAI sometimes splits them)
         prompt = " ".join(user_messages)
 
-        # Make request through OpenRouterProvider
-        response = self.provider.generate(
+        # Make request through our custom OpenRouterProvider
+        response = self._openrouter_provider.generate(
             model=self.model_name,
             prompt=prompt,
             system=system_message,
@@ -270,11 +275,15 @@ class PydanticAIModelFactory:
         )
 
         # Create OpenAI-compatible model pointing to OpenRouter
-        model = OpenAIChatModel(  # type: ignore[call-overload]
-            model_name,
+        # Use OpenAIProvider for custom base_url (PydanticAI API change)
+        openai_provider = OpenAIProvider(
             base_url=base_url,
             api_key=api_key,
             http_client=http_client,
+        )
+        model = OpenAIChatModel(
+            model_name,
+            provider=openai_provider,
             **kwargs,
         )
 
@@ -354,11 +363,15 @@ class PydanticAIModelFactory:
                 ),
             )
 
-            return OpenAIChatModel(  # type: ignore[call-overload,no-any-return]
-                model_name,
+            # Use OpenAIProvider for custom base_url (PydanticAI API change)
+            local_provider = OpenAIProvider(
                 base_url=base_url,
                 api_key=api_key,
                 http_client=http_client,
+            )
+            return OpenAIChatModel(  # type: ignore[no-any-return]
+                model_name,
+                provider=local_provider,
             )
         else:
             msg = (
