@@ -1,5 +1,6 @@
-"""Logging configuration using loguru for better console and file output."""
+"""Logging configuration using structlog for structured JSON logging."""
 
+import logging
 import sys
 import threading
 import time
@@ -9,73 +10,27 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
+import structlog
+from structlog.dev import ConsoleRenderer
+from structlog.processors import JSONRenderer
+from structlog.stdlib import LoggerFactory, add_log_level, add_logger_name
+
+# Standard library logging levels mapping
+_LOG_LEVELS = {
+    "TRACE": logging.DEBUG - 5,
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "SUCCESS": logging.INFO + 5,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
 
 
-def safe_rotation(message: Any, file: Any) -> bool:
-    """Rotation function that rotates at midnight, handles missing files gracefully."""
-    try:
-        # Check if file exists and has content
-        if file is None:
-            return False
-        # Get current time from the message
-        record_time = message.record.get("time")
-        if record_time is None:
-            return False
-        # Rotate at midnight (when hour is 0 and this is the first message of the day)
-        if record_time.hour == 0 and record_time.minute == 0:
-            # Only rotate if file has content
-            try:
-                if file.tell() > 0:
-                    return True
-            except (OSError, ValueError):
-                pass
-        return False
-    except Exception:
-        # Fail safe - don't rotate on errors
-        return False
-
-
-def _add_formatted_extra(record: dict) -> bool:
-    """Add formatted extra fields to the record for display.
-
-    This filter adds a '_formatted' field to the record's extra dict
-    containing a formatted string of all extra fields, prioritizing
-    key fields like file, title, note_id.
-
-    Returns:
-        True to allow the log record to be processed
-    """
-    extra = record.get("extra", {})
-    if not extra:
-        record["extra"]["_formatted"] = ""
-        return True
-
-    # Define priority fields that should always be shown first
-    priority_fields = ["file", "title", "note_id", "source_path"]
-    important_parts = []
-    other_parts = []
-
-    for key, value in extra.items():
-        # Skip internal fields
-        if key in ("name", "_formatted"):
-            continue
-
-        if key in priority_fields:
-            if value:  # Only show non-empty values
-                important_parts.append(f"{key}={value}")
-        elif value is not None and value != "":
-            other_parts.append(f"{key}={value}")
-
-    # Combine priority fields first, then others
-    all_parts = important_parts + other_parts
-
-    if all_parts:
-        record["extra"]["_formatted"] = " | " + " ".join(all_parts)
-    else:
-        record["extra"]["_formatted"] = ""
-
-    return True
+def _get_level_no(level_name: str) -> int:
+    """Get numeric log level from name."""
+    level_name = level_name.upper()
+    return _LOG_LEVELS.get(level_name, logging.INFO)
 
 
 @dataclass(slots=True)
@@ -92,36 +47,33 @@ class HighVolumeEventPolicy:
     window_seconds: float
 
 
-class ConsoleNoiseFilter:
+class ConsoleNoiseFilterProcessor:
     """
-    Filter that reduces console noise while preserving critical diagnostics.
+    Structlog processor that reduces console noise while preserving critical diagnostics.
 
-    This filter wraps a base filter (for formatting extras), enforces module-level
-    minimum log levels, and rate-limits specific high-volume events within a
-    sliding time window.
+    This processor enforces module-level minimum log levels and rate-limits
+    specific high-volume events within a sliding time window.
     """
 
     def __init__(
         self,
-        base_filter: Callable[[dict], bool],
         level_overrides: Mapping[str, str] | None = None,
-        high_volume_policies: Mapping[str, HighVolumeEventPolicy] | None = None,
+        high_volume_policies: Mapping[str,
+                                      HighVolumeEventPolicy] | None = None,
         time_func: Callable[[], float] | None = None,
     ) -> None:
         """
-        Initialize the console noise filter.
+        Initialize the console noise filter processor.
 
         Args:
-            base_filter: Callable used to enrich/validate records before filtering.
             level_overrides: Mapping of module prefixes to minimum log levels.
             high_volume_policies: Mapping of event names to rate-limit policies.
             time_func: Optional time provider for testing (defaults to time.monotonic).
         """
-        self.base_filter = base_filter
         self.level_overrides = dict(level_overrides or {})
         self.high_volume_policies = dict(high_volume_policies or {})
         self._resolved_level_overrides = {
-            prefix: logger.level(level_name).no
+            prefix: _get_level_no(level_name)
             for prefix, level_name in self.level_overrides.items()
             if level_name
         }
@@ -131,28 +83,29 @@ class ConsoleNoiseFilter:
         self._lock = threading.Lock()
         self._time_func = time_func or time.monotonic
 
-    def __call__(self, record: dict) -> bool:
-        """Apply formatting, level overrides, and rate limits to a log record."""
-        if not self.base_filter(record):
-            return False
+    def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+        """Apply level overrides and rate limits to a log event."""
+        # Check module-level overrides
+        logger_name = event_dict.get("logger", "") or ""
+        level_no = event_dict.get("level", logging.INFO)
 
-        level_obj = record.get("level")
-        if hasattr(level_obj, "no"):
-            level_no = getattr(level_obj, "no")
-        else:
-            try:
-                level_no = logger.level(str(level_obj)).no
-            except (TypeError, ValueError):
-                level_no = logger.level("INFO").no
+        if isinstance(level_no, str):
+            level_no = _get_level_no(level_no)
+        elif hasattr(level_no, "no"):
+            level_no = getattr(level_no, "no")
+        elif not isinstance(level_no, int):
+            level_no = logging.INFO
 
-        module_name = record.get("name", "") or ""
         for prefix, min_level in self._resolved_level_overrides.items():
-            if module_name.startswith(prefix) and level_no < min_level:
-                return False
+            if logger_name.startswith(prefix) and level_no < min_level:
+                # Drop this event
+                raise structlog.DropEvent
 
-        message = record.get("message")
+        # Check rate limiting
+        message = event_dict.get("event", "")
         policy = (
-            self.high_volume_policies.get(message) if isinstance(message, str) else None
+            self.high_volume_policies.get(
+                message) if isinstance(message, str) else None
         )
         if policy:
             now = self._time_func()
@@ -163,10 +116,11 @@ class ConsoleNoiseFilter:
                 while window and now - window[0] > policy.window_seconds:
                     window.popleft()
                 if len(window) >= policy.max_occurrences:
-                    return False
+                    # Drop this event
+                    raise structlog.DropEvent
                 window.append(now)
 
-        return True
+        return event_dict
 
 
 DEFAULT_CONSOLE_LEVEL_OVERRIDES: dict[str, str] = {
@@ -183,6 +137,92 @@ DEFAULT_HIGH_VOLUME_EVENTS: dict[str, HighVolumeEventPolicy] = {
     "discover_notes_in_dir": HighVolumeEventPolicy(5, 10.0),
 }
 
+# Global state for handlers
+_configured = False
+_handlers: list[logging.Handler] = []
+
+
+def _add_formatted_extra_processor(
+    logger: Any, method_name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Add formatted extra fields to the event dict for display.
+
+    This processor adds a '_formatted' field containing a formatted string
+    of all extra fields, prioritizing key fields like file, title, note_id.
+    """
+    # Extract priority fields
+    priority_fields = ["file", "title", "note_id", "source_path"]
+    important_parts = []
+    other_parts = []
+
+    for key, value in event_dict.items():
+        # Skip internal fields and standard structlog fields
+        if key in ("logger", "level", "event", "timestamp", "exception", "_formatted"):
+            continue
+
+        if key in priority_fields:
+            if value:  # Only show non-empty values
+                important_parts.append(f"{key}={value}")
+        elif value is not None and value != "":
+            other_parts.append(f"{key}={value}")
+
+    # Combine priority fields first, then others
+    all_parts = important_parts + other_parts
+
+    if all_parts:
+        event_dict["_formatted"] = " | " + " ".join(all_parts)
+    else:
+        event_dict["_formatted"] = ""
+
+    return event_dict
+
+
+def _create_console_renderer() -> ConsoleRenderer:
+    """Create console renderer with custom formatting."""
+    return ConsoleRenderer(
+        colors=True,
+        exception_formatter=structlog.dev.plain_traceback,
+    )
+
+
+def _create_json_renderer() -> JSONRenderer:
+    """Create JSON renderer for file logs."""
+    return JSONRenderer()
+
+
+def _setup_stdlib_logging(
+    log_level: str,
+    enable_console_noise_filter: bool,
+) -> None:
+    """Configure standard library logging to work with structlog."""
+    # Get root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    # Remove existing handlers
+    root_logger.handlers.clear()
+
+    # Base processors for all logs (noise filter is added per-handler, not globally)
+    base_processors = [
+        structlog.contextvars.merge_contextvars,
+        add_log_level,
+        add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        _add_formatted_extra_processor,
+    ]
+
+    # Configure structlog
+    structlog.configure(
+        processors=[*base_processors,
+                    structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
+        context_class=dict,
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
 
 def configure_logging(
     log_level: str = "INFO",
@@ -193,7 +233,7 @@ def configure_logging(
     error_log_retention_days: int = 90,
     enable_console_noise_filter: bool = True,
 ) -> None:
-    """Configure loguru logging with dual output.
+    """Configure structlog logging with dual output.
 
     Args:
         log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -204,129 +244,178 @@ def configure_logging(
         error_log_retention_days: Days to retain error logs (default: 90)
         enable_console_noise_filter: Toggle console-side noise suppression
     """
-    # Remove default handler
-    logger.remove()
+    global _configured, _handlers  # noqa: PLW0602
+
+    # Setup standard library logging
+    _setup_stdlib_logging(log_level, enable_console_noise_filter)
+
+    # Clear existing handlers
+    root_logger = logging.getLogger()
+    for handler in _handlers:
+        root_logger.removeHandler(handler)
+        handler.close()
+    _handlers.clear()
 
     # Determine log level
-    level = log_level.upper()
+    level = _get_level_no(log_level.upper())
 
-    if enable_console_noise_filter:
-        console_filter: Callable[[dict], bool] = ConsoleNoiseFilter(
-            base_filter=_add_formatted_extra,
-            level_overrides=DEFAULT_CONSOLE_LEVEL_OVERRIDES,
-            high_volume_policies=DEFAULT_HIGH_VOLUME_EVENTS,
-        )
-    else:
-        console_filter = _add_formatted_extra
-
-    # Add console handler - concise format with structured fields
-    logger.add(
-        sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level><blue>{extra[_formatted]}</blue>",
-        level=level,
-        colorize=True,
-        backtrace=False,
-        diagnose=False,
-        filter=console_filter,  # type: ignore[arg-type]
-    )
-
-    # Add file handler - detailed format with rotation (vault-level or custom)
+    # Determine log paths
     if log_file:
-        # Use specific log file
         log_path = log_file
-        # Ensure parent directory exists
         log_file.parent.mkdir(exist_ok=True, parents=True)
     else:
-        # Use log directory
         if log_dir is None:
             log_dir = Path("./logs")
         log_dir.mkdir(exist_ok=True, parents=True)
-        log_path = log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
+        log_path = log_dir / "obsidian-anki-sync.log"
 
-    logger.add(
-        log_path,
-        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
-        level="DEBUG",  # File gets all logs
-        # Rotate at midnight only for auto-named files
-        rotation=safe_rotation if not log_file else None,
-        retention="30 days",  # Keep logs for 30 days
-        compression="zip",  # Compress old logs
-        backtrace=True,  # Include traceback
-        diagnose=True,  # Include variable values in tracebacks
-        enqueue=True,  # Thread-safe
-        filter=_add_formatted_extra,  # type: ignore[arg-type]
-    )
-
-    # Add project-level log file handler (in project root)
     if project_log_dir is None:
         project_log_dir = Path("./logs")
     project_log_dir.mkdir(exist_ok=True, parents=True)
-    project_log_path = project_log_dir / "obsidian-anki-sync_{time:YYYY-MM-DD}.log"
 
-    logger.add(
-        project_log_path,
-        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}",
-        level="DEBUG",  # Project logs get all levels
-        rotation=safe_rotation,
-        retention="30 days",
-        compression="zip",
-        backtrace=True,
-        diagnose=True,
-        enqueue=True,
-        filter=_add_formatted_extra,  # type: ignore[arg-type]
-    )
+    # Console handler - human-readable with colors
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(level)
 
-    # Add error-specific log file handler (ERROR and above only)
-    error_log_path = project_log_dir / "errors_{time:YYYY-MM-DD}.log"
+    # Console processors (without noise filter if disabled, with it if enabled)
+    console_pre_chain = [
+        structlog.contextvars.merge_contextvars,
+        add_log_level,
+        add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]
 
-    def error_filter(record: Any) -> bool:
-        """Filter to only include ERROR and CRITICAL level logs."""
-        level_no = getattr(record.get("level"), "no", 0)  # type: ignore[union-attr]
-        error_level_no = logger.level("ERROR").no
-        return bool(level_no >= error_level_no)  # type: ignore[no-any-return]
-
-    logger.add(
-        error_log_path,
-        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}{extra[_formatted]}\n{exception}",
-        level="ERROR",  # Only ERROR and above
-        rotation=safe_rotation,
-        retention=f"{error_log_retention_days} days",
-        compression="zip",
-        backtrace=True,
-        diagnose=True,
-        enqueue=True,
-        filter=lambda record: error_filter(record)  # type: ignore[arg-type]
-        and _add_formatted_extra(record),  # type: ignore[arg-type]
-    )
-
-    if very_verbose:
-        # Add a separate handler for very verbose LLM logging
-        if log_file and log_path.parent is not None:
-            verbose_log_path: Path = (
-                log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
+    if enable_console_noise_filter:
+        console_pre_chain.append(
+            ConsoleNoiseFilterProcessor(
+                level_overrides=DEFAULT_CONSOLE_LEVEL_OVERRIDES,
+                high_volume_policies=DEFAULT_HIGH_VOLUME_EVENTS,
             )
-        else:
-            # Ensure log_dir is not None
-            if log_dir is None:
-                log_dir = Path("./logs")
-            verbose_log_path = (
-                log_dir / "obsidian-anki-sync_verbose_{time:YYYY-MM-DD}.log"
-            )
-        logger.add(
-            verbose_log_path,
-            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}\n{exception}",
-            level="DEBUG",
-            filter=lambda record: "llm" in record["name"].lower()
-            or "prompt" in record["message"].lower()
-            or "response" in record["message"].lower(),
-            rotation="00:00" if not log_file else None,
-            retention="7 days",  # Keep verbose logs for shorter time
-            compression="zip",
         )
 
+    console_pre_chain.append(_add_formatted_extra_processor)
+
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        processor=_create_console_renderer(),
+        foreign_pre_chain=console_pre_chain,
+    )
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+    _handlers.append(console_handler)
+
+    # File handler - JSON format with rotation
+    from logging.handlers import TimedRotatingFileHandler
+
+    file_handler = TimedRotatingFileHandler(
+        filename=str(log_path),
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.suffix = "%Y-%m-%d"
+
+    # File processors (no console noise filter, but include formatted extra)
+    file_pre_chain = [
+        structlog.contextvars.merge_contextvars,
+        add_log_level,
+        add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        _add_formatted_extra_processor,
+    ]
+
+    file_formatter = structlog.stdlib.ProcessorFormatter(
+        processor=_create_json_renderer(),
+        foreign_pre_chain=file_pre_chain,
+    )
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
+    _handlers.append(file_handler)
+
+    # Project-level log file handler
+    project_log_path = project_log_dir / "obsidian-anki-sync.log"
+    project_handler = TimedRotatingFileHandler(
+        filename=str(project_log_path),
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8",
+    )
+    project_handler.setLevel(logging.DEBUG)
+    project_handler.suffix = "%Y-%m-%d"
+    project_handler.setFormatter(file_formatter)
+    root_logger.addHandler(project_handler)
+    _handlers.append(project_handler)
+
+    # Error-specific log file handler (ERROR and above only)
+    error_log_path = project_log_dir / "errors.log"
+
+    class ErrorFilter(logging.Filter):
+        """Filter to only include ERROR and CRITICAL level logs."""
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            return record.levelno >= logging.ERROR
+
+    error_handler = TimedRotatingFileHandler(
+        filename=str(error_log_path),
+        when="midnight",
+        interval=1,
+        backupCount=error_log_retention_days,
+        encoding="utf-8",
+    )
+    error_handler.setLevel(logging.ERROR)
+    error_handler.suffix = "%Y-%m-%d"
+    error_handler.addFilter(ErrorFilter())
+    error_handler.setFormatter(file_formatter)
+    root_logger.addHandler(error_handler)
+    _handlers.append(error_handler)
+
+    # Verbose LLM logging handler (if enabled)
+    if very_verbose:
+        verbose_log_path = (
+            log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
+            if log_file
+            else log_dir / "obsidian-anki-sync_verbose.log"
+        )
+
+        class VerboseFilter(logging.Filter):
+            """Filter for LLM-related verbose logs."""
+
+            def filter(self, record: logging.LogRecord) -> bool:
+                logger_name = record.name.lower()
+                message = record.getMessage().lower()
+                return (
+                    "llm" in logger_name
+                    or "prompt" in message
+                    or "response" in message
+                )
+
+        verbose_handler = TimedRotatingFileHandler(
+            filename=str(verbose_log_path),
+            when="midnight",
+            interval=1,
+            backupCount=7,
+            encoding="utf-8",
+        )
+        verbose_handler.setLevel(logging.DEBUG)
+        verbose_handler.suffix = "%Y-%m-%d"
+        verbose_handler.addFilter(VerboseFilter())
+        verbose_handler.setFormatter(file_formatter)
+        root_logger.addHandler(verbose_handler)
+        _handlers.append(verbose_handler)
+
+    _configured = True
+
+    # Log configuration
+    logger = get_logger("obsidian_anki_sync.utils.logging")
     logger.info(
         "logging_configured",
-        console_level=level,
+        console_level=log_level,
         file_level="DEBUG",
         log_dir=str(log_dir) if not log_file else str(log_file.parent),
         log_file=str(log_file) if log_file else None,
@@ -344,7 +433,13 @@ def get_logger(name: str) -> Any:
         name: Logger name (typically __name__)
 
     Returns:
-        Loguru logger bound to the given name
+        Structlog logger bound to the given name
     """
-    # Loguru uses a single global logger, but we can bind context
-    return logger.bind(name=name)
+    if not _configured:
+        # Auto-configure with defaults if not configured
+        configure_logging()
+
+    # Get structlog logger and bind the name
+    logger = structlog.get_logger(name)
+    # The logger name is automatically set by add_logger_name processor
+    return logger

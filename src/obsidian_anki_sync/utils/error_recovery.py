@@ -171,6 +171,12 @@ class ErrorRecoveryManager:
         Returns:
             RecoveryResult with parsing outcome
         """
+        import time
+
+        recovery_start_time = time.time()
+        original_error = None
+        error_type = None
+
         # Strategy 1: Try normal parsing first
         try:
             metadata, qa_pairs = parse_note(file_path, tolerant_parsing=True)
@@ -181,17 +187,40 @@ class ErrorRecoveryManager:
                 method_used="normal_parsing",
             )
         except ParserError as e:
-            logger.warning("initial_parsing_failed", file=str(file_path), error=str(e))
             original_error = str(e)
+            error_type = type(e).__name__
+            logger.info(
+                "recovery_attempt_started",
+                file=str(file_path),
+                error_type=error_type,
+                error=original_error,
+                strategy="normal_parsing",
+            )
 
         # Strategy 2: Preprocess and retry
+        strategy_start = time.time()
         try:
+            logger.info(
+                "recovery_strategy_selected",
+                file=str(file_path),
+                strategy="preprocessing",
+                error_type=error_type,
+            )
             processed_content, warnings = self._preprocess_file(file_path)
             if processed_content:
                 # Write processed content to temp file and parse
                 temp_path = self._create_temp_file(processed_content, file_path)
                 try:
                     metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
+                    duration = time.time() - strategy_start
+                    logger.info(
+                        "recovery_attempt_completed",
+                        file=str(file_path),
+                        strategy="preprocessing",
+                        success=True,
+                        duration=round(duration, 3),
+                        warnings_count=len(warnings),
+                    )
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
@@ -204,13 +233,36 @@ class ErrorRecoveryManager:
                     # Clean up temp file
                     temp_path.unlink(missing_ok=True)
         except Exception as e:
-            logger.warning("preprocessing_recovery_failed", error=str(e))
+            duration = time.time() - strategy_start
+            logger.warning(
+                "recovery_attempt_failed",
+                file=str(file_path),
+                strategy="preprocessing",
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
         # Strategy 3: Specialized agent repair
+        strategy_start = time.time()
         try:
+            logger.info(
+                "recovery_strategy_selected",
+                file=str(file_path),
+                strategy="specialized_agent",
+                error_type=error_type,
+            )
             result = self._try_specialized_agents(file_path, original_error)
             if result:
                 metadata, qa_pairs = result
+                duration = time.time() - strategy_start
+                logger.info(
+                    "recovery_attempt_completed",
+                    file=str(file_path),
+                    strategy="specialized_agent",
+                    success=True,
+                    duration=round(duration, 3),
+                )
                 return RecoveryResult(
                     success=True,
                     metadata=metadata,
@@ -220,15 +272,38 @@ class ErrorRecoveryManager:
                     original_error=original_error,
                 )
         except Exception as e:
-            logger.warning("specialized_agent_recovery_failed", error=str(e))
+            duration = time.time() - strategy_start
+            logger.warning(
+                "recovery_attempt_failed",
+                file=str(file_path),
+                strategy="specialized_agent",
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
         # Strategy 4: Auto-repair specific issues
+        strategy_start = time.time()
         try:
+            logger.info(
+                "recovery_strategy_selected",
+                file=str(file_path),
+                strategy="auto_repair",
+                error_type=error_type,
+            )
             repaired_content = self._auto_repair_file(file_path)
             if repaired_content:
                 temp_path = self._create_temp_file(repaired_content, file_path)
                 try:
                     metadata, qa_pairs = parse_note(temp_path, tolerant_parsing=True)
+                    duration = time.time() - strategy_start
+                    logger.info(
+                        "recovery_attempt_completed",
+                        file=str(file_path),
+                        strategy="auto_repair",
+                        success=True,
+                        duration=round(duration, 3),
+                    )
                     return RecoveryResult(
                         success=True,
                         metadata=metadata,
@@ -240,11 +315,36 @@ class ErrorRecoveryManager:
                 finally:
                     temp_path.unlink(missing_ok=True)
         except Exception as e:
-            logger.warning("auto_repair_recovery_failed", error=str(e))
+            duration = time.time() - strategy_start
+            logger.warning(
+                "recovery_attempt_failed",
+                file=str(file_path),
+                strategy="auto_repair",
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
-        # Strategy 4: Create minimal valid structure
+        # Strategy 5: Create minimal valid structure
+        strategy_start = time.time()
         try:
+            logger.info(
+                "recovery_strategy_selected",
+                file=str(file_path),
+                strategy="minimal_structure",
+                error_type=error_type,
+            )
             metadata, qa_pairs = self._create_minimal_structure(file_path)
+            duration = time.time() - strategy_start
+            total_duration = time.time() - recovery_start_time
+            logger.info(
+                "recovery_attempt_completed",
+                file=str(file_path),
+                strategy="minimal_structure",
+                success=True,
+                duration=round(duration, 3),
+                fallback_used=True,
+            )
             return RecoveryResult(
                 success=True,
                 metadata=metadata,
@@ -254,9 +354,26 @@ class ErrorRecoveryManager:
                 original_error=original_error,
             )
         except Exception as e:
-            logger.error("minimal_structure_fallback_failed", error=str(e))
+            duration = time.time() - strategy_start
+            logger.error(
+                "recovery_attempt_failed",
+                file=str(file_path),
+                strategy="minimal_structure",
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
         # Final failure - return failure result
+        total_duration = time.time() - recovery_start_time
+        logger.error(
+            "recovery_all_strategies_failed",
+            file=str(file_path),
+            total_duration=round(total_duration, 3),
+            error_type=error_type,
+            original_error=original_error,
+            strategies_attempted=["preprocessing", "specialized_agent", "auto_repair", "minimal_structure"],
+        )
         return RecoveryResult(
             success=False,
             method_used="all_recovery_failed",

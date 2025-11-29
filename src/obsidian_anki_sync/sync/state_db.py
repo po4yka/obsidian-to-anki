@@ -97,11 +97,63 @@ class StateDB(IStateRepository):
             with self._connections_lock:
                 self._connections.append(conn)
             logger.debug(
-                "created_thread_local_connection",
+                "db_connection_created",
                 thread_id=threading.get_ident(),
                 total_connections=len(self._connections),
+                db_path=str(self._db_path),
             )
         return self._local.conn  # type: ignore[no-any-return]
+
+    def _execute_query(
+        self, query: str, params: tuple = (), operation: str = "query"
+    ) -> sqlite3.Cursor:
+        """Execute a database query with logging.
+
+        Args:
+            query: SQL query string
+            params: Query parameters
+            operation: Operation name for logging
+
+        Returns:
+            Cursor with results
+        """
+        import time
+
+        start_time = time.time()
+        try:
+            conn = self._get_connection()
+            cursor = conn.execute(query, params)
+            duration = time.time() - start_time
+
+            # Log slow queries (>100ms)
+            if duration > 0.1:
+                logger.warning(
+                    "db_slow_query",
+                    operation=operation,
+                    duration=round(duration, 3),
+                    params_count=len(params),
+                    query_preview=query[:100],
+                )
+            else:
+                logger.debug(
+                    "db_query",
+                    operation=operation,
+                    duration=round(duration, 4),
+                    params_count=len(params),
+                )
+
+            return cursor
+        except sqlite3.Error as e:
+            duration = time.time() - start_time
+            logger.error(
+                "db_query_error",
+                operation=operation,
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+                query_preview=query[:100],
+            )
+            raise
 
     def _init_schema(self) -> None:
         """Create tables if they don't exist.
@@ -345,32 +397,55 @@ class StateDB(IStateRepository):
 
     def insert_card(self, card: ModelCard, anki_guid: int) -> None:
         """Insert a new card record."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO cards (
-                slug, slug_base, lang, source_path, source_anchor,
-                card_index, anki_guid, content_hash, note_id, note_title, note_type,
-                card_guid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                card.slug,
-                card.manifest.slug_base,
-                card.lang,
-                card.manifest.source_path,
-                card.manifest.source_anchor,
-                card.manifest.card_index,
-                anki_guid,
-                card.content_hash,
-                card.manifest.note_id,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-            ),
-        )
-        conn.commit()
+        import time
+
+        start_time = time.time()
+        logger.debug("db_transaction_start", operation="insert_card", slug=card.slug)
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO cards (
+                    slug, slug_base, lang, source_path, source_anchor,
+                    card_index, anki_guid, content_hash, note_id, note_title, note_type,
+                    card_guid
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    card.slug,
+                    card.manifest.slug_base,
+                    card.lang,
+                    card.manifest.source_path,
+                    card.manifest.source_anchor,
+                    card.manifest.card_index,
+                    anki_guid,
+                    card.content_hash,
+                    card.manifest.note_id,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                ),
+            )
+            conn.commit()
+            duration = time.time() - start_time
+            logger.debug(
+                "db_transaction_committed",
+                operation="insert_card",
+                slug=card.slug,
+                duration=round(duration, 4),
+            )
+        except sqlite3.Error as e:
+            duration = time.time() - start_time
+            logger.error(
+                "db_transaction_error",
+                operation="insert_card",
+                slug=card.slug,
+                duration=round(duration, 3),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def update_card(self, card: ModelCard) -> None:
         """Update existing card record."""

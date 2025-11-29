@@ -104,12 +104,16 @@ class ProgressTracker:
             progress = self.db.get_progress(session_id)
             if progress:
                 self.progress = progress
+                progress_pct = progress.progress_pct
                 logger.info(
-                    "resuming_sync",
+                    "progress_resumed",
                     session_id=session_id,
                     phase=progress.phase.value,
-                    notes_processed=progress.notes_processed,
-                    total_notes=progress.total_notes,
+                    progress_pct=round(progress_pct, 1),
+                    items_processed=progress.notes_processed,
+                    items_total=progress.total_notes,
+                    items_remaining=progress.total_notes - progress.notes_processed,
+                    cards_generated=progress.cards_generated,
                 )
             else:
                 msg = f"No progress found for session {session_id}"
@@ -135,10 +139,16 @@ class ProgressTracker:
 
         def signal_handler(signum: int, frame: Any) -> None:
             signal_name = signal.Signals(signum).name
+            progress_pct = self.progress.progress_pct
             logger.warning(
-                "sync_interrupted",
-                signal=signal_name,
+                "progress_interrupted",
                 session_id=self.progress.session_id,
+                signal=signal_name,
+                phase=self.progress.phase.value,
+                progress_pct=round(progress_pct, 1),
+                items_processed=self.progress.notes_processed,
+                items_total=self.progress.total_notes,
+                cards_generated=self.progress.cards_generated,
             )
             self._interrupt_event.set()
             self.progress.phase = SyncPhase.INTERRUPTED
@@ -161,10 +171,16 @@ class ProgressTracker:
 
     def set_phase(self, phase: SyncPhase) -> None:
         """Update current sync phase."""
-        logger.debug(
-            "sync_phase_changed",
-            from_phase=self.progress.phase.value,
+        old_phase = self.progress.phase.value
+        progress_pct = self.progress.progress_pct
+        logger.info(
+            "progress_phase_changed",
+            session_id=self.progress.session_id,
+            from_phase=old_phase,
             to_phase=phase.value,
+            progress_pct=round(progress_pct, 1),
+            notes_processed=self.progress.notes_processed,
+            total_notes=self.progress.total_notes,
         )
         self.progress.phase = phase
         self.progress.updated_at = datetime.now()
@@ -203,6 +219,26 @@ class ProgressTracker:
         self.progress.notes_processed += 1
         self.progress.cards_generated += cards_generated
         self.progress.updated_at = datetime.now()
+
+        # Check for milestones (10%, 25%, 50%, 75%, 90%)
+        progress_pct = self.progress.progress_pct
+        milestone_thresholds = [10, 25, 50, 75, 90]
+        current_milestone = None
+        for threshold in milestone_thresholds:
+            if progress_pct >= threshold and progress_pct < threshold + 1:
+                current_milestone = threshold
+                break
+
+        if current_milestone:
+            logger.info(
+                "progress_milestone",
+                session_id=self.progress.session_id,
+                milestone=f"{current_milestone}%",
+                items_processed=self.progress.notes_processed,
+                items_total=self.progress.total_notes,
+                cards_generated=self.progress.cards_generated,
+            )
+
         self.db.save_progress(self.progress)
         logger.debug(
             "note_completed",

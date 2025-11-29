@@ -217,7 +217,14 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
     if not increment_step_count(state, "pre_validation"):
         return state
 
-    logger.info("langgraph_pre_validation_start")
+    pipeline_id = state.get("pipeline_id", "unknown")
+    logger.info(
+        "pipeline_node_executing",
+        pipeline_id=pipeline_id,
+        node="pre_validation",
+        input_state_keys=list(state.keys()),
+        note_id=state.get("metadata_dict", {}).get("id", "unknown"),
+    )
     start_time = time.time()
 
     config = get_config(state)

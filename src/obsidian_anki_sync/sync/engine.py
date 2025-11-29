@@ -33,6 +33,7 @@ from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.models import ManifestData, SyncAction
+from obsidian_anki_sync.providers.factory import ProviderFactory
 from obsidian_anki_sync.sync.anki_state_manager import AnkiStateManager
 from obsidian_anki_sync.sync.card_generator import CardGenerator
 from obsidian_anki_sync.sync.change_applier import ChangeApplier
@@ -41,7 +42,6 @@ from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
-from obsidian_anki_sync.providers.factory import ProviderFactory
 
 if TYPE_CHECKING:
     from obsidian_anki_sync.sync.progress import ProgressTracker
@@ -516,6 +516,9 @@ class SyncEngine:
         if self.progress:
             self.progress.install_signal_handlers()
 
+        import time
+
+        sync_start_time = time.time()
         try:
             # Step 0: Build index (if enabled)
             index_stats = None
@@ -525,11 +528,18 @@ class SyncEngine:
 
                     self.progress.set_phase(SyncPhase.INDEXING)
 
-                logger.info("building_index")
+                logger.info("sync_phase_started", phase="indexing")
+                index_start_time = time.time()
                 index_stats = build_full_index(
                     self.config, self.db, self.anki, incremental=incremental
                 )
-                logger.info("index_built", stats=index_stats["overall"])
+                index_duration = time.time() - index_start_time
+                logger.info(
+                    "sync_phase_completed",
+                    phase="indexing",
+                    duration=round(index_duration, 2),
+                    stats=index_stats["overall"],
+                )
 
                 # Check for interruption
                 if self.progress and self.progress.is_interrupted():
@@ -540,9 +550,16 @@ class SyncEngine:
             if self.use_agents and getattr(
                 self.config, "enable_duplicate_detection", False
             ):
-                logger.info("fetching_existing_cards_for_duplicate_detection")
+                logger.info("sync_phase_started", phase="fetching_existing_cards")
+                fetch_start_time = time.time()
                 existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
-                logger.info("fetched_existing_cards", count=len(existing_cards))
+                fetch_duration = time.time() - fetch_start_time
+                logger.info(
+                    "sync_phase_completed",
+                    phase="fetching_existing_cards",
+                    duration=round(fetch_duration, 2),
+                    count=len(existing_cards),
+                )
                 # Pass existing cards to card generator
                 self.card_generator.set_existing_cards_for_duplicate_detection(
                     existing_cards
@@ -554,11 +571,20 @@ class SyncEngine:
 
                 self.progress.set_phase(SyncPhase.SCANNING)
 
+            logger.info("sync_phase_started", phase="scanning")
+            scan_start_time = time.time()
             obsidian_cards = self.note_scanner.scan_notes(
                 sample_size=sample_size,
                 incremental=incremental,
                 qa_extractor=self.qa_extractor,
                 existing_cards_for_duplicate_detection=existing_cards,
+            )
+            scan_duration = time.time() - scan_start_time
+            logger.info(
+                "sync_phase_completed",
+                phase="scanning",
+                duration=round(scan_duration, 2),
+                cards_generated=len(obsidian_cards),
             )
 
             # Check for interruption
@@ -571,12 +597,26 @@ class SyncEngine:
 
                 self.progress.set_phase(SyncPhase.DETERMINING_ACTIONS)
 
+            logger.info("sync_phase_started", phase="determining_actions")
+            action_start_time = time.time()
             anki_cards = self.anki_state_manager.fetch_state()
 
             # Step 3: Determine sync actions
             self.changes = []
             self.anki_state_manager.determine_actions(
                 obsidian_cards, anki_cards, self.changes
+            )
+            action_duration = time.time() - action_start_time
+            changes_by_type = {}
+            for change in self.changes:
+                change_type = change.type.value
+                changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+            logger.info(
+                "sync_phase_completed",
+                phase="determining_actions",
+                duration=round(action_duration, 2),
+                total_changes=len(self.changes),
+                changes_by_type=changes_by_type,
             )
 
             # Check for interruption
@@ -585,20 +625,39 @@ class SyncEngine:
 
             # Step 4: Apply or preview
             if dry_run:
+                logger.info("sync_phase_started", phase="preview")
                 self._print_plan()
+                logger.info("sync_phase_completed", phase="preview", changes_previewed=len(self.changes))
             else:
                 if self.progress:
                     from .progress import SyncPhase
 
                     self.progress.set_phase(SyncPhase.APPLYING_CHANGES)
 
+                logger.info("sync_phase_started", phase="applying_changes")
+                apply_start_time = time.time()
                 self.change_applier.apply_changes(self.changes)
+                apply_duration = time.time() - apply_start_time
+                logger.info(
+                    "sync_phase_completed",
+                    phase="applying_changes",
+                    duration=round(apply_duration, 2),
+                    changes_applied=len(self.changes),
+                )
 
             # Mark as completed
             if self.progress:
                 self.progress.complete(success=True)
 
-            logger.info("sync_completed", stats=self.stats)
+            total_duration = time.time() - sync_start_time
+            logger.info(
+                "sync_completed",
+                stats=self.stats,
+                total_duration=round(total_duration, 2),
+                dry_run=dry_run,
+                incremental=incremental,
+                sample_size=sample_size,
+            )
 
             # Clean up memory after sync completion
             self._cleanup_memory()

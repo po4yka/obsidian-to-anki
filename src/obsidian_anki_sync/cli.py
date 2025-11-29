@@ -95,26 +95,65 @@ def sync(
     ] = "INFO",
 ) -> None:
     """Synchronize Obsidian notes to Anki cards."""
+    import time
+
+    start_time = time.time()
     config, logger = get_config_and_logger(config_path, log_level)
 
-    # Override LangGraph setting if CLI flag is provided
-    if use_langgraph is not None:
-        config.use_langgraph = use_langgraph
-        # Enable PydanticAI when using LangGraph
-        config.use_pydantic_ai = use_langgraph
-        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
-
-    # Delegate to sync handler
-    run_sync(
-        config=config,
-        logger=logger,
+    # Log command entry with all parameters
+    logger.info(
+        "cli_command_started",
+        command="sync",
         dry_run=dry_run,
         incremental=incremental,
         no_index=no_index,
         sample_size=sample,
         resume=resume,
         no_resume=no_resume,
+        use_langgraph=use_langgraph,
+        config_path=str(config_path) if config_path else None,
+        log_level=log_level,
+        vault_path=str(config.vault_path) if config.vault_path else None,
     )
+
+    try:
+        # Override LangGraph setting if CLI flag is provided
+        if use_langgraph is not None:
+            config.use_langgraph = use_langgraph
+            # Enable PydanticAI when using LangGraph
+            config.use_pydantic_ai = use_langgraph
+            logger.info("langgraph_system_override", use_langgraph=use_langgraph)
+
+        # Delegate to sync handler
+        run_sync(
+            config=config,
+            logger=logger,
+            dry_run=dry_run,
+            incremental=incremental,
+            no_index=no_index,
+            sample_size=sample,
+            resume=resume,
+            no_resume=no_resume,
+        )
+
+        duration = time.time() - start_time
+        logger.info(
+            "cli_command_completed",
+            command="sync",
+            duration=round(duration, 2),
+            success=True,
+        )
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(
+            "cli_command_failed",
+            command="sync",
+            duration=round(duration, 2),
+            error=str(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
+        raise
 
 
 @app.command(name="test-run")
@@ -158,7 +197,23 @@ def test_run(
     ] = False,
 ) -> None:
     """Run a sample by processing N random notes."""
+    import time
+
+    start_time = time.time()
     config, logger = get_config_and_logger(config_path, log_level)
+
+    # Log command entry
+    logger.info(
+        "cli_command_started",
+        command="test-run",
+        count=count,
+        dry_run=dry_run,
+        use_langgraph=use_langgraph,
+        config_path=str(config_path) if config_path else None,
+        log_level=log_level,
+        index=index,
+        vault_path=str(config.vault_path) if config.vault_path else None,
+    )
 
     # Override LangGraph setting if CLI flag is provided
     if use_langgraph is not None:
@@ -240,12 +295,25 @@ def test_run(
 
             console.print(table)
 
-            logger.info("test_run_completed", stats=stats)
-
+            duration = time.time() - start_time
+            logger.info(
+                "cli_command_completed",
+                command="test-run",
+                duration=round(duration, 2),
+                success=True,
+                stats=stats,
+            )
     except Exception as e:
-        logger.error("test_run_failed", error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
+        duration = time.time() - start_time
+        logger.error(
+            "cli_command_failed",
+            command="test-run",
+            duration=round(duration, 2),
+            error=str(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
+        raise
 
 
 @app.command(name="lint-note")

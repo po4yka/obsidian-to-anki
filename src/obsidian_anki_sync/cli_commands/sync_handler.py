@@ -138,10 +138,24 @@ def run_sync(
                 )
 
                 _display_sync_results(stats, no_index)
-                logger.info("sync_completed", stats=stats)
+                logger.info(
+                    "sync_completed",
+                    stats=stats,
+                    dry_run=dry_run,
+                    incremental=incremental,
+                    sample_size=sample_size,
+                )
 
     except Exception as e:
-        logger.error("sync_failed", error=str(e))
+        logger.error(
+            "sync_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+            dry_run=dry_run,
+            incremental=incremental,
+            sample_size=sample_size,
+            exc_info=True,
+        )
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
 

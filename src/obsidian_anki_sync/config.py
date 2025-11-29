@@ -997,25 +997,36 @@ def load_config(config_path: Path | None = None) -> Config:
     """Load configuration from .env and config.yaml files using pydantic-settings."""
     import yaml
 
+    from obsidian_anki_sync.utils.logging import get_logger
+
+    logger = get_logger(__name__)
+
     # Find config.yaml file
     candidate_paths: list[Path] = []
 
     if config_path:
         candidate_paths.append(config_path.expanduser())
+        logger.info("config_loading", config_path=str(config_path), source="cli_argument")
     else:
         env_path = os.getenv("OBSIDIAN_ANKI_CONFIG")
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
+            logger.debug("config_searching", source="environment_variable", path=env_path)
         candidate_paths.append(Path.cwd() / "config.yaml")
         default_repo_config = Path(
             __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
+        logger.debug("config_searching", source="default_locations", paths=[str(p) for p in candidate_paths])
 
     resolved_config_path: Path | None = None
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
+            logger.info("config_file_found", config_path=str(resolved_config_path))
             break
+
+    if not resolved_config_path:
+        logger.warning("config_file_not_found", searched_paths=[str(p) for p in candidate_paths])
 
     # Load YAML data if file exists
     yaml_data: dict[str, Any] = {}
@@ -1023,12 +1034,13 @@ def load_config(config_path: Path | None = None) -> Config:
         try:
             with open(resolved_config_path, encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f) or {}
+            logger.debug("config_yaml_loaded", config_path=str(resolved_config_path), keys_count=len(yaml_data))
         except Exception as e:
-            from ..utils.logging import get_logger
-
-            logger = get_logger(__name__)
-            logger.warning(
-                "yaml_config_load_failed", path=str(resolved_config_path), error=str(e)
+            logger.error(
+                "config_yaml_load_error",
+                config_path=str(resolved_config_path),
+                error=str(e),
+                error_type=type(e).__name__,
             )
 
     # Convert YAML data to environment variable format for pydantic-settings
@@ -1103,7 +1115,34 @@ def load_config(config_path: Path | None = None) -> Config:
                 Path(str(yaml_data["data_dir"])).expanduser().resolve()
             )
 
-        config = Config(**config_kwargs)
+        try:
+            config = Config(**config_kwargs)
+            logger.info(
+                "config_loaded",
+                vault_path=str(config.vault_path) if config.vault_path else None,
+                llm_provider=getattr(config, "llm_provider", None),
+                use_agents=getattr(config, "use_agents", False),
+                use_langgraph=getattr(config, "use_langgraph", False),
+            )
+        except Exception as e:
+            logger.error(
+                "config_validation_error",
+                error=str(e),
+                error_type=type(e).__name__,
+                config_path=str(resolved_config_path) if resolved_config_path else None,
+            )
+            raise
+
+    # Validate config after loading
+    try:
+        config.validate_config()
+        logger.debug("config_validation_passed")
+    except Exception as e:
+        logger.warning(
+            "config_validation_warning",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
 
     return config
 

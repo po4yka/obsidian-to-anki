@@ -488,13 +488,20 @@ class LangGraphOrchestrator:
         Returns:
             AgentPipelineResult with all pipeline stages
         """
+        import uuid
+
         start_time = time.time()
+        pipeline_id = str(uuid.uuid4())[:8]
 
         logger.info(
-            "langgraph_pipeline_start",
+            "pipeline_started",
+            pipeline_id=pipeline_id,
+            note_id=metadata.id,
             title=metadata.title,
             qa_pairs_count=len(qa_pairs),
             agent_framework="langgraph",
+            file_path=str(file_path) if file_path else None,
+            initial_state_keys=["note_content", "metadata_dict", "qa_pairs_dicts", "file_path"],
         )
 
         # NEW: Start observability tracking
@@ -524,6 +531,8 @@ class LangGraphOrchestrator:
         # Initialize state
         # Best practice: Initialize all state fields explicitly
         initial_state: PipelineState = {
+            # Pipeline tracking
+            "pipeline_id": pipeline_id,
             # Input data
             "note_content": note_content,
             "metadata_dict": metadata.model_dump(),
@@ -710,12 +719,19 @@ class LangGraphOrchestrator:
             retry_count=final_state["retry_count"],
         )
 
+        nodes_executed = final_state.get("step_count", 0)
+        stage_times = final_state.get("stage_times", {})
         logger.info(
-            "langgraph_pipeline_complete",
+            "pipeline_completed",
+            pipeline_id=pipeline_id,
+            note_id=metadata.id,
             success=success,
+            total_duration=round(total_time, 3),
             retry_count=final_state["retry_count"],
-            total_time=total_time,
-            messages=final_state["messages"],
+            nodes_executed=nodes_executed,
+            stage_times=stage_times,
+            current_stage=final_state.get("current_stage", "unknown"),
+            cards_generated=len(generation.cards) if generation and generation.cards else 0,
         )
 
         # NEW: Record observability metrics

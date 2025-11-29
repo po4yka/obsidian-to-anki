@@ -130,33 +130,49 @@ class CardGenerator:
 
         # Check cache
         cache_key = f"{metadata.id}:{relative_path}:{note_content_hash}"
+        cache_hit = False
         try:
             if self._agent_card_cache:
+                cache_start_time = time.time()
                 cached_cards = self._agent_card_cache.get(cache_key)
+                cache_duration = time.time() - cache_start_time
                 if cached_cards is not None:
+                    cache_hit = True
                     self._cache_hits += 1
-                    logger.info(
-                        "agent_cache_hit",
-                        cache_key=cache_key,
+                    logger.debug(
+                        "cache_hit",
+                        operation="agent_card_generation",
+                        cache_key=cache_key[:8],
                         note=relative_path,
-                        cards_returned=len(cached_cards),
-                        content_hash=note_content_hash,
+                        cards_count=len(cached_cards),
+                        cache_duration=round(cache_duration, 4),
+                        content_hash=note_content_hash[:8],
                     )
                     return cached_cards  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(
-                "agent_cache_read_error",
-                cache_key=cache_key,
+                "cache_read_error",
+                operation="agent_card_generation",
+                cache_key=cache_key[:8],
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
-        self._cache_misses += 1
-        logger.info(
-            "generating_cards_with_agents",
-            note=relative_path,
-            qa_pairs=len(qa_pairs),
-            cache_miss=True,
-        )
+        if not cache_hit:
+            self._cache_misses += 1
+            logger.debug(
+                "cache_miss",
+                operation="agent_card_generation",
+                cache_key=cache_key[:8],
+                note=relative_path,
+                reason="not_found",
+            )
+            logger.info(
+                "generating_cards_with_agents",
+                note=relative_path,
+                qa_pairs=len(qa_pairs),
+                cache_miss=True,
+            )
 
         file_path = self.config.vault_path / relative_path
 
@@ -231,12 +247,26 @@ class CardGenerator:
         # Cache the results
         try:
             if self._agent_card_cache:
+                cache_write_start = time.time()
                 self._agent_card_cache.set(cache_key, cards)
+                cache_write_duration = time.time() - cache_write_start
+                logger.debug(
+                    "cache_write",
+                    operation="agent_card_generation",
+                    cache_key=cache_key[:8],
+                    duration=round(cache_write_duration, 4),
+                    cards_count=len(cards),
+                    cache_size_bytes=sum(
+                        len(str(card).encode()) for card in cards
+                    ),
+                )
         except Exception as e:
             logger.warning(
-                "agent_cache_write_error",
-                cache_key=cache_key,
+                "cache_write_error",
+                operation="agent_card_generation",
+                cache_key=cache_key[:8],
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
         logger.info(
@@ -304,29 +334,52 @@ class CardGenerator:
         content_hash = compute_content_hash(qa_pair, metadata, lang)
         cache_key = f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
 
+        cache_hit = False
         try:
             if self._apf_card_cache:
+                cache_start_time = time.time()
                 cached_card = self._apf_card_cache.get(cache_key)
+                cache_duration = time.time() - cache_start_time
                 if cached_card is not None:
                     if cached_card.content_hash == content_hash:
+                        cache_hit = True
                         elapsed_ms = round((time.time() - start_time) * 1000, 2)
                         self._cache_hits += 1
                         self._cache_stats["hits"] += 1
                         logger.debug(
-                            "card_generation_cache_hit",
+                            "cache_hit",
+                            operation="apf_card_generation",
+                            cache_key=cache_key[:8],
                             slug=cached_card.slug,
                             elapsed_ms=elapsed_ms,
+                            cache_duration=round(cache_duration, 4),
                         )
                         return cached_card  # type: ignore[no-any-return]
+                    else:
+                        logger.debug(
+                            "cache_miss",
+                            operation="apf_card_generation",
+                            cache_key=cache_key[:8],
+                            reason="content_hash_mismatch",
+                        )
         except Exception as e:
             logger.warning(
-                "apf_cache_read_error",
-                cache_key=cache_key,
+                "cache_read_error",
+                operation="apf_card_generation",
+                cache_key=cache_key[:8],
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
-        self._cache_misses += 1
-        self._cache_stats["misses"] += 1
+        if not cache_hit:
+            self._cache_misses += 1
+            self._cache_stats["misses"] += 1
+            logger.debug(
+                "cache_miss",
+                operation="apf_card_generation",
+                cache_key=cache_key[:8],
+                reason="not_found",
+            )
 
         # Generate slug - use thread-safe method in parallel mode
         if self._slug_counters and self._slug_counter_lock:
@@ -412,18 +465,25 @@ class CardGenerator:
         # Cache the generated card
         try:
             if self._apf_card_cache:
+                cache_write_start = time.time()
                 self._apf_card_cache.set(cache_key, card)
+                cache_write_duration = time.time() - cache_write_start
                 logger.debug(
-                    "apf_cache_stored",
-                    cache_key=cache_key,
+                    "cache_write",
+                    operation="apf_card_generation",
+                    cache_key=cache_key[:8],
                     slug=slug,
+                    duration=round(cache_write_duration, 4),
+                    cache_size_bytes=len(str(card).encode()),
                     content_hash=content_hash[:8],
                 )
         except Exception as e:
             logger.warning(
-                "apf_cache_write_error",
-                cache_key=cache_key,
+                "cache_write_error",
+                operation="apf_card_generation",
+                cache_key=cache_key[:8],
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
         # Log generation time
