@@ -237,7 +237,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
     ) -> UnifiedAgentResult:
         """Run post-validation using PydanticAI."""
         try:
-            from ..models import GeneratedCard
+            from .models import GeneratedCard
 
             # Convert to PydanticAI expected types
             card_list = [GeneratedCard(**card) for card in cards]
