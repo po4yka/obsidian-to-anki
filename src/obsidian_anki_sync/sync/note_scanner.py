@@ -652,6 +652,9 @@ class NoteScanner:
         last_error = None
         for attempt in range(max_retries + 1):
             try:
+                # Ensure we have FD headroom before starting a new note processing task
+                self._wait_for_fd_headroom()
+
                 return self.process_note(
                     file_path, relative_path, existing_slugs, qa_extractor, slug_lock
                 )
