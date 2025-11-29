@@ -574,9 +574,15 @@ class TestReflectAfterEnrichmentNode:
         mock_agent = MagicMock()
         mock_agent.run = AsyncMock(return_value=mock_result)
 
-        with patch(
-            "obsidian_anki_sync.agents.langgraph.reflection_nodes.Agent",
-            return_value=mock_agent,
+        with (
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reflection_nodes.Agent",
+                return_value=mock_agent,
+            ),
+            patch(
+                "obsidian_anki_sync.agents.langgraph.reflection_nodes.get_model",
+                return_value=MagicMock(),  # Mock model available
+            ),
         ):
             result = await reflect_after_enrichment_node(mock_pipeline_state)
 

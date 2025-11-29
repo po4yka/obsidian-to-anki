@@ -229,9 +229,9 @@ class LangGraphOrchestrator:
                         ),
                     )
                 else:
-                    logger.warning(
+                    logger.info(
                         "rag_integration_not_indexed",
-                        hint="Run 'obsidian-anki-sync rag index' to build the index",
+                        hint="Run 'obsidian-anki-sync rag index' to build the index for enhanced features",
                     )
             except Exception as e:
                 logger.warning("rag_integration_init_failed", error=str(e))

@@ -49,9 +49,9 @@ class RAGIntegration:
 
             # Check if index exists
             if not self._service.is_indexed():
-                logger.warning(
-                    "rag_index_missing",
-                    hint="Run 'obsidian-anki-sync rag index' to build the index",
+                logger.info(
+                    "rag_index_not_built",
+                    hint="Run 'obsidian-anki-sync rag index' to build the index for enhanced features",
                 )
 
         return self._service
