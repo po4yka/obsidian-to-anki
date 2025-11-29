@@ -462,6 +462,21 @@ class Config(BaseSettings):
     )
 
     # ============================================================================
+    # Auto-Fix Configuration
+    # ============================================================================
+    # Auto-fix runs automatically as the first stage of the pipeline
+    autofix_write_back: bool = Field(
+        default=False,
+        description="Write auto-fixes back to source files (modifies original notes)",
+    )
+    autofix_handlers: list[str] | None = Field(
+        default=None,
+        description="List of enabled auto-fix handler types (None = all handlers enabled). "
+        "Available: trailing_whitespace, empty_references, title_format, moc_mismatch, "
+        "section_order, missing_related_questions, broken_wikilink, broken_related_entry",
+    )
+
+    # ============================================================================
     # Chain of Thought (CoT) Reasoning Configuration
     # ============================================================================
     enable_cot_reasoning: bool = Field(

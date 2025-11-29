@@ -7,7 +7,6 @@ the LangGraph state machine workflow.
 from __future__ import annotations
 
 import time
-import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -619,7 +618,11 @@ class LangGraphOrchestrator:
             "rag_enrichment": None,
             "rag_examples": None,
             "rag_duplicate_results": None,
+            # Auto-Fix configuration (autofix always runs as first step)
+            "autofix_write_back": getattr(self.config, "autofix_write_back", False),
+            "autofix_handlers": getattr(self.config, "autofix_handlers", None),
             # Pipeline stage results
+            "autofix": None,  # Will be populated by autofix_node
             "pre_validation": None,
             "note_correction": None,
             "card_splitting": None,
@@ -631,11 +634,7 @@ class LangGraphOrchestrator:
             "memorization_quality": None,
             "duplicate_detection": None,
             # Workflow control
-            "current_stage": (
-                "note_correction"
-                if getattr(self.config, "enable_note_correction", False)
-                else "pre_validation"
-            ),
+            "current_stage": self._determine_entry_stage(),
             "enable_card_splitting": self.enable_card_splitting,
             "enable_context_enrichment": self.enable_context_enrichment,
             "enable_memorization_quality": self.enable_memorization_quality,
@@ -980,3 +979,12 @@ class LangGraphOrchestrator:
         """Generate base slug from note metadata using collision-safe helper."""
 
         return generate_agent_slug_base(metadata)
+
+    def _determine_entry_stage(self) -> str:
+        """Determine the entry stage based on enabled features.
+
+        Returns:
+            The name of the first stage to execute in the pipeline.
+        """
+        # Autofix is always the first stage (permanent step)
+        return "autofix"

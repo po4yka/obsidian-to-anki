@@ -5,6 +5,7 @@ from langgraph.graph import END, StateGraph
 from obsidian_anki_sync.config import Config
 
 from .nodes import (
+    autofix_node,
     card_splitting_node,
     context_enrichment_node,
     duplicate_detection_node,
@@ -111,6 +112,13 @@ class WorkflowBuilder:
 
         # Check if CoT reasoning is enabled
         enable_cot = getattr(self.config, "enable_cot_reasoning", False)
+
+        # Add autofix node (permanent - always runs as first step)
+        workflow.add_node(
+            "autofix",
+            autofix_node,
+            retry_policy=None,  # Deterministic - no retry needed
+        )
 
         # Add optional note correction node (if enabled)
         enable_note_correction = getattr(self.config, "enable_note_correction", False)
@@ -255,13 +263,16 @@ class WorkflowBuilder:
         # ====================================================================
         # Set entry point and routing
         # ====================================================================
+        # Autofix always runs first (permanent step)
+        workflow.set_entry_point("autofix")
+
         if enable_cot:
             # CoT enabled: Route through reasoning nodes
             if enable_note_correction:
-                workflow.set_entry_point("note_correction")
+                workflow.add_edge("autofix", "note_correction")
                 workflow.add_edge("note_correction", "think_before_pre_validation")
             else:
-                workflow.set_entry_point("think_before_pre_validation")
+                workflow.add_edge("autofix", "think_before_pre_validation")
 
             # Reasoning nodes always proceed to their action nodes
             workflow.add_edge("think_before_pre_validation", "pre_validation")
@@ -371,11 +382,12 @@ class WorkflowBuilder:
 
         else:
             # CoT disabled: Original routing (no reasoning nodes)
+            # Autofix entry point already set above
             if enable_note_correction:
-                workflow.set_entry_point("note_correction")
+                workflow.add_edge("autofix", "note_correction")
                 workflow.add_edge("note_correction", "pre_validation")
             else:
-                workflow.set_entry_point("pre_validation")
+                workflow.add_edge("autofix", "pre_validation")
 
             # Add conditional edges
             workflow.add_conditional_edges(

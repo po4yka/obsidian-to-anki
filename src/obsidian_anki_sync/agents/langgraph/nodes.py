@@ -1,7 +1,8 @@
 """Pipeline node functions for LangGraph workflow.
 
-This module implements all 8 pipeline nodes that process notes through
+This module implements all 9 pipeline nodes that process notes through
 the card generation workflow:
+0. Auto-Fix - Fix note issues before processing (permanent step)
 1. Note Correction (optional)
 2. Pre-Validation
 3. Card Splitting (optional)
@@ -22,6 +23,7 @@ from obsidian_anki_sync.agents.exceptions import (
     StructuredOutputError,
 )
 from obsidian_anki_sync.agents.models import (
+    AutoFixResult,
     CardSplittingResult,
     ContextEnrichmentResult,
     GeneratedCard,
@@ -88,6 +90,99 @@ def _get_reasoning_recommendations(state: PipelineState) -> list[str]:
 # ============================================================================
 # Node Functions
 # ============================================================================
+
+
+async def autofix_node(state: PipelineState) -> PipelineState:
+    """Execute auto-fix stage to correct note issues before processing.
+
+    This node runs deterministic fixes for common note issues:
+    - Trailing whitespace
+    - Empty references sections
+    - Title format (bilingual)
+    - MOC field mismatches
+    - Section ordering
+    - Missing Related Questions sections
+    - Broken wikilinks
+    - Broken related entries
+
+    This is a permanent step that always runs as the first stage of the pipeline.
+
+    Args:
+        state: Current pipeline state
+
+    Returns:
+        Updated state with fixed content and autofix results
+    """
+    from obsidian_anki_sync.agents.autofix import AutoFixRegistry
+
+    # Check step limit (best practice: cycle protection)
+    if not increment_step_count(state, "autofix"):
+        return state
+
+    logger.info("langgraph_autofix_start")
+    start_time = time.time()
+
+    try:
+        # Get configuration
+        config = get_config(state)
+        note_content = state.get("note_content", "")
+        file_path = Path(state["file_path"]) if state.get("file_path") else None
+
+        # Get note index for link validation (if available from config)
+        note_index = getattr(config, "note_index", None) or set()
+
+        # Get enabled handlers from state or use all
+        enabled_handlers = state.get("autofix_handlers")
+
+        # Initialize registry
+        registry = AutoFixRegistry(
+            note_index=note_index,
+            enabled_handlers=enabled_handlers,
+            write_back=state.get("autofix_write_back", False),
+        )
+
+        # Run auto-fix
+        result = registry.fix_all(content=note_content, file_path=file_path)
+
+        # Update state with fixed content if modifications were made
+        if result.file_modified and result.fixed_content:
+            state["note_content"] = result.fixed_content
+            logger.info(
+                "autofix_content_updated",
+                issues_fixed=result.issues_fixed,
+                file_path=str(file_path) if file_path else None,
+            )
+
+        # Store result in state
+        state["autofix"] = result.model_dump()
+        state["stage_times"]["autofix"] = time.time() - start_time
+        state["messages"].append(
+            f"Autofix: {result.issues_fixed}/{len(result.issues_found)} issues fixed"
+        )
+
+        logger.info(
+            "langgraph_autofix_complete",
+            issues_found=len(result.issues_found),
+            issues_fixed=result.issues_fixed,
+            file_modified=result.file_modified,
+            duration_ms=round((time.time() - start_time) * 1000, 2),
+        )
+
+    except Exception as e:
+        logger.exception("autofix_error", error=str(e))
+        # Non-blocking: continue to next stage even if autofix fails
+        state["autofix"] = AutoFixResult(
+            file_modified=False,
+            issues_found=[],
+            issues_fixed=0,
+            issues_skipped=0,
+            fix_time=time.time() - start_time,
+        ).model_dump()
+        state["messages"].append(f"Autofix: failed ({e})")
+
+    # Move to next stage
+    state["current_stage"] = "note_correction"
+    return state
 
 
 async def note_correction_node(state: PipelineState) -> PipelineState:

@@ -49,6 +49,7 @@ class PipelineState(TypedDict):
     duplicate_detection_model: str | None
 
     # Pipeline stage results
+    autofix: dict | None  # Serialized AutoFixResult
     note_correction: dict | None  # Serialized NoteCorrectionResult
     pre_validation: dict | None  # Serialized PreValidationResult
     card_splitting: dict | None  # Serialized CardSplittingResult
@@ -64,6 +65,7 @@ class PipelineState(TypedDict):
 
     # Workflow control
     current_stage: Literal[
+        "autofix",
         "note_correction",
         "pre_validation",
         "card_splitting",
@@ -76,6 +78,9 @@ class PipelineState(TypedDict):
         "complete",
         "failed",
     ]
+    # Auto-fix always runs (permanent step) - configurable options only
+    autofix_write_back: bool  # Write fixes back to source files
+    autofix_handlers: list[str] | None  # List of enabled handler types (None = all)
     enable_card_splitting: bool
     enable_context_enrichment: bool
     enable_memorization_quality: bool

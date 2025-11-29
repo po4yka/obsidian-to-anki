@@ -430,3 +430,63 @@ class SplitValidationResult(BaseModel):
     feedback: str = ""
     suggested_modifications: list[str] = Field(default_factory=list)
     validation_time: float = 0.0
+
+
+class AutoFixIssue(BaseModel):
+    """A single auto-fixable issue found in a note."""
+
+    model_config = ConfigDict(frozen=False)
+
+    issue_type: Literal[
+        "trailing_whitespace",
+        "empty_references",
+        "title_format",
+        "moc_mismatch",
+        "section_order",
+        "missing_related_questions",
+        "broken_wikilink",
+        "broken_related_entry",
+        "missing_concept_links",
+        "related_count",
+    ] = Field(description="Type of issue detected")
+    severity: Literal["info", "warning", "error"] = Field(
+        default="warning", description="Issue severity"
+    )
+    description: str = Field(default="", description="Human-readable issue description")
+    location: str | None = Field(
+        default=None, description="Location in file (line number or field name)"
+    )
+    auto_fixed: bool = Field(default=False, description="Whether this issue was fixed")
+    fix_description: str = Field(
+        default="", description="Description of the fix applied"
+    )
+
+
+class AutoFixResult(BaseModel):
+    """Result from auto-fix agent during note scanning.
+
+    Tracks issues detected and fixes applied to notes before card generation.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    file_modified: bool = Field(
+        default=False, description="Whether the source file was modified"
+    )
+    issues_found: list[AutoFixIssue] = Field(
+        default_factory=list, description="All issues detected"
+    )
+    issues_fixed: int = Field(default=0, description="Number of issues auto-fixed")
+    issues_skipped: int = Field(
+        default=0, description="Number of issues that could not be fixed"
+    )
+    original_content: str | None = Field(
+        default=None, description="Original content before fixes (for rollback)"
+    )
+    fixed_content: str | None = Field(
+        default=None, description="Content after fixes applied"
+    )
+    fix_time: float = Field(default=0.0, ge=0.0, description="Time taken for fixes")
+    write_back_enabled: bool = Field(
+        default=False, description="Whether fixes were written back to file"
+    )
