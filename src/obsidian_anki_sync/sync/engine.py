@@ -133,6 +133,33 @@ class SyncEngine:
             # Still keep for backward compat
             self.apf_gen = APFGenerator(config)
             self.use_agents = True
+
+            # Configure LLM-based Q&A extraction when using agents
+            from obsidian_anki_sync.obsidian.parser import create_qa_extractor
+
+            qa_extractor_model = config.get_model_for_agent("qa_extractor")
+            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
+            if qa_extractor_temp is None:
+                model_config = config.get_model_config_for_task("qa_extraction")
+                qa_extractor_temp = model_config.get("temperature", 0.0)
+            reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
+
+            logger.info(
+                "configuring_llm_qa_extraction",
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
+            )
+            self.qa_extractor = create_qa_extractor(
+                llm_provider=self.agent_orchestrator.provider,
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
+                enable_content_generation=True,
+                repair_missing_sections=getattr(
+                    config, "enforce_bilingual_validation", True
+                ),
+            )
         else:
             self.apf_gen = APFGenerator(config)
             self.agent_orchestrator: LangGraphOrchestrator | None = None  # type: ignore
