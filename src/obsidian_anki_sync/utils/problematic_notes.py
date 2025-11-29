@@ -4,6 +4,7 @@ This module provides functionality to copy notes that fail processing
 to a dedicated folder structure for easier analysis and repair.
 """
 
+import contextlib
 import hashlib
 import json
 import shutil
@@ -42,20 +43,63 @@ class ProblematicNotesArchiver:
             self._load_index()
 
     def _load_index(self) -> None:
-        """Load or initialize the index of archived notes."""
-        if self.index_file.exists():
+        """Load or initialize the index of archived notes.
+
+        Creates a backup before loading and attempts recovery from backup
+        if the main index is corrupted.
+        """
+        if not self.index_file.exists():
+            self.index = {"notes": [], "last_updated": None}
+            return
+
+        backup_file = self.index_file.with_suffix(".json.bak")
+
+        # Create backup before loading (best effort)
+        with contextlib.suppress(OSError):
+            shutil.copy2(self.index_file, backup_file)
+
+        try:
+            with open(self.index_file, encoding="utf-8") as f:
+                self.index = json.load(f)
+            return
+        except json.JSONDecodeError as e:
+            logger.error(
+                "index_corrupted_attempting_recovery",
+                error=str(e),
+                index_file=str(self.index_file),
+            )
+        except OSError as e:
+            logger.warning(
+                "failed_to_read_index_file",
+                error=str(e),
+                index_file=str(self.index_file),
+            )
+            self.index = {"notes": [], "last_updated": None}
+            return
+
+        # Attempt recovery from backup
+        if backup_file.exists():
             try:
-                with open(self.index_file, encoding="utf-8") as f:
+                with open(backup_file, encoding="utf-8") as f:
                     self.index = json.load(f)
+                logger.info(
+                    "index_recovered_from_backup",
+                    backup_file=str(backup_file),
+                )
+                return
             except (OSError, json.JSONDecodeError) as e:
                 logger.warning(
-                    "failed_to_load_problematic_notes_index",
+                    "backup_recovery_failed",
                     error=str(e),
-                    action="creating_new_index",
+                    backup_file=str(backup_file),
                 )
-                self.index = {"notes": [], "last_updated": None}
-        else:
-            self.index = {"notes": [], "last_updated": None}
+
+        # No recovery possible - create new index
+        logger.warning(
+            "index_reset_data_lost",
+            index_file=str(self.index_file),
+        )
+        self.index = {"notes": [], "last_updated": None}
 
     def _save_index(self) -> None:
         """Save the index to disk."""

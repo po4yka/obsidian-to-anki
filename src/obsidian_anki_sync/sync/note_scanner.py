@@ -29,7 +29,7 @@ from arq.connections import RedisSettings
 from arq.jobs import Job
 
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.exceptions import ConfigurationError, ParserError
 from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
 from obsidian_anki_sync.sync.state_db import StateDB
@@ -665,6 +665,80 @@ class NoteScanner:
 
         return _run_queue_scan()
 
+    async def _validate_redis_connection(self, pool) -> bool:
+        """Validate Redis connection is healthy before submitting jobs.
+
+        Args:
+            pool: ArqRedis pool instance
+
+        Returns:
+            True if connection is healthy, False otherwise
+        """
+        try:
+            await pool.ping()
+            logger.info("redis_connection_healthy")
+            return True
+        except Exception as e:
+            logger.error("redis_connection_failed", error=str(e))
+            return False
+
+    async def _enqueue_with_retry(
+        self,
+        pool,
+        func_name: str,
+        *args,
+        max_retries: int = 3,
+        initial_delay: float = 1.0,
+        **kwargs,
+    ):
+        """Enqueue a job with retry logic and exponential backoff.
+
+        Args:
+            pool: ArqRedis pool instance
+            func_name: Name of the worker function to call
+            *args: Arguments for the worker function
+            max_retries: Maximum retry attempts
+            initial_delay: Initial delay between retries
+            **kwargs: Keyword arguments including _job_id
+
+        Returns:
+            Job instance or None if job already exists
+        """
+        delay = initial_delay
+        last_exception = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                return await pool.enqueue_job(func_name, *args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries:
+                    # Add jitter to prevent thundering herd
+                    jitter = delay * random.uniform(-0.1, 0.1)
+                    wait_time = delay + jitter
+                    logger.warning(
+                        "enqueue_retry",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        delay=round(wait_time, 2),
+                        error=str(e),
+                    )
+                    await asyncio.sleep(wait_time)
+                    delay = min(delay * 2, 30.0)  # Exponential backoff, max 30s
+                else:
+                    logger.error(
+                        "enqueue_retry_exhausted",
+                        attempts=max_retries + 1,
+                        error=str(e),
+                    )
+                    raise
+
+        if last_exception:
+            raise last_exception
+
+        # Should never reach here, but satisfy linter
+        return None
+
     async def _scan_notes_with_queue_async(
         self,
         note_files: list[tuple[Any, str]],
@@ -674,7 +748,15 @@ class NoteScanner:
         error_samples: defaultdict[str, list[str]],
         qa_extractor: Any = None,
     ) -> dict[str, Card]:
-        """Async implementation of queue scanning."""
+        """Async implementation of queue scanning with stability improvements.
+
+        Features:
+        - Redis health check before job submission
+        - Retry logic with exponential backoff for job submission
+        - Circuit breaker pattern for Redis failures
+        - Overall and per-job timeouts
+        - Adaptive polling with backoff
+        """
         logger.info(
             "queue_scan_started",
             total_notes=len(note_files),
@@ -684,100 +766,221 @@ class NoteScanner:
         redis_settings = RedisSettings.from_dsn(self.config.redis_url)
         pool = await create_pool(redis_settings)
 
-        job_map = {}  # job_id -> (file_path, relative_path)
+        # Validate Redis connection before proceeding
+        if not await self._validate_redis_connection(pool):
+            await pool.close()
+            msg = (
+                f"Redis unavailable at {self.config.redis_url}. "
+                "Check that Redis is running and accessible."
+            )
+            raise ConfigurationError(msg)
+
+        job_map: dict[str, tuple[Any, str]] = {}  # job_id -> (file_path, relative_path)
+        job_submit_times: dict[str, float] = {}  # job_id -> submission timestamp
+
+        # Circuit breaker state for Redis operations
+        consecutive_failures = 0
+        circuit_breaker_threshold = getattr(
+            self.config, "queue_circuit_breaker_threshold", 3
+        )
 
         logger.info("submitting_jobs", total_files=len(note_files))
 
-        # Submit all jobs
+        # Submit all jobs with retry logic
         for file_path, relative_path in note_files:
+            # Check circuit breaker
+            if consecutive_failures >= circuit_breaker_threshold:
+                logger.error(
+                    "circuit_breaker_open",
+                    consecutive_failures=consecutive_failures,
+                    threshold=circuit_breaker_threshold,
+                )
+                break
+
             try:
                 # Sanitize job ID to avoid issues with slashes
                 job_id = f"note-{relative_path.replace('/', '_').replace('\\', '_')}"
 
-                # We pass minimal data to keep payload small
-                # The worker will re-parse the file
-                job = await pool.enqueue_job(
+                # Enqueue with retry logic
+                job = await self._enqueue_with_retry(
+                    pool,
                     "process_note_job",
                     str(file_path),
                     relative_path,
-                    _job_id=job_id
+                    max_retries=getattr(self.config, "queue_max_retries", 3),
+                    _job_id=job_id,
                 )
+
+                submit_time = time.time()
                 if job:
                     job_map[job.job_id] = (file_path, relative_path)
-                    logger.debug("job_enqueued", job_id=job.job_id,
-                                 file=relative_path)
+                    job_submit_times[job.job_id] = submit_time
+                    logger.debug("job_enqueued", job_id=job.job_id, file=relative_path)
                 else:
-                    logger.warning("job_enqueue_returned_none",
-                                   file=relative_path, job_id=job_id)
+                    # Job with this ID already exists in Redis
+                    job_map[job_id] = (file_path, relative_path)
+                    job_submit_times[job_id] = submit_time
+                    logger.debug(
+                        "job_already_exists_tracking", file=relative_path, job_id=job_id
+                    )
+
+                # Reset circuit breaker on success
+                consecutive_failures = 0
+
             except Exception as e:
-                logger.error("queue_submission_failed",
-                             file=relative_path, error=str(e))
+                consecutive_failures += 1
+                logger.error(
+                    "queue_submission_failed",
+                    file=relative_path,
+                    error=str(e),
+                    consecutive_failures=consecutive_failures,
+                )
                 self.stats["errors"] = self.stats.get("errors", 0) + 1
 
         logger.info("jobs_submitted", count=len(job_map))
 
-        # Poll for results
+        if not job_map:
+            logger.warning("no_jobs_submitted")
+            await pool.close()
+            return obsidian_cards
+
+        # Poll for results with timeouts and adaptive polling
         pending_jobs = set(job_map.keys())
         completed_jobs = 0
 
+        # Timeout configuration
+        max_wait_time = getattr(self.config, "queue_max_wait_time_seconds", 18000)
+        job_timeout = getattr(self.config, "queue_job_timeout_seconds", 3600)
+        poll_start_time = time.time()
+
+        # Adaptive polling configuration
+        poll_interval = getattr(self.config, "queue_poll_interval", 0.5)
+        poll_max_interval = getattr(self.config, "queue_poll_max_interval", 5.0)
+        last_progress_time = time.time()
+        no_progress_threshold = 30  # seconds before increasing poll interval
+
         while pending_jobs:
-            # Check status of pending jobs
-            # In a real implementation we might use pubsub or just poll efficiently
-            # Here we poll with a simple delay
-            await asyncio.sleep(0.5)
+            # Check overall timeout
+            elapsed_total = time.time() - poll_start_time
+            if elapsed_total > max_wait_time:
+                logger.error(
+                    "queue_polling_timeout",
+                    pending_count=len(pending_jobs),
+                    elapsed=elapsed_total,
+                    max_wait=max_wait_time,
+                )
+                for job_id in pending_jobs:
+                    file_path, relative_path = job_map[job_id]
+                    logger.error("job_stuck_at_timeout", job_id=job_id, file=relative_path)
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                break
+
+            await asyncio.sleep(poll_interval)
 
             done_this_loop = set()
-            for job_id in pending_jobs:
-                job = Job(job_id=job_id, redis=pool)
-                status = await job.status()
+            progress_made = False
+
+            for job_id in list(pending_jobs):
+                # Check per-job timeout
+                job_elapsed = time.time() - job_submit_times.get(job_id, poll_start_time)
+                if job_elapsed > job_timeout:
+                    file_path, relative_path = job_map[job_id]
+                    logger.error(
+                        "job_timeout",
+                        job_id=job_id,
+                        file=relative_path,
+                        elapsed=job_elapsed,
+                        timeout=job_timeout,
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    error_by_type["job_timeout"] += 1
+                    if len(error_samples["job_timeout"]) < 3:
+                        error_samples["job_timeout"].append(
+                            f"{relative_path}: timed out after {job_elapsed:.0f}s"
+                        )
+                    done_this_loop.add(job_id)
+                    continue
+
+                try:
+                    job = Job(job_id=job_id, redis=pool)
+                    status = await job.status()
+                except Exception as e:
+                    logger.warning("job_status_check_failed", job_id=job_id, error=str(e))
+                    continue
 
                 if status == "complete":
-                    result = await job.result()
+                    progress_made = True
+                    try:
+                        result = await job.result()
+                    except Exception as e:
+                        logger.error(
+                            "job_result_fetch_failed", job_id=job_id, error=str(e)
+                        )
+                        self.stats["errors"] = self.stats.get("errors", 0) + 1
+                        done_this_loop.add(job_id)
+                        completed_jobs += 1
+                        continue
+
                     file_path, relative_path = job_map[job_id]
 
-                    if result["success"]:
-                        # Reconstruct cards from dicts
-                        from obsidian_anki_sync.models import Card
-                        for card_dict in result["cards"]:
-                            # We need to handle the fact that Card might need specific reconstruction
-                            # For now assuming Pydantic model can re-hydrate
+                    if result.get("success"):
+                        for card_dict in result.get("cards", []):
                             try:
                                 card = Card(**card_dict)
                                 obsidian_cards[card.slug] = card
                                 existing_slugs.add(card.slug)
                             except Exception as e:
-                                logger.error("card_rehydration_failed", slug=card_dict.get(
-                                    "slug"), error=str(e))
-
-                        self.stats["processed"] = self.stats.get(
-                            "processed", 0) + 1
+                                logger.error(
+                                    "card_rehydration_failed",
+                                    slug=card_dict.get("slug"),
+                                    error=str(e),
+                                )
+                        self.stats["processed"] = self.stats.get("processed", 0) + 1
                     else:
                         error_msg = result.get("error", "Unknown error")
-                        logger.warning("job_failed_result",
-                                       file=relative_path, error=error_msg)
+                        logger.warning(
+                            "job_failed_result", file=relative_path, error=error_msg
+                        )
                         self.stats["errors"] = self.stats.get("errors", 0) + 1
                         error_by_type["queue_error"] += 1
                         if len(error_samples["queue_error"]) < 3:
                             error_samples["queue_error"].append(
-                                f"{relative_path}: {error_msg}")
+                                f"{relative_path}: {error_msg}"
+                            )
 
                     done_this_loop.add(job_id)
                     completed_jobs += 1
 
                 elif status in ("failed", "not_found"):
-                    # Job failed at worker level (exception raised)
+                    progress_made = True
                     file_path, relative_path = job_map[job_id]
-                    logger.error("job_execution_failed",
-                                 file=relative_path, status=status)
+                    logger.error(
+                        "job_execution_failed", file=relative_path, status=status
+                    )
                     self.stats["errors"] = self.stats.get("errors", 0) + 1
                     done_this_loop.add(job_id)
                     completed_jobs += 1
 
             pending_jobs -= done_this_loop
 
+            # Adaptive polling: backoff if no progress
+            if progress_made:
+                poll_interval = getattr(self.config, "queue_poll_interval", 0.5)
+                last_progress_time = time.time()
+            elif time.time() - last_progress_time > no_progress_threshold:
+                old_interval = poll_interval
+                poll_interval = min(poll_interval * 1.5, poll_max_interval)
+                if poll_interval != old_interval:
+                    logger.debug(
+                        "polling_backoff",
+                        old_interval=old_interval,
+                        new_interval=poll_interval,
+                    )
+
             if done_this_loop:
-                logger.info("queue_progress",
-                            completed=completed_jobs, total=len(job_map))
+                logger.info(
+                    "queue_progress", completed=completed_jobs, total=len(job_map)
+                )
 
         await pool.close()
         return obsidian_cards
@@ -1298,6 +1501,9 @@ class NoteScanner:
             **snapshot,
         )
 
+        fd_wait_start = time.time()
+        fd_wait_max = 30  # seconds - prevent infinite hang
+
         while True:
             time.sleep(self._archiver_fd_poll_interval)
             has_headroom, snapshot = has_fd_headroom(
@@ -1308,3 +1514,13 @@ class NoteScanner:
                     **snapshot,
                 )
                 break
+
+            # Timeout to prevent infinite hang
+            if time.time() - fd_wait_start > fd_wait_max:
+                logger.error(
+                    "fd_headroom_timeout",
+                    waited=fd_wait_max,
+                    required_headroom=self._archiver_fd_headroom,
+                    **snapshot,
+                )
+                break  # Continue anyway to avoid process hang

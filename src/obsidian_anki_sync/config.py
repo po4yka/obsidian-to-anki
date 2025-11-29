@@ -160,6 +160,32 @@ class Config(BaseSettings):
         description="Maximum retries for queued tasks",
     )
 
+    # Queue Stability Configuration
+    queue_max_wait_time_seconds: int = Field(
+        default=18000,
+        description="Overall timeout for queue polling (5 hours)",
+    )
+    queue_job_timeout_seconds: int = Field(
+        default=3600,
+        description="Per-job timeout (1 hour)",
+    )
+    queue_poll_interval: float = Field(
+        default=0.5,
+        description="Initial poll interval for job status (seconds)",
+    )
+    queue_poll_max_interval: float = Field(
+        default=5.0,
+        description="Maximum poll interval with adaptive backoff (seconds)",
+    )
+    queue_circuit_breaker_threshold: int = Field(
+        default=3,
+        description="Consecutive failures before circuit breaker opens",
+    )
+    queue_circuit_breaker_timeout: int = Field(
+        default=60,
+        description="Seconds to wait before retrying after circuit breaker opens",
+    )
+
     # Optional fields (with defaults)
     # Obsidian source directories (optional - overrides source_dir if provided)
     # List of relative paths from vault_path to search for Q&A notes

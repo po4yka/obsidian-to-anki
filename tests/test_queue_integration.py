@@ -24,6 +24,10 @@ def mock_config():
 @pytest.fixture
 def mock_pool():
     pool = AsyncMock(spec=ArqRedis)
+    # Add ping method for health check
+    pool.ping = AsyncMock(return_value=True)
+    # Add close method
+    pool.close = AsyncMock(return_value=None)
     return pool
 
 
@@ -67,7 +71,11 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
 
     mock_pool.enqueue_job.return_value = mock_job
 
-    with patch("obsidian_anki_sync.sync.note_scanner.create_pool", return_value=mock_pool), \
+    # create_pool is async, so we need to return a coroutine that returns the mock_pool
+    async def mock_create_pool(*args, **kwargs):
+        return mock_pool
+
+    with patch("obsidian_anki_sync.sync.note_scanner.create_pool", side_effect=mock_create_pool), \
          patch("obsidian_anki_sync.sync.note_scanner.Job", return_value=mock_job_instance) as mock_job_class:
         from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
         archiver = ProblematicNotesArchiver(Path("/tmp"), enabled=True)
