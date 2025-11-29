@@ -30,7 +30,45 @@ def mock_pool():
 def test_scan_notes_with_queue(mock_config, mock_pool):
     """Test that scan_notes_with_queue submits jobs and collects results."""
 
-    with patch("obsidian_anki_sync.sync.note_scanner.create_pool", return_value=mock_pool) as mock_create_pool:
+    # Mock job returned by enqueue_job
+    mock_job = MagicMock()
+    mock_job.job_id = "test-job-id"
+
+    # Mock Job class instance for status checking
+    mock_job_instance = MagicMock()
+    mock_job_instance.status = AsyncMock(return_value="complete")
+    mock_job_instance.result = AsyncMock(return_value={
+        "success": True,
+        "cards": [
+            {
+                "slug": "test-card",
+                "lang": "en",
+                "apf_html": "<!-- test -->",
+                "manifest": {
+                    "slug": "test-card",
+                    "slug_base": "test-card",
+                    "lang": "en",
+                    "source_path": "/tmp/test.md",
+                    "source_anchor": "#card-1",
+                    "note_id": "test",
+                    "note_title": "Test",
+                    "card_index": 0,
+                    "guid": "guid",
+                    "hash6": None
+                },
+                "content_hash": "hash123",
+                "note_type": "APF::Simple",
+                "tags": ["tag"],
+                "guid": "guid"
+            }
+        ],
+        "slugs": ["test-card"]
+    })
+
+    mock_pool.enqueue_job.return_value = mock_job
+
+    with patch("obsidian_anki_sync.sync.note_scanner.create_pool", return_value=mock_pool), \
+         patch("obsidian_anki_sync.sync.note_scanner.Job", return_value=mock_job_instance) as mock_job_class:
         from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
         archiver = ProblematicNotesArchiver(Path("/tmp"), enabled=True)
         scanner = NoteScanner(
@@ -39,41 +77,6 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
             card_generator=MagicMock(),
             archiver=archiver,
         )
-
-        # Mock job
-        mock_job = MagicMock()
-        mock_job.job_id = "test-job-id"
-        mock_job.status = AsyncMock(return_value="complete")
-        mock_job.result = AsyncMock(return_value={
-            "success": True,
-            "cards": [
-                {
-                    "slug": "test-card",
-                    "lang": "en",
-                    "apf_html": "<!-- test -->",
-                    "manifest": {
-                        "slug": "test-card",
-                        "slug_base": "test-card",
-                        "lang": "en",
-                        "source_path": "/tmp/test.md",
-                        "source_anchor": "#card-1",
-                        "note_id": "test",
-                        "note_title": "Test",
-                        "card_index": 0,
-                        "guid": "guid",
-                        "hash6": None
-                    },
-                    "content_hash": "hash123",
-                    "note_type": "APF::Simple",
-                    "tags": ["tag"],
-                    "guid": "guid"
-                }
-            ],
-            "slugs": ["test-card"]
-        })
-
-        mock_pool.enqueue_job.return_value = mock_job
-        mock_pool.get_job = AsyncMock(return_value=mock_job)
 
         # Test data
         note_files = [(Path("/tmp/test.md"), "test.md")]
@@ -95,7 +98,8 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
         assert len(result) == 1
         assert "test-card" in result
         assert mock_pool.enqueue_job.called
-        assert mock_pool.get_job.called
+        # Verify Job class was instantiated with correct parameters
+        mock_job_class.assert_called_with(job_id="test-job-id", redis=mock_pool)
 
 
 @pytest.mark.asyncio

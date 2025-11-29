@@ -26,6 +26,7 @@ import asyncio
 import yaml  # type: ignore
 from arq import create_pool
 from arq.connections import RedisSettings
+from arq.jobs import Job
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ParserError
@@ -727,7 +728,7 @@ class NoteScanner:
 
             done_this_loop = set()
             for job_id in pending_jobs:
-                job = await pool.get_job(job_id)
+                job = Job(job_id=job_id, redis=pool)
                 status = await job.status()
 
                 if status == "complete":
