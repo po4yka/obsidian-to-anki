@@ -11,6 +11,7 @@ import yaml
 
 from obsidian_anki_sync.exceptions import DeckExportError
 from obsidian_anki_sync.models import Card
+from obsidian_anki_sync.utils.io import atomic_write
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .field_mapper import map_apf_to_anki_fields
@@ -472,7 +473,7 @@ def export_cards_to_yaml(
             yaml_data.append(card_data)
 
         # Write YAML file
-        with output_path.open("w", encoding="utf-8") as f:
+        with atomic_write(output_path) as f:
             yaml.dump(
                 yaml_data,
                 f,
@@ -514,7 +515,7 @@ def export_cards_to_csv(
 
         if not cards:
             # Create empty CSV with headers
-            with output_path.open("w", encoding="utf-8", newline="") as f:
+            with atomic_write(output_path, newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["noteId", "slug", "noteType", "tags", "fields"])
             logger.info("empty_csv_created", output_path=str(output_path))
@@ -551,7 +552,7 @@ def export_cards_to_csv(
         field_names.extend(sorted(all_field_names - set(common_fields)))
 
         # Write CSV file
-        with output_path.open("w", encoding="utf-8", newline="") as f:
+        with atomic_write(output_path, newline="") as f:
             dict_writer: csv.DictWriter[str] = csv.DictWriter(
                 f, fieldnames=field_names, extrasaction="ignore"
             )

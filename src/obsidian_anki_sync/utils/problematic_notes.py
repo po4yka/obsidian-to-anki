@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from obsidian_anki_sync.utils.fs_monitor import get_fd_limits, get_open_file_count
+from obsidian_anki_sync.utils.io import atomic_write
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -63,7 +64,8 @@ class ProblematicNotesArchiver:
 
         try:
             self.index["last_updated"] = datetime.now().isoformat()
-            with open(self.index_file, "w", encoding="utf-8") as f:
+            self.index["last_updated"] = datetime.now().isoformat()
+            with atomic_write(self.index_file) as f:
                 json.dump(self.index, f, indent=2, ensure_ascii=False)
         except OSError as e:
             logger.warning(
@@ -186,7 +188,7 @@ class ProblematicNotesArchiver:
 
             metadata_path = date_dir / f"{note_name}.meta.json"
             try:
-                with open(metadata_path, "w", encoding="utf-8") as f:
+                with atomic_write(metadata_path) as f:
                     json.dump(metadata, f, indent=2, ensure_ascii=False)
             except OSError as e:
                 logger.warning(
