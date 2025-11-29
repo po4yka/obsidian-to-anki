@@ -182,6 +182,7 @@ class AgentOrchestrator:
         metadata: NoteMetadata,
         qa_pairs: list[QAPair],
         file_path: Path | None = None,
+        existing_cards: list | None = None,
     ) -> AgentPipelineResult:
         """Process a note through the complete agent pipeline.
 
@@ -190,10 +191,15 @@ class AgentOrchestrator:
             metadata: Parsed metadata
             qa_pairs: Parsed Q/A pairs
             file_path: Optional file path for validation
+            existing_cards: Optional list of existing cards for duplicate detection
+                (currently unused in legacy orchestrator, accepted for API compatibility)
 
         Returns:
             AgentPipelineResult with all stages
         """
+        # Note: existing_cards is accepted for API compatibility with LangGraphOrchestrator
+        # but is not currently used in the legacy pipeline
+        _ = existing_cards
         start_time = time.time()
         stage_times: dict[str, float] = {}
 
