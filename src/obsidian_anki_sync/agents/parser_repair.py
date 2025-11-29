@@ -732,6 +732,181 @@ ALWAYS:
                 return None
         return None
 
+    async def analyze_and_correct_proactively_async(
+        self, content: str, file_path: Path | None = None
+    ) -> NoteCorrectionResult:
+        """Proactively analyze note quality and apply corrections before parsing asynchronously.
+
+        This method analyzes notes for common issues before they cause parsing failures,
+        enabling early correction and better quality.
+
+        Args:
+            content: Note content to analyze
+            file_path: Optional file path for context
+
+        Returns:
+            NoteCorrectionResult with analysis and corrections
+        """
+        import time
+
+        start_time = time.time()
+        logger.info(
+            "proactive_note_analysis_async_start",
+            file=str(file_path) if file_path else "unknown",
+        )
+
+        # Build proactive analysis prompt
+        analysis_prompt = f"""<task>
+Analyze this Obsidian note for quality issues and potential parsing problems BEFORE parsing occurs.
+Identify issues proactively to prevent parse failures.
+
+Think step by step:
+1. Check frontmatter structure and required fields
+2. Verify markdown structure (headers, sections, formatting)
+3. Check for missing language sections (EN/RU)
+4. Identify grammar and clarity issues
+5. Detect incomplete or truncated content
+6. Assess bilingual consistency
+7. Score overall quality
+</task>
+
+<note_content>
+{content[:3000]}
+</note_content>
+
+<analysis_requirements>
+Provide a comprehensive quality analysis:
+- Overall quality score (0.0-1.0)
+- List of issues found (be specific)
+- Whether correction is needed
+- Suggested corrections
+- Confidence in analysis (0.0-1.0)
+</analysis_requirements>
+
+<output_format>
+Respond with valid JSON:
+{{
+    "quality_score": 0.0-1.0,
+    "issues_found": ["issue1", "issue2", ...],
+    "needs_correction": true/false,
+    "suggested_corrections": ["correction1", "correction2", ...],
+    "confidence": 0.0-1.0
+}}
+</output_format>"""
+
+        system_prompt = """<role>
+You are a proactive quality analysis agent for Obsidian educational notes. Your goal is to identify and fix issues BEFORE they cause parsing failures.
+</role>
+
+<approach>
+1. Analyze the note structure and content
+2. Identify any issues that might cause parsing errors or reduce quality
+3. Determine if corrections are needed
+4. Provide specific, actionable suggestions
+</approach>"""
+
+        try:
+            # Call LLM for analysis
+            analysis_result = await self.ollama_client.generate_json_async(
+                model=self.model,
+                prompt=analysis_prompt,
+                system=system_prompt,
+                temperature=self.temperature,
+            )
+
+            needs_correction = analysis_result.get("needs_correction", False)
+            quality_score = analysis_result.get("quality_score", 0.0)
+            issues_found = analysis_result.get("issues_found", [])
+            confidence = analysis_result.get("confidence", 0.0)
+
+            # If correction is needed, apply it
+            corrected_content = None
+            corrections_applied = []
+            quality_after = None
+
+            if needs_correction and self.enable_content_generation:
+                logger.info(
+                    "proactive_correction_needed_async",
+                    file=str(file_path),
+                    issues=issues_found,
+                )
+
+                # Build correction prompt
+                correction_prompt = f"""<task>
+Apply corrections to this Obsidian note based on the identified issues.
+Fix the issues while preserving the original meaning and structure.
+
+Issues to fix:
+{json.dumps(issues_found, indent=2)}
+
+Suggested corrections:
+{json.dumps(analysis_result.get("suggested_corrections", []), indent=2)}
+</task>
+
+<note_content>
+{content}
+</note_content>
+
+<output_format>
+Respond with valid JSON:
+{{
+    "corrected_content": "FULL corrected note content",
+    "corrections_applied": ["correction1", "correction2", ...],
+    "quality_after": {{
+        "overall_score": 0.0-1.0,
+        "issues_remaining": []
+    }}
+}}
+</output_format>"""
+
+                # Call LLM for correction
+                correction_result_data = await self.ollama_client.generate_json_async(
+                    model=self.model,
+                    prompt=correction_prompt,
+                    system=system_prompt,
+                    temperature=self.temperature,
+                )
+
+                corrected_content = correction_result_data.get("corrected_content")
+                corrections_applied = correction_result_data.get(
+                    "corrections_applied", []
+                )
+                quality_after_data = correction_result_data.get("quality_after")
+
+                if quality_after_data:
+                    try:
+                        quality_after = RepairQualityScore(**quality_after_data)
+                    except Exception:
+                        pass
+
+            correction_time = time.time() - start_time
+
+            return NoteCorrectionResult(
+                needs_correction=needs_correction,
+                quality_score=quality_score,
+                issues_found=issues_found,
+                corrections_applied=corrections_applied,
+                corrected_content=corrected_content,
+                quality_after=quality_after,
+                confidence=confidence,
+                correction_time=correction_time,
+            )
+
+        except Exception as e:
+            logger.error(
+                "proactive_analysis_async_failed",
+                file=str(file_path),
+                error=str(e),
+            )
+            return NoteCorrectionResult(
+                needs_correction=False,
+                quality_score=0.0,
+                issues_found=[f"Analysis failed: {e!s}"],
+                corrections_applied=[],
+                confidence=0.0,
+                correction_time=time.time() - start_time,
+            )
+
     def analyze_and_correct_proactively(
         self, content: str, file_path: Path | None = None
     ) -> NoteCorrectionResult:

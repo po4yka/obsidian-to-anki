@@ -122,6 +122,43 @@ class BaseLLMProvider(ABC):
             reasoning_enabled=reasoning_enabled,
         )
 
+    async def generate_json_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        json_schema: dict[str, Any] | None = None,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a JSON response from the LLM asynchronously.
+
+        Default implementation wraps sync generate_json() in asyncio.to_thread().
+        Providers can override for native async support.
+
+        Args:
+            model: Model identifier
+            prompt: User prompt
+            system: System prompt
+            temperature: Sampling temperature
+            json_schema: JSON schema
+            reasoning_enabled: Enable reasoning mode
+
+        Returns:
+            Parsed JSON response as a dictionary
+        """
+        import asyncio
+
+        return await asyncio.to_thread(
+            self.generate_json,
+            model=model,
+            prompt=prompt,
+            system=system,
+            temperature=temperature,
+            json_schema=json_schema,
+            reasoning_enabled=reasoning_enabled,
+        )
+
     def generate_json(
         self,
         model: str,

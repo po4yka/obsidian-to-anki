@@ -1,5 +1,6 @@
 """OpenAI provider implementation supporting GPT models."""
 
+import json
 import time
 from typing import Any, cast
 
@@ -80,6 +81,11 @@ class OpenAIProvider(BaseLLMProvider):
         # Use synchronous httpx.Client for compatibility with existing sync code
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
+            timeout=httpx.Timeout(timeout),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            headers=headers,
+        )
+        self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
@@ -298,9 +304,234 @@ class OpenAIProvider(BaseLLMProvider):
             raise ValueError(msg)
         except Exception as e:
             request_duration = time.time() - request_start_time
+            raise
+
+    async def generate_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        format: str = "",
+        json_schema: dict[str, Any] | None = None,
+        stream: bool = False,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate completion from OpenAI asynchronously.
+
+        Args:
+            model: Model name
+            prompt: User prompt
+            system: System prompt
+            temperature: Sampling temperature
+            format: Response format
+            json_schema: JSON schema
+            stream: Enable streaming
+            reasoning_enabled: Enable reasoning
+
+        Returns:
+            Response dictionary
+
+        Raises:
+            NotImplementedError: If streaming is requested
+            httpx.HTTPError: If request fails
+        """
+        if stream:
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
+
+        # Build messages
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        # Build payload
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+
+        # Enable JSON mode if requested
+        if format == "json":
+            payload["response_format"] = {"type": "json_object"}
+
+        request_start_time = time.time()
+
+        logger.info(
+            "openai_generate_async_request",
+            model=model,
+            prompt_length=len(prompt),
+            system_length=len(system),
+            temperature=temperature,
+            json_mode=format == "json",
+            timeout=self.timeout,
+        )
+
+        # Retry logic
+        last_exception: httpx.HTTPStatusError | httpx.RequestError | None = None
+        import asyncio
+
+        for attempt in range(self.max_retries):
+            try:
+                response = await self.async_client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                break
+            except httpx.HTTPStatusError as e:
+                last_exception = e
+                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
+                    # Retry on server errors
+                    wait_time = 2**attempt  # Exponential backoff
+                    logger.warning(
+                        "openai_async_retry",
+                        attempt=attempt + 1,
+                        status_code=e.response.status_code,
+                        wait_time=wait_time,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+            except httpx.RequestError as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    wait_time = 2**attempt
+                    logger.warning(
+                        "openai_async_retry_request_error",
+                        attempt=attempt + 1,
+                        error=str(e),
+                        wait_time=wait_time,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+        else:
+            # All retries failed
+            if last_exception:
+                raise last_exception
+            msg = "All retries failed"
+            raise RuntimeError(msg)
+
+        request_duration = time.time() - request_start_time
+
+        try:
+            data = response.json()
+
+            # Validate response structure
+            choices = data.get("choices", [])
+            if not choices:
+                msg = (
+                    f"OpenAI returned empty choices array. Response: {str(data)[:500]}"
+                )
+                raise ValueError(msg)
+
+            # Extract response safely
+            first_choice = choices[0]
+            message = first_choice.get("message", {})
+            response_text = message.get("content", "")
+            finish_reason = first_choice.get("finish_reason", "stop")
+
+            # Extract token usage
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
+
+            # Build result in standard format
+            result = {
+                "response": response_text,
+                "model": data.get("model", model),
+                "finish_reason": finish_reason,
+                "_token_usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                },
+            }
+
+            logger.info(
+                "openai_generate_async_success",
+                model=model,
+                response_length=len(response_text),
+                request_duration=round(request_duration, 2),
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                finish_reason=result["finish_reason"],
+            )
+
+            return cast("dict[str, Any]", result)
+
+        except (KeyError, IndexError, TypeError) as e:
             logger.error(
-                "openai_unexpected_error",
+                "openai_async_parse_error",
+                error=str(e),
+                response_data=str(data)[:500],
+            )
+            msg = f"Failed to parse OpenAI response: {e}"
+            raise ValueError(msg)
+        except Exception as e:
+            request_duration = time.time() - request_start_time
+            logger.error(
+                "openai_async_unexpected_error",
                 error=str(e),
                 request_duration=round(request_duration, 2),
+            )
+            raise
+
+    async def generate_json_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        json_schema: dict[str, Any] | None = None,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a JSON response from OpenAI asynchronously.
+
+        Args:
+            model: Model identifier
+            prompt: User prompt
+            system: System prompt
+            temperature: Sampling temperature
+            json_schema: JSON schema
+            reasoning_enabled: Enable reasoning mode
+
+        Returns:
+            Parsed JSON response as a dictionary
+        """
+        result = await self.generate_async(
+            model=model,
+            prompt=prompt,
+            system=system,
+            temperature=temperature,
+            format="json",
+            json_schema=json_schema,
+            reasoning_enabled=reasoning_enabled,
+        )
+
+        response_text = result.get("response", "{}")
+        try:
+            parsed = json.loads(response_text)
+
+            if not parsed or (isinstance(parsed, dict) and len(parsed) == 0):
+                logger.error(
+                    "openai_async_empty_json_response",
+                    response_text=response_text[:500],
+                )
+                msg = f"OpenAI returned empty JSON response: {response_text}"
+                raise ValueError(msg)
+
+            return cast("dict[str, Any]", parsed)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "openai_async_json_parse_error",
+                error=str(e),
+                response_text=response_text[:500],
             )
             raise

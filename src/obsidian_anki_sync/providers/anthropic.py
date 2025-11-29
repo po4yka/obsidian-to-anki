@@ -88,6 +88,11 @@ class AnthropicProvider(BaseLLMProvider):
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
         )
+        self.async_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            headers=headers,
+        )
 
         logger.info(
             "anthropic_provider_initialized",
@@ -333,10 +338,190 @@ class AnthropicProvider(BaseLLMProvider):
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)
+            raise
+
+    async def generate_async(
+        self,
+        model: str,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.7,
+        format: str = "",
+        json_schema: dict[str, Any] | None = None,
+        stream: bool = False,
+        reasoning_enabled: bool = False,
+    ) -> dict[str, Any]:
+        """Generate completion from Claude asynchronously.
+
+        Args:
+            model: Model name
+            prompt: User prompt
+            system: System prompt
+            temperature: Sampling temperature
+            format: Response format
+            json_schema: JSON schema
+            stream: Enable streaming
+            reasoning_enabled: Enable reasoning
+
+        Returns:
+            Response dictionary
+
+        Raises:
+            NotImplementedError: If streaming is requested
+            httpx.HTTPError: If request fails
+        """
+        if stream:
+            msg = "Streaming is not yet supported"
+            raise NotImplementedError(msg)
+
+        # Build messages
+        messages = [{"role": "user", "content": prompt}]
+
+        # Build payload
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+            "temperature": temperature,
+        }
+
+        # Add system prompt if provided
+        if system:
+            payload["system"] = system
+
+        # For JSON mode, add instruction to system prompt
+        if format == "json":
+            json_instruction = "\n\nIMPORTANT: Respond with valid JSON only. Do not include any text before or after the JSON."
+            if system:
+                payload["system"] = system + json_instruction
+            else:
+                payload["system"] = json_instruction.strip()
+
+        request_start_time = time.time()
+
+        logger.info(
+            "anthropic_generate_async_request",
+            model=model,
+            prompt_length=len(prompt),
+            system_length=len(system),
+            temperature=temperature,
+            json_mode=format == "json",
+            max_tokens=self.max_tokens,
+            timeout=self.timeout,
+        )
+
+        # Retry logic
+        last_exception: httpx.HTTPStatusError | httpx.RequestError | None = None
+        import asyncio
+
+        for attempt in range(self.max_retries):
+            try:
+                response = await self.async_client.post(
+                    f"{self.base_url}/v1/messages",
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                break
+            except httpx.HTTPStatusError as e:
+                last_exception = e
+                # Check for rate limiting or server errors
+                if (
+                    e.response.status_code in (429, 500, 502, 503, 504)
+                    and attempt < self.max_retries - 1
+                ):
+                    wait_time = 2**attempt  # Exponential backoff
+                    logger.warning(
+                        "anthropic_async_retry",
+                        attempt=attempt + 1,
+                        status_code=e.response.status_code,
+                        wait_time=wait_time,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+            except httpx.RequestError as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    wait_time = 2**attempt
+                    logger.warning(
+                        "anthropic_async_retry_request_error",
+                        attempt=attempt + 1,
+                        error=str(e),
+                        wait_time=wait_time,
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+        else:
+            # All retries failed
+            if last_exception:
+                raise last_exception
+            msg = "All retries failed"
+            raise RuntimeError(msg)
+
+        request_duration = time.time() - request_start_time
+
+        try:
+            data = response.json()
+
+            # Extract response text from content blocks
+            content = data.get("content", [])
+            if not content:
+                msg = "No content in response"
+                raise ValueError(msg)
+
+            # Combine all text blocks
+            response_text = ""
+            for block in content:
+                if block.get("type") == "text":
+                    response_text += block.get("text", "")
+
+            # Extract token usage
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("input_tokens", 0)
+            completion_tokens = usage.get("output_tokens", 0)
+            total_tokens = prompt_tokens + completion_tokens
+
+            # Build result in standard format
+            result = {
+                "response": response_text,
+                "model": data.get("model", model),
+                "stop_reason": data.get("stop_reason", "end_turn"),
+                "_token_usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                },
+            }
+
+            logger.info(
+                "anthropic_generate_async_success",
+                model=model,
+                response_length=len(response_text),
+                request_duration=round(request_duration, 2),
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                stop_reason=result["stop_reason"],
+            )
+
+            return cast("dict[str, Any]", result)
+
+        except (KeyError, IndexError, TypeError, ValueError) as e:
+            logger.error(
+                "anthropic_async_parse_error",
+                model=model,
+                error=str(e),
+                response_data=str(data) if "data" in locals() else "N/A",
+                response_data_length=len(str(data)) if "data" in locals() else 0,
+            )
+            msg = f"Failed to parse Anthropic response: {e}"
+            raise ValueError(msg)
         except Exception as e:
             request_duration = time.time() - request_start_time
             logger.error(
-                "anthropic_unexpected_error",
+                "anthropic_async_unexpected_error",
                 error=str(e),
                 request_duration=round(request_duration, 2),
             )

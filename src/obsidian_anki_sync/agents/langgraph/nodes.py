@@ -248,7 +248,7 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         file_path = Path(state["file_path"]) if state.get(
             "file_path") else None
 
-        correction_result = correction_agent.analyze_and_correct_proactively(
+        correction_result = await correction_agent.analyze_and_correct_proactively_async(
             content=note_content, file_path=file_path
         )
 
