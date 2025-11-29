@@ -1,14 +1,12 @@
 """Worker for processing card generation jobs via Redis queue."""
 
-import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
-from arq import Worker
 from arq.connections import RedisSettings
 
 from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
-from obsidian_anki_sync.agents.models import Card
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.obsidian.parser import parse_note
@@ -20,16 +18,23 @@ logger = get_logger(__name__)
 async def startup(ctx: dict[str, Any]) -> None:
     """Initialize worker context."""
     logger.info("worker_startup")
-    config = Config()
-    ctx["config"] = config
 
-    # Initialize orchestrator
-    orchestrator = LangGraphOrchestrator(config)
-    if hasattr(orchestrator, "setup_async"):
-        await orchestrator.setup_async()
+    try:
+        config = Config()
+        ctx["config"] = config
 
-    ctx["orchestrator"] = orchestrator
-    logger.info("worker_orchestrator_initialized")
+        # Initialize orchestrator
+        orchestrator = LangGraphOrchestrator(config)
+        if hasattr(orchestrator, "setup_async"):
+            await orchestrator.setup_async()
+
+        ctx["orchestrator"] = orchestrator
+        logger.info("worker_orchestrator_initialized")
+    except Exception as e:
+        logger.warning("worker_startup_config_failed", error=str(e))
+        # Worker can still run without full config - jobs will handle config individually
+        ctx["config"] = None
+        ctx["orchestrator"] = None
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
@@ -58,8 +63,16 @@ async def process_note_job(
     Returns:
         Dict containing generated cards and status
     """
-    orchestrator: LangGraphOrchestrator = ctx["orchestrator"]
-    config: Config = ctx["config"]
+    # Get or create config and orchestrator
+    config = ctx.get("config")
+    orchestrator = ctx.get("orchestrator")
+
+    if config is None or orchestrator is None:
+        # Initialize config and orchestrator for this job
+        config = Config()
+        orchestrator = LangGraphOrchestrator(config)
+        if hasattr(orchestrator, "setup_async"):
+            await orchestrator.setup_async()
 
     logger.info("worker_processing_job", file=relative_path)
 
@@ -134,11 +147,13 @@ async def process_note_job(
 class WorkerSettings:
     """Arq worker settings."""
 
-    def __init__(self):
-        self.config = Config()
-        self.redis_settings = RedisSettings.from_dsn(self.config.redis_url)
-        self.functions = [process_note_job]
-        self.on_startup = startup
-        self.on_shutdown = shutdown
-        self.max_jobs = self.config.max_concurrent_generations
-        self.job_timeout = 600  # 10 minutes
+    functions = [process_note_job]
+    on_startup = startup
+    on_shutdown = shutdown
+    job_timeout = 600  # 10 minutes
+
+    # Use environment variables with defaults
+    redis_settings = RedisSettings.from_dsn(
+        os.getenv('REDIS_URL', 'redis://localhost:6379')
+    )
+    max_jobs = int(os.getenv('MAX_CONCURRENT_GENERATIONS', '5'))
