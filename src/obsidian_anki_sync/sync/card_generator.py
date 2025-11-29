@@ -193,7 +193,8 @@ class CardGenerator:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(file_path) if file_path.exists() else None,
+                        file_path=Path(
+                            file_path) if file_path.exists() else None,
                         existing_cards=self.existing_cards_for_duplicate_detection,
                     )
                 )
@@ -211,7 +212,8 @@ class CardGenerator:
 
         # Track metrics
         if result.post_validation and not result.post_validation.is_valid:
-            self.stats["validation_errors"] = self.stats.get("validation_errors", 0) + 1
+            self.stats["validation_errors"] = self.stats.get(
+                "validation_errors", 0) + 1
         if result.retry_count > 0:
             self.stats["auto_fix_attempts"] = (
                 self.stats.get("auto_fix_attempts", 0) + result.retry_count
@@ -222,11 +224,64 @@ class CardGenerator:
                 )
 
         if not result.success or not result.generation:
-            error_msg = (
-                result.post_validation.error_details
-                if result.post_validation
-                else "Unknown error"
-            )
+            # Check for error details in order: post_validation, pre_validation, memorization_quality
+            if result.post_validation and result.post_validation.error_details:
+                error_msg = f"Post-validation failed ({result.post_validation.error_type}): {result.post_validation.error_details}"
+            elif result.pre_validation and not result.pre_validation.is_valid:
+                # Include error_details if available, otherwise just the error type
+                error_details = result.pre_validation.error_details
+                if error_details:
+                    error_msg = f"Pre-validation failed ({result.pre_validation.error_type}): {error_details}"
+                else:
+                    error_msg = f"Pre-validation failed: {result.pre_validation.error_type}"
+            elif result.memorization_quality and not result.memorization_quality.is_memorizable:
+                # Include memorization issues if available
+                issues = result.memorization_quality.issues
+                if issues:
+                    # Limit to first 3 issues
+                    issue_summaries = [
+                        f"{issue.get('type', 'unknown')}: {issue.get('description', 'no description')}" for issue in issues[:3]]
+                    error_msg = f"Memorization quality failed: {', '.join(issue_summaries)}"
+                else:
+                    error_msg = f"Memorization quality failed: score {result.memorization_quality.memorization_score:.2f}"
+            else:
+                # Collect all available diagnostic information
+                diagnostics = []
+                if result.pre_validation:
+                    diagnostics.append(
+                        f"pre_valid={result.pre_validation.is_valid}")
+                    if not result.pre_validation.is_valid:
+                        diagnostics.append(
+                            f"pre_error={result.pre_validation.error_type}")
+                if result.post_validation:
+                    diagnostics.append(
+                        f"post_valid={result.post_validation.is_valid}")
+                    if not result.post_validation.is_valid:
+                        diagnostics.append(
+                            f"post_error={result.post_validation.error_type}")
+                if result.generation:
+                    diagnostics.append("has_generation=True")
+                else:
+                    diagnostics.append("has_generation=False")
+                if result.memorization_quality:
+                    diagnostics.append(
+                        f"memorizable={result.memorization_quality.is_memorizable}")
+
+                diagnostics_str = ", ".join(
+                    diagnostics) if diagnostics else "no diagnostics available"
+
+                logger.warning(
+                    "agent_pipeline_failed_with_unknown_error",
+                    success=result.success,
+                    has_generation=bool(result.generation),
+                    has_pre_validation=bool(result.pre_validation),
+                    has_post_validation=bool(result.post_validation),
+                    has_memorization_quality=bool(result.memorization_quality),
+                    diagnostics=diagnostics_str,
+                    total_time=result.total_time,
+                    retry_count=result.retry_count,
+                )
+                error_msg = f"Pipeline failed after {result.total_time:.1f}s with {result.retry_count} retries ({diagnostics_str})"
             msg = f"Agent pipeline failed: {error_msg}"
             raise ValueError(msg)
 
@@ -343,7 +398,8 @@ class CardGenerator:
                 if cached_card is not None:
                     if cached_card.content_hash == content_hash:
                         cache_hit = True
-                        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                        elapsed_ms = round(
+                            (time.time() - start_time) * 1000, 2)
                         self._cache_hits += 1
                         self._cache_stats["hits"] += 1
                         logger.debug(
@@ -390,8 +446,10 @@ class CardGenerator:
             slug_parts = []
             for part in path_parts:
                 normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
+                ascii_segment = normalized.encode(
+                    "ascii", "ignore").decode("ascii")
+                ascii_segment = re.sub(
+                    r"[^a-z0-9-]", "-", ascii_segment.lower())
                 ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
                 if ascii_segment:
                     slug_parts.append(ascii_segment)
@@ -435,7 +493,8 @@ class CardGenerator:
 
         # Generate APF card via LLM
         card = cast(
-            "Card", self.apf_gen.generate_card(qa_pair, metadata, manifest, lang)
+            "Card", self.apf_gen.generate_card(
+                qa_pair, metadata, manifest, lang)
         )
 
         # Ensure content hash is set
@@ -448,7 +507,8 @@ class CardGenerator:
             self.stats["validation_errors"] = self.stats.get(
                 "validation_errors", 0
             ) + len(validation.errors)
-            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
+            logger.error("apf_validation_errors", slug=slug,
+                         errors=validation.errors)
             msg = f"APF validation failed for {slug}: {validation.errors[0]}"
             raise ValueError(msg)
         if validation.warnings:
@@ -489,6 +549,7 @@ class CardGenerator:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
+        logger.info("card_generated", slug=slug,
+                    elapsed_seconds=round(elapsed, 2))
 
         return card
