@@ -59,3 +59,8 @@ settings.local.json
 
 # Build artifacts
 *.whl
+
+# AI/ML data and cache directories
+.chroma_db/
+.agent_memory/
+.cache/
