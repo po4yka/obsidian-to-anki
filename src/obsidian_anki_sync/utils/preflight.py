@@ -295,14 +295,8 @@ class PreflightChecker:
         provider_name = self.config.llm_provider
 
         # Skip check if using agent system (will be checked separately)
-        if (
-            self.config.use_agent_system
-            or self.config.use_langgraph
-            or self.config.use_pydantic_ai
-        ):
-            provider_type = (
-                "LangGraph" if self.config.use_langgraph else "legacy agent system"
-            )
+        if self.config.use_langgraph or self.config.use_pydantic_ai:
+            provider_type = "LangGraph"
             self.results.append(
                 CheckResult(
                     name="LLM Provider",

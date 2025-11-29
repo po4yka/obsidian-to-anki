@@ -90,13 +90,10 @@ langgraph_strict_mode: true # Use strict validation rules
 langgraph_checkpoint_enabled: true # Enable state persistence
 
 # =============================================================================
-# Legacy Agent System
+# Agent Settings
 # =============================================================================
 
-# Set to false when using LangGraph system
-use_agent_system: false
-
-# Agent settings (shared between legacy and LangGraph systems)
+# Agent settings for LangGraph system
 pre_validation_enabled: true
 post_validation_max_retries: 3
 post_validation_auto_fix: true

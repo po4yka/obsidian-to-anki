@@ -671,7 +671,6 @@ class TestConfigurationDefaults:
             db_path=temp_dir / "test.db",
         )
 
-        assert config.use_agent_system is False
         assert config.use_langgraph is False
         assert config.use_pydantic_ai is False
 

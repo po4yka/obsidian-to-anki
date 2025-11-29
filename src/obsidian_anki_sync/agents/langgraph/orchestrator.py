@@ -160,13 +160,10 @@ class LangGraphOrchestrator:
                     config, "memory_storage_path", Path(".agent_memory")
                 )
                 enable_semantic_search = getattr(config, "enable_semantic_search", True)
-                embedding_model = getattr(
-                    config, "embedding_model", "text-embedding-3-small"
-                )
 
                 self.memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
-                    embedding_model=embedding_model,
+                    config=config,
                     enable_semantic_search=enable_semantic_search,
                 )
                 logger.info(
@@ -357,7 +354,10 @@ class LangGraphOrchestrator:
                 def check_connection(self) -> bool:
                     return True  # LangGraph handles its own connection checks
 
-                async def generate(self, prompt: str, **kwargs) -> str:
+                def list_models(self) -> list[str]:
+                    return []  # LangGraph uses PydanticAI models directly
+
+                async def generate(self, model: str, prompt: str, **kwargs) -> str:
                     msg = "LangGraph orchestrator handles generation internally"
                     raise NotImplementedError(msg)
 

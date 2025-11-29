@@ -47,7 +47,7 @@ openrouter_model: "openai/gpt-4"
 # ============================================================================
 # Agent System Configuration
 # ============================================================================
-use_agent_system: true
+use_langgraph: true
 agent_execution_mode: "parallel" # 'parallel' or 'sequential'
 
 # ============================================================================

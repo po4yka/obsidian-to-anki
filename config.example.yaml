@@ -25,8 +25,8 @@ log_level: "INFO" # Options: DEBUG, INFO, WARN, ERROR
 # =============================================================================
 
 # Feature Flag: Use Multi-Agent AI System
-# You have all required models installed: qwen3:8b, qwen3:14b, qwen3:32b
-use_agent_system: true
+# Enables the LangGraph multi-agent orchestration system
+use_langgraph: true
 
 # Agent Execution Mode
 # - parallel: Faster but uses 30-34GB RAM (recommended for M4 Max)

@@ -25,9 +25,9 @@ log_level: "INFO" # Options: DEBUG, INFO, WARN, ERROR
 # =============================================================================
 
 # Feature Flag: Enable/Disable Agent System
-# Set to true to use the multi-agent AI system for card generation
-# Set to false to use the traditional OpenRouter-based generation
-use_agent_system: true
+# Set to true to use the LangGraph multi-agent AI system for card generation
+# Set to false to use the traditional APF-based generation
+use_langgraph: true
 
 # Agent Execution Mode
 # Options: parallel, sequential
@@ -61,7 +61,7 @@ post_validation_strict_mode: true # Strict quality requirements
 # =============================================================================
 # LEGACY OPENROUTER CONFIGURATION (Fallback)
 # =============================================================================
-# These settings are used when use_agent_system: false
+# These settings are used when use_langgraph: false
 # Requires OPENROUTER_API_KEY environment variable
 
 openrouter_model: "openai/gpt-4"
@@ -90,7 +90,7 @@ llm_top_p: 0.3
 #
 # 5. Disabling Agents (Use OpenRouter):
 #    obsidian-anki-sync sync --no-agents
-#    Or set use_agent_system: false in this config
+#    Or set use_langgraph: false in this config
 #
 # 6. Performance:
 #    - Pre-validator: Rejects 15-20% of malformed notes early

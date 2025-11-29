@@ -213,7 +213,6 @@ class NoteScanner:
                 use_agents = (
                     getattr(self.config, "use_langgraph", False)
                     or getattr(self.config, "use_pydantic_ai", False)
-                    or getattr(self.config, "use_agent_system", False)
                 )
                 note_content: str | None = None
                 if use_agents:
@@ -694,7 +693,6 @@ class NoteScanner:
             use_agents = (
                 getattr(self.config, "use_langgraph", False)
                 or getattr(self.config, "use_pydantic_ai", False)
-                or getattr(self.config, "use_agent_system", False)
             )
             if use_agents:
                 try:

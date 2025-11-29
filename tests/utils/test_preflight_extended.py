@@ -16,7 +16,6 @@ def mock_config():
     config.db_path = Path("/tmp/db/state.db")
     config.project_log_dir = Path("/tmp/logs")
     config.llm_provider = "ollama"
-    config.use_agent_system = False
     config.anki_connect_url = "http://localhost:8765"
     config.anki_note_type = "APF::Simple"
     config.anki_deck_name = "Test Deck"

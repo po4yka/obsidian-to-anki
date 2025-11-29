@@ -183,9 +183,6 @@ class Config(BaseSettings):
     export_output_path: Path | None = None
 
     # Agent system settings (optional, defaults provided)
-    # DEPRECATED: use_agent_system is deprecated, use use_langgraph instead
-    # Kept for backward compatibility - will enable LangGraph if set to True
-    use_agent_system: bool = False
     # Default to False - validation done by LLM repair instead
     enforce_bilingual_validation: bool = False
 

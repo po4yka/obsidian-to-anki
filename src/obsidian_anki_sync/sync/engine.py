@@ -105,7 +105,6 @@ class SyncEngine:
             llm_timeout=config.llm_timeout,
             use_langgraph=config.use_langgraph,
             use_pydantic_ai=config.use_pydantic_ai,
-            use_agent_system=config.use_agent_system,  # Legacy
             vault_path=str(config.vault_path),
             anki_deck=config.anki_deck_name,
             run_mode=config.run_mode,
@@ -113,21 +112,13 @@ class SyncEngine:
         )
 
         # Initialize card generator (APFGenerator or LangGraphOrchestrator)
-        # Note: use_agent_system is deprecated, treat it same as use_langgraph
-        if config.use_langgraph or config.use_pydantic_ai or config.use_agent_system:
+        if config.use_langgraph or config.use_pydantic_ai:
             if not AGENTS_AVAILABLE:
                 msg = (
                     "LangGraph agent system requested but not available. "
                     "Please ensure agent dependencies are installed."
                 )
                 raise RuntimeError(msg)
-            if config.use_agent_system and not (
-                config.use_langgraph or config.use_pydantic_ai
-            ):
-                logger.warning(
-                    "use_agent_system_deprecated",
-                    message="use_agent_system is deprecated, using LangGraph instead",
-                )
             logger.info("initializing_langgraph_orchestrator")
             self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
             # Still keep for backward compat

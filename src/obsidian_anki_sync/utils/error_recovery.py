@@ -102,13 +102,10 @@ class ErrorRecoveryManager:
                     config, "memory_storage_path", Path(".agent_memory")
                 )
                 enable_semantic_search = getattr(config, "enable_semantic_search", True)
-                embedding_model = getattr(
-                    config, "embedding_model", "text-embedding-3-small"
-                )
 
                 memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
-                    embedding_model=embedding_model,
+                    config=config,
                     enable_semantic_search=enable_semantic_search,
                 )
                 logger.info(

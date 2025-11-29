@@ -14,63 +14,16 @@ from typing import TYPE_CHECKING, Any, cast
 import chromadb
 import numpy as np
 from chromadb.config import Settings
-from openai import OpenAI
 
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .specialized import ProblemDomain
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from obsidian_anki_sync.config import Config
+    from obsidian_anki_sync.rag.embedding_provider import EmbeddingProvider
 
 logger = get_logger(__name__)
-
-
-class OpenAIEmbeddings:
-    """Simple OpenAI embeddings wrapper."""
-
-    def __init__(self, model: str = "text-embedding-3-small"):
-        """Initialize OpenAI embeddings.
-
-        Args:
-            model: Embedding model name
-
-        Raises:
-            ValueError: If OpenAI API key is not configured
-        """
-        try:
-            self.client = OpenAI()
-            self.model = model
-        except Exception as e:
-            msg = (
-                f"Failed to initialize OpenAI client: {e}. "
-                "Set OPENAI_API_KEY environment variable or disable semantic search."
-            )
-            raise ValueError(msg) from e
-
-    def embed_query(self, text: str) -> list[float]:
-        """Embed a single query text.
-
-        Args:
-            text: Text to embed
-
-        Returns:
-            Embedding vector
-        """
-        response = self.client.embeddings.create(model=self.model, input=text)
-        return response.data[0].embedding
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Embed multiple documents.
-
-        Args:
-            texts: List of texts to embed
-
-        Returns:
-            List of embedding vectors
-        """
-        response = self.client.embeddings.create(model=self.model, input=texts)
-        return [item.embedding for item in response.data]
 
 
 class DummyEmbeddingFunction:
@@ -87,17 +40,17 @@ class DummyEmbeddingFunction:
         return "default"
 
 
-class OpenAIEmbeddingFunction:
-    """OpenAI embedding function compatible with ChromaDB."""
+class RAGEmbeddingFunction:
+    """RAG embedding function compatible with ChromaDB."""
 
-    def __init__(self, embeddings: OpenAIEmbeddings):
-        self.embeddings = embeddings
+    def __init__(self, embedding_provider: EmbeddingProvider):
+        self.embedding_provider = embedding_provider
 
     def __call__(self, input: list[str]) -> list[list[float]]:
-        return self.embeddings.embed_documents(input)
+        return self.embedding_provider.embed_texts(input, use_cache=True)
 
     def name(self) -> str:
-        return f"openai-{self.embeddings.model}"
+        return f"rag-{self.embedding_provider.model_name}"
 
 
 class AgentMemoryStore:
@@ -106,18 +59,19 @@ class AgentMemoryStore:
     def __init__(
         self,
         storage_path: Path,
-        embedding_model: str | None = None,
+        config: Config | None = None,
         enable_semantic_search: bool = True,
     ):
         """Initialize agent memory store.
 
         Args:
             storage_path: Path to store ChromaDB data
-            embedding_model: Embedding model name (default: text-embedding-3-small)
+            config: Application configuration for embedding provider
             enable_semantic_search: Enable semantic search capabilities
         """
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
+        self.config = config
 
         # Initialize ChromaDB client
         self.client = chromadb.PersistentClient(
@@ -125,24 +79,36 @@ class AgentMemoryStore:
             settings=Settings(anonymized_telemetry=False),
         )
 
-        # Initialize embeddings
+        # Initialize embeddings using RAG embedding provider
         self.enable_semantic_search = enable_semantic_search
-        self.embeddings: OpenAIEmbeddings | None = None
+        self._embedding_provider: EmbeddingProvider | None = None
         self.embedding_function: Any = None  # ChromaDB EmbeddingFunction protocol
-        if enable_semantic_search:
-            model = embedding_model or "text-embedding-3-small"
+
+        if enable_semantic_search and config is not None:
             try:
-                self.embeddings = OpenAIEmbeddings(model=model)
-                self.embedding_function = OpenAIEmbeddingFunction(
-                    self.embeddings)
+                from obsidian_anki_sync.rag.embedding_provider import EmbeddingProvider
+
+                self._embedding_provider = EmbeddingProvider(config)
+                self.embedding_function = RAGEmbeddingFunction(self._embedding_provider)
+                logger.info(
+                    "agent_memory_embeddings_initialized",
+                    provider=config.llm_provider,
+                    model=self._embedding_provider.model_name,
+                )
             except Exception as e:
-                logger.warning(
-                    "openai_embeddings_unavailable",
+                logger.debug(
+                    "agent_memory_embeddings_unavailable",
                     error=str(e),
                     fallback="Using simple text matching",
                 )
-                self.embeddings = None
+                self._embedding_provider = None
                 self.enable_semantic_search = False
+        elif enable_semantic_search:
+            logger.debug(
+                "agent_memory_semantic_search_disabled",
+                reason="No config provided",
+            )
+            self.enable_semantic_search = False
 
         if not self.embedding_function:
             # Prevent ChromaDB from downloading default embedding models during tests
@@ -210,9 +176,9 @@ class AgentMemoryStore:
 
         # Generate embedding if enabled
         embedding = None
-        if self.enable_semantic_search and self.embeddings:
+        if self.enable_semantic_search and self._embedding_provider:
             try:
-                embedding = self.embeddings.embed_query(content)
+                embedding = self._embedding_provider.embed_text(content)
             except Exception as e:
                 logger.warning("embedding_generation_failed", error=str(e))
 
@@ -266,9 +232,9 @@ class AgentMemoryStore:
 
         # Generate embedding if enabled
         embedding = None
-        if self.enable_semantic_search and self.embeddings:
+        if self.enable_semantic_search and self._embedding_provider:
             try:
-                embedding = self.embeddings.embed_query(content)
+                embedding = self._embedding_provider.embed_text(content)
             except Exception as e:
                 logger.warning("embedding_generation_failed", error=str(e))
 
@@ -312,9 +278,9 @@ class AgentMemoryStore:
         query_text = f"{error_type}: {error_msg}"
 
         try:
-            if self.enable_semantic_search and self.embeddings:
+            if self.enable_semantic_search and self._embedding_provider:
                 # Semantic search using embeddings
-                query_embedding = self.embeddings.embed_query(query_text)
+                query_embedding = self._embedding_provider.embed_text(query_text)
                 results = collection.query(
                     query_embeddings=[np.array(query_embedding)],
                     n_results=limit,
@@ -403,9 +369,9 @@ class AgentMemoryStore:
         query_text = f"{error_type}: {error_msg}"
 
         try:
-            if self.enable_semantic_search and self.embeddings:
+            if self.enable_semantic_search and self._embedding_provider:
                 # Semantic search using embeddings
-                query_embedding = self.embeddings.embed_query(query_text)
+                query_embedding = self._embedding_provider.embed_text(query_text)
                 results = collection.query(
                     query_embeddings=[np.array(query_embedding)],
                     n_results=1,  # Get best match
@@ -481,9 +447,9 @@ class AgentMemoryStore:
 
         # Generate embedding if enabled
         embedding = None
-        if self.enable_semantic_search and self.embeddings:
+        if self.enable_semantic_search and self._embedding_provider:
             try:
-                embedding = self.embeddings.embed_query(content)
+                embedding = self._embedding_provider.embed_text(content)
             except Exception as e:
                 logger.warning("embedding_generation_failed", error=str(e))
 
@@ -530,9 +496,9 @@ class AgentMemoryStore:
 
         # Generate embedding if enabled
         embedding = None
-        if self.enable_semantic_search and self.embeddings:
+        if self.enable_semantic_search and self._embedding_provider:
             try:
-                embedding = self.embeddings.embed_query(content)
+                embedding = self._embedding_provider.embed_text(content)
             except Exception as e:
                 logger.warning("embedding_generation_failed", error=str(e))
 
