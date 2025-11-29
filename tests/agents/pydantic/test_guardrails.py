@@ -1,8 +1,11 @@
 import pytest
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from pydantic_ai.models.openai import OpenAIChatModel
 from obsidian_anki_sync.agents.pydantic_ai_agents import GeneratorAgentAI, CardGenerationOutput
-from obsidian_anki_sync.models import NoteMetadata, QAPair, GeneratedCard
+from obsidian_anki_sync.models import NoteMetadata, QAPair
+from obsidian_anki_sync.agents import GeneratedCard
+
 
 @pytest.mark.asyncio
 async def test_generator_agent_retries_on_invalid_apf():
@@ -39,8 +42,8 @@ async def test_generator_agent_retries_on_invalid_apf():
     # 3. Create a valid output
     valid_apf = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: python testing -->
-<!-- manifest: {"slug": "test-card", "lang": "en", "type": "Simple", "tags": ["python", "testing"]} -->
+<!-- Card 1 | slug: test-card | CardType: Simple | Tags: python testing unit_test -->
+<!-- manifest: {"slug": "test-card", "lang": "en", "type": "Simple", "tags": ["python", "testing", "unit_test"]} -->
 <!-- Title -->
 Test Card
 <!-- Key point -->
@@ -67,6 +70,7 @@ END_OF_CARDS"""
     )
     assert output.cards[0]["slug"] == "test-card"
 
+
 @pytest.mark.asyncio
 async def test_generator_agent_integration_mock():
     """Verify the agent integration with a mocked run method."""
@@ -79,8 +83,8 @@ async def test_generator_agent_integration_mock():
     # This simulates a successful retry or first-try success
     valid_apf = """<!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: test-card | CardType: Simple | Tags: python testing -->
-<!-- manifest: {"slug": "test-card", "lang": "en", "type": "Simple", "tags": ["python", "testing"]} -->
+<!-- Card 1 | slug: test-card | CardType: Simple | Tags: python testing unit_test -->
+<!-- manifest: {"slug": "test-card", "lang": "en", "type": "Simple", "tags": ["python", "testing", "unit_test"]} -->
 <!-- Title -->
 Test Card
 <!-- Key point -->
@@ -107,13 +111,13 @@ END_OF_CARDS"""
     agent.agent.run = AsyncMock(return_value=mock_result)
 
     # Run generation
+    now = datetime.now()
     metadata = NoteMetadata(
         id="test", title="Test", topic="Testing", tags=["test"],
-        language_tags=["python"], file_path="/tmp/test.md"
+        language_tags=["python"], created=now, updated=now
     )
     qa_pairs = [QAPair(
-        question_en="Q", answer_en="A", card_index=1,
-        question_hash="h", answer_hash="h"
+        question_en="Q", question_ru="Q", answer_en="A", answer_ru="A", card_index=1
     )]
 
     result = await agent.generate_cards(

@@ -511,7 +511,8 @@ class TestWorkflowBuilderCoTRouting:
         mock_config.enable_cot_reasoning = True
         builder = WorkflowBuilder(mock_config)
 
-        state = {"pre_validation": {"is_valid": False}}
+        state = {"pre_validation": {"is_valid": False},
+                 "enable_highlight_agent": False}
         result = builder._route_after_pre_validation_with_cot(state)
         assert result == "failed"
 
@@ -580,7 +581,8 @@ class TestOriginalRoutingFunctions:
 
     def test_should_continue_after_pre_validation_invalid(self):
         """Test routing after invalid pre-validation."""
-        state = {"pre_validation": {"is_valid": False}}
+        state = {"pre_validation": {"is_valid": False},
+                 "enable_highlight_agent": False}
         result = should_continue_after_pre_validation(state)
         assert result == "failed"
 

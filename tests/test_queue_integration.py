@@ -27,34 +27,53 @@ def mock_pool():
     return pool
 
 
-@pytest.mark.asyncio
-async def test_scan_notes_with_queue(mock_config, mock_pool):
+def test_scan_notes_with_queue(mock_config, mock_pool):
     """Test that scan_notes_with_queue submits jobs and collects results."""
 
     with patch("obsidian_anki_sync.sync.note_scanner.create_pool", return_value=mock_pool) as mock_create_pool:
-        scanner = NoteScanner(mock_config)
+        from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
+        archiver = ProblematicNotesArchiver(Path("/tmp"), enabled=True)
+        scanner = NoteScanner(
+            config=mock_config,
+            state_db=MagicMock(),
+            card_generator=MagicMock(),
+            archiver=archiver,
+        )
 
         # Mock job
-        mock_job = AsyncMock()
+        mock_job = MagicMock()
         mock_job.job_id = "test-job-id"
-        mock_job.status.return_value = "complete"
-        mock_job.result.return_value = {
+        mock_job.status = AsyncMock(return_value="complete")
+        mock_job.result = AsyncMock(return_value={
             "success": True,
             "cards": [
                 {
                     "slug": "test-card",
-                    "front": "Front",
-                    "back": "Back",
+                    "lang": "en",
+                    "apf_html": "<!-- test -->",
+                    "manifest": {
+                        "slug": "test-card",
+                        "slug_base": "test-card",
+                        "lang": "en",
+                        "source_path": "/tmp/test.md",
+                        "source_anchor": "#card-1",
+                        "note_id": "test",
+                        "note_title": "Test",
+                        "card_index": 0,
+                        "guid": "guid",
+                        "hash6": None
+                    },
+                    "content_hash": "hash123",
+                    "note_type": "APF::Simple",
                     "tags": ["tag"],
-                    "deck": "Default",
-                    "model": "Basic"
+                    "guid": "guid"
                 }
             ],
             "slugs": ["test-card"]
-        }
+        })
 
         mock_pool.enqueue_job.return_value = mock_job
-        mock_pool.get_job.return_value = mock_job
+        mock_pool.get_job = AsyncMock(return_value=mock_job)
 
         # Test data
         note_files = [(Path("/tmp/test.md"), "test.md")]
@@ -91,6 +110,7 @@ async def test_process_note_job():
     # Mock orchestrator result
     mock_result = MagicMock()
     mock_result.success = True
+    mock_result.generation = MagicMock()
     mock_result.generation.cards = [MagicMock()]
     ctx["orchestrator"].process_note.return_value = mock_result
 
@@ -98,15 +118,37 @@ async def test_process_note_job():
     mock_card = MagicMock()
     mock_card.slug = "test-card"
     mock_card.model_dump.return_value = {"slug": "test-card"}
-    ctx["orchestrator"].convert_to_cards.return_value = [mock_card]
+    # Make convert_to_cards synchronous (not async)
+    ctx["orchestrator"].convert_to_cards = MagicMock(return_value=[mock_card])
 
     with patch("pathlib.Path.exists", return_value=True), \
-         patch("pathlib.Path.read_text", return_value="content"):
+            patch("pathlib.Path.is_file", return_value=True), \
+            patch("pathlib.Path.read_text", return_value="content"):
+
+        # Provide dummy metadata and qa_pairs to avoid file parsing
+        from datetime import datetime
+        now = datetime.now()
+        metadata_dict = {
+            "id": "test",
+            "title": "Test",
+            "topic": "Testing",
+            "created": now.isoformat(),
+            "updated": now.isoformat()
+        }
+        qa_pairs_dicts = [{
+            "question_en": "Q",
+            "question_ru": "Q",
+            "answer_en": "A",
+            "answer_ru": "A",
+            "card_index": 1
+        }]
 
         result = await process_note_job(
             ctx,
             "/tmp/test.md",
-            "test.md"
+            "test.md",
+            metadata_dict,
+            qa_pairs_dicts
         )
 
         assert result["success"] is True

@@ -24,7 +24,6 @@ class Config(BaseSettings):
         env_ignore_empty=True,
         case_sensitive=False,
         extra="ignore",
-        frozen=True,
         validate_assignment=True,
     )
 
@@ -856,11 +855,7 @@ class Config(BaseSettings):
 
     @model_validator(mode="after")
     def validate_config(self) -> "Config":
-        """Validate configuration values after initialization.
-
-        Note: This runs during initialization, before the model is frozen.
-        Since frozen=True is set, we use object.__setattr__ to update validated paths.
-        """
+        """Validate configuration values after initialization."""
         vault_path = self.vault_path
         if isinstance(vault_path, str):
             if not vault_path:
