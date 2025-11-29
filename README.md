@@ -23,6 +23,8 @@ Sync Obsidian Q&A notes to Anki flashcards using LLM generation with multi-agent
 -   **Batch Operations**: Efficient bulk processing with rollback
 -   **APF v2.1**: Strict compliance with Anki Prompts Format
 -   **Validation Suite**: Note validation and repair tools
+-   **Task Queue**: Redis-backed queue for resilient parallel processing
+
 
 ## Table of Contents
 
@@ -383,7 +385,33 @@ obsidian-anki-sync analyze-logs      # Analyze logs
 obsidian-anki-sync list-problematic-notes # List issues
 ```
 
+    style F fill:#e2e3e5
+```
+
+## Task Queue (Advanced)
+
+For large vaults, you can use the Redis-backed task queue for resilient, parallel processing.
+
+### Prerequisites
+
+-   Redis server (e.g., `brew install redis && redis-server`)
+
+### Usage
+
+1.  **Start the Worker**:
+    ```bash
+    arq obsidian_anki_sync.worker.WorkerSettings
+    ```
+
+2.  **Run Sync with Queue**:
+    ```bash
+    obsidian-anki-sync sync --use-queue
+    ```
+
+This will submit note processing jobs to the queue, allowing for better error handling and parallelism.
+
 ## Development
+
 
 ### Code Quality
 

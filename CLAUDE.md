@@ -63,6 +63,10 @@ uv run pytest -m "not integration"
 
 # Run integration tests only
 uv run pytest tests/integration/
+
+# Run Queue Worker
+uv run arq obsidian_anki_sync.worker.WorkerSettings
+
 ```
 
 ## Architecture

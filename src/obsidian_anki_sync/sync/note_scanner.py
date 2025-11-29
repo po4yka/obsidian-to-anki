@@ -22,6 +22,11 @@ except ImportError:
     psutil = None  # type: ignore
 
 import yaml  # type: ignore
+from arq import create_pool
+from arq.connections import RedisSettings
+import asyncio
+
+
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ParserError
@@ -193,6 +198,15 @@ class NoteScanner:
         )
 
         if use_parallel:
+            if getattr(self.config, "enable_queue", False):
+                return self.scan_notes_with_queue(
+                    note_files,
+                    obsidian_cards,
+                    existing_slugs,
+                    error_by_type,
+                    error_samples,
+                    qa_extractor,
+                )
             return self.scan_notes_parallel(
                 note_files,
                 obsidian_cards,
@@ -611,6 +625,144 @@ class NoteScanner:
         self._defer_archival = False
         self._process_deferred_archives()
 
+        return obsidian_cards
+
+    def scan_notes_with_queue(
+        self,
+        note_files: list[tuple[Any, str]],
+        obsidian_cards: dict[str, Card],
+        existing_slugs: set[str],
+        error_by_type: defaultdict[str, int],
+        error_samples: defaultdict[str, list[str]],
+        qa_extractor: Any = None,
+    ) -> dict[str, Card]:
+        """Scan Obsidian notes using Redis queue for distribution.
+
+        Args:
+            note_files: List of (file_path, relative_path) tuples
+            obsidian_cards: Dict to populate with cards
+            existing_slugs: Set of existing slugs
+            error_by_type: Dict to aggregate errors by type
+            error_samples: Dict to store sample errors
+            qa_extractor: Optional QA extractor
+
+        Returns:
+            Dict of slug -> Card
+        """
+        import asyncio
+
+        # We need to run the async queue logic from a sync context
+        # This helper function handles the async loop
+        def _run_queue_scan():
+            return asyncio.run(self._scan_notes_with_queue_async(
+                note_files,
+                obsidian_cards,
+                existing_slugs,
+                error_by_type,
+                error_samples,
+                qa_extractor
+            ))
+
+        return _run_queue_scan()
+
+    async def _scan_notes_with_queue_async(
+        self,
+        note_files: list[tuple[Any, str]],
+        obsidian_cards: dict[str, Card],
+        existing_slugs: set[str],
+        error_by_type: defaultdict[str, int],
+        error_samples: defaultdict[str, list[str]],
+        qa_extractor: Any = None,
+    ) -> dict[str, Card]:
+        """Async implementation of queue scanning."""
+        logger.info(
+            "queue_scan_started",
+            total_notes=len(note_files),
+            redis_url=self.config.redis_url
+        )
+
+        redis_settings = RedisSettings.from_dsn(self.config.redis_url)
+        pool = await create_pool(redis_settings)
+
+        job_map = {}  # job_id -> (file_path, relative_path)
+
+        # Submit all jobs
+        for file_path, relative_path in note_files:
+            try:
+                # We pass minimal data to keep payload small
+                # The worker will re-parse the file
+                job = await pool.enqueue_job(
+                    "process_note_job",
+                    str(file_path),
+                    relative_path,
+                    _job_id=f"note-{relative_path}"
+                )
+                if job:
+                    job_map[job.job_id] = (file_path, relative_path)
+            except Exception as e:
+                logger.error("queue_submission_failed", file=relative_path, error=str(e))
+                self.stats["errors"] = self.stats.get("errors", 0) + 1
+
+        logger.info("jobs_submitted", count=len(job_map))
+
+        # Poll for results
+        pending_jobs = set(job_map.keys())
+        completed_jobs = 0
+
+        while pending_jobs:
+            # Check status of pending jobs
+            # In a real implementation we might use pubsub or just poll efficiently
+            # Here we poll with a simple delay
+            await asyncio.sleep(0.5)
+
+            done_this_loop = set()
+            for job_id in pending_jobs:
+                job = await pool.get_job(job_id)
+                status = await job.status()
+
+                if status == "complete":
+                    result = await job.result()
+                    file_path, relative_path = job_map[job_id]
+
+                    if result["success"]:
+                        # Reconstruct cards from dicts
+                        from obsidian_anki_sync.models import Card
+                        for card_dict in result["cards"]:
+                            # We need to handle the fact that Card might need specific reconstruction
+                            # For now assuming Pydantic model can re-hydrate
+                            try:
+                                card = Card(**card_dict)
+                                obsidian_cards[card.slug] = card
+                                existing_slugs.add(card.slug)
+                            except Exception as e:
+                                logger.error("card_rehydration_failed", slug=card_dict.get("slug"), error=str(e))
+
+                        self.stats["processed"] = self.stats.get("processed", 0) + 1
+                    else:
+                        error_msg = result.get("error", "Unknown error")
+                        logger.warning("job_failed_result", file=relative_path, error=error_msg)
+                        self.stats["errors"] = self.stats.get("errors", 0) + 1
+                        error_by_type["queue_error"] += 1
+                        if len(error_samples["queue_error"]) < 3:
+                            error_samples["queue_error"].append(f"{relative_path}: {error_msg}")
+
+                    done_this_loop.add(job_id)
+                    completed_jobs += 1
+
+                elif status in ("failed", "not_found"):
+                    # Job failed at worker level (exception raised)
+                    file_path, relative_path = job_map[job_id]
+                    logger.error("job_execution_failed", file=relative_path, status=status)
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    done_this_loop.add(job_id)
+                    completed_jobs += 1
+
+            pending_jobs -= done_this_loop
+
+            if done_this_loop:
+                logger.info("queue_progress", completed=completed_jobs, total=len(job_map))
+
+        await pool.close()
         return obsidian_cards
 
     def process_note_with_retry(

@@ -57,6 +57,8 @@ dependencies = [
     "langdetect>=1.0.9",
     # Security fix: Force urllib3 to safe version to address GHSA-48p4-8xcf-vxj5 and GHSA-pq67-6m6q-mj2v
     "urllib3>=2.5.0",
+    "arq>=0.25.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

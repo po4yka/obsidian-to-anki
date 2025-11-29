@@ -85,6 +85,20 @@ def sync(
             help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
         ),
     ] = None,
+    use_queue: Annotated[
+        bool,
+        typer.Option(
+            "--use-queue",
+            help="Use Redis queue for parallel processing (requires --use-langgraph)",
+        ),
+    ] = False,
+    redis_url: Annotated[
+        str,
+        typer.Option(
+            "--redis-url",
+            help="Redis URL for task queue",
+        ),
+    ] = "redis://localhost:6379",
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -123,7 +137,15 @@ def sync(
             # Enable PydanticAI when using LangGraph
             config.use_pydantic_ai = use_langgraph
             logger.info("langgraph_system_override", use_langgraph=use_langgraph)
+            logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
+        if use_queue:
+            config.enable_queue = True
+            config.redis_url = redis_url
+            if not config.use_langgraph:
+                logger.warning("queue_requires_langgraph", message="Enabling LangGraph because queue is enabled")
+                config.use_langgraph = True
+                config.use_pydantic_ai = True
         # Delegate to sync handler
         run_sync(
             config=config,

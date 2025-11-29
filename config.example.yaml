@@ -33,6 +33,13 @@ use_langgraph: true
 # - sequential: Slower but lower memory usage
 agent_execution_mode: "parallel"
 
+# Task Queue Configuration (Redis-backed)
+# Requires Redis server running
+enable_queue: false
+redis_url: "redis://localhost:6379"
+queue_max_retries: 3
+
+
 # Indexing LLM usage (disable to improve indexing speed and cost)
 index_use_llm_extraction: false
 

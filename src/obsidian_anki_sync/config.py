@@ -147,6 +147,20 @@ class Config(BaseSettings):
         description="Delay (seconds) between FD headroom checks when deferred archiving pauses",
     )
 
+    # Queue Configuration
+    redis_url: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for task queue",
+    )
+    enable_queue: bool = Field(
+        default=False,
+        description="Enable Redis-backed task queue for card generation",
+    )
+    queue_max_retries: int = Field(
+        default=3,
+        description="Maximum retries for queued tasks",
+    )
+
     # Optional fields (with defaults)
     # Obsidian source directories (optional - overrides source_dir if provided)
     # List of relative paths from vault_path to search for Q&A notes
