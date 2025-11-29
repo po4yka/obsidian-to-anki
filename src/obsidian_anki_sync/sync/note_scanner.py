@@ -27,6 +27,7 @@ from obsidian_anki_sync.exceptions import ParserError
 from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
 from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.fs_monitor import has_fd_headroom
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
@@ -106,6 +107,15 @@ class NoteScanner:
         self._archival_lock = threading.Lock()
         self._deferred_archives: list[dict] = []
         self._defer_archival = False  # When True, archival is deferred to end of scan
+        self._archiver_batch_size = max(
+            1, getattr(self.config, "archiver_batch_size", 64)
+        )
+        self._archiver_fd_headroom = max(
+            1, getattr(self.config, "archiver_min_fd_headroom", 32)
+        )
+        self._archiver_fd_poll_interval = max(
+            0.01, getattr(self.config, "archiver_fd_poll_interval", 0.05)
+        )
 
     def scan_notes(
         self,
@@ -239,7 +249,8 @@ class NoteScanner:
                 )
                 note_content = note_content or ""
 
-                logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
+                logger.debug("processing_note",
+                             file=relative_path, pairs=len(qa_pairs))
 
                 tasks = [
                     (qa_pair, lang)
@@ -481,7 +492,8 @@ class NoteScanner:
                 len(note_files),
             )
         else:
-            max_workers = min(self.config.max_concurrent_generations, len(note_files))
+            max_workers = min(
+                self.config.max_concurrent_generations, len(note_files))
 
         logger.info(
             "parallel_scan_started",
@@ -541,9 +553,11 @@ class NoteScanner:
                     with stats_lock:
                         notes_processed += 1
                         if result_info["success"]:
-                            self.stats["processed"] = self.stats.get("processed", 0) + 1
+                            self.stats["processed"] = self.stats.get(
+                                "processed", 0) + 1
                         else:
-                            self.stats["errors"] = self.stats.get("errors", 0) + 1
+                            self.stats["errors"] = self.stats.get(
+                                "errors", 0) + 1
                             if result_info["error_type"]:
                                 error_by_type[result_info["error_type"]] += 1
                                 if len(error_samples[result_info["error_type"]]) < 3:
@@ -589,7 +603,8 @@ class NoteScanner:
                         percent=percent,
                         elapsed_seconds=round(elapsed_time, 1),
                         avg_seconds_per_note=round(avg_time_per_note, 2),
-                        estimated_remaining_seconds=round(estimated_remaining, 1),
+                        estimated_remaining_seconds=round(
+                            estimated_remaining, 1),
                         cards_generated=len(obsidian_cards),
                         active_workers=max_workers,
                     )
@@ -737,7 +752,8 @@ class NoteScanner:
                 file_path, qa_extractor=qa_extractor, content=note_content or None
             )
 
-            slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
+            slug_view: Collection[str] = _ThreadSafeSlugView(
+                existing_slugs, slug_lock)
 
             tasks = [
                 (qa_pair, lang)
@@ -766,7 +782,8 @@ class NoteScanner:
                 slug_view: Collection[str] = slug_view,
             ):
                 if self.progress:
-                    self.progress.start_note(relative_path, qa_pair.card_index, lang)
+                    self.progress.start_note(
+                        relative_path, qa_pair.card_index, lang)
                 try:
                     card = self.card_generator.generate_card(
                         qa_pair=qa_pair,
@@ -999,7 +1016,7 @@ class NoteScanner:
                         file=relative_path,
                         error=str(read_err),
                     )
-                    note_content = ""
+                    note_content = None
 
             self.archiver.archive_note(
                 note_path=file_path,
@@ -1008,7 +1025,7 @@ class NoteScanner:
                 processing_stage=processing_stage,
                 card_index=card_index,
                 language=language,
-                note_content=note_content if note_content else None,
+                note_content=note_content if note_content is not None else None,
                 context={"relative_path": relative_path},
             )
         except Exception as archive_error:
@@ -1035,30 +1052,71 @@ class NoteScanner:
         logger.info(
             "processing_deferred_archives",
             count=deferred_count,
+            batch_size=self._archiver_batch_size,
         )
 
         archived_count = 0
-        for archive_request in archives_to_process:
-            self._archive_note_immediate(
-                file_path=archive_request["file_path"],
-                relative_path=archive_request["relative_path"],
-                error=archive_request["error"],
-                processing_stage=archive_request["processing_stage"],
-                note_content=archive_request["note_content"],
-                card_index=archive_request["card_index"],
-                language=archive_request["language"],
-            )
-            archived_count += 1
+        for batch_start in range(0, deferred_count, self._archiver_batch_size):
+            batch = archives_to_process[
+                batch_start: batch_start + self._archiver_batch_size
+            ]
 
-            # Log progress every 100 archives
-            if archived_count % 100 == 0:
-                logger.info(
-                    "deferred_archive_progress",
-                    processed=archived_count,
-                    total=deferred_count,
+            for archive_request in batch:
+                file_path: Path = archive_request["file_path"]
+                note_content = archive_request["note_content"]
+                if not file_path.exists() and note_content is None:
+                    logger.warning(
+                        "skipping_deferred_archive_missing_source",
+                        file=str(file_path),
+                        relative_path=archive_request["relative_path"],
+                    )
+                    continue
+
+                self._archive_note_immediate(
+                    file_path=file_path,
+                    relative_path=archive_request["relative_path"],
+                    error=archive_request["error"],
+                    processing_stage=archive_request["processing_stage"],
+                    note_content=note_content,
+                    card_index=archive_request["card_index"],
+                    language=archive_request["language"],
                 )
+                archived_count += 1
+
+                if archived_count % 100 == 0:
+                    logger.info(
+                        "deferred_archive_progress",
+                        processed=archived_count,
+                        total=deferred_count,
+                    )
+
+            if archived_count < deferred_count:
+                self._wait_for_fd_headroom()
 
         logger.info(
             "deferred_archives_completed",
             archived=archived_count,
         )
+
+    def _wait_for_fd_headroom(self) -> None:
+        """Pause archival if the process is too close to the FD limit."""
+        has_headroom, snapshot = has_fd_headroom(self._archiver_fd_headroom)
+        if has_headroom:
+            return
+
+        logger.warning(
+            "archiver_fd_headroom_low",
+            required_headroom=self._archiver_fd_headroom,
+            **snapshot,
+        )
+
+        while True:
+            time.sleep(self._archiver_fd_poll_interval)
+            has_headroom, snapshot = has_fd_headroom(
+                self._archiver_fd_headroom)
+            if has_headroom:
+                logger.debug(
+                    "archiver_fd_headroom_restored",
+                    **snapshot,
+                )
+                break

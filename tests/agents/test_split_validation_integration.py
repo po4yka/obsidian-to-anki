@@ -5,7 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from obsidian_anki_sync.agents.langgraph.nodes import split_validation_node
-from obsidian_anki_sync.agents.langgraph.state import PipelineState
+from obsidian_anki_sync.agents.langgraph.state import (
+    PipelineState,
+    register_runtime_resources,
+)
 from obsidian_anki_sync.agents.models import (
     CardSplitPlan,
     CardSplittingResult,
@@ -26,9 +29,6 @@ def mock_config():
 @pytest.fixture
 def pipeline_state(mock_config):
     """Create a sample pipeline state."""
-    from unittest.mock import MagicMock
-    from obsidian_anki_sync.agents.langgraph.state import register_runtime_resources
-
     # Create a mock model factory
     mock_model_factory = MagicMock()
     mock_model_factory.get_model.side_effect = lambda agent_type: MagicMock(

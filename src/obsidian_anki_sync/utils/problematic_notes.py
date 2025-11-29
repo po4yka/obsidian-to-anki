@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from obsidian_anki_sync.utils.fs_monitor import get_fd_limits, get_open_file_count
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -136,13 +137,14 @@ class ProblematicNotesArchiver:
                         "failed_to_read_note_for_archival",
                         note_path=str(note_path),
                         error=str(e),
+                        **self._fd_snapshot(),
                     )
-                    note_content = ""
+                    note_content = None
 
             # Compute content hash
             content_hash = (
                 hashlib.sha256(note_content.encode("utf-8")).hexdigest()
-                if note_content
+                if note_content is not None
                 else ""
             )
 
@@ -164,15 +166,11 @@ class ProblematicNotesArchiver:
             archived_note_path = date_dir / note_name
 
             # Copy note file
-            try:
-                shutil.copy2(note_path, archived_note_path)
-            except OSError as e:
-                logger.error(
-                    "failed_to_copy_note_for_archival",
-                    source=str(note_path),
-                    destination=str(archived_note_path),
-                    error=str(e),
-                )
+            if not self._write_archived_note(
+                source_path=note_path,
+                destination_path=archived_note_path,
+                note_content=note_content,
+            ):
                 return None
 
             # Create metadata file
@@ -187,7 +185,8 @@ class ProblematicNotesArchiver:
                 "processing_stage": processing_stage,
                 "content_hash": content_hash,
                 "traceback": "".join(
-                    traceback.format_exception(type(error), error, error.__traceback__)
+                    traceback.format_exception(
+                        type(error), error, error.__traceback__)
                 ),
                 "context": context or {},
             }
@@ -201,6 +200,7 @@ class ProblematicNotesArchiver:
                     "failed_to_save_note_metadata",
                     metadata_path=str(metadata_path),
                     error=str(e),
+                    **self._fd_snapshot(),
                 )
 
             # Update index
@@ -264,7 +264,8 @@ class ProblematicNotesArchiver:
             notes = [n for n in notes if n.get("category") == category]
 
         if date:
-            notes = [n for n in notes if n.get("timestamp", "").startswith(date)]
+            notes = [n for n in notes if n.get(
+                "timestamp", "").startswith(date)]
 
         # Sort by timestamp (newest first)
         notes.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
@@ -319,3 +320,48 @@ class ProblematicNotesArchiver:
             self._save_index()
 
         return cleaned
+
+    def _write_archived_note(
+        self,
+        source_path: Path,
+        destination_path: Path,
+        note_content: str | None,
+    ) -> bool:
+        """Write the archived note without leaking file descriptors."""
+        try:
+            if note_content is not None:
+                destination_path.write_text(note_content, encoding="utf-8")
+            else:
+                with source_path.open("rb") as src, destination_path.open("wb") as dst:
+                    shutil.copyfileobj(src, dst, length=1024 * 1024)
+
+            try:
+                shutil.copystat(source_path, destination_path,
+                                follow_symlinks=True)
+            except OSError as stat_error:
+                logger.debug(
+                    "failed_to_copy_note_metadata_stat",
+                    source=str(source_path),
+                    destination=str(destination_path),
+                    error=str(stat_error),
+                )
+            return True
+        except OSError as e:
+            logger.error(
+                "failed_to_copy_note_for_archival",
+                source=str(source_path),
+                destination=str(destination_path),
+                error=str(e),
+                **self._fd_snapshot(),
+            )
+            return False
+
+    @staticmethod
+    def _fd_snapshot() -> dict[str, int | None]:
+        """Return current file descriptor stats for diagnostics."""
+        soft_limit, hard_limit = get_fd_limits()
+        return {
+            "open_fd_count": get_open_file_count(),
+            "soft_fd_limit": soft_limit,
+            "hard_fd_limit": hard_limit,
+        }

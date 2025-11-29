@@ -148,6 +148,8 @@
 - **–––—–∂–Ω–——Ç—:** —–µ—Ç—–– —–µ—Ç–µ–≤—ã— –≤—ã–∑––≤––≤; —Ç––π–º–—É—Ç—ã; –—Ç–ª––∂–µ–Ω–Ω––µ –ø––≤—Ç–—–µ–Ω––µ –—à––±––∫.
 - **–––±–ª—–––µ–º–——Ç—:** ——Ç——É–∫—Ç—É—–—––≤––Ω–Ω—ã–µ –ª––≥–; ——á——Ç—á––∫– –ø– ––ø–µ—–—–—–º; –—Ç—á——Ç ––± –—à––±–∫–— –ª––Ω—Ç–µ—– APF.
 
+- **File Descriptor Guard Rails:** Deferred problematic-note archival MUST honor `archiver_batch_size`, `archiver_min_fd_headroom`, and `archiver_fd_poll_interval`. When `fs_monitor` reports that available descriptors drop below the configured headroom, the pipeline SHALL pause archival until headroom recovers and emit a structured log with the FD snapshot for debugging EMFILE failures.
+
 ## 13. –––ª–––—–— – —Ç–µ——Ç–—––≤––Ω––µ
 
 - **Unit—Ç–µ——Ç—ã:**

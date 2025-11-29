@@ -10,11 +10,11 @@ from __future__ import annotations
 import asyncio
 import atexit
 import threading
-from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
+    from concurrent.futures import Future
 
 
 class AsyncioRunner:

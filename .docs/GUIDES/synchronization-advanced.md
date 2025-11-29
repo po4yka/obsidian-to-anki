@@ -1,6 +1,38 @@
 # Advanced Synchronization
 
-Advanced sync features: semantic analysis, conflict resolution, and change management.
+Advanced sync features: semantic analysis, conflict resolution, change management, and
+resource guard rails for large vaults.
+
+## Problematic Note Archival Guard Rails
+
+The sync engine queues failed notes while generations run in parallel, then archives
+them at the end of a batch. Copying thousands of notes in one shot can exhaust the
+process file descriptor (FD) limit on macOS and Linux, so the pipeline now enforces
+batched archival with live FD monitoring:
+
+-   `archiver_batch_size` (default `64`): maximum number of deferred notes written
+    before re-checking system headroom. Increase it for SSD-backed runners with high
+    limits; decrease it for constrained CI sandboxes.
+-   `archiver_min_fd_headroom` (default `32`): minimum number of free descriptors that
+    must remain before another batch runs. When the snapshot falls below this
+    threshold the archiver pauses.
+-   `archiver_fd_poll_interval` (default `0.05` seconds): backoff interval while we
+    wait for other workers to release descriptors.
+
+Headroom data comes from `obsidian_anki_sync.utils.fs_monitor`, which first tries
+`psutil.Process().num_fds()` and falls back to `/proc/self/fd` or `/dev/fd`. These
+diagnostics are added to structured logs whenever note copying fails so operators
+can correlate EMFILE errors with the observed open-count/limit.
+
+```bash
+# Example overrides for extremely low ulimit -n environments
+ARCHIVER_BATCH_SIZE=16
+ARCHIVER_MIN_FD_HEADROOM=8
+ARCHIVER_FD_POLL_INTERVAL=0.1
+```
+
+If your environment allows only ~128 descriptors, the above tuning keeps backpressure
+fair while still draining queued notes deterministically.
 
 ## Semantic Diff Analysis
 
