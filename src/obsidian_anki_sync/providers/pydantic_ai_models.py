@@ -15,8 +15,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.utils.logging import get_logger
 
-from .openrouter import OpenRouterProvider
-
 logger = get_logger(__name__)
 
 
@@ -43,10 +41,14 @@ class OpenRouterSettings(BaseSettings):
 
 
 class EnhancedOpenRouterModel(OpenAIChatModel):
-    """Enhanced OpenRouter model that uses OpenRouterProvider for reasoning support.
+    """Enhanced OpenRouter model with proper PydanticAI integration.
 
-    This model extends PydanticAI's OpenAIChatModel but routes requests through
-    the OpenRouterProvider to enable reasoning configuration and other enhancements.
+    This model extends PydanticAI's OpenAIChatModel and properly configures
+    the OpenAI provider for OpenRouter compatibility. It does NOT override
+    the request method to avoid API compatibility issues with PydanticAI.
+
+    For reasoning support, use OpenRouter's native reasoning models or
+    configure reasoning at the prompt/system level.
     """
 
     def __init__(
@@ -68,14 +70,33 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             base_url: OpenRouter base URL
             site_url: Site URL for rankings
             site_name: Site name for rankings
-            max_tokens: Maximum tokens per request
-            reasoning_enabled: Enable reasoning for this model
+            max_tokens: Maximum tokens per request (stored for reference)
+            reasoning_enabled: Enable reasoning for this model (stored for reference)
             **kwargs: Additional OpenAIChatModel arguments
         """
+        # Build HTTP headers for OpenRouter
+        http_headers: dict[str, str] = {}
+        if site_url:
+            http_headers["HTTP-Referer"] = site_url
+        if site_name:
+            http_headers["X-Title"] = site_name
+
+        # Create explicitly configured async HTTP client
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10,
+                keepalive_expiry=30.0,
+            ),
+            headers=http_headers if http_headers else None,
+        )
+
         # Initialize with OpenAIProvider for custom base_url support
         provider = OpenAIProvider(
             base_url=base_url,
-            api_key=api_key or "dummy",  # Will be overridden
+            api_key=api_key or "",
+            http_client=http_client,
         )
         super().__init__(
             model_name,
@@ -83,18 +104,9 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             **kwargs,
         )
 
-        # Create our custom OpenRouter provider instance for reasoning support
-        # Use different name to avoid conflict with parent's provider attribute
-        self._openrouter_provider = OpenRouterProvider(
-            api_key=api_key,
-            base_url=base_url,
-            site_url=site_url,
-            site_name=site_name,
-            max_tokens=max_tokens,
-        )
-
-        # Store reasoning configuration
+        # Store configuration for reference (not used in request override)
         self.reasoning_enabled = reasoning_enabled
+        self._max_tokens = max_tokens
 
         logger.info(
             "enhanced_openrouter_model_created",
@@ -103,67 +115,11 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             max_tokens=max_tokens,
         )
 
-    async def request(
-        self,
-        messages: list[dict[str, Any]],
-        model_settings: dict[str, Any] | None = None,
-        model_request_parameters: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Make a request using the OpenRouterProvider with reasoning support.
-
-        This overrides PydanticAI's default request method to use our enhanced
-        OpenRouter provider which supports reasoning configuration.
-
-        Args:
-            messages: Chat messages in OpenAI format
-            model_settings: Model settings (temperature, etc.)
-            model_request_parameters: Additional request parameters
-
-        Returns:
-            Response dictionary in OpenAI format
-        """
-        # Extract parameters
-        temperature = model_settings.get("temperature", 0.7) if model_settings else 0.7
-        max_tokens = model_settings.get("max_tokens") if model_settings else None
-
-        # Build system message and user prompt
-        system_message = ""
-        user_messages = []
-
-        for message in messages:
-            if message["role"] == "system":
-                system_message = message["content"]
-            elif message["role"] == "user":
-                user_messages.append(message["content"])
-
-        # Combine user messages (PydanticAI sometimes splits them)
-        prompt = " ".join(user_messages)
-
-        # Make request through our custom OpenRouterProvider
-        response = self._openrouter_provider.generate(
-            model=self.model_name,
-            prompt=prompt,
-            system=system_message,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            reasoning_enabled=self.reasoning_enabled,
-        )
-
-        # Convert response to OpenAI format expected by PydanticAI
-        return {
-            "choices": [
-                {
-                    "finish_reason": response.get("finish_reason", "stop"),
-                    "index": 0,
-                    "message": {
-                        "content": response["response"],
-                        "role": "assistant",
-                    },
-                }
-            ],
-            "model": response.get("model", self.model_name),
-            "usage": response.get("usage", {}),
-        }
+    # NOTE: We intentionally do NOT override the request() method.
+    # PydanticAI's internal API uses ModelMessage, ModelSettings, and
+    # ModelRequestParameters types that are not simple dicts. Overriding
+    # this method incorrectly causes "'ModelRequest' object is not subscriptable"
+    # errors. The parent OpenAIChatModel handles all request processing correctly.
 
 
 class PydanticAIModelFactory:
