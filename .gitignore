@@ -46,6 +46,7 @@ htmlcov/
 .sync_state.db
 .sync_state.db-shm
 .sync_state.db-wal
+dump.rdb
 .cache/
 *.log
 logs/
