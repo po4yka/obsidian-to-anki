@@ -54,7 +54,10 @@ class RAGEmbeddingFunction:
 
 
 class AgentMemoryStore:
-    """Persistent memory store for agent learning using ChromaDB."""
+    """Persistent memory store for agent learning using ChromaDB.
+
+    Uses lazy initialization to avoid opening file handles until actually needed.
+    """
 
     def __init__(
         self,
@@ -70,29 +73,39 @@ class AgentMemoryStore:
             enable_semantic_search: Enable semantic search capabilities
         """
         self.storage_path = Path(storage_path)
-        self.storage_path.mkdir(parents=True, exist_ok=True)
         self.config = config
+        self._enable_semantic_search = enable_semantic_search
+
+        # Lazy-initialized resources (to avoid file descriptor exhaustion)
+        self._client: chromadb.PersistentClient | None = None
+        self._collections: dict[str, Any] | None = None
+        self._embedding_provider: EmbeddingProvider | None = None
+        self._embedding_function: Any = None
+        self._initialized = False
+
+    def _ensure_initialized(self) -> None:
+        """Lazily initialize ChromaDB and collections when first needed."""
+        if self._initialized:
+            return
+
+        self.storage_path.mkdir(parents=True, exist_ok=True)
 
         # Initialize ChromaDB client
-        self.client = chromadb.PersistentClient(
+        self._client = chromadb.PersistentClient(
             path=str(self.storage_path),
             settings=Settings(anonymized_telemetry=False),
         )
 
         # Initialize embeddings using RAG embedding provider
-        self.enable_semantic_search = enable_semantic_search
-        self._embedding_provider: EmbeddingProvider | None = None
-        self.embedding_function: Any = None  # ChromaDB EmbeddingFunction protocol
-
-        if enable_semantic_search and config is not None:
+        if self._enable_semantic_search and self.config is not None:
             try:
                 from obsidian_anki_sync.rag.embedding_provider import EmbeddingProvider
 
-                self._embedding_provider = EmbeddingProvider(config)
-                self.embedding_function = RAGEmbeddingFunction(self._embedding_provider)
+                self._embedding_provider = EmbeddingProvider(self.config)
+                self._embedding_function = RAGEmbeddingFunction(self._embedding_provider)
                 logger.info(
                     "agent_memory_embeddings_initialized",
-                    provider=config.llm_provider,
+                    provider=self.config.llm_provider,
                     model=self._embedding_provider.model_name,
                 )
             except Exception as e:
@@ -102,24 +115,48 @@ class AgentMemoryStore:
                     fallback="Using simple text matching",
                 )
                 self._embedding_provider = None
-                self.enable_semantic_search = False
-        elif enable_semantic_search:
+                self._enable_semantic_search = False
+        elif self._enable_semantic_search:
             logger.debug(
                 "agent_memory_semantic_search_disabled",
                 reason="No config provided",
             )
-            self.enable_semantic_search = False
+            self._enable_semantic_search = False
 
-        if not self.embedding_function:
+        if not self._embedding_function:
             # Prevent ChromaDB from downloading default embedding models during tests
-            self.embedding_function = DummyEmbeddingFunction()
+            self._embedding_function = DummyEmbeddingFunction()
 
         # Initialize collections
         self._initialize_collections()
+        self._initialized = True
+
+    @property
+    def client(self) -> chromadb.PersistentClient:
+        """Get ChromaDB client (lazy initialization)."""
+        self._ensure_initialized()
+        return self._client  # type: ignore[return-value]
+
+    @property
+    def collections(self) -> dict[str, Any]:
+        """Get collections (lazy initialization)."""
+        self._ensure_initialized()
+        return self._collections  # type: ignore[return-value]
+
+    @property
+    def enable_semantic_search(self) -> bool:
+        """Check if semantic search is enabled."""
+        return self._enable_semantic_search
+
+    @property
+    def embedding_function(self) -> Any:
+        """Get embedding function (lazy initialization)."""
+        self._ensure_initialized()
+        return self._embedding_function
 
     def _initialize_collections(self) -> None:
         """Initialize ChromaDB collections for different memory types."""
-        self.collections = {}
+        self._collections = {}
 
         memory_types = [
             "failure_patterns",
@@ -130,12 +167,12 @@ class AgentMemoryStore:
 
         for memory_type in memory_types:
             try:
-                collection = self.client.get_or_create_collection(
+                collection = self._client.get_or_create_collection(
                     name=memory_type,
                     metadata={"description": f"Memory store for {memory_type}"},
-                    embedding_function=self.embedding_function,
+                    embedding_function=self._embedding_function,
                 )
-                self.collections[memory_type] = collection
+                self._collections[memory_type] = collection
             except Exception as e:
                 logger.error(
                     "failed_to_create_collection",
