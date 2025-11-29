@@ -5,8 +5,13 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 
+from typing import TYPE_CHECKING
+
 from obsidian_anki_sync.agents.models import AutoFixIssue
 from obsidian_anki_sync.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from obsidian_anki_sync.validation.ai_fixer import AIFixer
 
 logger = get_logger(__name__)
 
@@ -326,13 +331,12 @@ class MocMismatchHandler(AutoFixHandler):
 class SectionOrderHandler(AutoFixHandler):
     """Detect section order issues (RU Q, EN Q, RU A, EN A).
 
-    This handler only DETECTS section order issues but does NOT auto-fix them.
-    Section reordering is complex and could break formatting, indentation,
-    code blocks, and other markdown structures. Manual review is recommended.
+    This handler only DETECTS section order issues.
+    If AIFixer is available, it can attempt to fix it.
     """
 
     issue_type = "section_order"
-    description = "Detect sections not in expected order (detect only - no auto-fix)"
+    description = "Detect sections not in expected order"
 
     EXPECTED_ORDER = [
         r"#\s*[Вв]опрос\s*\(RU\)",  # Russian Question
@@ -340,6 +344,9 @@ class SectionOrderHandler(AutoFixHandler):
         r"##\s*[Оо]твет\s*\(RU\)",  # Russian Answer
         r"##\s*Answer\s*\(EN\)",  # English Answer
     ]
+
+    def __init__(self, ai_fixer: AIFixer | None = None):
+        self.ai_fixer = ai_fixer
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
         issues: list[AutoFixIssue] = []
@@ -370,15 +377,26 @@ class SectionOrderHandler(AutoFixHandler):
     def fix(
         self, content: str, issues: list[AutoFixIssue], metadata: dict | None = None
     ) -> tuple[str, list[AutoFixIssue]]:
-        """Section order is detect-only - no auto-fix to avoid breaking formatting."""
-        # Do NOT auto-fix section order as it could break:
-        # - Code block indentation
-        # - Nested lists
-        # - Internal formatting
-        # - Content that appears before/after recognized sections
+        if not issues:
+            return content, issues
+
+        if self.ai_fixer and self.ai_fixer.available:
+            try:
+                fixed_content, changes = self.ai_fixer.fix_note_structure(content)
+                if fixed_content != content:
+                    for issue in issues:
+                        issue.auto_fixed = True
+                        issue.fix_description = f"AI reorganized structure: {', '.join(changes)}"
+                    return fixed_content, issues
+            except Exception as e:
+                logger.warning("ai_structure_fix_failed", error=str(e))
+
+        # Fallback if no AI or AI failed
         for issue in issues:
             issue.auto_fixed = False
-            issue.fix_description = "Manual fix required (auto-fix disabled to preserve formatting)"
+            issue.fix_description = (
+                "Manual fix required (AI fixer disabled or failed)"
+            )
 
         return content, issues
 

@@ -39,6 +39,13 @@ class BilingualTitleResult(BaseModel):
     ru_title: str = Field(description="Russian title (accurate translation)")
 
 
+class StructureFixResult(BaseModel):
+    """Result of structure fixing."""
+
+    fixed_content: str = Field(description="Reorganized note content")
+    changes_made: list[str] = Field(description="List of changes applied")
+
+
 class AIFixer:
     """AI-powered fixer using existing provider system."""
 
@@ -247,6 +254,73 @@ Generate a bilingual title. Respond with JSON: {{"en_title": "<English>", "ru_ti
         except Exception as e:
             logger.error("bilingual_title_generation_failed", error=str(e))
             return None
+
+    def fix_note_structure(self, content: str) -> tuple[str, list[str]]:
+        """Fix note structure (headers, order, missing sections) using AI.
+
+        Args:
+            content: Full note content
+
+        Returns:
+            Tuple of (fixed_content, list_of_changes)
+        """
+        if not self.available or self.provider is None:
+            return content, []
+
+        system_prompt = """You are an Obsidian note structure fixer.
+Your goal is to reorganize and fix the note to match the expected format strictly.
+Do not change the content (text, code), only the structure, headers, and order.
+
+Expected Structure:
+1. YAML Frontmatter (preserve existing)
+2. # Question (EN)
+3. # Вопрос (RU)
+4. ## Answer (EN)
+5. ## Ответ (RU)
+6. ## References (optional)
+7. ## Ссылки (RU) (optional)
+8. ## Related Questions (optional)
+
+Rules:
+- Ensure all headers match exactly as above.
+- Move content to appropriate sections.
+- If a section is missing but content exists, add the header.
+- Maintain all code blocks and text exactly as is.
+- Ensure 2 blank lines before H1/H2 headers.
+"""
+
+        user_prompt = f"""Fix the structure of this note:
+
+```markdown
+{content}
+```
+
+Respond with JSON: {{"fixed_content": "<full markdown content>", "changes_made": ["<change 1>", "<change 2>"]}}"""
+
+        try:
+            schema = {
+                "type": "object",
+                "properties": {
+                    "fixed_content": {"type": "string"},
+                    "changes_made": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["fixed_content", "changes_made"],
+            }
+
+            result = self.provider.generate_json(
+                model=self.model,
+                prompt=user_prompt,
+                system=system_prompt,
+                temperature=self.temperature,
+                json_schema=schema,
+            )
+
+            parsed = StructureFixResult(**result)
+            return parsed.fixed_content, parsed.changes_made
+
+        except Exception as e:
+            logger.error("structure_fix_failed", error=str(e))
+            return content, []
 
 
 class AIFixerValidator(BaseValidator):
