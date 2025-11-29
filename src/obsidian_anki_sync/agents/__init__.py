@@ -1,5 +1,6 @@
 """Multi-agent AI system for obsidian-to-anki conversion."""
 
+from .langgraph import LangGraphOrchestrator
 from .models import (
     AgentPipelineResult,
     GeneratedCard,
@@ -7,7 +8,6 @@ from .models import (
     PostValidationResult,
     PreValidationResult,
 )
-from .orchestrator import AgentOrchestrator
 
 try:
     from .pydantic import GeneratorAgentAI, PostValidatorAgentAI, PreValidatorAgentAI
@@ -19,27 +19,14 @@ except ModuleNotFoundError:
     PreValidatorAgentAI = None  # type: ignore[assignment, misc]
     _PYDANTIC_AGENTS_AVAILABLE = False
 
-try:
-    from .langgraph import LangGraphOrchestrator
-
-    _LANGGRAPH_AVAILABLE = True
-except ModuleNotFoundError:
-    LangGraphOrchestrator = None  # type: ignore[assignment, misc]
-    _LANGGRAPH_AVAILABLE = False
-
 __all__ = [
-    # Orchestrators
-    "AgentOrchestrator",  # Legacy orchestrator
     "AgentPipelineResult",
     "GeneratedCard",
     "GenerationResult",
+    "LangGraphOrchestrator",
     "PostValidationResult",
-    # Result models
     "PreValidationResult",
 ]
-
-if _LANGGRAPH_AVAILABLE:
-    __all__ += ["LangGraphOrchestrator"]
 
 if _PYDANTIC_AGENTS_AVAILABLE:
     __all__ += [

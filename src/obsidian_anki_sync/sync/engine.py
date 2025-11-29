@@ -33,7 +33,6 @@ from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.models import ManifestData, SyncAction
-from obsidian_anki_sync.obsidian.parser import create_qa_extractor
 from obsidian_anki_sync.sync.anki_state_manager import AnkiStateManager
 from obsidian_anki_sync.sync.card_generator import CardGenerator
 from obsidian_anki_sync.sync.change_applier import ChangeApplier
@@ -48,14 +47,14 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# Import agent orchestrator (optional dependency)
+# Import LangGraph orchestrator (optional dependency)
 try:
-    from obsidian_anki_sync.agents.orchestrator import AgentOrchestrator
+    from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 
     AGENTS_AVAILABLE = True
 except ImportError:
     AGENTS_AVAILABLE = False
-    AgentOrchestrator = None  # type: ignore
+    LangGraphOrchestrator = None  # type: ignore
     logger.warning("agent_system_not_available", reason="Import failed")
 
 # Import progress display (optional)
@@ -114,65 +113,29 @@ class SyncEngine:
         )
 
         # Initialize card generator (APFGenerator or LangGraphOrchestrator)
-        if config.use_langgraph or config.use_pydantic_ai:
+        # Note: use_agent_system is deprecated, treat it same as use_langgraph
+        if config.use_langgraph or config.use_pydantic_ai or config.use_agent_system:
             if not AGENTS_AVAILABLE:
                 msg = (
                     "LangGraph agent system requested but not available. "
                     "Please ensure agent dependencies are installed."
                 )
                 raise RuntimeError(msg)
+            if config.use_agent_system and not (
+                config.use_langgraph or config.use_pydantic_ai
+            ):
+                logger.warning(
+                    "use_agent_system_deprecated",
+                    message="use_agent_system is deprecated, using LangGraph instead",
+                )
             logger.info("initializing_langgraph_orchestrator")
-            from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
-
             self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
             # Still keep for backward compat
             self.apf_gen = APFGenerator(config)
             self.use_agents = True
-        elif config.use_agent_system:
-            # Legacy fallback for backward compatibility
-            if not AGENTS_AVAILABLE:
-                msg = (
-                    "Agent system requested but not available. "
-                    "Please ensure agent dependencies are installed."
-                )
-                raise RuntimeError(msg)
-            logger.warning("using_legacy_agent_system_deprecated")
-            self.agent_orchestrator = AgentOrchestrator(config)  # type: ignore
-            # Still keep for backward compat
-            self.apf_gen = APFGenerator(config)
-            self.use_agents = True
-
-            # Configure LLM-based Q&A extraction when using agents
-            # Use the same provider as the orchestrator
-            # Resolve model from config (handles empty strings and presets)
-            qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
-            if qa_extractor_temp is None:
-                # Get temperature from model config if not explicitly set
-                model_config = config.get_model_config_for_task("qa_extraction")
-                qa_extractor_temp = model_config.get("temperature", 0.0)
-            reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
-
-            logger.info(
-                "configuring_llm_qa_extraction",
-                model=qa_extractor_model,
-                temperature=qa_extractor_temp,
-                reasoning_enabled=reasoning_enabled,
-            )
-            # Create QA extractor agent for LLM-based extraction
-            self.qa_extractor = create_qa_extractor(
-                llm_provider=self.agent_orchestrator.provider,
-                model=qa_extractor_model,
-                temperature=qa_extractor_temp,
-                reasoning_enabled=reasoning_enabled,
-                enable_content_generation=True,
-                repair_missing_sections=getattr(
-                    config, "enforce_bilingual_validation", True
-                ),
-            )
         else:
             self.apf_gen = APFGenerator(config)
-            self.agent_orchestrator: AgentOrchestrator | None = None  # type: ignore
+            self.agent_orchestrator: LangGraphOrchestrator | None = None  # type: ignore
             self.use_agents = False
             # No LLM extraction when not using agents
             self.qa_extractor = None

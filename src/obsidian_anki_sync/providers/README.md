@@ -367,21 +367,21 @@ except ConnectionError as e:
 The provider system integrates seamlessly with the agent orchestrator:
 
 ```python
-from obsidian_anki_sync.agents import AgentOrchestrator
+from obsidian_anki_sync.agents import LangGraphOrchestrator
 from obsidian_anki_sync.providers import ProviderFactory
 from obsidian_anki_sync.config import Config
 
 config = Config(...)
 
 # Option 1: Let orchestrator create provider from config
-orchestrator = AgentOrchestrator(config)
+orchestrator = LangGraphOrchestrator(config)
 
 # Option 2: Provide custom provider
 provider = ProviderFactory.create_provider(
     "lm_studio",
     base_url="http://192.168.1.100:1234/v1"
 )
-orchestrator = AgentOrchestrator(config, provider=provider)
+orchestrator = LangGraphOrchestrator(config, provider=provider)
 ```
 
 ---
@@ -424,7 +424,7 @@ class MockProvider(BaseLLMProvider):
 
 # Use in tests
 provider = MockProvider()
-orchestrator = AgentOrchestrator(config, provider=provider)
+orchestrator = LangGraphOrchestrator(config, provider=provider)
 ```
 
 ---
