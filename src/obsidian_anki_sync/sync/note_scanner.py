@@ -265,10 +265,6 @@ class NoteScanner:
                     )
                 ]
 
-                max_workers_note = max(
-                    1, min(self.config.max_concurrent_generations, len(tasks))
-                )
-
                 def _generate_single(
                     qa_pair: QAPair,
                     lang: str,
@@ -332,17 +328,11 @@ class NoteScanner:
 
                         return None, error_message, error_type_name
 
-                if max_workers_note == 1:
-                    results = [
-                        _generate_single(qa_pair, lang) for qa_pair, lang in tasks
-                    ]
-                else:
-                    with ThreadPoolExecutor(max_workers=max_workers_note) as executor:
-                        futures = [
-                            executor.submit(_generate_single, qa_pair, lang)
-                            for qa_pair, lang in tasks
-                        ]
-                        results = [future.result() for future in futures]
+                # Execute card generation sequentially to avoid nested thread pools
+                # The outer loop (scan_notes_parallel) already handles concurrency at the note level
+                results = [
+                    _generate_single(qa_pair, lang) for qa_pair, lang in tasks
+                ]
 
                 failures_this_note = 0
                 for (qa_pair, lang), (card, error_message, error_type) in zip(
