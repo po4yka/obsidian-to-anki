@@ -19,6 +19,7 @@ class ModelTask(str, Enum):
     QA_EXTRACTION = "qa_extraction"
     PARSER_REPAIR = "parser_repair"
     PRE_VALIDATION = "pre_validation"
+    HIGHLIGHT = "highlight"
     GENERATION = "generation"
     POST_VALIDATION = "post_validation"
     CONTEXT_ENRICHMENT = "context_enrichment"
@@ -234,6 +235,12 @@ MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
             max_tokens=4096,  # Moderate: Pre-validation is typically simpler
             reasoning_enabled=False,  # Rule-based validation doesn't need reasoning
         ),
+        ModelTask.HIGHLIGHT: ModelConfig(
+            model_name="x-ai/grok-4.1-fast",
+            temperature=0.1,
+            max_tokens=8192,  # Highlighting may need longer excerpts
+            reasoning_enabled=True,  # Enable reasoning for candidate extraction
+        ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
@@ -290,6 +297,12 @@ MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
             max_tokens=8192,  # Increased: More thorough pre-validation
             reasoning_enabled=False,  # Keep simple for speed
         ),
+        ModelTask.HIGHLIGHT: ModelConfig(
+            model_name="x-ai/grok-4.1-fast",
+            temperature=0.1,
+            max_tokens=12288,  # Allow larger excerpts for summaries
+            reasoning_enabled=True,
+        ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
             temperature=0.3,
@@ -345,6 +358,12 @@ MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
             temperature=0.0,
             max_tokens=16384,  # Increased: Rigorous pre-validation
             reasoning_enabled=False,  # Keep deterministic for reliability
+        ),
+        ModelTask.HIGHLIGHT: ModelConfig(
+            model_name="x-ai/grok-4.1-fast",
+            temperature=0.1,
+            max_tokens=16384,  # Maximum context for deep analysis
+            reasoning_enabled=True,
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
@@ -403,6 +422,12 @@ MODEL_PRESETS: dict[ModelPreset, dict[ModelTask, ModelConfig]] = {
             temperature=0.0,
             max_tokens=4096,  # Increased: Speed-focused but thorough
             reasoning_enabled=False,  # Keep fast and deterministic
+        ),
+        ModelTask.HIGHLIGHT: ModelConfig(
+            model_name="x-ai/grok-4.1-fast",
+            temperature=0.1,
+            max_tokens=6144,  # Keep fast while allowing summaries
+            reasoning_enabled=True,
         ),
         ModelTask.GENERATION: ModelConfig(
             model_name="x-ai/grok-4.1-fast",
@@ -476,7 +501,8 @@ def get_model_config(
     Returns:
         Model configuration
     """
-    preset_configs = MODEL_PRESETS.get(preset, MODEL_PRESETS[ModelPreset.BALANCED])
+    preset_configs = MODEL_PRESETS.get(
+        preset, MODEL_PRESETS[ModelPreset.BALANCED])
     config = preset_configs.get(task)
 
     if config is None:
@@ -506,9 +532,11 @@ def get_model_config(
                 elif key == "temperature":
                     config_dict[key] = float(value)
                 elif key == "max_tokens":
-                    config_dict[key] = int(value) if value is not None else None
+                    config_dict[key] = int(
+                        value) if value is not None else None
                 elif key == "top_p":
-                    config_dict[key] = float(value) if value is not None else None
+                    config_dict[key] = float(
+                        value) if value is not None else None
                 elif key == "reasoning_enabled":
                     config_dict[key] = bool(value)
         config = ModelConfig(**config_dict)

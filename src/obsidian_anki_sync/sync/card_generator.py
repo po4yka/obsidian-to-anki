@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import diskcache
 
+from obsidian_anki_sync.agents.models import HighlightResult
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.apf.html_validator import validate_card_html
 from obsidian_anki_sync.apf.linter import validate_apf
@@ -227,6 +228,17 @@ class CardGenerator:
         if not result.success or not result.generation:
             # Use the robust error extraction method
             error_msg = self._extract_pipeline_error_message(result)
+            highlight_hint = self._format_highlight_hint(
+                result.highlight_result)
+            if highlight_hint:
+                logger.info(
+                    "highlight_agent_summary",
+                    note=relative_path,
+                    candidates=len(result.highlight_result.qa_candidates)
+                    if result.highlight_result
+                    else 0,
+                )
+                error_msg = f"{error_msg}\n{highlight_hint}"
             msg = f"Agent pipeline failed: {error_msg}"
             raise ValueError(msg)
 
@@ -518,40 +530,69 @@ class CardGenerator:
             # Category 1: Post-validation errors (highest priority - most specific)
             if (hasattr(result, 'post_validation') and result.post_validation and
                 hasattr(result.post_validation, 'is_valid') and
-                hasattr(result.post_validation, 'error_details') and
                     hasattr(result.post_validation, 'error_type')):
 
-                if not result.post_validation.is_valid and result.post_validation.error_details:
+                if not result.post_validation.is_valid:
                     error_type = getattr(
                         result.post_validation, 'error_type', 'unknown')
-                    return f"Card validation failed ({error_type}): {result.post_validation.error_details}"
+
+                    # Use standardized error messages for post-validation too
+                    standardized_messages = {
+                        'syntax': 'Card syntax error: Generated cards contain invalid formatting or structure.',
+                        'factual': 'Card accuracy error: Generated cards contain factual inaccuracies or incorrect information.',
+                        'semantic': 'Card semantic error: Generated cards have logical inconsistencies or unclear content.',
+                        'template': 'Card template error: Generated cards do not follow the required format specifications.',
+                        'none': 'Card validation failed unexpectedly. Review the generated cards for issues.',
+                    }
+
+                    # Get the standardized message
+                    standardized_message = standardized_messages.get(
+                        error_type,
+                        f'Card validation failed ({error_type}): Generated cards have quality issues.'
+                    )
+
+                    # Include specific error details if available and not too verbose
+                    error_details = getattr(
+                        result.post_validation, 'error_details', '')
+                    if error_details and error_details.strip() and len(error_details) < 150:
+                        return f"{standardized_message} Details: {error_details}"
+                    else:
+                        return standardized_message
 
             # Category 2: Pre-validation errors (second priority)
             if (hasattr(result, 'pre_validation') and result.pre_validation and
                 hasattr(result.pre_validation, 'is_valid') and
-                hasattr(result.pre_validation, 'error_details') and
                     hasattr(result.pre_validation, 'error_type')):
 
                 if not result.pre_validation.is_valid:
                     error_type = getattr(
                         result.pre_validation, 'error_type', 'unknown')
+
+                    # Use standardized error messages based on error type
+                    # This provides consistent, user-friendly messages instead of LLM-generated text
+                    standardized_messages = {
+                        'structure': 'Note structure issue: Missing or invalid Q&A pairs. Ensure your note contains questions and answers in the expected format.',
+                        'format': 'Content format issue: Invalid markdown formatting detected. Check for proper syntax and structure.',
+                        'frontmatter': 'YAML frontmatter error: Invalid or missing metadata. Check tags, title, and other frontmatter fields.',
+                        'content': 'Content issue: Note content is incomplete or malformed. Review the note for missing information.',
+                        'none': 'Validation completed but failed unexpectedly. This may indicate an internal processing error.',
+                    }
+
+                    # Get the standardized message, fallback to generic message
+                    standardized_message = standardized_messages.get(
+                        error_type,
+                        f'Content validation failed ({error_type}): Check your note structure and content.'
+                    )
+
+                    # If we have additional error details from the LLM, we can append them
+                    # but prioritize the standardized message for consistency
                     error_details = getattr(
                         result.pre_validation, 'error_details', '')
-
-                    if error_details and error_details.strip():
-                        return f"Content validation failed ({error_type}): {error_details}"
+                    if error_details and error_details.strip() and len(error_details) < 100:
+                        # Only append short, specific details to avoid LLM variability
+                        return f"{standardized_message} Details: {error_details}"
                     else:
-                        # Provide user-friendly messages for common error types
-                        user_friendly_messages = {
-                            'structure': 'Note structure issue detected. Check Q&A format and YAML frontmatter.',
-                            'format': 'Content format issue. Ensure proper markdown formatting.',
-                            'frontmatter': 'YAML frontmatter error. Check tags, title, and metadata.',
-                            'content': 'Content issue. Review note content for problems.',
-                            'none': 'Validation completed but marked as failed.',
-                        }
-                        message = user_friendly_messages.get(
-                            error_type, f'Validation failed ({error_type})')
-                        return f"Content validation failed: {message}"
+                        return standardized_message
 
             # Category 3: Memorization quality errors
             if (hasattr(result, 'memorization_quality') and result.memorization_quality and
@@ -690,3 +731,37 @@ class CardGenerator:
                 has_success=hasattr(result, 'success') if result else False,
             )
             return f"Pipeline failed (error analysis unavailable: {type(e).__name__})"
+
+    def _format_highlight_hint(self, highlight: HighlightResult | None) -> str:
+        """Format highlight agent output for error messaging."""
+
+        if not highlight:
+            return ""
+
+        sections: list[str] = []
+        if highlight.qa_candidates:
+            qa_lines: list[str] = []
+            for qa in highlight.qa_candidates[:3]:
+                question = qa.question.strip()
+                answer = qa.answer.strip()
+                qa_lines.append(
+                    f"- Q: {question} | A: {answer} (confidence {qa.confidence:.2f})"
+                )
+                excerpt = qa.source_excerpt or ""
+                if excerpt:
+                    qa_lines.append(f"  Excerpt: {excerpt.strip()}")
+            sections.append("Candidate Q&A pairs:\n" + "\n".join(qa_lines))
+
+        if highlight.suggestions:
+            suggestion_lines = [
+                f"- {suggestion.strip()}" for suggestion in highlight.suggestions[:5]
+            ]
+            sections.append("Suggestions:\n" + "\n".join(suggestion_lines))
+
+        if highlight.note_status and highlight.note_status != "unknown":
+            sections.append(f"Detected note status: {highlight.note_status}")
+
+        if not sections:
+            return ""
+
+        return "Highlight agent findings:\n" + "\n".join(sections)

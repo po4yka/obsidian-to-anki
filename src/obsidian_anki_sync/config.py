@@ -658,6 +658,20 @@ class Config(BaseSettings):
     enable_duplicate_detection: bool = (
         False  # Check against existing cards (requires existing_cards)
     )
+    enable_highlight_agent: bool = Field(
+        default=True,
+        description="Run highlight agent to extract candidate Q&A when validation fails",
+    )
+    highlight_max_candidates: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of QA candidates suggested by highlight agent",
+    )
+    highlight_model: str = Field(
+        default="",
+        description="Override model for highlight agent (empty string uses preset/default)",
+    )
 
     # Performance Optimization Settings
     enable_batch_operations: bool = True  # Enable batch Anki and DB operations
@@ -710,6 +724,7 @@ class Config(BaseSettings):
             "reasoning": ModelTask.GENERATION,  # CoT reasoning uses generation task
             # Self-reflection uses post-validation task
             "reflection": ModelTask.POST_VALIDATION,
+            "highlight": ModelTask.HIGHLIGHT,
         }
 
         task = agent_to_task.get(agent_type)
@@ -731,6 +746,7 @@ class Config(BaseSettings):
             "reasoning": self.reasoning_model or self.generator_model,  # CoT reasoning
             "reflection": self.reflection_model
             or self.generator_model,  # Self-reflection
+            "highlight": self.highlight_model or self.pre_validator_model,
         }
 
         explicit_model = agent_model_map.get(agent_type, "")
@@ -1021,27 +1037,32 @@ def load_config(config_path: Path | None = None) -> Config:
 
     if config_path:
         candidate_paths.append(config_path.expanduser())
-        logger.info("config_loading", config_path=str(config_path), source="cli_argument")
+        logger.info("config_loading", config_path=str(
+            config_path), source="cli_argument")
     else:
         env_path = os.getenv("OBSIDIAN_ANKI_CONFIG")
         if env_path:
             candidate_paths.append(Path(env_path).expanduser())
-            logger.debug("config_searching", source="environment_variable", path=env_path)
+            logger.debug("config_searching",
+                         source="environment_variable", path=env_path)
         candidate_paths.append(Path.cwd() / "config.yaml")
         default_repo_config = Path(
             __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
-        logger.debug("config_searching", source="default_locations", paths=[str(p) for p in candidate_paths])
+        logger.debug("config_searching", source="default_locations",
+                     paths=[str(p) for p in candidate_paths])
 
     resolved_config_path: Path | None = None
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
-            logger.info("config_file_found", config_path=str(resolved_config_path))
+            logger.info("config_file_found",
+                        config_path=str(resolved_config_path))
             break
 
     if not resolved_config_path:
-        logger.warning("config_file_not_found", searched_paths=[str(p) for p in candidate_paths])
+        logger.warning("config_file_not_found", searched_paths=[
+                       str(p) for p in candidate_paths])
 
     # Load YAML data if file exists
     yaml_data: dict[str, Any] = {}
@@ -1049,7 +1070,8 @@ def load_config(config_path: Path | None = None) -> Config:
         try:
             with open(resolved_config_path, encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f) or {}
-            logger.debug("config_yaml_loaded", config_path=str(resolved_config_path), keys_count=len(yaml_data))
+            logger.debug("config_yaml_loaded", config_path=str(
+                resolved_config_path), keys_count=len(yaml_data))
         except Exception as e:
             logger.error(
                 "config_yaml_load_error",
@@ -1134,7 +1156,8 @@ def load_config(config_path: Path | None = None) -> Config:
             config = Config(**config_kwargs)
             logger.info(
                 "config_loaded",
-                vault_path=str(config.vault_path) if config.vault_path else None,
+                vault_path=str(
+                    config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
                 use_agents=getattr(config, "use_agents", False),
                 use_langgraph=getattr(config, "use_langgraph", False),
@@ -1144,7 +1167,8 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_validation_error",
                 error=str(e),
                 error_type=type(e).__name__,
-                config_path=str(resolved_config_path) if resolved_config_path else None,
+                config_path=str(
+                    resolved_config_path) if resolved_config_path else None,
             )
             raise
 

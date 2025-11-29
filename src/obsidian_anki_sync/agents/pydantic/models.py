@@ -18,7 +18,8 @@ class PreValidationOutput(BaseModel):
     error_type: str = Field(
         description="Type of error: format, structure, frontmatter, content, or none"
     )
-    error_details: str = Field(default="", description="Detailed error description")
+    error_details: str = Field(
+        default="", description="Detailed error description")
     suggested_fixes: list[str] = Field(
         default_factory=list, description="Suggested fixes for validation errors"
     )
@@ -33,11 +34,13 @@ class CardGenerationOutput(BaseModel):
     cards: list[dict[str, Any]] = Field(
         description="Generated cards with all APF fields"
     )
-    total_generated: int = Field(ge=0, description="Total number of cards generated")
+    total_generated: int = Field(
+        ge=0, description="Total number of cards generated")
     generation_notes: str = Field(
         default="", description="Notes about the generation process"
     )
-    confidence: float = Field(default=0.5, description="Overall generation confidence")
+    confidence: float = Field(
+        default=0.5, description="Overall generation confidence")
 
 
 class PostValidationOutput(BaseModel):
@@ -47,7 +50,8 @@ class PostValidationOutput(BaseModel):
     error_type: str = Field(
         description="Type of error: syntax, factual, semantic, template, or none"
     )
-    error_details: str = Field(default="", description="Detailed validation errors")
+    error_details: str = Field(
+        default="", description="Detailed validation errors")
     card_issues: list[dict[str, str]] = Field(
         default_factory=list,
         description="Per-card issues with card_index and issue description",
@@ -88,7 +92,8 @@ class MemorizationQualityOutput(BaseModel):
     suggested_improvements: list[str] = Field(
         default_factory=list, description="Actionable improvements"
     )
-    confidence: float = Field(default=0.5, description="Confidence in assessment")
+    confidence: float = Field(
+        default=0.5, description="Confidence in assessment")
 
 
 class CardSplitPlanOutput(BaseModel):
@@ -104,8 +109,10 @@ class CardSplitPlanOutput(BaseModel):
 class CardSplittingOutput(BaseModel):
     """Structured output from card splitting agent."""
 
-    should_split: bool = Field(description="Whether to split into multiple cards")
-    card_count: int = Field(default=1, ge=1, description="Number of cards to generate")
+    should_split: bool = Field(
+        description="Whether to split into multiple cards")
+    card_count: int = Field(
+        default=1, ge=1, description="Number of cards to generate")
     splitting_strategy: str = Field(
         description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware"
     )
@@ -126,18 +133,22 @@ class DuplicateMatchOutput(BaseModel):
 
     card_slug: str = Field(min_length=1)
     similarity_score: float = Field(default=0.0)
-    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    duplicate_type: str = Field(
+        description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(default="")
 
 
 class DuplicateDetectionOutput(BaseModel):
     """Structured output from duplicate detection agent."""
 
-    is_duplicate: bool = Field(description="True if exact or semantic duplicate")
+    is_duplicate: bool = Field(
+        description="True if exact or semantic duplicate")
     similarity_score: float = Field(default=0.0)
-    duplicate_type: str = Field(description="exact/semantic/partial_overlap/unique")
+    duplicate_type: str = Field(
+        description="exact/semantic/partial_overlap/unique")
     reasoning: str = Field(description="Explanation of similarity assessment")
-    recommendation: str = Field(description="delete/merge/keep_both/review_manually")
+    recommendation: str = Field(
+        description="delete/merge/keep_both/review_manually")
     better_card: str | None = Field(
         default=None, description="'new' or existing card slug if duplicate"
     )
@@ -162,11 +173,60 @@ class ContextEnrichmentOutput(BaseModel):
     enrichment_type: list[str] = Field(
         default_factory=list, description="Types of enrichment to add"
     )
-    enriched_answer: str = Field(default="", description="Enhanced answer text")
-    enriched_extra: str = Field(default="", description="Enhanced Extra section")
-    additions_summary: str = Field(default="", description="Summary of additions")
+    enriched_answer: str = Field(
+        default="", description="Enhanced answer text")
+    enriched_extra: str = Field(
+        default="", description="Enhanced Extra section")
+    additions_summary: str = Field(
+        default="", description="Summary of additions")
     rationale: str = Field(default="", description="Why enrichment helps")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class HighlightCandidateOutput(BaseModel):
+    """Structured QA candidate output from highlight agent."""
+
+    question: str = Field(description="Suggested question text")
+    answer: str = Field(description="Suggested answer text")
+    confidence: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Confidence in this candidate"
+    )
+    source_excerpt: str | None = Field(
+        default=None, description="Excerpt or block reference where this candidate originated"
+    )
+    anchor: str | None = Field(
+        default=None, description="Optional anchor/heading reference within the note"
+    )
+
+
+class HighlightOutput(BaseModel):
+    """Structured output from highlight agent."""
+
+    qa_candidates: list[HighlightCandidateOutput] = Field(
+        default_factory=list, description="Candidate Q&A pairs found in the note"
+    )
+    summaries: list[str] = Field(
+        default_factory=list, description="High-level summaries of note sections"
+    )
+    suggestions: list[str] = Field(
+        default_factory=list, description="Actionable next steps for the author"
+    )
+    detected_sections: list[str] = Field(
+        default_factory=list, description="Titles or sections detected in the note"
+    )
+    confidence: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Confidence in highlight usefulness"
+    )
+    note_status: str = Field(
+        default="unknown",
+        description="Inferred status of the note (draft/incomplete/ready)",
+    )
+    analysis_time: float = Field(
+        default=0.0, ge=0.0, description="Estimated time spent analyzing the note"
+    )
+    raw_excerpt: str | None = Field(
+        default=None, description="Optional excerpt containing the primary highlight"
+    )
 
 
 # ============================================================================
@@ -226,3 +286,13 @@ class ContextEnrichmentDeps(BaseModel):
     extra: str
     card_slug: str
     note_title: str
+
+
+class HighlightDeps(BaseModel):
+    """Dependencies for highlight agent."""
+
+    note_content: str
+    metadata: NoteMetadata
+    max_candidates: int = Field(
+        default=3, description="Max number of QA candidates to extract"
+    )

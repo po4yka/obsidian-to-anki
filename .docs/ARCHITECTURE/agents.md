@@ -126,6 +126,19 @@ Input Note → Pre-Validator → Generator → Post-Validator → Output Cards
 **Output**: `PreValidationResult` with validation status and issues
 **Success Rate**: ~85% pass rate, catches 60% of issues
 
+#### Highlight Agent
+
+**Purpose**: When a note fails pre-validation (usually because Q&A sections are missing or incomplete), the highlight agent analyzes the entire note and proposes candidate Q/A pairs plus actionable suggestions so authors know exactly what to fix.
+
+**Models**: Structured-output models (default `x-ai/grok-4.1-fast`) with reasoning enabled
+**Output**: `HighlightResult` containing:
+
+-   candidate Q/A pairs with confidence scores and excerpts
+-   actionable suggestions (e.g., “Add RU answer for Question 1”)
+-   inferred note status (`draft`, `incomplete`, etc.)
+
+**Routing**: Automatically invoked when pre-validation fails and `enable_highlight_agent` is `true`. Results are surfaced in sync logs so authors get immediate guidance instead of a generic error.
+
 #### Generator Agent
 
 **Purpose**: Core card generation from validated Q&A pairs.

@@ -10,6 +10,7 @@ from .nodes import (
     context_enrichment_node,
     duplicate_detection_node,
     generation_node,
+    highlight_node,
     linter_validation_node,
     memorization_quality_node,
     note_correction_node,
@@ -41,7 +42,7 @@ from .state import PipelineState
 # Conditional Routing Functions
 def should_continue_after_pre_validation(
     state: PipelineState,
-) -> Literal["card_splitting", "generation", "failed"]:
+) -> Literal["card_splitting", "generation", "highlight", "failed"]:
     """Determine next node after pre-validation."""
     pre_validation = state.get("pre_validation")
     if pre_validation and pre_validation["is_valid"]:
@@ -49,6 +50,8 @@ def should_continue_after_pre_validation(
         if state.get("enable_card_splitting", True):
             return "card_splitting"
         return "generation"
+    if state.get("enable_highlight_agent", True):
+        return "highlight"
     return "failed"
 
 
@@ -121,7 +124,8 @@ class WorkflowBuilder:
         )
 
         # Add optional note correction node (if enabled)
-        enable_note_correction = getattr(self.config, "enable_note_correction", False)
+        enable_note_correction = getattr(
+            self.config, "enable_note_correction", False)
         if enable_note_correction:
             workflow.add_node(
                 "note_correction",
@@ -227,13 +231,19 @@ class WorkflowBuilder:
             duplicate_detection_node,
             retry_policy=VALIDATION_RETRY_POLICY,
         )
+        workflow.add_node(
+            "highlight",
+            highlight_node,
+            retry_policy=None,
+        )
 
         # ====================================================================
         # Self-Reflection Nodes (if enabled)
         # Reflection nodes run AFTER action nodes to evaluate outputs
         # They do NOT retry - reflection failure should not block pipeline
         # ====================================================================
-        enable_self_reflection = getattr(self.config, "enable_self_reflection", False)
+        enable_self_reflection = getattr(
+            self.config, "enable_self_reflection", False)
 
         if enable_self_reflection:
             # Add reflection nodes (run AFTER action nodes)
@@ -270,7 +280,8 @@ class WorkflowBuilder:
             # CoT enabled: Route through reasoning nodes
             if enable_note_correction:
                 workflow.add_edge("autofix", "note_correction")
-                workflow.add_edge("note_correction", "think_before_pre_validation")
+                workflow.add_edge("note_correction",
+                                  "think_before_pre_validation")
             else:
                 workflow.add_edge("autofix", "think_before_pre_validation")
 
@@ -278,9 +289,11 @@ class WorkflowBuilder:
             workflow.add_edge("think_before_pre_validation", "pre_validation")
             workflow.add_edge("think_before_card_splitting", "card_splitting")
             workflow.add_edge("think_before_generation", "generation")
-            workflow.add_edge("think_before_post_validation", "post_validation")
+            workflow.add_edge("think_before_post_validation",
+                              "post_validation")
             workflow.add_edge("think_before_enrichment", "context_enrichment")
-            workflow.add_edge("think_before_memorization", "memorization_quality")
+            workflow.add_edge("think_before_memorization",
+                              "memorization_quality")
             workflow.add_edge("think_before_duplicate", "duplicate_detection")
 
             # Pre-validation routes to thinking nodes
@@ -290,6 +303,7 @@ class WorkflowBuilder:
                 {
                     "think_card_splitting": "think_before_card_splitting",
                     "think_generation": "think_before_generation",
+                    "highlight": "highlight",
                     "failed": END,
                 },
             )
@@ -300,7 +314,8 @@ class WorkflowBuilder:
 
             # Generation -> Linter -> think_before_post_validation
             workflow.add_edge("generation", "linter_validation")
-            workflow.add_edge("linter_validation", "think_before_post_validation")
+            workflow.add_edge("linter_validation",
+                              "think_before_post_validation")
 
             # Post-validation routes (with optional self-reflection)
             if enable_self_reflection:
@@ -330,7 +345,8 @@ class WorkflowBuilder:
                 workflow.add_edge("revise_generation", "generation")
 
                 # Enrichment routes to reflection
-                workflow.add_edge("context_enrichment", "reflect_after_enrichment")
+                workflow.add_edge("context_enrichment",
+                                  "reflect_after_enrichment")
 
                 # Enrichment reflection routes to revision or next stage
                 workflow.add_conditional_edges(
@@ -396,6 +412,7 @@ class WorkflowBuilder:
                 {
                     "card_splitting": "card_splitting",
                     "generation": "generation",
+                    "highlight": "highlight",
                     "failed": END,
                 },
             )
@@ -437,7 +454,8 @@ class WorkflowBuilder:
                 workflow.add_edge("revise_generation", "generation")
 
                 # Enrichment routes to reflection
-                workflow.add_edge("context_enrichment", "reflect_after_enrichment")
+                workflow.add_edge("context_enrichment",
+                                  "reflect_after_enrichment")
 
                 # Enrichment reflection routes to revision or next stage
                 workflow.add_conditional_edges(
@@ -487,6 +505,9 @@ class WorkflowBuilder:
             # Duplicate detection always goes to END
             workflow.add_edge("duplicate_detection", END)
 
+        # Highlight node always terminates after providing suggestions
+        workflow.add_edge("highlight", END)
+
         return workflow
 
     # ========================================================================
@@ -495,13 +516,15 @@ class WorkflowBuilder:
 
     def _route_after_pre_validation_with_cot(
         self, state: PipelineState
-    ) -> Literal["think_card_splitting", "think_generation", "failed"]:
+    ) -> Literal["think_card_splitting", "think_generation", "highlight", "failed"]:
         """Route after pre-validation when CoT is enabled."""
         pre_validation = state.get("pre_validation")
         if pre_validation and pre_validation["is_valid"]:
             if state.get("enable_card_splitting", True):
                 return "think_card_splitting"
             return "think_generation"
+        if state.get("enable_highlight_agent", True):
+            return "highlight"
         return "failed"
 
     def _route_after_post_validation_with_cot(

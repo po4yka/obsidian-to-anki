@@ -22,7 +22,8 @@ class AgentError(Exception):
     def __str__(self) -> str:
         """Return string representation."""
         if self.details:
-            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
+            details_str = ", ".join(
+                f"{k}={v}" for k, v in self.details.items())
             return f"{self.message} ({details_str})"
         return self.message
 
@@ -37,6 +38,10 @@ class PreValidationError(ValidationError):
 
 class PostValidationError(ValidationError):
     """Raised when post-validation fails."""
+
+
+class HighlightError(AgentError):
+    """Raised when highlight agent fails."""
 
 
 class GenerationError(AgentError):

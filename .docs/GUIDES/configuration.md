@@ -197,6 +197,17 @@ memorization_quality_model: "moonshotai/kimi-k2"
 card_splitting_model: "qwen/qwen-2.5-32b-instruct"
 ```
 
+### Highlight Agent
+
+```yaml
+# Highlight agent (runs when notes fail pre-validation)
+enable_highlight_agent: true
+highlight_max_candidates: 3
+highlight_model: "" # Empty string uses preset/default model
+```
+
+When enabled, the highlight agent analyzes incomplete notes and surfaces candidate Q&A pairs plus actionable suggestions. The output is included in sync logs so you know exactly which sections need attention instead of a generic “validation failed” message.
+
 ## Sync Configuration
 
 ### Vault and Deck Settings

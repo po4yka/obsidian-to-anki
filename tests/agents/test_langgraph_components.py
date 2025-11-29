@@ -3,7 +3,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from obsidian_anki_sync.agents.langgraph.model_factory import ModelFactory
-from obsidian_anki_sync.agents.langgraph.workflow_builder import WorkflowBuilder
+from obsidian_anki_sync.agents.langgraph.workflow_builder import (
+    WorkflowBuilder,
+    should_continue_after_pre_validation,
+)
 from obsidian_anki_sync.config import Config
 
 
@@ -19,6 +22,8 @@ def mock_config():
     config.enable_context_enrichment = True
     config.enable_memorization_quality = True
     config.enable_duplicate_detection = False
+    config.enable_highlight_agent = True
+    config.highlight_max_candidates = 3
     return config
 
 
@@ -77,3 +82,25 @@ class TestWorkflowBuilder:
         # But we can check if compile works
         app = workflow.compile()
         assert app is not None
+
+
+class TestHighlightRouting:
+    def test_should_route_to_highlight_when_enabled(self):
+        state = {
+            "pre_validation": {"is_valid": False},
+            "enable_card_splitting": True,
+            "enable_highlight_agent": True,
+        }
+        route = should_continue_after_pre_validation(
+            state)  # type: ignore[arg-type]
+        assert route == "highlight"
+
+    def test_cot_route_includes_highlight(self, mock_config):
+        builder = WorkflowBuilder(mock_config)
+        state = {
+            "pre_validation": {"is_valid": False},
+            "enable_highlight_agent": True,
+        }
+        route = builder._route_after_pre_validation_with_cot(
+            state)  # type: ignore[arg-type]
+        assert route == "highlight"

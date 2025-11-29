@@ -33,7 +33,8 @@ class PipelineState(TypedDict):
     qa_pairs_dicts: list[dict]  # Serialized QAPair list
     file_path: str | None
     slug_base: str
-    runtime_key: str  # Lookup key for runtime resources (config, models, selectors)
+    # Lookup key for runtime resources (config, models, selectors)
+    runtime_key: str
     config_snapshot: dict  # JSON-serializable config snapshot for reference
     existing_cards_dicts: (
         list[dict] | None
@@ -47,6 +48,7 @@ class PipelineState(TypedDict):
     context_enrichment_model: str | None
     memorization_quality_model: str | None
     duplicate_detection_model: str | None
+    highlight_model: str | None
 
     # Pipeline stage results
     autofix: dict | None  # Serialized AutoFixResult
@@ -62,6 +64,7 @@ class PipelineState(TypedDict):
     memorization_quality: dict | None  # Serialized MemorizationQualityResult
     # Serialized DuplicateDetectionResult (per card)
     duplicate_detection: dict | None
+    highlight_result: dict | None  # Serialized HighlightResult
 
     # Workflow control
     current_stage: Literal[
@@ -75,16 +78,19 @@ class PipelineState(TypedDict):
         "context_enrichment",
         "memorization_quality",
         "duplicate_detection",
+        "highlight",
         "complete",
         "failed",
     ]
     # Auto-fix always runs (permanent step) - configurable options only
     autofix_write_back: bool  # Write fixes back to source files
-    autofix_handlers: list[str] | None  # List of enabled handler types (None = all)
+    # List of enabled handler types (None = all)
+    autofix_handlers: list[str] | None
     enable_card_splitting: bool
     enable_context_enrichment: bool
     enable_memorization_quality: bool
     enable_duplicate_detection: bool
+    enable_highlight_agent: bool
     retry_count: int
     max_retries: int
     auto_fix_enabled: bool
@@ -173,10 +179,12 @@ class PipelineState(TypedDict):
     # RAG Results (per-stage outputs)
     rag_enrichment: dict | None  # RAG context enrichment data
     rag_examples: list[dict] | None  # Few-shot examples from RAG
-    rag_duplicate_results: list[dict] | None  # RAG-based duplicate check results
+    # RAG-based duplicate check results
+    rag_duplicate_results: list[dict] | None
 
     # Unified agent framework configuration
-    agent_framework: str  # Agent framework to use ("pydantic_ai", "langchain", etc.)
+    # Agent framework to use ("pydantic_ai", "langchain", etc.)
+    agent_framework: str
     agent_selector: str | None  # Runtime cache key for agent selector
     split_validator_model: str | None  # Model name for split validation
 
