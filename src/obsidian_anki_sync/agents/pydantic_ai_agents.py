@@ -102,7 +102,8 @@ class CardGenerationOutput(BaseModel):
                 errors.append(f"Card {i+1} ({slug}): {'; '.join(result.errors)}")
 
         if errors:
-            raise ValueError(f"APF Validation Failed: {'; '.join(errors)}")
+            msg = f"APF Validation Failed: {'; '.join(errors)}"
+            raise ValueError(msg)
 
         return cards
 

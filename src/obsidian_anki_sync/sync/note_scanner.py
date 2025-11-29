@@ -3,9 +3,9 @@
 Handles discovery, parsing, and processing of Obsidian notes.
 """
 
+import errno
 import random
 import time
-import errno
 from collections import defaultdict
 from collections.abc import Collection
 from pathlib import Path
@@ -21,12 +21,11 @@ try:
 except ImportError:
     psutil = None  # type: ignore
 
+import asyncio
+
 import yaml  # type: ignore
 from arq import create_pool
 from arq.connections import RedisSettings
-import asyncio
-
-
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import ParserError

@@ -188,7 +188,7 @@ class TitleFormatHandler(AutoFixHandler):
     description = "Ensure title has bilingual format 'English / Russian'"
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
-        issues = []
+        issues: list[AutoFixIssue] = []
 
         if not metadata:
             return issues
@@ -269,7 +269,7 @@ class MocMismatchHandler(AutoFixHandler):
     description = "Update MOC field to match topic (moc-{topic})"
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
-        issues = []
+        issues: list[AutoFixIssue] = []
 
         if not metadata:
             return issues
@@ -342,7 +342,7 @@ class SectionOrderHandler(AutoFixHandler):
     ]
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
-        issues = []
+        issues: list[AutoFixIssue] = []
 
         # Find positions of each section
         positions = []
@@ -390,7 +390,7 @@ class MissingRelatedQuestionsHandler(AutoFixHandler):
     description = "Add ## Related Questions section from YAML related field"
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
-        issues = []
+        issues: list[AutoFixIssue] = []
 
         if not metadata:
             return issues
@@ -548,7 +548,7 @@ class BrokenRelatedEntryHandler(AutoFixHandler):
         self.note_index = note_index or set()
 
     def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
-        issues = []
+        issues: list[AutoFixIssue] = []
 
         if not metadata or not self.note_index:
             return issues

@@ -874,10 +874,8 @@ Respond with valid JSON:
                 quality_after_data = correction_result_data.get("quality_after")
 
                 if quality_after_data:
-                    try:
+                    with contextlib.suppress(Exception):
                         quality_after = RepairQualityScore(**quality_after_data)
-                    except Exception:
-                        pass
 
             correction_time = time.time() - start_time
 

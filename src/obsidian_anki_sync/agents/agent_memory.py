@@ -77,7 +77,7 @@ class AgentMemoryStore:
         self._enable_semantic_search = enable_semantic_search
 
         # Lazy-initialized resources (to avoid file descriptor exhaustion)
-        self._client: chromadb.PersistentClient | None = None
+        self._client: chromadb.api.client.ClientAPI | None = None
         self._collections: dict[str, Any] | None = None
         self._embedding_provider: EmbeddingProvider | None = None
         self._embedding_function: Any = None
@@ -132,7 +132,7 @@ class AgentMemoryStore:
         self._initialized = True
 
     @property
-    def client(self) -> chromadb.PersistentClient:
+    def client(self) -> chromadb.api.client.ClientAPI:
         """Get ChromaDB client (lazy initialization)."""
         self._ensure_initialized()
         return self._client  # type: ignore[return-value]
@@ -167,12 +167,13 @@ class AgentMemoryStore:
 
         for memory_type in memory_types:
             try:
-                collection = self._client.get_or_create_collection(
-                    name=memory_type,
-                    metadata={"description": f"Memory store for {memory_type}"},
-                    embedding_function=self._embedding_function,
-                )
-                self._collections[memory_type] = collection
+                if self._client:
+                    collection = self._client.get_or_create_collection(
+                        name=memory_type,
+                        metadata={"description": f"Memory store for {memory_type}"},
+                        embedding_function=self._embedding_function,
+                    )
+                    self._collections[memory_type] = collection
             except Exception as e:
                 logger.error(
                     "failed_to_create_collection",

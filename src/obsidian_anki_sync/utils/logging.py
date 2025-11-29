@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -83,7 +83,7 @@ class ConsoleNoiseFilterProcessor:
         self._lock = threading.Lock()
         self._time_func = time_func or time.monotonic
 
-    def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    def __call__(self, logger: Any, method_name: str, event_dict: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
         """Apply level overrides and rate limits to a log event."""
         # Check module-level overrides
         logger_name = event_dict.get("logger", "") or ""
@@ -143,8 +143,8 @@ _handlers: list[logging.Handler] = []
 
 
 def _add_formatted_extra_processor(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     """Add formatted extra fields to the event dict for display.
 
     This processor adds a '_formatted' field containing a formatted string
@@ -203,7 +203,7 @@ def _setup_stdlib_logging(
     root_logger.handlers.clear()
 
     # Base processors for all logs (noise filter is added per-handler, not globally)
-    base_processors = [
+    base_processors: list[structlog.typing.Processor] = [
         structlog.contextvars.merge_contextvars,
         add_log_level,
         add_logger_name,
@@ -278,7 +278,7 @@ def configure_logging(
     console_handler.setLevel(level)
 
     # Console processors (without noise filter if disabled, with it if enabled)
-    console_pre_chain = [
+    console_pre_chain: list[structlog.typing.Processor] = [
         structlog.contextvars.merge_contextvars,
         add_log_level,
         add_logger_name,
@@ -319,7 +319,7 @@ def configure_logging(
     file_handler.suffix = "%Y-%m-%d"
 
     # File processors (no console noise filter, but include formatted extra)
-    file_pre_chain = [
+    file_pre_chain: list[structlog.typing.Processor] = [
         structlog.contextvars.merge_contextvars,
         add_log_level,
         add_logger_name,
@@ -377,11 +377,14 @@ def configure_logging(
 
     # Verbose LLM logging handler (if enabled)
     if very_verbose:
-        verbose_log_path = (
-            log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
-            if log_file
-            else log_dir / "obsidian-anki-sync_verbose.log"
-        )
+        if log_file:
+            verbose_log_path = (
+                log_path.parent / f"{log_path.stem}_verbose{log_path.suffix}"
+            )
+        else:
+            # log_dir is guaranteed to be set if log_file is not set
+            assert log_dir is not None
+            verbose_log_path = log_dir / "obsidian-anki-sync_verbose.log"
 
         class VerboseFilter(logging.Filter):
             """Filter for LLM-related verbose logs."""
