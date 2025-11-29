@@ -100,9 +100,12 @@ class NoteScanner:
         self._slug_counters = slug_counters or {}
         self._slug_counter_lock = slug_counter_lock
 
-        # Lock for serializing archival operations to prevent file descriptor exhaustion
+        # Deferred archival system to prevent "too many open files" during parallel scans
         import threading
+
         self._archival_lock = threading.Lock()
+        self._deferred_archives: list[dict] = []
+        self._defer_archival = False  # When True, archival is deferred to end of scan
 
     def scan_notes(
         self,
@@ -487,6 +490,9 @@ class NoteScanner:
             auto_adjust=self.config.auto_adjust_workers,
         )
 
+        # Enable deferred archival to prevent "too many open files" during parallel scan
+        self._defer_archival = True
+
         # Initialize slug counters from existing slugs
         if self._slug_counter_lock:
             with self._slug_counter_lock:
@@ -594,6 +600,10 @@ class NoteScanner:
             cards=len(obsidian_cards),
             workers_used=max_workers,
         )
+
+        # Disable deferred archival and process queued archives sequentially
+        self._defer_archival = False
+        self._process_deferred_archives()
 
         return obsidian_cards
 
@@ -918,8 +928,9 @@ class NoteScanner:
     ) -> None:
         """Safely archive a problematic note.
 
-        Uses a lock to serialize archival operations and prevent file descriptor
-        exhaustion when many notes fail concurrently.
+        When _defer_archival is True (during parallel scans), archival requests
+        are queued and processed sequentially after the scan completes.
+        This prevents "too many open files" errors from concurrent file operations.
 
         Args:
             file_path: Absolute path to the note file
@@ -930,33 +941,124 @@ class NoteScanner:
             card_index: Optional card index
             language: Optional language
         """
-        # Serialize archival operations to prevent file descriptor exhaustion
-        with self._archival_lock:
-            try:
-                if note_content is None:
-                    try:
-                        note_content = file_path.read_text(encoding="utf-8")
-                    except (UnicodeDecodeError, OSError) as read_err:
-                        logger.debug(
-                            "unable_to_read_note_for_archiving",
-                            file=relative_path,
-                            error=str(read_err),
-                        )
-                        note_content = ""
+        # During parallel scans, defer archival to prevent file descriptor exhaustion
+        if self._defer_archival:
+            with self._archival_lock:
+                self._deferred_archives.append(
+                    {
+                        "file_path": file_path,
+                        "relative_path": relative_path,
+                        "error": error,
+                        "processing_stage": processing_stage,
+                        "note_content": note_content,
+                        "card_index": card_index,
+                        "language": language,
+                    }
+                )
+            return
 
-                self.archiver.archive_note(
-                    note_path=file_path,
-                    error=error,
-                    error_type=type(error).__name__,
-                    processing_stage=processing_stage,
-                    card_index=card_index,
-                    language=language,
-                    note_content=note_content if note_content else None,
-                    context={"relative_path": relative_path},
+        # Immediate archival (non-parallel mode)
+        self._archive_note_immediate(
+            file_path=file_path,
+            relative_path=relative_path,
+            error=error,
+            processing_stage=processing_stage,
+            note_content=note_content,
+            card_index=card_index,
+            language=language,
+        )
+
+    def _archive_note_immediate(
+        self,
+        file_path: Path,
+        relative_path: str,
+        error: Exception,
+        processing_stage: str,
+        note_content: str | None = None,
+        card_index: int | None = None,
+        language: str | None = None,
+    ) -> None:
+        """Immediately archive a problematic note.
+
+        Args:
+            file_path: Absolute path to the note file
+            relative_path: Relative path for logging
+            error: The exception that caused the failure
+            processing_stage: Stage where error occurred
+            note_content: Optional note content
+            card_index: Optional card index
+            language: Optional language
+        """
+        try:
+            if note_content is None:
+                try:
+                    note_content = file_path.read_text(encoding="utf-8")
+                except (UnicodeDecodeError, OSError) as read_err:
+                    logger.debug(
+                        "unable_to_read_note_for_archiving",
+                        file=relative_path,
+                        error=str(read_err),
+                    )
+                    note_content = ""
+
+            self.archiver.archive_note(
+                note_path=file_path,
+                error=error,
+                error_type=type(error).__name__,
+                processing_stage=processing_stage,
+                card_index=card_index,
+                language=language,
+                note_content=note_content if note_content else None,
+                context={"relative_path": relative_path},
+            )
+        except Exception as archive_error:
+            logger.warning(
+                "failed_to_archive_problematic_note",
+                note_path=str(file_path),
+                archive_error=str(archive_error),
+            )
+
+    def _process_deferred_archives(self) -> None:
+        """Process all deferred archival requests sequentially.
+
+        Called after parallel scan completes to archive failed notes
+        without risking file descriptor exhaustion.
+        """
+        with self._archival_lock:
+            deferred_count = len(self._deferred_archives)
+            archives_to_process = self._deferred_archives.copy()
+            self._deferred_archives.clear()
+
+        if deferred_count == 0:
+            return
+
+        logger.info(
+            "processing_deferred_archives",
+            count=deferred_count,
+        )
+
+        archived_count = 0
+        for archive_request in archives_to_process:
+            self._archive_note_immediate(
+                file_path=archive_request["file_path"],
+                relative_path=archive_request["relative_path"],
+                error=archive_request["error"],
+                processing_stage=archive_request["processing_stage"],
+                note_content=archive_request["note_content"],
+                card_index=archive_request["card_index"],
+                language=archive_request["language"],
+            )
+            archived_count += 1
+
+            # Log progress every 100 archives
+            if archived_count % 100 == 0:
+                logger.info(
+                    "deferred_archive_progress",
+                    processed=archived_count,
+                    total=deferred_count,
                 )
-            except Exception as archive_error:
-                logger.warning(
-                    "failed_to_archive_problematic_note",
-                    note_path=str(file_path),
-                    archive_error=str(archive_error),
-                )
+
+        logger.info(
+            "deferred_archives_completed",
+            archived=archived_count,
+        )
