@@ -408,16 +408,30 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
     except BaseException:
         raise
 
-    logger.info(
-        "langgraph_pre_validation_complete",
-        is_valid=pre_result.is_valid,
-        time=pre_result.validation_time,
-    )
+    if pre_result.is_valid:
+        logger.info(
+            "langgraph_pre_validation_complete",
+            is_valid=pre_result.is_valid,
+            time=pre_result.validation_time,
+        )
+    else:
+        logger.warning(
+            "langgraph_pre_validation_failed",
+            is_valid=pre_result.is_valid,
+            time=pre_result.validation_time,
+            error_type=pre_result.error_type,
+            error_details=pre_result.error_details,
+        )
 
     state["pre_validation"] = pre_result.model_dump()
     state["stage_times"]["pre_validation"] = pre_result.validation_time
     state["current_stage"] = "generation" if pre_result.is_valid else "failed"
-    state["messages"].append(f"Pre-validation: {pre_result.error_type}")
+    if pre_result.is_valid:
+        state["messages"].append("Pre-validation: passed")
+    else:
+        state["messages"].append(
+            f"Pre-validation failed ({pre_result.error_type}): {pre_result.error_details}"
+        )
 
     return state
 

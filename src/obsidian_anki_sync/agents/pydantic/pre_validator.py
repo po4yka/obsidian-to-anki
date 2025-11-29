@@ -110,11 +110,20 @@ Validate the structure, frontmatter, and content quality."""
                 validation_time=0.0,
             )
 
-            logger.info(
-                "pydantic_ai_pre_validation_complete",
-                is_valid=output.is_valid,
-                confidence=output.confidence,
-            )
+            if output.is_valid:
+                logger.info(
+                    "pydantic_ai_pre_validation_complete",
+                    is_valid=output.is_valid,
+                    confidence=output.confidence,
+                )
+            else:
+                logger.warning(
+                    "pydantic_ai_pre_validation_failed",
+                    is_valid=output.is_valid,
+                    confidence=output.confidence,
+                    error_type=output.error_type,
+                    error_details=output.error_details,
+                )
 
             return validation_result
 
