@@ -32,11 +32,12 @@ class ProviderFactory:
     }
 
     @classmethod
-    def create_provider(cls, provider_type: str, **kwargs: Any) -> BaseLLMProvider:
+    def create_provider(cls, provider_type: str, verbose_logging: bool = False, **kwargs: Any) -> BaseLLMProvider:
         """Create a provider instance based on type.
 
         Args:
             provider_type: Provider type ("ollama", "lm_studio", "openrouter", "openai", "anthropic", "claude")
+            verbose_logging: Whether to log detailed initialization info
             **kwargs: Provider-specific configuration parameters
 
         Returns:
@@ -88,15 +89,19 @@ class ProviderFactory:
 
         provider_class = cls.PROVIDER_MAP[provider_type_lower]
 
-        logger.info(
-            "creating_provider",
-            provider_type=provider_type,
-            provider_class=provider_class.__name__,
-        )
+        if verbose_logging:
+            logger.info(
+                "creating_provider",
+                provider_type=provider_type,
+                provider_class=provider_class.__name__,
+            )
 
         try:
-            provider = cast("BaseLLMProvider", provider_class(**kwargs))
-            logger.info("provider_created_successfully", provider_type=provider_type)
+            provider = cast("BaseLLMProvider", provider_class(
+                verbose_logging=verbose_logging, **kwargs))
+            if verbose_logging:
+                logger.info("provider_created_successfully",
+                            provider_type=provider_type)
             return provider
         except Exception as e:
             logger.error(
@@ -107,11 +112,12 @@ class ProviderFactory:
             raise
 
     @classmethod
-    def create_from_config(cls, config: Any) -> BaseLLMProvider:
+    def create_from_config(cls, config: Any, verbose_logging: bool = False) -> BaseLLMProvider:
         """Create a provider instance from a Config object.
 
         Args:
             config: Configuration object with provider settings
+            verbose_logging: Whether to log detailed initialization info
 
         Returns:
             Initialized provider instance
@@ -196,13 +202,14 @@ class ProviderFactory:
             msg = f"Unsupported provider type in config: {provider_type}"
             raise ValueError(msg)
 
-        logger.info(
-            "creating_provider_from_config",
-            provider_type=provider_type,
-            config_attributes=list(kwargs.keys()),
-        )
+        if verbose_logging:
+            logger.info(
+                "creating_provider_from_config",
+                provider_type=provider_type,
+                config_attributes=list(kwargs.keys()),
+            )
 
-        return cls.create_provider(provider_type, **kwargs)
+        return cls.create_provider(provider_type, verbose_logging=verbose_logging, **kwargs)
 
     @classmethod
     def list_supported_providers(cls) -> list[str]:

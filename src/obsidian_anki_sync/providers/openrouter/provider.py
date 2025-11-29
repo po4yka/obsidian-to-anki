@@ -62,6 +62,7 @@ class OpenRouterProvider(BaseLLMProvider):
         max_tokens: int | None = 2048,
         site_url: str | None = None,
         site_name: str | None = None,
+        verbose_logging: bool = False,
         **kwargs: Any,
     ):
         """Initialize OpenRouter provider.
@@ -73,6 +74,7 @@ class OpenRouterProvider(BaseLLMProvider):
             max_tokens: Maximum tokens in response (default: 2048)
             site_url: Your site URL (optional, for rankings)
             site_name: Your site name (optional, for rankings)
+            verbose_logging: Whether to log detailed initialization info
             **kwargs: Additional configuration options
 
         Raises:
@@ -94,6 +96,7 @@ class OpenRouterProvider(BaseLLMProvider):
             max_tokens = 2048
 
         super().__init__(
+            verbose_logging=verbose_logging,
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
@@ -131,7 +134,8 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -139,13 +143,14 @@ class OpenRouterProvider(BaseLLMProvider):
         self._headers = headers
         self._timeout = timeout
 
-        logger.info(
-            "openrouter_provider_initialized",
-            base_url=base_url,
-            timeout=timeout,
-            max_tokens=max_tokens,
-            has_site_info=bool(site_url and site_name),
-        )
+        if verbose_logging:
+            logger.info(
+                "openrouter_provider_initialized",
+                base_url=base_url,
+                timeout=timeout,
+                max_tokens=max_tokens,
+                has_site_info=bool(site_url and site_name),
+            )
 
     def _get_async_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client."""
@@ -158,7 +163,8 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
         return self._async_client
@@ -259,7 +265,8 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success", model_count=len(models))
+            logger.info("openrouter_list_models_success",
+                        model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
@@ -303,7 +310,8 @@ class OpenRouterProvider(BaseLLMProvider):
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -598,7 +606,8 @@ class OpenRouterProvider(BaseLLMProvider):
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
-            completion = self._extract_completion(message, model, result, json_schema)
+            completion = self._extract_completion(
+                message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -612,7 +621,8 @@ class OpenRouterProvider(BaseLLMProvider):
             finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(
+                model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -708,7 +718,8 @@ class OpenRouterProvider(BaseLLMProvider):
             elif message.get("refusal"):
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get("finish_reason", "unknown")
+                finish_reason = result["choices"][0].get(
+                    "finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -1042,7 +1053,8 @@ class OpenRouterProvider(BaseLLMProvider):
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,

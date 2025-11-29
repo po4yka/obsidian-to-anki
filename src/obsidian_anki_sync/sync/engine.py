@@ -120,46 +120,84 @@ class SyncEngine:
                     "Please ensure agent dependencies are installed."
                 )
                 raise RuntimeError(msg)
-            logger.info("initializing_langgraph_orchestrator")
-            self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
-            # Still keep for backward compat
-            self.apf_gen = APFGenerator(config)
-            self.use_agents = True
 
-            # Configure LLM-based Q&A extraction when using agents
-            from obsidian_anki_sync.obsidian.parser import create_qa_extractor
+            # Show progress bar for initialization
+            logger.info("starting_agent_initialization_progress")
+            from rich.console import Console
+            from rich.progress import Progress, SpinnerColumn, TextColumn
 
-            qa_extractor_model = config.get_model_for_agent("qa_extractor")
-            qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
-            if qa_extractor_temp is None:
-                model_config = config.get_model_config_for_task("qa_extraction")
-                qa_extractor_temp = model_config.get("temperature", 0.0)
-            reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
+            console = Console()
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+                transient=False,
+            ) as progress:
+                task = progress.add_task(
+                    "Initializing agent system...", total=4)
 
-            logger.info(
-                "configuring_llm_qa_extraction",
-                model=qa_extractor_model,
-                temperature=qa_extractor_temp,
-                reasoning_enabled=reasoning_enabled,
-            )
+                logger.info("initializing_langgraph_orchestrator")
+                progress.update(
+                    task, description="Initializing LangGraph orchestrator...")
+                self.agent_orchestrator = LangGraphOrchestrator(
+                    config)  # type: ignore
+                progress.update(task, advance=1,
+                                description="LangGraph orchestrator ready")
 
-            # Create a real provider instance for the extractor
-            # We cannot use self.agent_orchestrator.provider because it's a dummy provider
-            # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
-            qa_provider = ProviderFactory.create_from_config(config)
+                # Still keep for backward compat
+                progress.update(
+                    task, description="Initializing APF generator...")
+                self.apf_gen = APFGenerator(config)
+                progress.update(task, advance=1,
+                                description="APF generator ready")
+                self.use_agents = True
 
-            self.qa_extractor = create_qa_extractor(
-                llm_provider=qa_provider,
-                model=qa_extractor_model,
-                temperature=qa_extractor_temp,
-                reasoning_enabled=reasoning_enabled,
-                enable_content_generation=getattr(
-                    config, "enable_content_generation", True
-                ),
-                repair_missing_sections=getattr(
-                    config, "repair_missing_sections", True
-                ),
-            )
+                # Configure LLM-based Q&A extraction when using agents
+                from obsidian_anki_sync.obsidian.parser import create_qa_extractor
+
+                qa_extractor_model = config.get_model_for_agent("qa_extractor")
+                qa_extractor_temp = getattr(
+                    config, "qa_extractor_temperature", None)
+                if qa_extractor_temp is None:
+                    model_config = config.get_model_config_for_task(
+                        "qa_extraction")
+                    qa_extractor_temp = model_config.get("temperature", 0.0)
+                reasoning_enabled = getattr(
+                    config, "llm_reasoning_enabled", False)
+
+                logger.info(
+                    "configuring_llm_qa_extraction",
+                    model=qa_extractor_model,
+                    temperature=qa_extractor_temp,
+                    reasoning_enabled=reasoning_enabled,
+                )
+
+                # Create a real provider instance for the extractor
+                # We cannot use self.agent_orchestrator.provider because it's a dummy provider
+                # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
+                progress.update(
+                    task, description="Creating QA extraction provider...")
+                qa_provider = ProviderFactory.create_from_config(
+                    config, verbose_logging=True)
+                progress.update(task, advance=1,
+                                description="QA extraction provider ready")
+
+                progress.update(
+                    task, description="Creating QA extractor agent...")
+                self.qa_extractor = create_qa_extractor(
+                    llm_provider=qa_provider,
+                    model=qa_extractor_model,
+                    temperature=qa_extractor_temp,
+                    reasoning_enabled=reasoning_enabled,
+                    enable_content_generation=getattr(
+                        config, "enable_content_generation", True
+                    ),
+                    repair_missing_sections=getattr(
+                        config, "repair_missing_sections", True
+                    ),
+                )
+                progress.update(task, advance=1,
+                                description="QA extractor ready")
         else:
             self.apf_gen = APFGenerator(config)
             self.agent_orchestrator: LangGraphOrchestrator | None = None  # type: ignore
@@ -445,7 +483,8 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(
+            f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -550,7 +589,8 @@ class SyncEngine:
             if self.use_agents and getattr(
                 self.config, "enable_duplicate_detection", False
             ):
-                logger.info("sync_phase_started", phase="fetching_existing_cards")
+                logger.info("sync_phase_started",
+                            phase="fetching_existing_cards")
                 fetch_start_time = time.time()
                 existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
                 fetch_duration = time.time() - fetch_start_time
@@ -610,7 +650,8 @@ class SyncEngine:
             changes_by_type = {}
             for change in self.changes:
                 change_type = change.type.value
-                changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                changes_by_type[change_type] = changes_by_type.get(
+                    change_type, 0) + 1
             logger.info(
                 "sync_phase_completed",
                 phase="determining_actions",
@@ -627,7 +668,8 @@ class SyncEngine:
             if dry_run:
                 logger.info("sync_phase_started", phase="preview")
                 self._print_plan()
-                logger.info("sync_phase_completed", phase="preview", changes_previewed=len(self.changes))
+                logger.info("sync_phase_completed", phase="preview",
+                            changes_previewed=len(self.changes))
             else:
                 if self.progress:
                     from .progress import SyncPhase
@@ -695,7 +737,8 @@ class SyncEngine:
             from obsidian_anki_sync.utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(session_id=self.progress.progress.session_id)
+                log_session_summary(
+                    session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:

@@ -39,6 +39,7 @@ class AnthropicProvider(BaseLLMProvider):
         timeout: float = 120.0,
         max_retries: int = 3,
         max_tokens: int = 4096,
+        verbose_logging: bool = False,
         **kwargs: Any,
     ):
         """Initialize Anthropic provider.
@@ -50,9 +51,11 @@ class AnthropicProvider(BaseLLMProvider):
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries
             max_tokens: Maximum tokens to generate
+            verbose_logging: Whether to log detailed initialization info
             **kwargs: Additional configuration options
         """
         super().__init__(
+            verbose_logging=verbose_logging,
             api_key=api_key,
             base_url=base_url,
             api_version=api_version,
@@ -85,12 +88,14 @@ class AnthropicProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 
@@ -334,7 +339,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)
@@ -514,7 +520,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)
