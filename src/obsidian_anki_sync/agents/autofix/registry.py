@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -92,7 +92,7 @@ class AutoFixRegistry:
                 note_index=self.note_index
             )
 
-    def _parse_yaml_frontmatter(self, content: str) -> dict | None:
+    def _parse_yaml_frontmatter(self, content: str) -> dict[str, Any] | None:
         """Parse YAML frontmatter from note content.
 
         Args:
@@ -110,7 +110,10 @@ class AutoFixRegistry:
                 return None
 
             yaml_content = content[4:end_match]
-            return yaml.safe_load(yaml_content)
+            result = yaml.safe_load(yaml_content)
+            if isinstance(result, dict):
+                return result
+            return None
         except yaml.YAMLError as e:
             logger.warning("yaml_parse_error", error=str(e))
             return None

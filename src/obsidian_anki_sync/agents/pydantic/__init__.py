@@ -6,8 +6,8 @@ This package provides type-safe agents using PydanticAI for card generation pipe
 from .card_splitting import CardSplittingAgentAI
 from .context_enrichment import ContextEnrichmentAgentAI
 from .duplicate_detection import DuplicateDetectionAgentAI
-from .highlight import HighlightAgentAI
 from .generator import GeneratorAgentAI
+from .highlight import HighlightAgentAI
 from .memorization import MemorizationQualityAgentAI
 from .models import (
     CardSplitPlanOutput,
@@ -49,6 +49,9 @@ __all__ = [
     "GenerationDeps",
     "GeneratorAgentAI",
     "HighlightAgentAI",
+    "HighlightCandidateOutput",
+    "HighlightDeps",
+    "HighlightOutput",
     "MemorizationIssue",
     "MemorizationQualityAgentAI",
     "MemorizationQualityOutput",
@@ -60,8 +63,5 @@ __all__ = [
     "PreValidationOutput",
     # Agents
     "PreValidatorAgentAI",
-    "HighlightCandidateOutput",
-    "HighlightDeps",
-    "HighlightOutput",
     "SplitValidatorAgentAI",
 ]
