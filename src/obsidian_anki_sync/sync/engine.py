@@ -146,9 +146,11 @@ class SyncEngine:
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,
-                enable_content_generation=True,
+                enable_content_generation=getattr(
+                    config, "enable_content_generation", True
+                ),
                 repair_missing_sections=getattr(
-                    config, "enforce_bilingual_validation", True
+                    config, "repair_missing_sections", True
                 ),
             )
         else:

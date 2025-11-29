@@ -100,6 +100,10 @@ class NoteScanner:
         self._slug_counters = slug_counters or {}
         self._slug_counter_lock = slug_counter_lock
 
+        # Lock for serializing archival operations to prevent file descriptor exhaustion
+        import threading
+        self._archival_lock = threading.Lock()
+
     def scan_notes(
         self,
         sample_size: int | None = None,
@@ -914,6 +918,9 @@ class NoteScanner:
     ) -> None:
         """Safely archive a problematic note.
 
+        Uses a lock to serialize archival operations and prevent file descriptor
+        exhaustion when many notes fail concurrently.
+
         Args:
             file_path: Absolute path to the note file
             relative_path: Relative path for logging
@@ -923,31 +930,33 @@ class NoteScanner:
             card_index: Optional card index
             language: Optional language
         """
-        try:
-            if note_content is None:
-                try:
-                    note_content = file_path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError) as read_err:
-                    logger.debug(
-                        "unable_to_read_note_for_archiving",
-                        file=relative_path,
-                        error=str(read_err),
-                    )
-                    note_content = ""
+        # Serialize archival operations to prevent file descriptor exhaustion
+        with self._archival_lock:
+            try:
+                if note_content is None:
+                    try:
+                        note_content = file_path.read_text(encoding="utf-8")
+                    except (UnicodeDecodeError, OSError) as read_err:
+                        logger.debug(
+                            "unable_to_read_note_for_archiving",
+                            file=relative_path,
+                            error=str(read_err),
+                        )
+                        note_content = ""
 
-            self.archiver.archive_note(
-                note_path=file_path,
-                error=error,
-                error_type=type(error).__name__,
-                processing_stage=processing_stage,
-                card_index=card_index,
-                language=language,
-                note_content=note_content if note_content else None,
-                context={"relative_path": relative_path},
-            )
-        except Exception as archive_error:
-            logger.warning(
-                "failed_to_archive_problematic_note",
-                note_path=str(file_path),
-                archive_error=str(archive_error),
-            )
+                self.archiver.archive_note(
+                    note_path=file_path,
+                    error=error,
+                    error_type=type(error).__name__,
+                    processing_stage=processing_stage,
+                    card_index=card_index,
+                    language=language,
+                    note_content=note_content if note_content else None,
+                    context={"relative_path": relative_path},
+                )
+            except Exception as archive_error:
+                logger.warning(
+                    "failed_to_archive_problematic_note",
+                    note_path=str(file_path),
+                    archive_error=str(archive_error),
+                )
