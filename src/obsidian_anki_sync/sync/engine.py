@@ -41,6 +41,7 @@ from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
+from obsidian_anki_sync.providers.factory import ProviderFactory
 
 if TYPE_CHECKING:
     from obsidian_anki_sync.sync.progress import ProgressTracker
@@ -141,8 +142,14 @@ class SyncEngine:
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,
             )
+
+            # Create a real provider instance for the extractor
+            # We cannot use self.agent_orchestrator.provider because it's a dummy provider
+            # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
+            qa_provider = ProviderFactory.create_from_config(config)
+
             self.qa_extractor = create_qa_extractor(
-                llm_provider=self.agent_orchestrator.provider,
+                llm_provider=qa_provider,
                 model=qa_extractor_model,
                 temperature=qa_extractor_temp,
                 reasoning_enabled=reasoning_enabled,

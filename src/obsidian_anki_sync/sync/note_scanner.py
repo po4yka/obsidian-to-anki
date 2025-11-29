@@ -745,6 +745,8 @@ class NoteScanner:
                     else:
                         note_content = file_path.read_text(encoding="utf-8")
                 except (UnicodeDecodeError, OSError) as e:
+                    if isinstance(e, OSError) and e.errno in (errno.EMFILE, errno.ENFILE):
+                        raise
                     logger.warning(
                         "failed_to_read_note_content",
                         file=relative_path,
@@ -868,6 +870,8 @@ class NoteScanner:
             OSError,
             UnicodeDecodeError,
         ) as e:
+            if isinstance(e, OSError) and e.errno in (errno.EMFILE, errno.ENFILE):
+                raise
             self._archive_note_safely(
                 file_path=file_path,
                 relative_path=relative_path,
