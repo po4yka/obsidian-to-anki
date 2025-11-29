@@ -1001,6 +1001,57 @@ class Config(BaseSettings):
                 suggestion="Set llm_top_p to a value between 0.0 and 1.0",
             )
 
+        # Validate queue stability bounds (fail-fast on invalid config)
+        if self.enable_queue:
+            if self.queue_max_wait_time_seconds < 60:
+                msg = f"queue_max_wait_time_seconds must be >= 60: {self.queue_max_wait_time_seconds}"
+                raise ConfigurationError(
+                    msg,
+                    suggestion="Set queue_max_wait_time_seconds to at least 60 seconds.",
+                )
+            if self.queue_job_timeout_seconds < 30:
+                msg = f"queue_job_timeout_seconds must be >= 30: {self.queue_job_timeout_seconds}"
+                raise ConfigurationError(
+                    msg,
+                    suggestion="Set queue_job_timeout_seconds to at least 30 seconds.",
+                )
+            if self.queue_circuit_breaker_threshold < 1:
+                msg = f"queue_circuit_breaker_threshold must be >= 1: {self.queue_circuit_breaker_threshold}"
+                raise ConfigurationError(
+                    msg,
+                    suggestion="Set queue_circuit_breaker_threshold to at least 1.",
+                )
+            if not (0.1 <= self.queue_poll_interval <= 10.0):
+                msg = f"queue_poll_interval must be 0.1-10.0: {self.queue_poll_interval}"
+                raise ConfigurationError(
+                    msg,
+                    suggestion="Set queue_poll_interval between 0.1 and 10.0 seconds.",
+                )
+
+        # Validate retry bounds for various retry settings
+        retry_attrs = [
+            ("queue_max_retries", self.queue_max_retries if self.enable_queue else 3),
+            ("openai_max_retries", self.openai_max_retries),
+            ("anthropic_max_retries", self.anthropic_max_retries),
+            ("post_validation_max_retries", self.post_validation_max_retries),
+            ("langgraph_max_retries", self.langgraph_max_retries),
+        ]
+        for attr_name, value in retry_attrs:
+            if value < 0 or value > 10:
+                msg = f"{attr_name} must be 0-10: {value}"
+                raise ConfigurationError(
+                    msg,
+                    suggestion=f"Set {attr_name} to a value between 0 and 10.",
+                )
+
+        # Validate concurrent generation bounds
+        if self.max_concurrent_generations < 1 or self.max_concurrent_generations > 50:
+            msg = f"max_concurrent_generations must be 1-50: {self.max_concurrent_generations}"
+            raise ConfigurationError(
+                msg,
+                suggestion="Set max_concurrent_generations between 1 and 50.",
+            )
+
         if validated_vault != self.vault_path:
             object.__setattr__(self, "vault_path", validated_vault)
         if validated_db != self.db_path:

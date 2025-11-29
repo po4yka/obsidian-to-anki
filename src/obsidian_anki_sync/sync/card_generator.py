@@ -15,6 +15,7 @@ from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.apf.html_validator import validate_card_html
 from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.exceptions import CardGenerationError
 from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
 from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
 from obsidian_anki_sync.utils.async_runner import AsyncioRunner
@@ -239,8 +240,19 @@ class CardGenerator:
                     else 0,
                 )
                 error_msg = f"{error_msg}\n{highlight_hint}"
+
+            # Determine error type for fail-fast categorization
+            error_type = self._determine_error_type(result)
+            error_details = self._extract_error_details(result)
+
             msg = f"Agent pipeline failed: {error_msg}"
-            raise ValueError(msg)
+            raise CardGenerationError(
+                msg,
+                error_type=error_type,
+                error_details=error_details,
+                note_path=relative_path,
+                suggestion=self._get_error_suggestion(error_type),
+            )
 
         # Convert GeneratedCard to Card instances
         cards = self.agent_orchestrator.convert_to_cards(
@@ -765,3 +777,96 @@ class CardGenerator:
             return ""
 
         return "Highlight agent findings:\n" + "\n".join(sections)
+
+    def _determine_error_type(self, result: "AgentPipelineResult") -> str:
+        """Determine the category of pipeline error for fail-fast handling.
+
+        Args:
+            result: The pipeline result to analyze
+
+        Returns:
+            Error type category string
+        """
+        # Check pre-validation first (earliest stage)
+        if hasattr(result, 'pre_validation') and result.pre_validation:
+            if not getattr(result.pre_validation, 'is_valid', True):
+                return "pre_validation"
+
+        # Check generation stage
+        if not getattr(result, 'generation', None):
+            return "generation"
+
+        # Check post-validation
+        if hasattr(result, 'post_validation') and result.post_validation:
+            if not getattr(result.post_validation, 'is_valid', True):
+                return "post_validation"
+
+        # Check memorization quality
+        if hasattr(result, 'memorization_quality') and result.memorization_quality:
+            if not getattr(result.memorization_quality, 'is_memorizable', True):
+                return "memorization_quality"
+
+        return "unknown"
+
+    def _extract_error_details(self, result: "AgentPipelineResult") -> str | None:
+        """Extract specific error details from the failing stage.
+
+        Args:
+            result: The pipeline result to analyze
+
+        Returns:
+            Error details string or None
+        """
+        # Pre-validation errors
+        if hasattr(result, 'pre_validation') and result.pre_validation:
+            if not getattr(result.pre_validation, 'is_valid', True):
+                error_type = getattr(result.pre_validation, 'error_type', '')
+                error_details = getattr(result.pre_validation, 'error_details', '')
+                if error_type or error_details:
+                    return f"{error_type}: {error_details}".strip(": ")
+
+        # Post-validation errors
+        if hasattr(result, 'post_validation') and result.post_validation:
+            if not getattr(result.post_validation, 'is_valid', True):
+                error_type = getattr(result.post_validation, 'error_type', '')
+                error_details = getattr(result.post_validation, 'error_details', '')
+                if error_type or error_details:
+                    return f"{error_type}: {error_details}".strip(": ")
+
+        # Memorization quality issues
+        if hasattr(result, 'memorization_quality') and result.memorization_quality:
+            if not getattr(result.memorization_quality, 'is_memorizable', True):
+                issues = getattr(result.memorization_quality, 'issues', [])
+                if issues:
+                    return "; ".join(str(i) for i in issues[:3])
+
+        return None
+
+    def _get_error_suggestion(self, error_type: str) -> str | None:
+        """Get actionable suggestion based on error type.
+
+        Args:
+            error_type: The error category
+
+        Returns:
+            Suggestion string or None
+        """
+        suggestions = {
+            "pre_validation": (
+                "Check note structure: ensure valid YAML frontmatter, "
+                "proper Q&A formatting, and required metadata fields."
+            ),
+            "generation": (
+                "Card generation failed. Check LLM provider connectivity, "
+                "API key validity, and model availability."
+            ),
+            "post_validation": (
+                "Generated cards failed quality validation. "
+                "Review note content for clarity and completeness."
+            ),
+            "memorization_quality": (
+                "Cards do not meet memorization standards. "
+                "Consider simplifying content or breaking into smaller cards."
+            ),
+        }
+        return suggestions.get(error_type)

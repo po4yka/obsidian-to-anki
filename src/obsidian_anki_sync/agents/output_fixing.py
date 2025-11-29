@@ -5,6 +5,7 @@ providing automatic retry with fixing for structured outputs that fail validatio
 """
 
 import json
+import re
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -298,8 +299,6 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
                 return str(error.details["output"])
 
         # Look for JSON-like content in error message
-        import re
-
         json_match = re.search(r"\{.*\}", error_str, re.DOTALL)
         if json_match:
             return json_match.group(0)

@@ -112,8 +112,8 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                     self._agents[agent_type] = GeneratorAgentAI(model)
                 elif agent_type == "pre_validator":
                     from ..domain.interfaces.llm_config import get_model_for_agent
-                    from .pydantic.pre_validator import PreValidatorAgentAI
                     from ..validation.ai_fixer import AIFixer
+                    from .pydantic.pre_validator import PreValidatorAgentAI
 
                     model = get_model_for_agent(self.config, "pre_validator")
                     # Check if auto-fix is enabled in config
@@ -174,16 +174,14 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
             )
 
             return UnifiedAgentResult(
-                success=result.success,
+                success=result.total_cards > 0,
                 reasoning=(
-                    "Cards generated successfully"
-                    if result.success
-                    else result.errors[0]
-                    if result.errors
-                    else "Generation failed"
+                    f"Successfully generated {result.total_cards} card(s)"
+                    if result.total_cards > 0
+                    else "No cards generated"
                 ),
                 data=result,
-                warnings=result.warnings,
+                warnings=[],
                 confidence=0.9,  # PydanticAI generally reliable
                 agent_framework=self.agent_framework,
                 agent_type="generator",

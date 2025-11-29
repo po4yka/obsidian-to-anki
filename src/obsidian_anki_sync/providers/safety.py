@@ -10,6 +10,7 @@ from limits import RateLimitItemPerMinute, RateLimitItemPerSecond
 from limits.storage import MemoryStorage
 from limits.strategies import FixedWindowRateLimiter
 
+from obsidian_anki_sync.exceptions import ConcurrencyTimeoutError
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -24,6 +25,7 @@ class SafetyConfig:
     max_response_length: int = 50000  # ~12.5K tokens
     max_concurrent_requests: int = 3  # Prevent resource exhaustion
     request_timeout_seconds: float = 600.0  # 10 minutes
+    concurrency_wait_timeout_seconds: float = 60.0  # Max wait for slot
 
     # Rate limiting
     max_requests_per_minute: int = 60
@@ -155,13 +157,15 @@ class RateLimiter:
 class ConcurrencyLimiter:
     """Limits concurrent requests to prevent resource exhaustion."""
 
-    def __init__(self, max_concurrent: int):
+    def __init__(self, max_concurrent: int, timeout: float = 60.0):
         """Initialize concurrency limiter.
 
         Args:
             max_concurrent: Maximum concurrent requests
+            timeout: Maximum time to wait for a slot (seconds)
         """
         self.max_concurrent = max_concurrent
+        self.timeout = timeout
         self.current_count = 0
         self.lock = Lock()
         self.waiting = 0
@@ -171,31 +175,66 @@ class ConcurrencyLimiter:
 
         Returns:
             Wait time in seconds
+
+        Raises:
+            ConcurrencyTimeoutError: If timeout is exceeded waiting for slot
         """
         start_wait = time.time()
 
         with self.lock:
             self.waiting += 1
 
-        while True:
+        try:
+            while True:
+                with self.lock:
+                    if self.current_count < self.max_concurrent:
+                        self.current_count += 1
+                        self.waiting -= 1
+                        wait_time = time.time() - start_wait
+
+                        if wait_time > 0.1:
+                            logger.info(
+                                "concurrency_slot_acquired",
+                                wait_seconds=round(wait_time, 2),
+                                active_requests=self.current_count,
+                                max_concurrent=self.max_concurrent,
+                            )
+
+                        return wait_time
+
+                # Check timeout before sleeping
+                elapsed = time.time() - start_wait
+                if elapsed >= self.timeout:
+                    with self.lock:
+                        self.waiting -= 1
+                    logger.error(
+                        "concurrency_slot_timeout",
+                        timeout=self.timeout,
+                        elapsed=round(elapsed, 2),
+                        max_concurrent=self.max_concurrent,
+                        active=self.current_count,
+                        waiting=self.waiting,
+                    )
+                    msg = f"Timed out after {elapsed:.1f}s waiting for concurrency slot"
+                    raise ConcurrencyTimeoutError(
+                        msg,
+                        timeout=self.timeout,
+                        max_concurrent=self.max_concurrent,
+                        suggestion=(
+                            "Reduce concurrent operations or increase "
+                            "concurrency_wait_timeout_seconds in safety config."
+                        ),
+                    )
+
+                # Wait briefly before checking again
+                time.sleep(0.1)
+        except ConcurrencyTimeoutError:
+            raise
+        except Exception:
+            # Ensure waiting count is decremented on unexpected errors
             with self.lock:
-                if self.current_count < self.max_concurrent:
-                    self.current_count += 1
-                    self.waiting -= 1
-                    wait_time = time.time() - start_wait
-
-                    if wait_time > 0.1:
-                        logger.info(
-                            "concurrency_slot_acquired",
-                            wait_seconds=round(wait_time, 2),
-                            active_requests=self.current_count,
-                            max_concurrent=self.max_concurrent,
-                        )
-
-                    return wait_time
-
-            # Wait briefly before checking again
-            time.sleep(0.1)
+                self.waiting = max(0, self.waiting - 1)
+            raise
 
     def release(self) -> None:
         """Release a concurrency slot."""

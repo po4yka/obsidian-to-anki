@@ -29,7 +29,11 @@ from arq.connections import RedisSettings
 from arq.jobs import Job
 
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.exceptions import ConfigurationError, ParserError
+from obsidian_anki_sync.exceptions import (
+    CircuitBreakerOpenError,
+    ConfigurationError,
+    ParserError,
+)
 from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
 from obsidian_anki_sync.sync.state_db import StateDB
@@ -788,14 +792,27 @@ class NoteScanner:
 
         # Submit all jobs with retry logic
         for file_path, relative_path in note_files:
-            # Check circuit breaker
+            # Check circuit breaker - fail fast if too many consecutive failures
             if consecutive_failures >= circuit_breaker_threshold:
                 logger.error(
                     "circuit_breaker_open",
                     consecutive_failures=consecutive_failures,
                     threshold=circuit_breaker_threshold,
                 )
-                break
+                await pool.close()
+                msg = (
+                    f"Circuit breaker opened after {consecutive_failures} "
+                    f"consecutive failures (threshold: {circuit_breaker_threshold})"
+                )
+                raise CircuitBreakerOpenError(
+                    msg,
+                    consecutive_failures=consecutive_failures,
+                    threshold=circuit_breaker_threshold,
+                    suggestion=(
+                        "Check Redis connectivity and worker health. "
+                        "Reduce batch size or increase circuit breaker threshold."
+                    ),
+                )
 
             try:
                 # Sanitize job ID to avoid issues with slashes

@@ -9,6 +9,7 @@ import httpx
 from openai import OpenAI
 
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.exceptions import APFValidationError
 from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
 from obsidian_anki_sync.utils.code_detection import detect_code_language_from_metadata
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
@@ -133,15 +134,29 @@ class APFGenerator:
                 )
                 break
 
-            # If this was the last attempt, log warning but continue
+            # If this was the last attempt, fail fast
             if attempt >= self.MAX_VALIDATION_RETRIES:
-                logger.warning(
+                logger.error(
                     "validation_failed_after_retries",
                     slug=manifest.slug,
                     errors=validation_errors,
                     attempts=attempt + 1,
                 )
-                break
+                msg = (
+                    f"APF validation failed for {manifest.slug} after "
+                    f"{attempt + 1} attempts: {validation_errors[0]}"
+                )
+                raise APFValidationError(
+                    msg,
+                    slug=manifest.slug,
+                    validation_errors=validation_errors,
+                    attempts=attempt + 1,
+                    suggestion=(
+                        "Review the Q&A content for formatting issues, "
+                        "ensure code blocks are properly fenced, "
+                        "and check for balanced HTML tags."
+                    ),
+                )
 
             # Ask LLM to fix the errors
             logger.info(
@@ -608,7 +623,10 @@ QUALITY RULES:
         return detect_code_language_from_metadata(metadata)
 
     def _normalize_code_blocks(self, apf_html: str, default_lang: str) -> str:
-        """Convert Markdown code fences to <pre><code> blocks if present."""
+        """Convert Markdown code fences to <pre><code> blocks if present.
+
+        Includes iteration limit to prevent infinite loops on malformed input.
+        """
         if "```" not in apf_html:
             return apf_html
 
@@ -616,7 +634,13 @@ QUALITY RULES:
         cursor = 0
         default_class = self._format_code_language(default_lang)
 
-        while True:
+        # Prevent infinite loops - max iterations based on content length
+        max_iterations = len(apf_html) // 3 + 10  # At least 3 chars per fence
+        iteration = 0
+
+        while iteration < max_iterations:
+            iteration += 1
+
             start = apf_html.find("```", cursor)
             if start == -1:
                 normalized_parts.append(apf_html[cursor:])
@@ -649,7 +673,26 @@ QUALITY RULES:
                 "\n</code></pre>"
             )
 
-            cursor = end + 3
+            new_cursor = end + 3
+            if new_cursor <= cursor:
+                # Cursor didn't advance - break to prevent infinite loop
+                logger.warning(
+                    "code_block_normalization_stuck",
+                    cursor=cursor,
+                    new_cursor=new_cursor,
+                )
+                normalized_parts.append(apf_html[cursor:])
+                break
+            cursor = new_cursor
+        else:
+            # Max iterations reached
+            logger.warning(
+                "code_block_normalization_max_iterations",
+                iterations=iteration,
+                content_length=len(apf_html),
+            )
+            # Append remaining content
+            normalized_parts.append(apf_html[cursor:])
 
         return "".join(normalized_parts)
 

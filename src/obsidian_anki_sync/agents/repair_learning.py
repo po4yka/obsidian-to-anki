@@ -5,6 +5,7 @@ based on historical success rates.
 """
 
 import hashlib
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -54,8 +55,6 @@ class RepairLearningSystem:
         # Normalize error message (remove file paths, timestamps, etc.)
         normalized_msg = error_message.lower()
         # Remove common variable parts
-        import re
-
         normalized_msg = re.sub(r"/[^\s]+", "/path", normalized_msg)
         normalized_msg = re.sub(r"\d{4}-\d{2}-\d{2}", "date", normalized_msg)
 

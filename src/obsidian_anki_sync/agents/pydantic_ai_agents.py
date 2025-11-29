@@ -8,6 +8,7 @@ This module provides type-safe agents using PydanticAI for:
 All agents use structured outputs and proper type validation.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -1149,8 +1150,6 @@ Analyze similarity and provide your assessment."""
         Returns:
             Tuple of (question, answer)
         """
-        import re
-
         question = ""
         answer = ""
 
@@ -1356,8 +1355,6 @@ Provide your enrichment assessment."""
 
     def _extract_qa_from_apf(self, apf_html: str) -> tuple[str, str]:
         """Extract question and answer from APF HTML."""
-        import re
-
         question = ""
         answer = ""
 
@@ -1375,8 +1372,6 @@ Provide your enrichment assessment."""
 
     def _extract_extra_from_apf(self, apf_html: str) -> str:
         """Extract Extra section from APF HTML."""
-        import re
-
         extra_match = re.search(r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
         if extra_match:
             return re.sub(r"<[^>]+>", "", extra_match.group(1)).strip()
@@ -1386,8 +1381,6 @@ Provide your enrichment assessment."""
         self, original_apf: str, new_answer: str, new_extra: str
     ) -> str:
         """Rebuild APF HTML with enriched content."""
-        import re
-
         # Replace answer
         apf_html = re.sub(
             r'(<div class="back">)(.*?)(</div>)',

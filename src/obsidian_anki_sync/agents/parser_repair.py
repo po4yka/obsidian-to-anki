@@ -9,6 +9,7 @@ This agent activates only when rule-based parsing fails:
 
 import contextlib
 import json
+import re
 from pathlib import Path
 
 from obsidian_anki_sync.exceptions import ParserError
@@ -1206,8 +1207,6 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         has_ru_answer = "## Ответ (RU)" in content or "## Ответ" in content
 
         # Extract language tags from frontmatter
-        import re
-
         lang_tags_match = re.search(r"language_tags:\s*\[(.*?)\]", content)
         if lang_tags_match:
             lang_tags_str = lang_tags_match.group(1)
@@ -1236,8 +1235,6 @@ Apply corrections conservatively - only fix real issues, preserve all valid cont
         errors = []
 
         # Extract frontmatter
-        import re
-
         frontmatter_match = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
         if not frontmatter_match:
             errors.append("Invalid or missing YAML frontmatter")

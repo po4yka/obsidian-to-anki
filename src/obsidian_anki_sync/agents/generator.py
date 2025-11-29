@@ -1384,8 +1384,6 @@ Translated content:"""
             )
 
         # 2. Normalize CardType format in headers (ensure CardType: not type:)
-        import re
-
         # Replace any "type:" with "CardType:" in card headers
         apf_html = re.sub(
             r"(<!--\s*Card\s+\d+\s*\|\s*slug:\s*[^\|]+\s*\|\s*)type:(\s*[^\|]+\s*\|\s*Tags:)",
@@ -1424,8 +1422,6 @@ Translated content:"""
         Returns:
             HTML with fixed card headers
         """
-        import re
-
         # Find all card headers
         header_pattern = r"(<!--\s*Card\s+(\d+)\s*\|.*?-->)"
         matches = list(re.finditer(header_pattern, html))
@@ -1465,7 +1461,9 @@ Translated content:"""
                             fixed_tags.append(fixed_tag)
                     tags_str = " ".join(fixed_tags[:6])  # Limit to 6 tags
                 else:
-                    tags_str = " ".join(manifest.tags[:6])
+                    # Safe access to tags with fallback to empty list
+                    manifest_tags = getattr(manifest, "tags", [])
+                    tags_str = " ".join(manifest_tags[:6]) if manifest_tags else ""
 
                 # Build correct header
                 fixed_header = f"<!-- Card {card_num} | slug: {slug} | CardType: {card_type} | Tags: {tags_str} -->"
@@ -1486,20 +1484,21 @@ Translated content:"""
         Returns:
             HTML with valid manifest
         """
-        import json
-        import re
-
         # Check if manifest exists
         manifest_pattern = r"<!--\s*manifest:\s*({.*?})\s*-->"
         manifest_match = re.search(manifest_pattern, html, re.DOTALL)
 
         if not manifest_match:
             # Add manifest before END_CARDS
+            # Safe access to optional attributes with sensible defaults
+            manifest_type = getattr(manifest, "type", "Simple")
+            manifest_tags = getattr(manifest, "tags", [])
+
             manifest_data = {
                 "slug": manifest.slug,
                 "lang": manifest.lang,
-                "type": manifest.type,
-                "tags": manifest.tags,
+                "type": manifest_type,
+                "tags": manifest_tags,
             }
             manifest_json = json.dumps(manifest_data, separators=(",", ":"))
             manifest_comment = f"<!-- manifest: {manifest_json} -->"
@@ -1519,21 +1518,29 @@ Translated content:"""
                 # Check if slug matches
                 if manifest_data.get("slug") != manifest.slug:
                     # Fix manifest slug
+                    # Safe access to optional attributes with sensible defaults
+                    manifest_type = getattr(manifest, "type", "Simple")
+                    manifest_tags = getattr(manifest, "tags", [])
+
                     manifest_data["slug"] = manifest.slug
                     manifest_data["lang"] = manifest.lang
-                    manifest_data["type"] = manifest.type
-                    manifest_data["tags"] = manifest.tags
+                    manifest_data["type"] = manifest_type
+                    manifest_data["tags"] = manifest_tags
                     new_manifest_json = json.dumps(manifest_data, separators=(",", ":"))
                     new_manifest = f"<!-- manifest: {new_manifest_json} -->"
                     html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
                     logger.debug("pre_validation_fix_manifest_slug", slug=manifest.slug)
             except json.JSONDecodeError:
                 # Invalid JSON, replace it
+                # Safe access to optional attributes with sensible defaults
+                manifest_type = getattr(manifest, "type", "Simple")
+                manifest_tags = getattr(manifest, "tags", [])
+
                 manifest_data = {
                     "slug": manifest.slug,
                     "lang": manifest.lang,
-                    "type": manifest.type,
-                    "tags": manifest.tags,
+                    "type": manifest_type,
+                    "tags": manifest_tags,
                 }
                 new_manifest_json = json.dumps(manifest_data, separators=(",", ":"))
                 new_manifest = f"<!-- manifest: {new_manifest_json} -->"
@@ -1551,8 +1558,6 @@ Translated content:"""
         Returns:
             Fixed HTML with all code blocks properly wrapped
         """
-        import re
-
         # Match <code>...</code> tags (non-greedy to match individual tags)
         fixed_html = html
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
@@ -1661,12 +1666,13 @@ Translated content:"""
 
     def _extract_card_data_from_html(self, apf_html: str, manifest: Manifest) -> dict:
         """Extract card data from existing HTML for regeneration."""
-        import re
+        # Safe access to optional attributes with sensible defaults
+        manifest_tags = getattr(manifest, "tags", [])
 
         card_data = {
             "card_index": 1,
             "slug": manifest.slug,
-            "tags": manifest.tags,
+            "tags": manifest_tags,
             "title": "Generated Card",
             "question": "",
             "answer": "",

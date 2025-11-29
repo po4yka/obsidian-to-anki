@@ -1,5 +1,6 @@
 """Auto-improvement agent for enhancing card quality based on assessment feedback."""
 
+import json
 import re
 import time
 
@@ -467,8 +468,6 @@ Only return the JSON, no other text or explanations."""
     ) -> dict[str, str | None] | None:
         """Parse LLM improvement response."""
         try:
-            import json
-
             result = json.loads(response.strip())
             if isinstance(result, dict) and "question" in result:
                 return result

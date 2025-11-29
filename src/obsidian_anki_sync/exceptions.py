@@ -254,6 +254,142 @@ class PostValidationError(AgentError):
     """
 
 
+class CardGenerationError(AgentError):
+    """Card generation pipeline error with detailed context.
+
+    Raised when the card generation pipeline fails. Carries the full
+    pipeline result for diagnostic purposes.
+
+    Attributes:
+        error_type: Category of failure (pre_validation, generation, post_validation)
+        error_details: Specific error details from the failing stage
+        note_path: Path to the note that failed
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_type: str | None = None,
+        error_details: str | None = None,
+        note_path: str | None = None,
+        suggestion: str | None = None,
+    ):
+        """Initialize card generation error.
+
+        Args:
+            message: Human-readable error message
+            error_type: Category of failure
+            error_details: Specific error details
+            note_path: Path to the note that failed
+            suggestion: Optional suggestion for resolving the error
+        """
+        self.error_type = error_type
+        self.error_details = error_details
+        self.note_path = note_path
+        super().__init__(message, suggestion)
+
+
+class CircuitBreakerOpenError(SyncError):
+    """Circuit breaker is open due to too many failures.
+
+    Raised when consecutive failures exceed the threshold and the
+    circuit breaker prevents further operations.
+
+    Attributes:
+        consecutive_failures: Number of consecutive failures
+        threshold: The failure threshold that was exceeded
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        consecutive_failures: int,
+        threshold: int,
+        suggestion: str | None = None,
+    ):
+        """Initialize circuit breaker error.
+
+        Args:
+            message: Human-readable error message
+            consecutive_failures: Number of consecutive failures
+            threshold: The failure threshold
+            suggestion: Optional suggestion for resolving the error
+        """
+        self.consecutive_failures = consecutive_failures
+        self.threshold = threshold
+        super().__init__(message, suggestion)
+
+
+class APFValidationError(ValidationError):
+    """APF HTML validation failed after retries.
+
+    Raised when APF validation cannot produce valid HTML even after
+    all retry attempts are exhausted.
+
+    Attributes:
+        slug: The card slug that failed validation
+        validation_errors: List of validation errors
+        attempts: Number of validation attempts made
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        slug: str,
+        validation_errors: list[str],
+        attempts: int,
+        suggestion: str | None = None,
+    ):
+        """Initialize APF validation error.
+
+        Args:
+            message: Human-readable error message
+            slug: The card slug that failed
+            validation_errors: List of validation errors
+            attempts: Number of attempts made
+            suggestion: Optional suggestion for resolving the error
+        """
+        self.slug = slug
+        self.validation_errors = validation_errors
+        self.attempts = attempts
+        super().__init__(message, suggestion)
+
+
+class ConcurrencyTimeoutError(SyncError):
+    """Timed out waiting for concurrency slot.
+
+    Raised when the system cannot acquire a concurrency slot within
+    the allowed timeout period.
+
+    Attributes:
+        timeout: The timeout value in seconds
+        max_concurrent: The maximum concurrent operations allowed
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        timeout: float,
+        max_concurrent: int,
+        suggestion: str | None = None,
+    ):
+        """Initialize concurrency timeout error.
+
+        Args:
+            message: Human-readable error message
+            timeout: The timeout value in seconds
+            max_concurrent: Maximum concurrent operations
+            suggestion: Optional suggestion for resolving the error
+        """
+        self.timeout = timeout
+        self.max_concurrent = max_concurrent
+        super().__init__(message, suggestion)
+
+
 # Export helper functions for backward compatibility
 
 
@@ -278,10 +414,13 @@ def get_exception_hierarchy() -> dict[str, list[str]]:
         ],
         "ValidationError": [
             "ParserError",
+            "APFValidationError",
         ],
         "SyncError": [
             "IndexingError",
             "StateError",
+            "CircuitBreakerOpenError",
+            "ConcurrencyTimeoutError",
         ],
         "AnkiError": [
             "AnkiConnectError",
@@ -293,6 +432,7 @@ def get_exception_hierarchy() -> dict[str, list[str]]:
             "PreValidationError",
             "GeneratorError",
             "PostValidationError",
+            "CardGenerationError",
         ],
     }
 
