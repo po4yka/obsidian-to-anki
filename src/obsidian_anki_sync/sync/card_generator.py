@@ -23,6 +23,7 @@ from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
+    from obsidian_anki_sync.agents.models import AgentPipelineResult
 
 logger = get_logger(__name__)
 
@@ -224,64 +225,8 @@ class CardGenerator:
                 )
 
         if not result.success or not result.generation:
-            # Check for error details in order: post_validation, pre_validation, memorization_quality
-            if result.post_validation and result.post_validation.error_details:
-                error_msg = f"Post-validation failed ({result.post_validation.error_type}): {result.post_validation.error_details}"
-            elif result.pre_validation and not result.pre_validation.is_valid:
-                # Include error_details if available, otherwise just the error type
-                error_details = result.pre_validation.error_details
-                if error_details:
-                    error_msg = f"Pre-validation failed ({result.pre_validation.error_type}): {error_details}"
-                else:
-                    error_msg = f"Pre-validation failed: {result.pre_validation.error_type}"
-            elif result.memorization_quality and not result.memorization_quality.is_memorizable:
-                # Include memorization issues if available
-                issues = result.memorization_quality.issues
-                if issues:
-                    # Limit to first 3 issues
-                    issue_summaries = [
-                        f"{issue.get('type', 'unknown')}: {issue.get('description', 'no description')}" for issue in issues[:3]]
-                    error_msg = f"Memorization quality failed: {', '.join(issue_summaries)}"
-                else:
-                    error_msg = f"Memorization quality failed: score {result.memorization_quality.memorization_score:.2f}"
-            else:
-                # Collect all available diagnostic information
-                diagnostics = []
-                if result.pre_validation:
-                    diagnostics.append(
-                        f"pre_valid={result.pre_validation.is_valid}")
-                    if not result.pre_validation.is_valid:
-                        diagnostics.append(
-                            f"pre_error={result.pre_validation.error_type}")
-                if result.post_validation:
-                    diagnostics.append(
-                        f"post_valid={result.post_validation.is_valid}")
-                    if not result.post_validation.is_valid:
-                        diagnostics.append(
-                            f"post_error={result.post_validation.error_type}")
-                if result.generation:
-                    diagnostics.append("has_generation=True")
-                else:
-                    diagnostics.append("has_generation=False")
-                if result.memorization_quality:
-                    diagnostics.append(
-                        f"memorizable={result.memorization_quality.is_memorizable}")
-
-                diagnostics_str = ", ".join(
-                    diagnostics) if diagnostics else "no diagnostics available"
-
-                logger.warning(
-                    "agent_pipeline_failed_with_unknown_error",
-                    success=result.success,
-                    has_generation=bool(result.generation),
-                    has_pre_validation=bool(result.pre_validation),
-                    has_post_validation=bool(result.post_validation),
-                    has_memorization_quality=bool(result.memorization_quality),
-                    diagnostics=diagnostics_str,
-                    total_time=result.total_time,
-                    retry_count=result.retry_count,
-                )
-                error_msg = f"Pipeline failed after {result.total_time:.1f}s with {result.retry_count} retries ({diagnostics_str})"
+            # Use the robust error extraction method
+            error_msg = self._extract_pipeline_error_message(result)
             msg = f"Agent pipeline failed: {error_msg}"
             raise ValueError(msg)
 
@@ -553,3 +498,195 @@ class CardGenerator:
                     elapsed_seconds=round(elapsed, 2))
 
         return card
+
+    def _extract_pipeline_error_message(
+        self, result: "AgentPipelineResult"
+    ) -> str:
+        """Extract a comprehensive and user-friendly error message from pipeline result.
+
+        Args:
+            result: The AgentPipelineResult from the failed pipeline
+
+        Returns:
+            A detailed error message suitable for user display
+        """
+        # Validate result object structure
+        if not hasattr(result, 'success') or not hasattr(result, 'total_time'):
+            return "Pipeline failed: Invalid result structure"
+
+        try:
+            # Category 1: Post-validation errors (highest priority - most specific)
+            if (hasattr(result, 'post_validation') and result.post_validation and
+                hasattr(result.post_validation, 'is_valid') and
+                hasattr(result.post_validation, 'error_details') and
+                    hasattr(result.post_validation, 'error_type')):
+
+                if not result.post_validation.is_valid and result.post_validation.error_details:
+                    error_type = getattr(
+                        result.post_validation, 'error_type', 'unknown')
+                    return f"Card validation failed ({error_type}): {result.post_validation.error_details}"
+
+            # Category 2: Pre-validation errors (second priority)
+            if (hasattr(result, 'pre_validation') and result.pre_validation and
+                hasattr(result.pre_validation, 'is_valid') and
+                hasattr(result.pre_validation, 'error_details') and
+                    hasattr(result.pre_validation, 'error_type')):
+
+                if not result.pre_validation.is_valid:
+                    error_type = getattr(
+                        result.pre_validation, 'error_type', 'unknown')
+                    error_details = getattr(
+                        result.pre_validation, 'error_details', '')
+
+                    if error_details and error_details.strip():
+                        return f"Content validation failed ({error_type}): {error_details}"
+                    else:
+                        # Provide user-friendly messages for common error types
+                        user_friendly_messages = {
+                            'structure': 'Note structure issue detected. Check Q&A format and YAML frontmatter.',
+                            'format': 'Content format issue. Ensure proper markdown formatting.',
+                            'frontmatter': 'YAML frontmatter error. Check tags, title, and metadata.',
+                            'content': 'Content issue. Review note content for problems.',
+                            'none': 'Validation completed but marked as failed.',
+                        }
+                        message = user_friendly_messages.get(
+                            error_type, f'Validation failed ({error_type})')
+                        return f"Content validation failed: {message}"
+
+            # Category 3: Memorization quality errors
+            if (hasattr(result, 'memorization_quality') and result.memorization_quality and
+                hasattr(result.memorization_quality, 'is_memorizable') and
+                hasattr(result.memorization_quality, 'issues') and
+                    hasattr(result.memorization_quality, 'memorization_score')):
+
+                if not result.memorization_quality.is_memorizable:
+                    issues = getattr(result.memorization_quality, 'issues', [])
+                    score = getattr(result.memorization_quality,
+                                    'memorization_score', 0.0)
+
+                    if issues and isinstance(issues, list):
+                        # Limit to most important issues
+                        issue_summaries = []
+                        for issue in issues[:3]:  # Top 3 issues
+                            if isinstance(issue, dict):
+                                issue_type = issue.get('type', 'unknown')
+                                description = issue.get(
+                                    'description', 'no description')
+                                issue_summaries.append(
+                                    f"{issue_type}: {description}")
+                            else:
+                                issue_summaries.append(str(issue))
+
+                        if issue_summaries:
+                            return f"Quality check failed (score: {score:.2f}): {', '.join(issue_summaries)}"
+                        else:
+                            return f"Quality check failed: memorization score {score:.2f} (too low)"
+                    else:
+                        return f"Quality check failed: memorization score {score:.2f} (below threshold)"
+
+            # Category 4: Pipeline-level errors (no generation produced)
+            if not getattr(result, 'generation', None):
+                # Collect diagnostic information
+                diagnostics = []
+
+                # Check pre-validation status
+                if hasattr(result, 'pre_validation') and result.pre_validation:
+                    is_valid = getattr(result.pre_validation, 'is_valid', None)
+                    diagnostics.append(
+                        f"pre_validation={'passed' if is_valid else 'failed'}")
+                    if not is_valid:
+                        error_type = getattr(
+                            result.pre_validation, 'error_type', 'unknown')
+                        diagnostics.append(f"pre_error='{error_type}'")
+
+                # Check post-validation status
+                if hasattr(result, 'post_validation') and result.post_validation:
+                    is_valid = getattr(
+                        result.post_validation, 'is_valid', None)
+                    diagnostics.append(
+                        f"post_validation={'passed' if is_valid else 'failed'}")
+
+                # Check memorization quality
+                if hasattr(result, 'memorization_quality') and result.memorization_quality:
+                    is_memorizable = getattr(
+                        result.memorization_quality, 'is_memorizable', None)
+                    diagnostics.append(
+                        f"memorization_quality={'passed' if is_memorizable else 'failed'}")
+
+                # Add timing and retry info
+                total_time = getattr(result, 'total_time', 0)
+                retry_count = getattr(result, 'retry_count', 0)
+
+                diagnostics.append(f"time={total_time:.1f}s")
+                diagnostics.append(f"retries={retry_count}")
+
+                diagnostics_str = " | ".join(diagnostics)
+
+                logger.warning(
+                    "agent_pipeline_failed_no_generation",
+                    success=result.success,
+                    total_time=total_time,
+                    retry_count=retry_count,
+                    diagnostics=diagnostics_str,
+                    has_pre_validation=bool(
+                        getattr(result, 'pre_validation', None)),
+                    has_post_validation=bool(
+                        getattr(result, 'post_validation', None)),
+                    has_memorization_quality=bool(
+                        getattr(result, 'memorization_quality', None)),
+                )
+
+                return f"Pipeline failed to generate cards ({diagnostics_str})"
+
+            # Category 5: Unexpected success but no generation (edge case)
+            if result.success and not getattr(result, 'generation', None):
+                logger.warning(
+                    "agent_pipeline_successful_but_no_cards",
+                    total_time=getattr(result, 'total_time', 0),
+                    retry_count=getattr(result, 'retry_count', 0),
+                )
+                return "Pipeline completed successfully but generated no cards"
+
+            # Category 6: Generic fallback with full diagnostics
+            diagnostics = []
+
+            # Safe attribute access with defaults
+            success = getattr(result, 'success', 'unknown')
+            total_time = getattr(result, 'total_time', 0)
+            retry_count = getattr(result, 'retry_count', 0)
+
+            diagnostics.append(f"success={success}")
+            diagnostics.append(f"time={total_time:.1f}s")
+            diagnostics.append(f"retries={retry_count}")
+
+            # Add stage information if available
+            if hasattr(result, 'pre_validation') and result.pre_validation:
+                diagnostics.append("has_pre_validation=True")
+            if hasattr(result, 'post_validation') and result.post_validation:
+                diagnostics.append("has_post_validation=True")
+            if hasattr(result, 'generation') and result.generation:
+                diagnostics.append("has_generation=True")
+            if hasattr(result, 'memorization_quality') and result.memorization_quality:
+                diagnostics.append("has_memorization_quality=True")
+
+            diagnostics_str = " | ".join(diagnostics)
+
+            logger.error(
+                "agent_pipeline_unexpected_failure",
+                diagnostics=diagnostics_str,
+                result_type=type(result).__name__,
+                result_attrs=list(vars(result).keys()) if hasattr(
+                    result, '__dict__') else 'no_attrs',
+            )
+
+            return f"Pipeline failed unexpectedly ({diagnostics_str})"
+
+        except Exception as e:
+            # Ultimate fallback - something went wrong with error extraction itself
+            logger.exception(
+                "error_during_error_extraction",
+                error=str(e),
+                result_type=type(result).__name__ if result else 'None',
+                has_success=hasattr(result, 'success') if result else False,
+            )
+            return f"Pipeline failed (error analysis unavailable: {type(e).__name__})"
