@@ -154,29 +154,22 @@ class ProblematicNotesArchiver:
             date_dir = self.archive_dir / date_str / category
             date_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate safe filename
+            # Generate safe filename for metadata
             note_name = note_path.name
             # Avoid overwriting existing files
             counter = 0
             base_name = note_path.stem
-            while (date_dir / note_name).exists():
+            while (date_dir / f"{note_name}.meta.json").exists():
                 counter += 1
                 note_name = f"{base_name}_{counter}{note_path.suffix}"
 
-            archived_note_path = date_dir / note_name
-
-            # Copy note file
-            if not self._write_archived_note(
-                source_path=note_path,
-                destination_path=archived_note_path,
-                note_content=note_content,
-            ):
-                return None
+            # We no longer copy the note file itself, just the metadata
+            # archived_note_path = None
 
             # Create metadata file
             metadata = {
                 "original_path": str(note_path),
-                "archived_path": str(archived_note_path),
+                "archived_path": None,
                 "error_type": error_type,
                 "error_message": str(error),
                 "timestamp": datetime.now().isoformat(),
@@ -191,7 +184,7 @@ class ProblematicNotesArchiver:
                 "context": context or {},
             }
 
-            metadata_path = archived_note_path.with_suffix(".meta.json")
+            metadata_path = date_dir / f"{note_name}.meta.json"
             try:
                 with open(metadata_path, "w", encoding="utf-8") as f:
                     json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -206,7 +199,7 @@ class ProblematicNotesArchiver:
             # Update index
             index_entry = {
                 "original_path": str(note_path),
-                "archived_path": str(archived_note_path),
+                "archived_path": None,
                 "error_type": error_type,
                 "timestamp": metadata["timestamp"],
                 "category": category,
@@ -216,14 +209,14 @@ class ProblematicNotesArchiver:
             self._save_index()
 
             logger.info(
-                "note_archived",
+                "note_archived_metadata_only",
                 original_path=str(note_path),
-                archived_path=str(archived_note_path),
+                metadata_path=str(metadata_path),
                 error_type=error_type,
                 category=category,
             )
 
-            return archived_note_path
+            return metadata_path
 
         except Exception as e:
             logger.error(
@@ -320,41 +313,6 @@ class ProblematicNotesArchiver:
             self._save_index()
 
         return cleaned
-
-    def _write_archived_note(
-        self,
-        source_path: Path,
-        destination_path: Path,
-        note_content: str | None,
-    ) -> bool:
-        """Write the archived note without leaking file descriptors."""
-        try:
-            if note_content is not None:
-                destination_path.write_text(note_content, encoding="utf-8")
-            else:
-                with source_path.open("rb") as src, destination_path.open("wb") as dst:
-                    shutil.copyfileobj(src, dst, length=1024 * 1024)
-
-            try:
-                shutil.copystat(source_path, destination_path,
-                                follow_symlinks=True)
-            except OSError as stat_error:
-                logger.debug(
-                    "failed_to_copy_note_metadata_stat",
-                    source=str(source_path),
-                    destination=str(destination_path),
-                    error=str(stat_error),
-                )
-            return True
-        except OSError as e:
-            logger.error(
-                "failed_to_copy_note_for_archival",
-                source=str(source_path),
-                destination=str(destination_path),
-                error=str(e),
-                **self._fd_snapshot(),
-            )
-            return False
 
     @staticmethod
     def _fd_snapshot() -> dict[str, int | None]:

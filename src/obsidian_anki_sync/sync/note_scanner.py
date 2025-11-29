@@ -5,6 +5,7 @@ Handles discovery, parsing, and processing of Obsidian notes.
 
 import random
 import time
+import errno
 from collections import defaultdict
 from collections.abc import Collection
 from pathlib import Path
@@ -1018,16 +1019,37 @@ class NoteScanner:
                     )
                     note_content = None
 
-            self.archiver.archive_note(
-                note_path=file_path,
-                error=error,
-                error_type=type(error).__name__,
-                processing_stage=processing_stage,
-                card_index=card_index,
-                language=language,
-                note_content=note_content if note_content is not None else None,
-                context={"relative_path": relative_path},
-            )
+            # Retry logic for FD exhaustion
+            max_retries = 3
+            for attempt in range(max_retries + 1):
+                try:
+                    self.archiver.archive_note(
+                        note_path=file_path,
+                        error=error,
+                        error_type=type(error).__name__,
+                        processing_stage=processing_stage,
+                        card_index=card_index,
+                        language=language,
+                        note_content=note_content if note_content is not None else None,
+                        context={"relative_path": relative_path},
+                    )
+                    return  # Success
+                except OSError as e:
+                    # Check for "Too many open files" (EMFILE) or "File table overflow" (ENFILE)
+                    if e.errno in (errno.EMFILE, errno.ENFILE):
+                        if attempt < max_retries:
+                            logger.warning(
+                                "archival_fd_exhaustion_retry",
+                                file=relative_path,
+                                attempt=attempt + 1,
+                                max_retries=max_retries,
+                                error=str(e),
+                            )
+                            # Wait for headroom before retrying
+                            self._wait_for_fd_headroom()
+                            continue
+                    raise  # Re-raise if not FD error or retries exhausted
+
         except Exception as archive_error:
             logger.warning(
                 "failed_to_archive_problematic_note",
@@ -1057,6 +1079,9 @@ class NoteScanner:
 
         archived_count = 0
         for batch_start in range(0, deferred_count, self._archiver_batch_size):
+            # Proactively check for headroom before starting a batch
+            self._wait_for_fd_headroom()
+
             batch = archives_to_process[
                 batch_start: batch_start + self._archiver_batch_size
             ]
@@ -1089,9 +1114,6 @@ class NoteScanner:
                         processed=archived_count,
                         total=deferred_count,
                     )
-
-            if archived_count < deferred_count:
-                self._wait_for_fd_headroom()
 
         logger.info(
             "deferred_archives_completed",
