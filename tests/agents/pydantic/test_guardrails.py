@@ -1,10 +1,15 @@
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from pydantic_ai.models.openai import OpenAIChatModel
-from obsidian_anki_sync.agents.pydantic_ai_agents import GeneratorAgentAI, CardGenerationOutput
-from obsidian_anki_sync.models import NoteMetadata, QAPair
+
 from obsidian_anki_sync.agents import GeneratedCard
+from obsidian_anki_sync.agents.pydantic_ai_agents import (
+    CardGenerationOutput,
+    GeneratorAgentAI,
+)
+from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 
 @pytest.mark.asyncio
@@ -27,7 +32,7 @@ async def test_generator_agent_retries_on_invalid_apf():
         "slug": "test-card",
         "lang": "en",
         "apf_html": "Invalid APF content",  # Missing sentinels
-        "confidence": 0.9
+        "confidence": 0.9,
     }
 
     # 2. Verify validator raises ValueError
@@ -36,7 +41,7 @@ async def test_generator_agent_retries_on_invalid_apf():
             cards=[invalid_card],
             total_generated=1,
             generation_notes="Test",
-            confidence=0.9
+            confidence=0.9,
         )
 
     # 3. Create a valid output
@@ -58,15 +63,12 @@ END_OF_CARDS"""
         "slug": "test-card",
         "lang": "en",
         "apf_html": valid_apf,
-        "confidence": 0.9
+        "confidence": 0.9,
     }
 
     # 4. Verify validator passes
     output = CardGenerationOutput(
-        cards=[valid_card],
-        total_generated=1,
-        generation_notes="Test",
-        confidence=0.9
+        cards=[valid_card], total_generated=1, generation_notes="Test", confidence=0.9
     )
     assert output.cards[0]["slug"] == "test-card"
 
@@ -96,16 +98,18 @@ END_OF_CARDS"""
 
     mock_result = MagicMock()
     mock_result.data = CardGenerationOutput(
-        cards=[{
-            "card_index": 1,
-            "slug": "test-card",
-            "lang": "en",
-            "apf_html": valid_apf,
-            "confidence": 0.9
-        }],
+        cards=[
+            {
+                "card_index": 1,
+                "slug": "test-card",
+                "lang": "en",
+                "apf_html": valid_apf,
+                "confidence": 0.9,
+            }
+        ],
         total_generated=1,
         generation_notes="Success",
-        confidence=0.9
+        confidence=0.9,
     )
 
     agent.agent.run = AsyncMock(return_value=mock_result)
@@ -113,18 +117,22 @@ END_OF_CARDS"""
     # Run generation
     now = datetime.now()
     metadata = NoteMetadata(
-        id="test", title="Test", topic="Testing", tags=["test"],
-        language_tags=["python"], created=now, updated=now
+        id="test",
+        title="Test",
+        topic="Testing",
+        tags=["test"],
+        language_tags=["python"],
+        created=now,
+        updated=now,
     )
-    qa_pairs = [QAPair(
-        question_en="Q", question_ru="Q", answer_en="A", answer_ru="A", card_index=1
-    )]
+    qa_pairs = [
+        QAPair(
+            question_en="Q", question_ru="Q", answer_en="A", answer_ru="A", card_index=1
+        )
+    ]
 
     result = await agent.generate_cards(
-        note_content="content",
-        metadata=metadata,
-        qa_pairs=qa_pairs,
-        slug_base="test"
+        note_content="content", metadata=metadata, qa_pairs=qa_pairs, slug_base="test"
     )
 
     assert len(result.cards) == 1

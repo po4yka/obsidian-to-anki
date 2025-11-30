@@ -22,6 +22,7 @@ def get_config_and_logger(
     log_level: str = "INFO",
     log_file: Path | None = None,
     very_verbose: bool = False,
+    verbose: bool = False,
 ) -> tuple[Config, Any]:
     """Load configuration and logger (dependency injection helper).
 
@@ -34,6 +35,7 @@ def get_config_and_logger(
         log_level: Logging level
         log_file: Optional specific log file path
         very_verbose: Enable very verbose logging (full LLM requests/responses)
+        verbose: Show all log messages on terminal (for debugging)
 
     Returns:
         Tuple of (Config, Logger)
@@ -55,6 +57,7 @@ def get_config_and_logger(
             log_dir=log_dir,
             log_file=log_file,
             very_verbose=very_verbose,
+            verbose=verbose,
             project_log_dir=_config.get_log_dir(),
             error_log_retention_days=_config.error_log_retention_days,
         )

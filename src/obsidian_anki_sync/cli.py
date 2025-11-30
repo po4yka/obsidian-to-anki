@@ -107,12 +107,20 @@ def sync(
         str,
         typer.Option("--log-level", help="Log level (DEBUG, INFO, WARN, ERROR)"),
     ] = "INFO",
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show all log messages on terminal (for debugging)",
+        ),
+    ] = False,
 ) -> None:
     """Synchronize Obsidian notes to Anki cards."""
     import time
 
     start_time = time.time()
-    config, logger = get_config_and_logger(config_path, log_level)
+    config, logger = get_config_and_logger(config_path, log_level, verbose=verbose)
 
     # Log command entry with all parameters
     logger.info(
@@ -127,6 +135,7 @@ def sync(
         use_langgraph=use_langgraph,
         config_path=str(config_path) if config_path else None,
         log_level=log_level,
+        verbose=verbose,
         vault_path=str(config.vault_path) if config.vault_path else None,
     )
 
@@ -143,7 +152,10 @@ def sync(
             config.enable_queue = True
             config.redis_url = redis_url
             if not config.use_langgraph:
-                logger.warning("queue_requires_langgraph", message="Enabling LangGraph because queue is enabled")
+                logger.warning(
+                    "queue_requires_langgraph",
+                    message="Enabling LangGraph because queue is enabled",
+                )
                 config.use_langgraph = True
                 config.use_pydantic_ai = True
         # Delegate to sync handler
@@ -217,12 +229,20 @@ def test_run(
             help="Build the full vault index before sampling (default: --no-index)",
         ),
     ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show all log messages on terminal (for debugging)",
+        ),
+    ] = False,
 ) -> None:
     """Run a sample by processing N random notes."""
     import time
 
     start_time = time.time()
-    config, logger = get_config_and_logger(config_path, log_level)
+    config, logger = get_config_and_logger(config_path, log_level, verbose=verbose)
 
     # Log command entry
     logger.info(

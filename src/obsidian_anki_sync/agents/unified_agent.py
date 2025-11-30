@@ -128,9 +128,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                         ai_fixer = AIFixer.from_config(self.config)
 
                     self._agents[agent_type] = PreValidatorAgentAI(
-                        model=model,
-                        enable_autofix=enable_autofix,
-                        ai_fixer=ai_fixer
+                        model=model, enable_autofix=enable_autofix, ai_fixer=ai_fixer
                     )
                 elif agent_type == "post_validator":
                     from .pydantic.post_validator import PostValidatorAgentAI

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-
 from typing import TYPE_CHECKING
 
 from obsidian_anki_sync.agents.models import AutoFixIssue
@@ -58,7 +57,9 @@ class TrailingWhitespaceHandler(AutoFixHandler):
     """
 
     issue_type = "trailing_whitespace"
-    description = "Remove trailing spaces and tabs from lines (preserves markdown line breaks)"
+    description = (
+        "Remove trailing spaces and tabs from lines (preserves markdown line breaks)"
+    )
 
     def _is_markdown_line_break(self, line: str) -> bool:
         """Check if trailing spaces are a markdown line break (2+ spaces).
@@ -115,7 +116,9 @@ class TrailingWhitespaceHandler(AutoFixHandler):
 
         for issue in issues:
             issue.auto_fixed = True
-            issue.fix_description = "Removed trailing whitespace (preserved markdown line breaks)"
+            issue.fix_description = (
+                "Removed trailing whitespace (preserved markdown line breaks)"
+            )
 
         return fixed_content, issues
 
@@ -386,7 +389,9 @@ class SectionOrderHandler(AutoFixHandler):
                 if fixed_content != content:
                     for issue in issues:
                         issue.auto_fixed = True
-                        issue.fix_description = f"AI reorganized structure: {', '.join(changes)}"
+                        issue.fix_description = (
+                            f"AI reorganized structure: {', '.join(changes)}"
+                        )
                     return fixed_content, issues
             except Exception as e:
                 logger.warning("ai_structure_fix_failed", error=str(e))
@@ -394,9 +399,7 @@ class SectionOrderHandler(AutoFixHandler):
         # Fallback if no AI or AI failed
         for issue in issues:
             issue.auto_fixed = False
-            issue.fix_description = (
-                "Manual fix required (AI fixer disabled or failed)"
-            )
+            issue.fix_description = "Manual fix required (AI fixer disabled or failed)"
 
         return content, issues
 
@@ -419,7 +422,9 @@ class MissingRelatedQuestionsHandler(AutoFixHandler):
 
         # Check if Related Questions section exists
         has_related_section = bool(
-            re.search(r"^##\s*Related\s*Questions", content, re.MULTILINE | re.IGNORECASE)
+            re.search(
+                r"^##\s*Related\s*Questions", content, re.MULTILINE | re.IGNORECASE
+            )
         )
 
         if not has_related_section:
@@ -453,7 +458,9 @@ class MissingRelatedQuestionsHandler(AutoFixHandler):
 
         for issue in issues:
             issue.auto_fixed = True
-            issue.fix_description = f"Added Related Questions section with {len(related)} links"
+            issue.fix_description = (
+                f"Added Related Questions section with {len(related)} links"
+            )
 
         return fixed_content, issues
 
@@ -641,7 +648,9 @@ class BrokenRelatedEntryHandler(AutoFixHandler):
 
             for issue in issues:
                 issue.auto_fixed = True
-                issue.fix_description = f"Removed {removed_count} broken entries from related field"
+                issue.fix_description = (
+                    f"Removed {removed_count} broken entries from related field"
+                )
         else:
             fixed_content = content
             for issue in issues:

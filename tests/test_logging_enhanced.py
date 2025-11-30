@@ -38,6 +38,7 @@ class TestEnhancedLogging:
 
         # Flush handlers to ensure logs are written
         import logging
+
         logging.shutdown()
 
         # Check that log files exist
@@ -63,6 +64,7 @@ class TestEnhancedLogging:
 
         # Flush handlers to ensure logs are written
         import logging
+
         logging.shutdown()
 
         # Find error log file
@@ -71,8 +73,7 @@ class TestEnhancedLogging:
 
         error_log_content = error_logs[0].read_text(encoding="utf-8")
         # Check for JSON structure
-        lines = [line.strip()
-                 for line in error_log_content.split("\n") if line.strip()]
+        lines = [line.strip() for line in error_log_content.split("\n") if line.strip()]
         assert len(lines) > 0
 
         # Verify at least one line is valid JSON
@@ -108,6 +109,7 @@ class TestEnhancedLogging:
 
         # Flush handlers to ensure logs are written
         import logging
+
         logging.shutdown()
 
         # Verify error log was created
@@ -127,16 +129,19 @@ class TestEnhancedLogging:
 
         # Flush handlers to ensure logs are written
         import logging
+
         logging.shutdown()
 
         # Find main log file
-        log_files = [f for f in project_log_dir.glob(
-            "obsidian-anki-sync*.log") if "errors" not in f.name]
+        log_files = [
+            f
+            for f in project_log_dir.glob("obsidian-anki-sync*.log")
+            if "errors" not in f.name
+        ]
         assert len(log_files) >= 1
 
         log_content = log_files[0].read_text(encoding="utf-8")
-        lines = [line.strip()
-                 for line in log_content.split("\n") if line.strip()]
+        lines = [line.strip() for line in log_content.split("\n") if line.strip()]
         assert len(lines) > 0
 
         # Verify JSON structure
@@ -155,7 +160,9 @@ class TestEnhancedLogging:
             except json.JSONDecodeError:
                 continue
 
-        assert found_message, "Test message not found in log file with correct JSON structure"
+        assert found_message, (
+            "Test message not found in log file with correct JSON structure"
+        )
 
     def test_structured_fields_preserved(self, temp_dir):
         """Test that structured fields are preserved in logs."""
@@ -176,15 +183,18 @@ class TestEnhancedLogging:
 
         # Flush handlers to ensure logs are written
         import logging
+
         logging.shutdown()
 
-        log_files = [f for f in project_log_dir.glob(
-            "obsidian-anki-sync*.log") if "errors" not in f.name]
+        log_files = [
+            f
+            for f in project_log_dir.glob("obsidian-anki-sync*.log")
+            if "errors" not in f.name
+        ]
         assert len(log_files) >= 1
 
         log_content = log_files[0].read_text(encoding="utf-8")
-        lines = [line.strip()
-                 for line in log_content.split("\n") if line.strip()]
+        lines = [line.strip() for line in log_content.split("\n") if line.strip()]
 
         found = False
         for line in lines:

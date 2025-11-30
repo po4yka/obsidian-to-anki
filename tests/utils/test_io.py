@@ -2,8 +2,11 @@ import os
 import threading
 import time
 from pathlib import Path
+
 import pytest
+
 from obsidian_anki_sync.utils.io import atomic_write
+
 
 def test_atomic_write_creates_file(tmp_path):
     """Test that atomic_write creates a file with correct content."""
@@ -16,6 +19,7 @@ def test_atomic_write_creates_file(tmp_path):
     assert target_file.exists()
     assert target_file.read_text(encoding="utf-8") == content
 
+
 def test_atomic_write_overwrites_file(tmp_path):
     """Test that atomic_write overwrites an existing file."""
     target_file = tmp_path / "test_file.txt"
@@ -26,6 +30,7 @@ def test_atomic_write_overwrites_file(tmp_path):
         f.write(new_content)
 
     assert target_file.read_text(encoding="utf-8") == new_content
+
 
 def test_atomic_write_failure_cleanup(tmp_path):
     """Test that temp file is cleaned up on failure and target is unchanged."""
@@ -47,6 +52,7 @@ def test_atomic_write_failure_cleanup(tmp_path):
     temp_files = list(tmp_path.glob(".tmp_*"))
     assert len(temp_files) == 0
 
+
 def test_atomic_write_atomicity(tmp_path):
     """
     Test atomicity by checking that the file doesn't exist (or has old content)
@@ -63,6 +69,7 @@ def test_atomic_write_atomicity(tmp_path):
 
     assert target_file.exists()
     assert target_file.read_text(encoding="utf-8") == content
+
 
 if __name__ == "__main__":
     # Manual run if pytest is not available

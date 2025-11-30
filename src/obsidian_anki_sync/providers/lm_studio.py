@@ -43,7 +43,10 @@ class LMStudioProvider(BaseLLMProvider):
         """
         super().__init__(
             verbose_logging=verbose_logging,
-            base_url=base_url, timeout=timeout, max_tokens=max_tokens, **kwargs
+            base_url=base_url,
+            timeout=timeout,
+            max_tokens=max_tokens,
+            **kwargs,
         )
 
         self.base_url = base_url.rstrip("/")
@@ -55,8 +58,7 @@ class LMStudioProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5,
-                                max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
         )
 
         logger.info(
@@ -101,8 +103,7 @@ class LMStudioProvider(BaseLLMProvider):
 
             # OpenAI API format: {"data": [{"id": "model-name"}, ...]}
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("lm_studio_list_models_success",
-                        model_count=len(models))
+            logger.info("lm_studio_list_models_success", model_count=len(models))
             return models
         except Exception as e:
             logger.error("lm_studio_list_models_failed", error=str(e))

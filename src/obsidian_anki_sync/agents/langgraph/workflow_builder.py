@@ -124,8 +124,7 @@ class WorkflowBuilder:
         )
 
         # Add optional note correction node (if enabled)
-        enable_note_correction = getattr(
-            self.config, "enable_note_correction", False)
+        enable_note_correction = getattr(self.config, "enable_note_correction", False)
         if enable_note_correction:
             workflow.add_node(
                 "note_correction",
@@ -242,8 +241,7 @@ class WorkflowBuilder:
         # Reflection nodes run AFTER action nodes to evaluate outputs
         # They do NOT retry - reflection failure should not block pipeline
         # ====================================================================
-        enable_self_reflection = getattr(
-            self.config, "enable_self_reflection", False)
+        enable_self_reflection = getattr(self.config, "enable_self_reflection", False)
 
         if enable_self_reflection:
             # Add reflection nodes (run AFTER action nodes)
@@ -280,8 +278,7 @@ class WorkflowBuilder:
             # CoT enabled: Route through reasoning nodes
             if enable_note_correction:
                 workflow.add_edge("autofix", "note_correction")
-                workflow.add_edge("note_correction",
-                                  "think_before_pre_validation")
+                workflow.add_edge("note_correction", "think_before_pre_validation")
             else:
                 workflow.add_edge("autofix", "think_before_pre_validation")
 
@@ -289,11 +286,9 @@ class WorkflowBuilder:
             workflow.add_edge("think_before_pre_validation", "pre_validation")
             workflow.add_edge("think_before_card_splitting", "card_splitting")
             workflow.add_edge("think_before_generation", "generation")
-            workflow.add_edge("think_before_post_validation",
-                              "post_validation")
+            workflow.add_edge("think_before_post_validation", "post_validation")
             workflow.add_edge("think_before_enrichment", "context_enrichment")
-            workflow.add_edge("think_before_memorization",
-                              "memorization_quality")
+            workflow.add_edge("think_before_memorization", "memorization_quality")
             workflow.add_edge("think_before_duplicate", "duplicate_detection")
 
             # Pre-validation routes to thinking nodes
@@ -314,8 +309,7 @@ class WorkflowBuilder:
 
             # Generation -> Linter -> think_before_post_validation
             workflow.add_edge("generation", "linter_validation")
-            workflow.add_edge("linter_validation",
-                              "think_before_post_validation")
+            workflow.add_edge("linter_validation", "think_before_post_validation")
 
             # Post-validation routes (with optional self-reflection)
             if enable_self_reflection:
@@ -345,8 +339,7 @@ class WorkflowBuilder:
                 workflow.add_edge("revise_generation", "generation")
 
                 # Enrichment routes to reflection
-                workflow.add_edge("context_enrichment",
-                                  "reflect_after_enrichment")
+                workflow.add_edge("context_enrichment", "reflect_after_enrichment")
 
                 # Enrichment reflection routes to revision or next stage
                 workflow.add_conditional_edges(
@@ -454,8 +447,7 @@ class WorkflowBuilder:
                 workflow.add_edge("revise_generation", "generation")
 
                 # Enrichment routes to reflection
-                workflow.add_edge("context_enrichment",
-                                  "reflect_after_enrichment")
+                workflow.add_edge("context_enrichment", "reflect_after_enrichment")
 
                 # Enrichment reflection routes to revision or next stage
                 workflow.add_conditional_edges(

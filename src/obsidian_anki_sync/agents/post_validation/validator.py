@@ -243,13 +243,18 @@ class PostValidatorAgent:
                     )
                     return fixed_cards
 
-            elif error_classification in ["html_syntax", "apf_sentinel", "section_header"]:
+            elif error_classification in [
+                "html_syntax",
+                "apf_sentinel",
+                "section_header",
+            ]:
                 # Complex syntax/structure issues - use LLM
                 logger.debug(f"auto_fix_classified_{error_classification}")
                 fixed_cards = self._llm_based_fix(cards, error_details)
                 if fixed_cards:
                     logger.info(
-                        f"auto_fix_{error_classification}_success", cards_fixed=len(fixed_cards)
+                        f"auto_fix_{error_classification}_success",
+                        cards_fixed=len(fixed_cards),
                     )
                     return fixed_cards
 

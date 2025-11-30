@@ -53,8 +53,7 @@ class TestProblematicNotesArchiver:
     def test_archiver_initialization(self, temp_dir):
         """Test archiver initialization."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         assert archiver.archive_dir == archive_dir
         assert archiver.enabled is True
@@ -65,8 +64,7 @@ class TestProblematicNotesArchiver:
     def test_archiver_disabled(self, temp_dir):
         """Test archiver when disabled."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=False)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=False)
 
         assert archiver.enabled is False
         result = archiver.archive_note(
@@ -78,8 +76,7 @@ class TestProblematicNotesArchiver:
     def test_archive_note_parser_error(self, temp_dir, sample_note_content):
         """Test archiving a note with parser error."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test_note.md"
         note_path.write_text(sample_note_content, encoding="utf-8")
@@ -113,8 +110,7 @@ class TestProblematicNotesArchiver:
     def test_archive_note_with_context(self, temp_dir, sample_note_content):
         """Test archiving with additional context."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test_note.md"
         note_path.write_text(sample_note_content, encoding="utf-8")
@@ -142,8 +138,7 @@ class TestProblematicNotesArchiver:
     def test_get_archived_notes(self, temp_dir, sample_note_content):
         """Test retrieving archived notes."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         # Archive multiple notes
         for i in range(3):
@@ -176,8 +171,7 @@ class TestProblematicNotesArchiver:
     def test_error_category_mapping(self, temp_dir):
         """Test error type to category mapping."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         note_path = temp_dir / "test.md"
         note_path.write_text("test", encoding="utf-8")
@@ -198,8 +192,7 @@ class TestProblematicNotesArchiver:
     def test_cleanup_old_archives(self, temp_dir, sample_note_content):
         """Test cleanup of old archived notes."""
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
 
         # Archive a note
         note_path = temp_dir / "test.md"
@@ -220,8 +213,7 @@ class TestProblematicNotesArchiver:
         import hashlib
 
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
         note_path = temp_dir / "prefetched.md"
         # Write different content to file
         note_path.write_text("stale content", encoding="utf-8")
@@ -240,8 +232,7 @@ class TestProblematicNotesArchiver:
         with open(archived_path, encoding="utf-8") as f:
             metadata = json.load(f)
 
-        expected_hash = hashlib.sha256(
-            sample_note_content.encode("utf-8")).hexdigest()
+        expected_hash = hashlib.sha256(sample_note_content.encode("utf-8")).hexdigest()
         assert metadata["content_hash"] == expected_hash
 
     @pytest.mark.skipif(resource is None, reason="resource module unavailable")
@@ -257,8 +248,7 @@ class TestProblematicNotesArchiver:
         resource.setrlimit(resource.RLIMIT_NOFILE, (target_soft, hard_limit))
 
         archive_dir = temp_dir / "problematic_notes"
-        archiver = ProblematicNotesArchiver(
-            archive_dir=archive_dir, enabled=True)
+        archiver = ProblematicNotesArchiver(archive_dir=archive_dir, enabled=True)
         note_path = temp_dir / "fd_stress_note.md"
         note_path.write_text(sample_note_content, encoding="utf-8")
 
@@ -276,8 +266,7 @@ class TestProblematicNotesArchiver:
                     raise
 
             if not exhausted:
-                pytest.skip(
-                    "Unable to exhaust file descriptors on this platform")
+                pytest.skip("Unable to exhaust file descriptors on this platform")
 
             # Free minimal headroom for the archival copy operation.
             for _ in range(min(4, len(open_handles))):
@@ -298,5 +287,4 @@ class TestProblematicNotesArchiver:
             for handle in open_handles:
                 with suppress(OSError):
                     handle.close()
-            resource.setrlimit(resource.RLIMIT_NOFILE,
-                               (soft_limit, hard_limit))
+            resource.setrlimit(resource.RLIMIT_NOFILE, (soft_limit, hard_limit))

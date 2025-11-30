@@ -26,7 +26,7 @@ class TestFDExhaustionFix(unittest.TestCase):
             config=self.config,
             state_db=self.state_db,
             card_generator=self.card_generator,
-            archiver=self.archiver
+            archiver=self.archiver,
         )
 
     @patch("obsidian_anki_sync.sync.note_scanner.has_fd_headroom")
@@ -45,7 +45,7 @@ class TestFDExhaustionFix(unittest.TestCase):
             file_path=Path("test.md"),
             relative_path="test.md",
             error=Exception("Original error"),
-            processing_stage="test"
+            processing_stage="test",
         )
 
         # Verify
@@ -73,7 +73,7 @@ class TestFDExhaustionFix(unittest.TestCase):
             file_path=Path("test.md"),
             relative_path="test.md",
             error=Exception("Original error"),
-            processing_stage="test"
+            processing_stage="test",
         )
 
         # Should have retried max_retries + 1 times (initial + 3 retries = 4)
@@ -91,7 +91,7 @@ class TestFDExhaustionFix(unittest.TestCase):
                 relative_path=f"note_{i}.md",
                 error=Exception("Test"),
                 processing_stage="test",
-                note_content=f"Test note content {i}"
+                note_content=f"Test note content {i}",
             )
 
         self.scanner._defer_archival = False
@@ -110,6 +110,7 @@ class TestFDExhaustionFix(unittest.TestCase):
             # My implementation calls _wait_for_fd_headroom() before each batch.
             # So at least 2 calls.
             assert mock_has_headroom.call_count >= 2
+
 
 if __name__ == "__main__":
     unittest.main()

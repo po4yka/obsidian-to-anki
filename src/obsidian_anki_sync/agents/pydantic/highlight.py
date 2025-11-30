@@ -56,8 +56,8 @@ well-formed Q&A snippets that could be turned into Anki cards.
 
 Title: {metadata.title}
 Topic: {metadata.topic}
-Tags: {', '.join(metadata.tags)}
-Language Tags: {', '.join(metadata.language_tags)}
+Tags: {", ".join(metadata.tags)}
+Language Tags: {", ".join(metadata.language_tags)}
 Max Candidates: {max_candidates}
 
 Note Content Preview (truncated):\n{preview}
@@ -82,12 +82,10 @@ Note Content Preview (truncated):\n{preview}
                 qa_candidates=qa_candidates,
                 summaries=[summary.strip() for summary in output.summaries],
                 suggestions=[s.strip() for s in output.suggestions],
-                detected_sections=[s.strip()
-                                   for s in output.detected_sections],
+                detected_sections=[s.strip() for s in output.detected_sections],
                 confidence=max(0.0, min(1.0, output.confidence)),
                 note_status=output.note_status or "unknown",
-                analysis_time=output.analysis_time or (
-                    time.time() - start_time),
+                analysis_time=output.analysis_time or (time.time() - start_time),
                 raw_excerpt=output.raw_excerpt,
             )
 

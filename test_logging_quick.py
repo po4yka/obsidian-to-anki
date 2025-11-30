@@ -1,7 +1,9 @@
 """Quick test script for logging."""
-from obsidian_anki_sync.utils.logging import configure_logging, get_logger
-import tempfile
+
 import pathlib
+import tempfile
+
+from obsidian_anki_sync.utils.logging import configure_logging, get_logger
 
 with tempfile.TemporaryDirectory() as tmpdir:
     configure_logging(log_level="INFO", project_log_dir=pathlib.Path(tmpdir))

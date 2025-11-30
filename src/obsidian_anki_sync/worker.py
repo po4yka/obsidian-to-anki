@@ -131,13 +131,19 @@ async def process_note_job(
             elif result.generation.total_cards == 0:
                 error_details.append("Generator returned zero cards")
 
-            error_msg = "; ".join(error_details) if error_details else "Unknown pipeline error"
+            error_msg = (
+                "; ".join(error_details) if error_details else "Unknown pipeline error"
+            )
             logger.warning(
                 "pipeline_generation_failed",
                 file=relative_path,
                 error=error_msg,
-                pre_valid=result.pre_validation.is_valid if result.pre_validation else None,
-                post_valid=result.post_validation.is_valid if result.post_validation else None,
+                pre_valid=result.pre_validation.is_valid
+                if result.pre_validation
+                else None,
+                post_valid=result.post_validation.is_valid
+                if result.post_validation
+                else None,
             )
             return {
                 "success": False,

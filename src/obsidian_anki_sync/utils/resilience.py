@@ -264,7 +264,9 @@ def _log_retry_attempt(retry_state: RetryCallState) -> None:
     logger.warning(
         "tenacity_retry",
         attempt=retry_state.attempt_number,
-        wait_seconds=round(retry_state.next_action.sleep if retry_state.next_action else 0, 2),
+        wait_seconds=round(
+            retry_state.next_action.sleep if retry_state.next_action else 0, 2
+        ),
         error=str(retry_state.outcome.exception()) if retry_state.outcome else None,
     )
 

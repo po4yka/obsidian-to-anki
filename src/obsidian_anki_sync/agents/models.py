@@ -10,12 +10,10 @@ class NoteMetadata(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    id: str | None = Field(
-        default=None, description="Optional note identifier")
+    id: str | None = Field(default=None, description="Optional note identifier")
     title: str = Field(default="", description="Note title")
     topic: str = Field(default="", description="Primary note topic")
-    tags: list[str] = Field(default_factory=list,
-                            description="Associated tags")
+    tags: list[str] = Field(default_factory=list, description="Associated tags")
     file_path: str | None = Field(default=None, description="Source file path")
     language_tags: list[str] = Field(
         default_factory=list, description="Language tags for the note"
@@ -33,8 +31,7 @@ class QualityDimension(BaseModel):
     weight: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Dimension weight in overall score"
     )
-    issues: list[str] = Field(default_factory=list,
-                              description="Specific issues found")
+    issues: list[str] = Field(default_factory=list, description="Specific issues found")
     strengths: list[str] = Field(
         default_factory=list, description="Positive aspects identified"
     )
@@ -72,8 +69,7 @@ class PreValidationResult(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     is_valid: bool
-    error_type: Literal["format", "structure",
-                        "frontmatter", "content", "none"]
+    error_type: Literal["format", "structure", "frontmatter", "content", "none"]
     error_details: str = ""
     auto_fix_applied: bool = False
     fixed_content: str | None = None
@@ -92,8 +88,7 @@ class GeneratedCard(BaseModel):
     slug: str = Field(min_length=1, description="Unique card identifier")
     lang: str = Field(pattern="^(en|ru)$", description="Card language")
     apf_html: str = Field(min_length=1, description="APF HTML content")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Generation confidence score")
+    confidence: float = Field(ge=0.0, le=1.0, description="Generation confidence score")
     content_hash: str = Field(
         default="", description="Stable content hash for change detection"
     )
@@ -202,13 +197,11 @@ class RepairDiagnosis(BaseModel):
     severity: Literal["low", "medium", "high", "critical"] = Field(
         description="Severity of the error"
     )
-    error_description: str = Field(
-        description="Detailed description of the error")
+    error_description: str = Field(description="Detailed description of the error")
     repair_priority: int = Field(
         default=5, ge=1, le=10, description="Repair priority (1=highest, 10=lowest)"
     )
-    can_auto_fix: bool = Field(
-        description="Whether this error can be auto-fixed")
+    can_auto_fix: bool = Field(description="Whether this error can be auto-fixed")
 
 
 class RepairQualityScore(BaseModel):
@@ -259,14 +252,12 @@ class DuplicateMatch(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_slug: str = Field(
-        min_length=1, description="Slug of potential duplicate card")
+    card_slug: str = Field(min_length=1, description="Slug of potential duplicate card")
     similarity_score: float = Field(
         default=0.0, ge=0.0, le=1.0, description="Similarity score"
     )
     duplicate_type: Literal["exact", "semantic", "partial_overlap", "unique"]
-    reasoning: str = Field(
-        default="", description="Why this is considered a duplicate")
+    reasoning: str = Field(default="", description="Why this is considered a duplicate")
 
 
 class DuplicateDetectionResult(BaseModel):
@@ -294,8 +285,7 @@ class EnrichmentAddition(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    enrichment_type: Literal["example", "mnemonic",
-                             "visual", "related", "practical"]
+    enrichment_type: Literal["example", "mnemonic", "visual", "related", "practical"]
     content: str = Field(min_length=1)
     rationale: str = Field(default="")
 
@@ -346,13 +336,17 @@ class HighlightResult(BaseModel):
         default_factory=list, description="High-level summaries of note content"
     )
     suggestions: list[str] = Field(
-        default_factory=list, description="Actionable suggestions for improving the note"
+        default_factory=list,
+        description="Actionable suggestions for improving the note",
     )
     detected_sections: list[str] = Field(
         default_factory=list, description="Sections detected during analysis"
     )
     confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Confidence that the highlights are helpful"
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence that the highlights are helpful",
     )
     note_status: Literal["draft", "incomplete", "ready", "unknown"] = Field(
         default="unknown", description="Inferred note status based on analysis"
@@ -361,7 +355,8 @@ class HighlightResult(BaseModel):
         default=0.0, ge=0.0, description="Time spent running the highlight agent"
     )
     raw_excerpt: str | None = Field(
-        default=None, description="Optional raw excerpt containing the highlighted content"
+        default=None,
+        description="Optional raw excerpt containing the highlighted content",
     )
 
 
@@ -373,8 +368,7 @@ class NoteCorrectionResult(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    needs_correction: bool = Field(
-        description="Whether the note needs correction")
+    needs_correction: bool = Field(description="Whether the note needs correction")
     corrected_content: str | None = Field(
         default=None, description="Corrected note content if repairs were applied"
     )
@@ -437,8 +431,7 @@ class PartialRepairResult(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    repaired_content: str = Field(
-        description="Partially or fully repaired content")
+    repaired_content: str = Field(description="Partially or fully repaired content")
     sections_fixed: list[str] = Field(
         default_factory=list,
         description="List of sections that were successfully fixed",
@@ -472,14 +465,14 @@ class AgentPipelineResult(BaseModel):
     post_validation: PostValidationResult | None = None
     memorization_quality: MemorizationQualityResult | None = None
     highlight_result: HighlightResult | None = Field(
-        default=None, description="Highlight analysis when Q/A content is missing or weak"
+        default=None,
+        description="Highlight analysis when Q/A content is missing or weak",
     )
     note_correction: NoteCorrectionResult | None = Field(
         default=None, description="Proactive note correction result"
     )
     total_time: float = Field(ge=0.0)
-    retry_count: int = Field(
-        ge=0, description="Number of post-validation retries")
+    retry_count: int = Field(ge=0, description="Number of post-validation retries")
 
 
 class SplitValidationResult(BaseModel):
@@ -517,13 +510,11 @@ class AutoFixIssue(BaseModel):
     severity: Literal["info", "warning", "error"] = Field(
         default="warning", description="Issue severity"
     )
-    description: str = Field(
-        default="", description="Human-readable issue description")
+    description: str = Field(default="", description="Human-readable issue description")
     location: str | None = Field(
         default=None, description="Location in file (line number or field name)"
     )
-    auto_fixed: bool = Field(
-        default=False, description="Whether this issue was fixed")
+    auto_fixed: bool = Field(default=False, description="Whether this issue was fixed")
     fix_description: str = Field(
         default="", description="Description of the fix applied"
     )
@@ -543,8 +534,7 @@ class AutoFixResult(BaseModel):
     issues_found: list[AutoFixIssue] = Field(
         default_factory=list, description="All issues detected"
     )
-    issues_fixed: int = Field(
-        default=0, description="Number of issues auto-fixed")
+    issues_fixed: int = Field(default=0, description="Number of issues auto-fixed")
     issues_skipped: int = Field(
         default=0, description="Number of issues that could not be fixed"
     )
@@ -554,8 +544,7 @@ class AutoFixResult(BaseModel):
     fixed_content: str | None = Field(
         default=None, description="Content after fixes applied"
     )
-    fix_time: float = Field(default=0.0, ge=0.0,
-                            description="Time taken for fixes")
+    fix_time: float = Field(default=0.0, ge=0.0, description="Time taken for fixes")
     write_back_enabled: bool = Field(
         default=False, description="Whether fixes were written back to file"
     )

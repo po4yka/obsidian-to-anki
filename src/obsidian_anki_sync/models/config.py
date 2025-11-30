@@ -501,8 +501,7 @@ def get_model_config(
     Returns:
         Model configuration
     """
-    preset_configs = MODEL_PRESETS.get(
-        preset, MODEL_PRESETS[ModelPreset.BALANCED])
+    preset_configs = MODEL_PRESETS.get(preset, MODEL_PRESETS[ModelPreset.BALANCED])
     config = preset_configs.get(task)
 
     if config is None:
@@ -532,11 +531,9 @@ def get_model_config(
                 elif key == "temperature":
                     config_dict[key] = float(value)
                 elif key == "max_tokens":
-                    config_dict[key] = int(
-                        value) if value is not None else None
+                    config_dict[key] = int(value) if value is not None else None
                 elif key == "top_p":
-                    config_dict[key] = float(
-                        value) if value is not None else None
+                    config_dict[key] = float(value) if value is not None else None
                 elif key == "reasoning_enabled":
                     config_dict[key] = bool(value)
         config = ModelConfig(**config_dict)

@@ -1,20 +1,20 @@
-
 import os
-import sys
-import time
 import resource
 import shutil
+import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 # Add src to path
 sys.path.insert(0, os.path.abspath("src"))
 
 from obsidian_anki_sync.sync.note_scanner import NoteScanner
-from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 from obsidian_anki_sync.utils.fs_monitor import get_open_file_count
+from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
+
 
 def setup_environment():
     # Set a low FD limit for testing
@@ -28,6 +28,7 @@ def setup_environment():
     print(f"New FD limits: soft={new_soft}, hard={hard}")
     return new_soft
 
+
 def consume_fds(count):
     fds = []
     try:
@@ -37,6 +38,7 @@ def consume_fds(count):
     except OSError as e:
         print(f"Stopped consuming FDs at {len(fds)} due to error: {e}")
     return fds
+
 
 def test_deferred_archival_exhaustion():
     # Setup directories
@@ -57,8 +59,8 @@ def test_deferred_archival_exhaustion():
     config.source_subdirs = None
     config.source_dir = None
     config.max_concurrent_generations = 1
-    config.archiver_batch_size = 64 # Default
-    config.archiver_min_fd_headroom = 32 # Default
+    config.archiver_batch_size = 64  # Default
+    config.archiver_min_fd_headroom = 32  # Default
     config.archiver_fd_poll_interval = 0.1
 
     state_db = MagicMock()
@@ -71,7 +73,7 @@ def test_deferred_archival_exhaustion():
         config=config,
         state_db=state_db,
         card_generator=card_generator,
-        archiver=archiver
+        archiver=archiver,
     )
 
     # Manually populate deferred archives to simulate a parallel run result
@@ -81,7 +83,7 @@ def test_deferred_archival_exhaustion():
             file_path=vault_dir / f"note_{i}.md",
             relative_path=f"note_{i}.md",
             error=Exception("Test error"),
-            processing_stage="test"
+            processing_stage="test",
         )
 
     print(f"Deferred {len(scanner._deferred_archives)} notes.")
@@ -96,7 +98,9 @@ def test_deferred_archival_exhaustion():
     target_open = soft - 10
     to_open = target_open - current_open
 
-    print(f"Current open: {current_open}, Target open: {target_open}, To open: {to_open}")
+    print(
+        f"Current open: {current_open}, Target open: {target_open}, To open: {to_open}"
+    )
 
     held_fds = consume_fds(max(0, to_open))
     print(f"Held {len(held_fds)} FDs. Current open: {get_open_file_count()}")
@@ -110,12 +114,14 @@ def test_deferred_archival_exhaustion():
     except Exception as e:
         print(f"Processing failed with: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         # Cleanup
         for f in held_fds:
             f.close()
         shutil.rmtree(temp_dir)
+
 
 if __name__ == "__main__":
     setup_environment()

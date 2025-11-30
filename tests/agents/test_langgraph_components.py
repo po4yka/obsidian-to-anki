@@ -91,8 +91,7 @@ class TestHighlightRouting:
             "enable_card_splitting": True,
             "enable_highlight_agent": True,
         }
-        route = should_continue_after_pre_validation(
-            state)  # type: ignore[arg-type]
+        route = should_continue_after_pre_validation(state)  # type: ignore[arg-type]
         assert route == "highlight"
 
     def test_cot_route_includes_highlight(self, mock_config):
@@ -101,6 +100,5 @@ class TestHighlightRouting:
             "pre_validation": {"is_valid": False},
             "enable_highlight_agent": True,
         }
-        route = builder._route_after_pre_validation_with_cot(
-            state)  # type: ignore[arg-type]
+        route = builder._route_after_pre_validation_with_cot(state)  # type: ignore[arg-type]
         assert route == "highlight"

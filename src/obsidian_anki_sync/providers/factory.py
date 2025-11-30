@@ -32,7 +32,9 @@ class ProviderFactory:
     }
 
     @classmethod
-    def create_provider(cls, provider_type: str, verbose_logging: bool = False, **kwargs: Any) -> BaseLLMProvider:
+    def create_provider(
+        cls, provider_type: str, verbose_logging: bool = False, **kwargs: Any
+    ) -> BaseLLMProvider:
         """Create a provider instance based on type.
 
         Args:
@@ -97,11 +99,14 @@ class ProviderFactory:
             )
 
         try:
-            provider = cast("BaseLLMProvider", provider_class(
-                verbose_logging=verbose_logging, **kwargs))
+            provider = cast(
+                "BaseLLMProvider",
+                provider_class(verbose_logging=verbose_logging, **kwargs),
+            )
             if verbose_logging:
-                logger.info("provider_created_successfully",
-                            provider_type=provider_type)
+                logger.info(
+                    "provider_created_successfully", provider_type=provider_type
+                )
             return provider
         except Exception as e:
             logger.error(
@@ -112,7 +117,9 @@ class ProviderFactory:
             raise
 
     @classmethod
-    def create_from_config(cls, config: Any, verbose_logging: bool = False) -> BaseLLMProvider:
+    def create_from_config(
+        cls, config: Any, verbose_logging: bool = False
+    ) -> BaseLLMProvider:
         """Create a provider instance from a Config object.
 
         Args:
@@ -209,7 +216,9 @@ class ProviderFactory:
                 config_attributes=list(kwargs.keys()),
             )
 
-        return cls.create_provider(provider_type, verbose_logging=verbose_logging, **kwargs)
+        return cls.create_provider(
+            provider_type, verbose_logging=verbose_logging, **kwargs
+        )
 
     @classmethod
     def list_supported_providers(cls) -> list[str]:

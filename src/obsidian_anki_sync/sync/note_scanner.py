@@ -246,9 +246,8 @@ class NoteScanner:
                 break
 
             try:
-                use_agents = (
-                    getattr(self.config, "use_langgraph", False)
-                    or getattr(self.config, "use_pydantic_ai", False)
+                use_agents = getattr(self.config, "use_langgraph", False) or getattr(
+                    self.config, "use_pydantic_ai", False
                 )
                 note_content: str | None = None
                 if use_agents:
@@ -268,8 +267,7 @@ class NoteScanner:
                 )
                 note_content = note_content or ""
 
-                logger.debug("processing_note",
-                             file=relative_path, pairs=len(qa_pairs))
+                logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
                 tasks = [
                     (qa_pair, lang)
@@ -348,9 +346,7 @@ class NoteScanner:
 
                 # Execute card generation sequentially to avoid nested thread pools
                 # The outer loop (scan_notes_parallel) already handles concurrency at the note level
-                results = [
-                    _generate_single(qa_pair, lang) for qa_pair, lang in tasks
-                ]
+                results = [_generate_single(qa_pair, lang) for qa_pair, lang in tasks]
 
                 failures_this_note = 0
                 for (qa_pair, lang), (card, error_message, error_type) in zip(
@@ -501,8 +497,7 @@ class NoteScanner:
                 len(note_files),
             )
         else:
-            max_workers = min(
-                self.config.max_concurrent_generations, len(note_files))
+            max_workers = min(self.config.max_concurrent_generations, len(note_files))
 
         logger.info(
             "parallel_scan_started",
@@ -562,11 +557,9 @@ class NoteScanner:
                     with stats_lock:
                         notes_processed += 1
                         if result_info["success"]:
-                            self.stats["processed"] = self.stats.get(
-                                "processed", 0) + 1
+                            self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if result_info["error_type"]:
                                 error_by_type[result_info["error_type"]] += 1
                                 if len(error_samples[result_info["error_type"]]) < 3:
@@ -612,8 +605,7 @@ class NoteScanner:
                         percent=percent,
                         elapsed_seconds=round(elapsed_time, 1),
                         avg_seconds_per_note=round(avg_time_per_note, 2),
-                        estimated_remaining_seconds=round(
-                            estimated_remaining, 1),
+                        estimated_remaining_seconds=round(estimated_remaining, 1),
                         cards_generated=len(obsidian_cards),
                         active_workers=max_workers,
                     )
@@ -658,14 +650,16 @@ class NoteScanner:
         # We need to run the async queue logic from a sync context
         # This helper function handles the async loop
         def _run_queue_scan():
-            return asyncio.run(self._scan_notes_with_queue_async(
-                note_files,
-                obsidian_cards,
-                existing_slugs,
-                error_by_type,
-                error_samples,
-                qa_extractor
-            ))
+            return asyncio.run(
+                self._scan_notes_with_queue_async(
+                    note_files,
+                    obsidian_cards,
+                    existing_slugs,
+                    error_by_type,
+                    error_samples,
+                    qa_extractor,
+                )
+            )
 
         return _run_queue_scan()
 
@@ -764,7 +758,7 @@ class NoteScanner:
         logger.info(
             "queue_scan_started",
             total_notes=len(note_files),
-            redis_url=self.config.redis_url
+            redis_url=self.config.redis_url,
         )
 
         redis_settings = RedisSettings.from_dsn(self.config.redis_url)
@@ -888,7 +882,9 @@ class NoteScanner:
                 )
                 for job_id in pending_jobs:
                     file_path, relative_path = job_map[job_id]
-                    logger.error("job_stuck_at_timeout", job_id=job_id, file=relative_path)
+                    logger.error(
+                        "job_stuck_at_timeout", job_id=job_id, file=relative_path
+                    )
                     self.stats["errors"] = self.stats.get("errors", 0) + 1
                 break
 
@@ -899,7 +895,9 @@ class NoteScanner:
 
             for job_id in list(pending_jobs):
                 # Check per-job timeout
-                job_elapsed = time.time() - job_submit_times.get(job_id, poll_start_time)
+                job_elapsed = time.time() - job_submit_times.get(
+                    job_id, poll_start_time
+                )
                 if job_elapsed > job_timeout:
                     file_path, relative_path = job_map[job_id]
                     logger.error(
@@ -922,7 +920,9 @@ class NoteScanner:
                     job = Job(job_id=job_id, redis=pool)
                     status = await job.status()
                 except Exception as e:
-                    logger.warning("job_status_check_failed", job_id=job_id, error=str(e))
+                    logger.warning(
+                        "job_status_check_failed", job_id=job_id, error=str(e)
+                    )
                     continue
 
                 if status == "complete":
@@ -930,7 +930,9 @@ class NoteScanner:
                     try:
                         result = await job.result()
                     except Exception as e:
-                        error_str = str(e) if str(e) else f"{type(e).__name__}: (no message)"
+                        error_str = (
+                            str(e) if str(e) else f"{type(e).__name__}: (no message)"
+                        )
                         logger.error(
                             "job_result_fetch_failed",
                             job_id=job_id,
@@ -1106,9 +1108,8 @@ class NoteScanner:
         try:
             # Read full note content if using agent system
             note_content = ""
-            use_agents = (
-                getattr(self.config, "use_langgraph", False)
-                or getattr(self.config, "use_pydantic_ai", False)
+            use_agents = getattr(self.config, "use_langgraph", False) or getattr(
+                self.config, "use_pydantic_ai", False
             )
             if use_agents:
                 try:
@@ -1128,7 +1129,10 @@ class NoteScanner:
                     else:
                         note_content = file_path.read_text(encoding="utf-8")
                 except (UnicodeDecodeError, OSError) as e:
-                    if isinstance(e, OSError) and e.errno in (errno.EMFILE, errno.ENFILE):
+                    if isinstance(e, OSError) and e.errno in (
+                        errno.EMFILE,
+                        errno.ENFILE,
+                    ):
                         raise
                     logger.warning(
                         "failed_to_read_note_content",
@@ -1141,8 +1145,7 @@ class NoteScanner:
                 file_path, qa_extractor=qa_extractor, content=note_content or None
             )
 
-            slug_view: Collection[str] = _ThreadSafeSlugView(
-                existing_slugs, slug_lock)
+            slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
 
             tasks = [
                 (qa_pair, lang)
@@ -1171,8 +1174,7 @@ class NoteScanner:
                 slug_view: Collection[str] = slug_view,
             ):
                 if self.progress:
-                    self.progress.start_note(
-                        relative_path, qa_pair.card_index, lang)
+                    self.progress.start_note(relative_path, qa_pair.card_index, lang)
                 try:
                     card = self.card_generator.generate_card(
                         qa_pair=qa_pair,
@@ -1473,7 +1475,7 @@ class NoteScanner:
             self._wait_for_fd_headroom()
 
             batch = archives_to_process[
-                batch_start: batch_start + self._archiver_batch_size
+                batch_start : batch_start + self._archiver_batch_size
             ]
 
             for archive_request in batch:
@@ -1527,8 +1529,7 @@ class NoteScanner:
 
         while True:
             time.sleep(self._archiver_fd_poll_interval)
-            has_headroom, snapshot = has_fd_headroom(
-                self._archiver_fd_headroom)
+            has_headroom, snapshot = has_fd_headroom(self._archiver_fd_headroom)
             if has_headroom:
                 logger.debug(
                     "archiver_fd_headroom_restored",

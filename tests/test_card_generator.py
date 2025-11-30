@@ -16,7 +16,9 @@ def card_generator() -> CardGenerator:
     return CardGenerator(config, apf_gen)
 
 
-def test_format_highlight_hint_includes_candidates(card_generator: CardGenerator) -> None:
+def test_format_highlight_hint_includes_candidates(
+    card_generator: CardGenerator,
+) -> None:
     highlight = HighlightResult(
         qa_candidates=[
             HighlightedQA(
@@ -43,7 +45,9 @@ def test_format_highlight_hint_includes_candidates(card_generator: CardGenerator
     assert "draft" in formatted
 
 
-def test_format_highlight_hint_returns_blank_for_empty(card_generator: CardGenerator) -> None:
+def test_format_highlight_hint_returns_blank_for_empty(
+    card_generator: CardGenerator,
+) -> None:
     highlight = HighlightResult(
         qa_candidates=[],
         summaries=[],

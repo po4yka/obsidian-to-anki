@@ -196,8 +196,7 @@ class CardGenerator:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(
-                            file_path) if file_path.exists() else None,
+                        file_path=Path(file_path) if file_path.exists() else None,
                         existing_cards=self.existing_cards_for_duplicate_detection,
                     )
                 )
@@ -215,8 +214,7 @@ class CardGenerator:
 
         # Track metrics
         if result.post_validation and not result.post_validation.is_valid:
-            self.stats["validation_errors"] = self.stats.get(
-                "validation_errors", 0) + 1
+            self.stats["validation_errors"] = self.stats.get("validation_errors", 0) + 1
         if result.retry_count > 0:
             self.stats["auto_fix_attempts"] = (
                 self.stats.get("auto_fix_attempts", 0) + result.retry_count
@@ -229,8 +227,7 @@ class CardGenerator:
         if not result.success or not result.generation:
             # Use the robust error extraction method
             error_msg = self._extract_pipeline_error_message(result)
-            highlight_hint = self._format_highlight_hint(
-                result.highlight_result)
+            highlight_hint = self._format_highlight_hint(result.highlight_result)
             if highlight_hint:
                 logger.info(
                     "highlight_agent_summary",
@@ -280,9 +277,7 @@ class CardGenerator:
                     cache_key=cache_key[:8],
                     duration=round(cache_write_duration, 4),
                     cards_count=len(cards),
-                    cache_size_bytes=sum(
-                        len(str(card).encode()) for card in cards
-                    ),
+                    cache_size_bytes=sum(len(str(card).encode()) for card in cards),
                 )
         except Exception as e:
             logger.warning(
@@ -367,8 +362,7 @@ class CardGenerator:
                 if cached_card is not None:
                     if cached_card.content_hash == content_hash:
                         cache_hit = True
-                        elapsed_ms = round(
-                            (time.time() - start_time) * 1000, 2)
+                        elapsed_ms = round((time.time() - start_time) * 1000, 2)
                         self._cache_hits += 1
                         self._cache_stats["hits"] += 1
                         logger.debug(
@@ -415,10 +409,8 @@ class CardGenerator:
             slug_parts = []
             for part in path_parts:
                 normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode(
-                    "ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(
-                    r"[^a-z0-9-]", "-", ascii_segment.lower())
+                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
+                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
                 ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
                 if ascii_segment:
                     slug_parts.append(ascii_segment)
@@ -462,8 +454,7 @@ class CardGenerator:
 
         # Generate APF card via LLM
         card = cast(
-            "Card", self.apf_gen.generate_card(
-                qa_pair, metadata, manifest, lang)
+            "Card", self.apf_gen.generate_card(qa_pair, metadata, manifest, lang)
         )
 
         # Ensure content hash is set
@@ -476,8 +467,7 @@ class CardGenerator:
             self.stats["validation_errors"] = self.stats.get(
                 "validation_errors", 0
             ) + len(validation.errors)
-            logger.error("apf_validation_errors", slug=slug,
-                         errors=validation.errors)
+            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
             msg = f"APF validation failed for {slug}: {validation.errors[0]}"
             raise ValueError(msg)
         if validation.warnings:
@@ -518,14 +508,11 @@ class CardGenerator:
         # Log generation time
         elapsed = time.time() - start_time
         self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug,
-                    elapsed_seconds=round(elapsed, 2))
+        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
 
         return card
 
-    def _extract_pipeline_error_message(
-        self, result: "AgentPipelineResult"
-    ) -> str:
+    def _extract_pipeline_error_message(self, result: "AgentPipelineResult") -> str:
         """Extract a comprehensive and user-friendly error message from pipeline result.
 
         Args:
@@ -535,98 +522,109 @@ class CardGenerator:
             A detailed error message suitable for user display
         """
         # Validate result object structure
-        if not hasattr(result, 'success') or not hasattr(result, 'total_time'):
+        if not hasattr(result, "success") or not hasattr(result, "total_time"):
             return "Pipeline failed: Invalid result structure"
 
         try:
             # Category 1: Post-validation errors (highest priority - most specific)
-            if (hasattr(result, 'post_validation') and result.post_validation and
-                hasattr(result.post_validation, 'is_valid') and
-                    hasattr(result.post_validation, 'error_type')):
-
+            if (
+                hasattr(result, "post_validation")
+                and result.post_validation
+                and hasattr(result.post_validation, "is_valid")
+                and hasattr(result.post_validation, "error_type")
+            ):
                 if not result.post_validation.is_valid:
                     error_type = getattr(
-                        result.post_validation, 'error_type', 'unknown')
+                        result.post_validation, "error_type", "unknown"
+                    )
 
                     # Use standardized error messages for post-validation too
                     standardized_messages = {
-                        'syntax': 'Card syntax error: Generated cards contain invalid formatting or structure.',
-                        'factual': 'Card accuracy error: Generated cards contain factual inaccuracies or incorrect information.',
-                        'semantic': 'Card semantic error: Generated cards have logical inconsistencies or unclear content.',
-                        'template': 'Card template error: Generated cards do not follow the required format specifications.',
-                        'none': 'Card validation failed unexpectedly. Review the generated cards for issues.',
+                        "syntax": "Card syntax error: Generated cards contain invalid formatting or structure.",
+                        "factual": "Card accuracy error: Generated cards contain factual inaccuracies or incorrect information.",
+                        "semantic": "Card semantic error: Generated cards have logical inconsistencies or unclear content.",
+                        "template": "Card template error: Generated cards do not follow the required format specifications.",
+                        "none": "Card validation failed unexpectedly. Review the generated cards for issues.",
                     }
 
                     # Get the standardized message
                     standardized_message = standardized_messages.get(
                         error_type,
-                        f'Card validation failed ({error_type}): Generated cards have quality issues.'
+                        f"Card validation failed ({error_type}): Generated cards have quality issues.",
                     )
 
                     # Include specific error details if available and not too verbose
-                    error_details = getattr(
-                        result.post_validation, 'error_details', '')
-                    if error_details and error_details.strip() and len(error_details) < 150:
+                    error_details = getattr(result.post_validation, "error_details", "")
+                    if (
+                        error_details
+                        and error_details.strip()
+                        and len(error_details) < 150
+                    ):
                         return f"{standardized_message} Details: {error_details}"
                     else:
                         return standardized_message
 
             # Category 2: Pre-validation errors (second priority)
-            if (hasattr(result, 'pre_validation') and result.pre_validation and
-                hasattr(result.pre_validation, 'is_valid') and
-                    hasattr(result.pre_validation, 'error_type')):
-
+            if (
+                hasattr(result, "pre_validation")
+                and result.pre_validation
+                and hasattr(result.pre_validation, "is_valid")
+                and hasattr(result.pre_validation, "error_type")
+            ):
                 if not result.pre_validation.is_valid:
-                    error_type = getattr(
-                        result.pre_validation, 'error_type', 'unknown')
+                    error_type = getattr(result.pre_validation, "error_type", "unknown")
 
                     # Use standardized error messages based on error type
                     # This provides consistent, user-friendly messages instead of LLM-generated text
                     standardized_messages = {
-                        'structure': 'Note structure issue: Missing or invalid Q&A pairs. Ensure your note contains questions and answers in the expected format.',
-                        'format': 'Content format issue: Invalid markdown formatting detected. Check for proper syntax and structure.',
-                        'frontmatter': 'YAML frontmatter error: Invalid or missing metadata. Check tags, title, and other frontmatter fields.',
-                        'content': 'Content issue: Note content is incomplete or malformed. Review the note for missing information.',
-                        'none': 'Validation completed but failed unexpectedly. This may indicate an internal processing error.',
+                        "structure": "Note structure issue: Missing or invalid Q&A pairs. Ensure your note contains questions and answers in the expected format.",
+                        "format": "Content format issue: Invalid markdown formatting detected. Check for proper syntax and structure.",
+                        "frontmatter": "YAML frontmatter error: Invalid or missing metadata. Check tags, title, and other frontmatter fields.",
+                        "content": "Content issue: Note content is incomplete or malformed. Review the note for missing information.",
+                        "none": "Validation completed but failed unexpectedly. This may indicate an internal processing error.",
                     }
 
                     # Get the standardized message, fallback to generic message
                     standardized_message = standardized_messages.get(
                         error_type,
-                        f'Content validation failed ({error_type}): Check your note structure and content.'
+                        f"Content validation failed ({error_type}): Check your note structure and content.",
                     )
 
                     # If we have additional error details from the LLM, we can append them
                     # but prioritize the standardized message for consistency
-                    error_details = getattr(
-                        result.pre_validation, 'error_details', '')
-                    if error_details and error_details.strip() and len(error_details) < 100:
+                    error_details = getattr(result.pre_validation, "error_details", "")
+                    if (
+                        error_details
+                        and error_details.strip()
+                        and len(error_details) < 100
+                    ):
                         # Only append short, specific details to avoid LLM variability
                         return f"{standardized_message} Details: {error_details}"
                     else:
                         return standardized_message
 
             # Category 3: Memorization quality errors
-            if (hasattr(result, 'memorization_quality') and result.memorization_quality and
-                hasattr(result.memorization_quality, 'is_memorizable') and
-                hasattr(result.memorization_quality, 'issues') and
-                    hasattr(result.memorization_quality, 'memorization_score')):
-
+            if (
+                hasattr(result, "memorization_quality")
+                and result.memorization_quality
+                and hasattr(result.memorization_quality, "is_memorizable")
+                and hasattr(result.memorization_quality, "issues")
+                and hasattr(result.memorization_quality, "memorization_score")
+            ):
                 if not result.memorization_quality.is_memorizable:
-                    issues = getattr(result.memorization_quality, 'issues', [])
-                    score = getattr(result.memorization_quality,
-                                    'memorization_score', 0.0)
+                    issues = getattr(result.memorization_quality, "issues", [])
+                    score = getattr(
+                        result.memorization_quality, "memorization_score", 0.0
+                    )
 
                     if issues and isinstance(issues, list):
                         # Limit to most important issues
                         issue_summaries = []
                         for issue in issues[:3]:  # Top 3 issues
                             if isinstance(issue, dict):
-                                issue_type = issue.get('type', 'unknown')
-                                description = issue.get(
-                                    'description', 'no description')
-                                issue_summaries.append(
-                                    f"{issue_type}: {description}")
+                                issue_type = issue.get("type", "unknown")
+                                description = issue.get("description", "no description")
+                                issue_summaries.append(f"{issue_type}: {description}")
                             else:
                                 issue_summaries.append(str(issue))
 
@@ -638,37 +636,44 @@ class CardGenerator:
                         return f"Quality check failed: memorization score {score:.2f} (below threshold)"
 
             # Category 4: Pipeline-level errors (no generation produced)
-            if not getattr(result, 'generation', None):
+            if not getattr(result, "generation", None):
                 # Collect diagnostic information
                 diagnostics = []
 
                 # Check pre-validation status
-                if hasattr(result, 'pre_validation') and result.pre_validation:
-                    is_valid = getattr(result.pre_validation, 'is_valid', None)
+                if hasattr(result, "pre_validation") and result.pre_validation:
+                    is_valid = getattr(result.pre_validation, "is_valid", None)
                     diagnostics.append(
-                        f"pre_validation={'passed' if is_valid else 'failed'}")
+                        f"pre_validation={'passed' if is_valid else 'failed'}"
+                    )
                     if not is_valid:
                         error_type = getattr(
-                            result.pre_validation, 'error_type', 'unknown')
+                            result.pre_validation, "error_type", "unknown"
+                        )
                         diagnostics.append(f"pre_error='{error_type}'")
 
                 # Check post-validation status
-                if hasattr(result, 'post_validation') and result.post_validation:
-                    is_valid = getattr(
-                        result.post_validation, 'is_valid', None)
+                if hasattr(result, "post_validation") and result.post_validation:
+                    is_valid = getattr(result.post_validation, "is_valid", None)
                     diagnostics.append(
-                        f"post_validation={'passed' if is_valid else 'failed'}")
+                        f"post_validation={'passed' if is_valid else 'failed'}"
+                    )
 
                 # Check memorization quality
-                if hasattr(result, 'memorization_quality') and result.memorization_quality:
+                if (
+                    hasattr(result, "memorization_quality")
+                    and result.memorization_quality
+                ):
                     is_memorizable = getattr(
-                        result.memorization_quality, 'is_memorizable', None)
+                        result.memorization_quality, "is_memorizable", None
+                    )
                     diagnostics.append(
-                        f"memorization_quality={'passed' if is_memorizable else 'failed'}")
+                        f"memorization_quality={'passed' if is_memorizable else 'failed'}"
+                    )
 
                 # Add timing and retry info
-                total_time = getattr(result, 'total_time', 0)
-                retry_count = getattr(result, 'retry_count', 0)
+                total_time = getattr(result, "total_time", 0)
+                retry_count = getattr(result, "retry_count", 0)
 
                 diagnostics.append(f"time={total_time:.1f}s")
                 diagnostics.append(f"retries={retry_count}")
@@ -681,22 +686,21 @@ class CardGenerator:
                     total_time=total_time,
                     retry_count=retry_count,
                     diagnostics=diagnostics_str,
-                    has_pre_validation=bool(
-                        getattr(result, 'pre_validation', None)),
-                    has_post_validation=bool(
-                        getattr(result, 'post_validation', None)),
+                    has_pre_validation=bool(getattr(result, "pre_validation", None)),
+                    has_post_validation=bool(getattr(result, "post_validation", None)),
                     has_memorization_quality=bool(
-                        getattr(result, 'memorization_quality', None)),
+                        getattr(result, "memorization_quality", None)
+                    ),
                 )
 
                 return f"Pipeline failed to generate cards ({diagnostics_str})"
 
             # Category 5: Unexpected success but no generation (edge case)
-            if result.success and not getattr(result, 'generation', None):
+            if result.success and not getattr(result, "generation", None):
                 logger.warning(
                     "agent_pipeline_successful_but_no_cards",
-                    total_time=getattr(result, 'total_time', 0),
-                    retry_count=getattr(result, 'retry_count', 0),
+                    total_time=getattr(result, "total_time", 0),
+                    retry_count=getattr(result, "retry_count", 0),
                 )
                 return "Pipeline completed successfully but generated no cards"
 
@@ -704,22 +708,22 @@ class CardGenerator:
             diagnostics = []
 
             # Safe attribute access with defaults
-            success = getattr(result, 'success', 'unknown')
-            total_time = getattr(result, 'total_time', 0)
-            retry_count = getattr(result, 'retry_count', 0)
+            success = getattr(result, "success", "unknown")
+            total_time = getattr(result, "total_time", 0)
+            retry_count = getattr(result, "retry_count", 0)
 
             diagnostics.append(f"success={success}")
             diagnostics.append(f"time={total_time:.1f}s")
             diagnostics.append(f"retries={retry_count}")
 
             # Add stage information if available
-            if hasattr(result, 'pre_validation') and result.pre_validation:
+            if hasattr(result, "pre_validation") and result.pre_validation:
                 diagnostics.append("has_pre_validation=True")
-            if hasattr(result, 'post_validation') and result.post_validation:
+            if hasattr(result, "post_validation") and result.post_validation:
                 diagnostics.append("has_post_validation=True")
-            if hasattr(result, 'generation') and result.generation:
+            if hasattr(result, "generation") and result.generation:
                 diagnostics.append("has_generation=True")
-            if hasattr(result, 'memorization_quality') and result.memorization_quality:
+            if hasattr(result, "memorization_quality") and result.memorization_quality:
                 diagnostics.append("has_memorization_quality=True")
 
             diagnostics_str = " | ".join(diagnostics)
@@ -728,8 +732,9 @@ class CardGenerator:
                 "agent_pipeline_unexpected_failure",
                 diagnostics=diagnostics_str,
                 result_type=type(result).__name__,
-                result_attrs=list(vars(result).keys()) if hasattr(
-                    result, '__dict__') else 'no_attrs',
+                result_attrs=list(vars(result).keys())
+                if hasattr(result, "__dict__")
+                else "no_attrs",
             )
 
             return f"Pipeline failed unexpectedly ({diagnostics_str})"
@@ -739,8 +744,8 @@ class CardGenerator:
             logger.exception(
                 "error_during_error_extraction",
                 error=str(e),
-                result_type=type(result).__name__ if result else 'None',
-                has_success=hasattr(result, 'success') if result else False,
+                result_type=type(result).__name__ if result else "None",
+                has_success=hasattr(result, "success") if result else False,
             )
             return f"Pipeline failed (error analysis unavailable: {type(e).__name__})"
 
@@ -788,22 +793,22 @@ class CardGenerator:
             Error type category string
         """
         # Check pre-validation first (earliest stage)
-        if hasattr(result, 'pre_validation') and result.pre_validation:
-            if not getattr(result.pre_validation, 'is_valid', True):
+        if hasattr(result, "pre_validation") and result.pre_validation:
+            if not getattr(result.pre_validation, "is_valid", True):
                 return "pre_validation"
 
         # Check generation stage
-        if not getattr(result, 'generation', None):
+        if not getattr(result, "generation", None):
             return "generation"
 
         # Check post-validation
-        if hasattr(result, 'post_validation') and result.post_validation:
-            if not getattr(result.post_validation, 'is_valid', True):
+        if hasattr(result, "post_validation") and result.post_validation:
+            if not getattr(result.post_validation, "is_valid", True):
                 return "post_validation"
 
         # Check memorization quality
-        if hasattr(result, 'memorization_quality') and result.memorization_quality:
-            if not getattr(result.memorization_quality, 'is_memorizable', True):
+        if hasattr(result, "memorization_quality") and result.memorization_quality:
+            if not getattr(result.memorization_quality, "is_memorizable", True):
                 return "memorization_quality"
 
         return "unknown"
@@ -818,25 +823,25 @@ class CardGenerator:
             Error details string or None
         """
         # Pre-validation errors
-        if hasattr(result, 'pre_validation') and result.pre_validation:
-            if not getattr(result.pre_validation, 'is_valid', True):
-                error_type = getattr(result.pre_validation, 'error_type', '')
-                error_details = getattr(result.pre_validation, 'error_details', '')
+        if hasattr(result, "pre_validation") and result.pre_validation:
+            if not getattr(result.pre_validation, "is_valid", True):
+                error_type = getattr(result.pre_validation, "error_type", "")
+                error_details = getattr(result.pre_validation, "error_details", "")
                 if error_type or error_details:
                     return f"{error_type}: {error_details}".strip(": ")
 
         # Post-validation errors
-        if hasattr(result, 'post_validation') and result.post_validation:
-            if not getattr(result.post_validation, 'is_valid', True):
-                error_type = getattr(result.post_validation, 'error_type', '')
-                error_details = getattr(result.post_validation, 'error_details', '')
+        if hasattr(result, "post_validation") and result.post_validation:
+            if not getattr(result.post_validation, "is_valid", True):
+                error_type = getattr(result.post_validation, "error_type", "")
+                error_details = getattr(result.post_validation, "error_details", "")
                 if error_type or error_details:
                     return f"{error_type}: {error_details}".strip(": ")
 
         # Memorization quality issues
-        if hasattr(result, 'memorization_quality') and result.memorization_quality:
-            if not getattr(result.memorization_quality, 'is_memorizable', True):
-                issues = getattr(result.memorization_quality, 'issues', [])
+        if hasattr(result, "memorization_quality") and result.memorization_quality:
+            if not getattr(result.memorization_quality, "is_memorizable", True):
+                issues = getattr(result.memorization_quality, "issues", [])
                 if issues:
                     return "; ".join(str(i) for i in issues[:3])
 

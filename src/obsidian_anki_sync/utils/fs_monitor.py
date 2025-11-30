@@ -55,7 +55,9 @@ def get_fd_limits() -> tuple[int | None, int | None]:
     return int(soft), int(hard)
 
 
-def has_fd_headroom(min_headroom: int = DEFAULT_HEADROOM) -> tuple[bool, dict[str, int | None]]:
+def has_fd_headroom(
+    min_headroom: int = DEFAULT_HEADROOM,
+) -> tuple[bool, dict[str, int | None]]:
     """Return whether we have the requested FD headroom."""
     open_count = get_open_file_count()
     soft_limit, hard_limit = get_fd_limits()

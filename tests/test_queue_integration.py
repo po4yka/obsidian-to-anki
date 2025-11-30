@@ -41,33 +41,35 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     # Mock Job class instance for status checking
     mock_job_instance = MagicMock()
     mock_job_instance.status = AsyncMock(return_value="complete")
-    mock_job_instance.result = AsyncMock(return_value={
-        "success": True,
-        "cards": [
-            {
-                "slug": "test-card",
-                "lang": "en",
-                "apf_html": "<!-- test -->",
-                "manifest": {
+    mock_job_instance.result = AsyncMock(
+        return_value={
+            "success": True,
+            "cards": [
+                {
                     "slug": "test-card",
-                    "slug_base": "test-card",
                     "lang": "en",
-                    "source_path": "/tmp/test.md",
-                    "source_anchor": "#card-1",
-                    "note_id": "test",
-                    "note_title": "Test",
-                    "card_index": 0,
+                    "apf_html": "<!-- test -->",
+                    "manifest": {
+                        "slug": "test-card",
+                        "slug_base": "test-card",
+                        "lang": "en",
+                        "source_path": "/tmp/test.md",
+                        "source_anchor": "#card-1",
+                        "note_id": "test",
+                        "note_title": "Test",
+                        "card_index": 0,
+                        "guid": "guid",
+                        "hash6": None,
+                    },
+                    "content_hash": "hash123",
+                    "note_type": "APF::Simple",
+                    "tags": ["tag"],
                     "guid": "guid",
-                    "hash6": None
-                },
-                "content_hash": "hash123",
-                "note_type": "APF::Simple",
-                "tags": ["tag"],
-                "guid": "guid"
-            }
-        ],
-        "slugs": ["test-card"]
-    })
+                }
+            ],
+            "slugs": ["test-card"],
+        }
+    )
 
     mock_pool.enqueue_job.return_value = mock_job
 
@@ -75,9 +77,17 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     async def mock_create_pool(*args, **kwargs):
         return mock_pool
 
-    with patch("obsidian_anki_sync.sync.note_scanner.create_pool", side_effect=mock_create_pool), \
-         patch("obsidian_anki_sync.sync.note_scanner.Job", return_value=mock_job_instance) as mock_job_class:
+    with (
+        patch(
+            "obsidian_anki_sync.sync.note_scanner.create_pool",
+            side_effect=mock_create_pool,
+        ),
+        patch(
+            "obsidian_anki_sync.sync.note_scanner.Job", return_value=mock_job_instance
+        ) as mock_job_class,
+    ):
         from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
+
         archiver = ProblematicNotesArchiver(Path("/tmp"), enabled=True)
         scanner = NoteScanner(
             config=mock_config,
@@ -95,11 +105,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
 
         # Run scan
         result = scanner.scan_notes_with_queue(
-            note_files,
-            obsidian_cards,
-            existing_slugs,
-            error_by_type,
-            error_samples
+            note_files, obsidian_cards, existing_slugs, error_by_type, error_samples
         )
 
         # Verify
@@ -114,10 +120,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
 async def test_process_note_job():
     """Test worker job processing."""
 
-    ctx = {
-        "config": Config(),
-        "orchestrator": AsyncMock()
-    }
+    ctx = {"config": Config(), "orchestrator": AsyncMock()}
 
     # Mock orchestrator result
     mock_result = MagicMock()
@@ -133,34 +136,34 @@ async def test_process_note_job():
     # Make convert_to_cards synchronous (not async)
     ctx["orchestrator"].convert_to_cards = MagicMock(return_value=[mock_card])
 
-    with patch("pathlib.Path.exists", return_value=True), \
-            patch("pathlib.Path.is_file", return_value=True), \
-            patch("pathlib.Path.read_text", return_value="content"):
-
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value="content"),
+    ):
         # Provide dummy metadata and qa_pairs to avoid file parsing
         from datetime import datetime
+
         now = datetime.now()
         metadata_dict = {
             "id": "test",
             "title": "Test",
             "topic": "Testing",
             "created": now.isoformat(),
-            "updated": now.isoformat()
+            "updated": now.isoformat(),
         }
-        qa_pairs_dicts = [{
-            "question_en": "Q",
-            "question_ru": "Q",
-            "answer_en": "A",
-            "answer_ru": "A",
-            "card_index": 1
-        }]
+        qa_pairs_dicts = [
+            {
+                "question_en": "Q",
+                "question_ru": "Q",
+                "answer_en": "A",
+                "answer_ru": "A",
+                "card_index": 1,
+            }
+        ]
 
         result = await process_note_job(
-            ctx,
-            "/tmp/test.md",
-            "test.md",
-            metadata_dict,
-            qa_pairs_dicts
+            ctx, "/tmp/test.md", "test.md", metadata_dict, qa_pairs_dicts
         )
 
         assert result["success"] is True

@@ -31,8 +31,9 @@ def pipeline_state(mock_config):
     """Create a sample pipeline state."""
     # Create a mock model factory
     mock_model_factory = MagicMock()
-    mock_model_factory.get_model.side_effect = lambda agent_type: MagicMock(
-    ) if agent_type == "split_validator" else None
+    mock_model_factory.get_model.side_effect = (
+        lambda agent_type: MagicMock() if agent_type == "split_validator" else None
+    )
 
     # Register runtime resources and get the key
     runtime_key = register_runtime_resources(
@@ -57,8 +58,9 @@ def pipeline_state(mock_config):
         stage_times={},
         step_counts={},
         runtime_key=runtime_key,
-        config_snapshot=mock_config.__dict__ if hasattr(
-            mock_config, '__dict__') else {},
+        config_snapshot=mock_config.__dict__
+        if hasattr(mock_config, "__dict__")
+        else {},
     )
 
 

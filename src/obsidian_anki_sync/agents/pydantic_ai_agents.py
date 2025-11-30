@@ -100,7 +100,7 @@ class CardGenerationOutput(BaseModel):
             result = validate_apf(apf_html, slug)
 
             if result.errors:
-                errors.append(f"Card {i+1} ({slug}): {'; '.join(result.errors)}")
+                errors.append(f"Card {i + 1} ({slug}): {'; '.join(result.errors)}")
 
         if errors:
             msg = f"APF Validation Failed: {'; '.join(errors)}"

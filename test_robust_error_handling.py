@@ -3,9 +3,9 @@
 
 from obsidian_anki_sync.agents.models import (
     AgentPipelineResult,
-    PreValidationResult,
-    PostValidationResult,
     MemorizationQualityResult,
+    PostValidationResult,
+    PreValidationResult,
 )
 from obsidian_anki_sync.sync.card_generator import CardGenerator
 
@@ -28,7 +28,7 @@ def test_robust_error_handling():
         is_valid=False,
         error_type="structure",
         error_details="No Q&A pairs are present in the provided note content.",
-        validation_time=1.5
+        validation_time=1.5,
     )
 
     result1 = AgentPipelineResult(
@@ -38,7 +38,7 @@ def test_robust_error_handling():
         post_validation=None,
         memorization_quality=None,
         total_time=2.0,
-        retry_count=0
+        retry_count=0,
     )
 
     error_msg1 = generator._extract_pipeline_error_message(result1)
@@ -51,7 +51,7 @@ def test_robust_error_handling():
         is_valid=False,
         error_type="structure",
         error_details="",  # Empty details
-        validation_time=1.0
+        validation_time=1.0,
     )
 
     result2 = AgentPipelineResult(
@@ -61,7 +61,7 @@ def test_robust_error_handling():
         post_validation=None,
         memorization_quality=None,
         total_time=1.5,
-        retry_count=0
+        retry_count=0,
     )
 
     error_msg2 = generator._extract_pipeline_error_message(result2)
@@ -74,22 +74,25 @@ def test_robust_error_handling():
         is_valid=False,
         error_type="factual",
         error_details="Incorrect information in generated card",
-        validation_time=2.0
+        validation_time=2.0,
     )
 
     result3 = AgentPipelineResult(
         success=False,
         pre_validation=PreValidationResult(
-            is_valid=True, error_type="none", validation_time=1.0),
+            is_valid=True, error_type="none", validation_time=1.0
+        ),
         generation=None,
         post_validation=post_validation_failed,
         memorization_quality=None,
         total_time=3.0,
-        retry_count=1
+        retry_count=1,
     )
 
     error_msg3 = generator._extract_pipeline_error_message(result3)
-    expected3 = "Card validation failed (factual): Incorrect information in generated card"
+    expected3 = (
+        "Card validation failed (factual): Incorrect information in generated card"
+    )
     assert error_msg3 == expected3, f"Expected '{expected3}', got '{error_msg3}'"
     print(f"✓ Test 3 passed: {error_msg3}")
 
@@ -99,22 +102,23 @@ def test_robust_error_handling():
         memorization_score=0.3,
         issues=[
             {"type": "clarity", "description": "Question is unclear"},
-            {"type": "length", "description": "Answer is too long"}
+            {"type": "length", "description": "Answer is too long"},
         ],
         strengths=[],
         suggested_improvements=["Simplify question", "Shorten answer"],
-        assessment_time=1.0
+        assessment_time=1.0,
     )
 
     result4 = AgentPipelineResult(
         success=False,
         pre_validation=PreValidationResult(
-            is_valid=True, error_type="none", validation_time=1.0),
+            is_valid=True, error_type="none", validation_time=1.0
+        ),
         generation=None,
         post_validation=None,
         memorization_quality=memorization_failed,
         total_time=4.0,
-        retry_count=0
+        retry_count=0,
     )
 
     error_msg4 = generator._extract_pipeline_error_message(result4)
@@ -127,12 +131,13 @@ def test_robust_error_handling():
     result5 = AgentPipelineResult(
         success=False,
         pre_validation=PreValidationResult(
-            is_valid=True, error_type="none", validation_time=1.0),
+            is_valid=True, error_type="none", validation_time=1.0
+        ),
         generation=None,
         post_validation=None,
         memorization_quality=None,
         total_time=5.5,
-        retry_count=2
+        retry_count=2,
     )
 
     error_msg5 = generator._extract_pipeline_error_message(result5)
@@ -159,7 +164,7 @@ def test_robust_error_handling():
             self.total_time = 1.0
 
         def __getattr__(self, name):
-            if name == 'generation':
+            if name == "generation":
                 raise RuntimeError("Simulated error during attribute access")
             return None
 

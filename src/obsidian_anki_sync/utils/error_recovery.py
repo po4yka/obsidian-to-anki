@@ -372,7 +372,12 @@ class ErrorRecoveryManager:
             total_duration=round(total_duration, 3),
             error_type=error_type,
             original_error=original_error,
-            strategies_attempted=["preprocessing", "specialized_agent", "auto_repair", "minimal_structure"],
+            strategies_attempted=[
+                "preprocessing",
+                "specialized_agent",
+                "auto_repair",
+                "minimal_structure",
+            ],
         )
         return RecoveryResult(
             success=False,

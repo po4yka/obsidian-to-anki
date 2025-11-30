@@ -60,7 +60,9 @@ class TestTrailingWhitespaceHandler:
         fixed_content, updated_issues = handler.fix(content, issues)
 
         # Markdown line break preserved, single trailing space removed
-        assert fixed_content == "Markdown break here  \nUnintentional space\nClean line\n"
+        assert (
+            fixed_content == "Markdown break here  \nUnintentional space\nClean line\n"
+        )
         assert all(issue.auto_fixed for issue in updated_issues)
 
     def test_fix_trailing_whitespace(self):

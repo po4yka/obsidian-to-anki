@@ -1001,7 +1001,9 @@ class StateDB(IStateRepository):
                     progress.phase.value,
                     progress.started_at.isoformat(),
                     progress.updated_at.isoformat(),
-                    progress.completed_at.isoformat() if progress.completed_at else None,
+                    progress.completed_at.isoformat()
+                    if progress.completed_at
+                    else None,
                     progress.total_notes,
                     progress.notes_processed,
                     progress.cards_generated,

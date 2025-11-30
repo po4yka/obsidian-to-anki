@@ -22,8 +22,7 @@ class AgentError(Exception):
     def __str__(self) -> str:
         """Return string representation."""
         if self.details:
-            details_str = ", ".join(
-                f"{k}={v}" for k, v in self.details.items())
+            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
             return f"{self.message} ({details_str})"
         return self.message
 

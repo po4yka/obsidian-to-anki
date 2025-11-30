@@ -49,8 +49,13 @@ class OllamaProvider(BaseLLMProvider):
             verbose_logging: Whether to log detailed initialization info
             **kwargs: Additional configuration options
         """
-        super().__init__(verbose_logging=verbose_logging,
-                         base_url=base_url, api_key=api_key, timeout=timeout, **kwargs)
+        super().__init__(
+            verbose_logging=verbose_logging,
+            base_url=base_url,
+            api_key=api_key,
+            timeout=timeout,
+            **kwargs,
+        )
 
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -74,8 +79,7 @@ class OllamaProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5,
-                                max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=headers,
         )
 
@@ -210,8 +214,7 @@ class OllamaProvider(BaseLLMProvider):
                 )
 
             # Rate limiting and concurrency control
-            rate_info = self.safety.rate_limiter.check_and_wait(
-                estimated_tokens)
+            rate_info = self.safety.rate_limiter.check_and_wait(estimated_tokens)
             if rate_info["wait_time"] > 0:
                 logger.info(
                     "rate_limit_wait",
@@ -273,8 +276,7 @@ class OllamaProvider(BaseLLMProvider):
 
             # Extract performance metrics from Ollama response
             eval_count = result.get("eval_count", 0)
-            eval_duration = result.get(
-                "eval_duration", 0) / 1e9  # Convert to seconds
+            eval_duration = result.get("eval_duration", 0) / 1e9  # Convert to seconds
             prompt_eval_count = result.get("prompt_eval_count", 0)
             prompt_eval_duration = result.get("prompt_eval_duration", 0) / 1e9
 

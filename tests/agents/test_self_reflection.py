@@ -63,8 +63,9 @@ def mock_pipeline_state():
 
     # Create a mock model factory that returns a model for "reflection"
     mock_model_factory = MagicMock()
-    mock_model_factory.get_model.side_effect = lambda agent_type: MagicMock(
-    ) if agent_type == "reflection" else None
+    mock_model_factory.get_model.side_effect = (
+        lambda agent_type: MagicMock() if agent_type == "reflection" else None
+    )
 
     return {
         "note_content": "# Test Note\n\nQ: What is Python?\nA: A programming language.",
@@ -266,8 +267,7 @@ class TestReflectionTrace:
             output=output,
             reflection_time=1.5,
             timestamp=1234567890.0,
-            stage_specific_data={
-                "card_quality_scores": output.card_quality_scores},
+            stage_specific_data={"card_quality_scores": output.card_quality_scores},
         )
 
         assert trace.stage == "generation"
@@ -326,23 +326,20 @@ class TestShouldSkipReflection:
     def test_skip_when_disabled(self, mock_pipeline_state):
         """Test reflection is skipped when disabled."""
         mock_pipeline_state["enable_self_reflection"] = False
-        assert _should_skip_reflection(
-            mock_pipeline_state, "generation") is True
+        assert _should_skip_reflection(mock_pipeline_state, "generation") is True
 
     def test_skip_when_stage_not_enabled(self, mock_pipeline_state):
         """Test reflection is skipped for non-enabled stage."""
         mock_pipeline_state["reflection_enabled_stages"] = ["generation"]
         assert (
-            _should_skip_reflection(
-                mock_pipeline_state, "context_enrichment") is True
+            _should_skip_reflection(mock_pipeline_state, "context_enrichment") is True
         )
 
     def test_not_skip_when_enabled(self, mock_pipeline_state):
         """Test reflection is not skipped when properly enabled."""
         mock_pipeline_state["enable_self_reflection"] = True
         mock_pipeline_state["reflection_enabled_stages"] = ["generation"]
-        assert _should_skip_reflection(
-            mock_pipeline_state, "generation") is False
+        assert _should_skip_reflection(mock_pipeline_state, "generation") is False
 
 
 class TestStoreReflectionTrace:
@@ -473,8 +470,7 @@ class TestShouldReviseEnrichment:
             "revision_needed": True,
         }
         mock_pipeline_state["max_revisions"] = 2
-        mock_pipeline_state["stage_revision_counts"] = {
-            "context_enrichment": 0}
+        mock_pipeline_state["stage_revision_counts"] = {"context_enrichment": 0}
 
         assert should_revise_enrichment(mock_pipeline_state) is True
 
@@ -484,8 +480,7 @@ class TestShouldReviseEnrichment:
             "revision_needed": True,
         }
         mock_pipeline_state["max_revisions"] = 2
-        mock_pipeline_state["stage_revision_counts"] = {
-            "context_enrichment": 2}
+        mock_pipeline_state["stage_revision_counts"] = {"context_enrichment": 2}
 
         assert should_revise_enrichment(mock_pipeline_state) is False
 
@@ -508,8 +503,7 @@ class TestReflectAfterGenerationNode:
 
     async def test_skips_when_stage_not_enabled(self, mock_pipeline_state):
         """Test reflection is skipped for non-enabled stage."""
-        mock_pipeline_state["reflection_enabled_stages"] = [
-            "context_enrichment"]
+        mock_pipeline_state["reflection_enabled_stages"] = ["context_enrichment"]
 
         result = await reflect_after_generation_node(mock_pipeline_state)
 
@@ -787,16 +781,14 @@ class TestDomainDetection:
     def test_domain_detection_from_topic_medical(self):
         """Test domain detection from topic metadata for medical content."""
         # Use a completely fresh state dict
-        state = {"metadata_dict": {
-            "topic": "Clinical Pharmacology", "tags": []}}
+        state = {"metadata_dict": {"topic": "Clinical Pharmacology", "tags": []}}
         domain = detect_domain(state)
         assert domain == "medical"
 
     def test_domain_detection_from_topic_interview(self):
         """Test domain detection from topic metadata for interview content."""
         # Use a completely fresh state dict
-        state = {"metadata_dict": {
-            "topic": "System Design Interview", "tags": []}}
+        state = {"metadata_dict": {"topic": "System Design Interview", "tags": []}}
         domain = detect_domain(state)
         assert domain == "interview"
 
@@ -999,10 +991,8 @@ class TestSmartReflectionSkipping:
         ]  # 3 pairs
         # > 500 chars
         mock_pipeline_state["note_content"] = "Long content that exceeds threshold" * 20
-        mock_pipeline_state["pre_validation"] = {
-            "confidence": 0.95}  # High confidence
-        mock_pipeline_state["post_validation"] = {
-            "confidence": 0.92}  # High confidence
+        mock_pipeline_state["pre_validation"] = {"confidence": 0.95}  # High confidence
+        mock_pipeline_state["post_validation"] = {"confidence": 0.92}  # High confidence
 
         should_skip = _is_simple_content(mock_pipeline_state, config)
         assert should_skip is True
@@ -1021,8 +1011,7 @@ class TestSmartReflectionSkipping:
         ]  # 3 pairs
         # > 500 chars
         mock_pipeline_state["note_content"] = "Long content that exceeds threshold" * 20
-        mock_pipeline_state["pre_validation"] = {
-            "confidence": 0.7}  # Medium confidence
+        mock_pipeline_state["pre_validation"] = {"confidence": 0.7}  # Medium confidence
         mock_pipeline_state["post_validation"] = {
             "confidence": 0.8
         }  # Medium confidence
@@ -1038,12 +1027,10 @@ class TestSmartReflectionSkipping:
         config.reflection_enabled_stages = ["generation"]
 
         mock_pipeline_state["config"] = config
-        mock_pipeline_state["qa_pairs_dicts"] = [
-            {"question": "Q1"}]  # Low count
+        mock_pipeline_state["qa_pairs_dicts"] = [{"question": "Q1"}]  # Low count
         mock_pipeline_state["note_content"] = "Short"
 
-        should_skip = _should_skip_reflection(
-            mock_pipeline_state, "generation")
+        should_skip = _should_skip_reflection(mock_pipeline_state, "generation")
         assert should_skip is True
         assert mock_pipeline_state["reflection_skipped"] is True
         assert mock_pipeline_state["reflection_skip_reason"] == "simple_content"

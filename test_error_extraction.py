@@ -3,9 +3,9 @@
 
 from obsidian_anki_sync.agents.models import (
     AgentPipelineResult,
-    PreValidationResult,
-    PostValidationResult,
     MemorizationQualityResult,
+    PostValidationResult,
+    PreValidationResult,
 )
 
 
@@ -17,7 +17,7 @@ def test_error_extraction():
         is_valid=False,
         error_type="structure",
         error_details="Invalid Q&A format detected",
-        validation_time=1.5
+        validation_time=1.5,
     )
 
     result1 = AgentPipelineResult(
@@ -27,7 +27,7 @@ def test_error_extraction():
         post_validation=None,
         memorization_quality=None,
         total_time=2.0,
-        retry_count=0
+        retry_count=0,
     )
 
     # Simulate the error extraction logic
@@ -51,7 +51,7 @@ def test_error_extraction():
         is_valid=False,
         error_type="format",
         error_details="",  # Empty error details
-        validation_time=1.0
+        validation_time=1.0,
     )
 
     result2 = AgentPipelineResult(
@@ -61,7 +61,7 @@ def test_error_extraction():
         post_validation=None,
         memorization_quality=None,
         total_time=1.5,
-        retry_count=0
+        retry_count=0,
     )
 
     if result2.post_validation and result2.post_validation.error_details:
@@ -84,18 +84,19 @@ def test_error_extraction():
         is_valid=False,
         error_type="factual",
         error_details="Incorrect information in generated card",
-        validation_time=2.0
+        validation_time=2.0,
     )
 
     result3 = AgentPipelineResult(
         success=False,
         pre_validation=PreValidationResult(
-            is_valid=True, error_type="none", validation_time=1.0),
+            is_valid=True, error_type="none", validation_time=1.0
+        ),
         generation=None,
         post_validation=post_validation_failed,
         memorization_quality=None,
         total_time=3.0,
-        retry_count=1
+        retry_count=1,
     )
 
     if result3.post_validation and result3.post_validation.error_details:
@@ -109,7 +110,9 @@ def test_error_extraction():
     else:
         error_msg = "Unknown error"
 
-    expected = "Post-validation failed (factual): Incorrect information in generated card"
+    expected = (
+        "Post-validation failed (factual): Incorrect information in generated card"
+    )
     assert error_msg == expected, f"Expected '{expected}', got '{error_msg}'"
     print(f"✓ Test 3 passed: {error_msg}")
 
@@ -119,22 +122,23 @@ def test_error_extraction():
         memorization_score=0.3,
         issues=[
             {"type": "clarity", "description": "Question is unclear"},
-            {"type": "length", "description": "Answer is too long"}
+            {"type": "length", "description": "Answer is too long"},
         ],
         strengths=[],
         suggested_improvements=["Simplify question", "Shorten answer"],
-        assessment_time=1.0
+        assessment_time=1.0,
     )
 
     result4 = AgentPipelineResult(
         success=False,
         pre_validation=PreValidationResult(
-            is_valid=True, error_type="none", validation_time=1.0),
+            is_valid=True, error_type="none", validation_time=1.0
+        ),
         generation=None,
         post_validation=None,
         memorization_quality=memorization_failed,
         total_time=4.0,
-        retry_count=0
+        retry_count=0,
     )
 
     if result4.post_validation and result4.post_validation.error_details:
@@ -145,11 +149,15 @@ def test_error_extraction():
             error_msg = f"Pre-validation failed ({result4.pre_validation.error_type}): {error_details}"
         else:
             error_msg = f"Pre-validation failed: {result4.pre_validation.error_type}"
-    elif result4.memorization_quality and not result4.memorization_quality.is_memorizable:
+    elif (
+        result4.memorization_quality and not result4.memorization_quality.is_memorizable
+    ):
         issues = result4.memorization_quality.issues
         if issues:
             issue_summaries = [
-                f"{issue.get('type', 'unknown')}: {issue.get('description', 'no description')}" for issue in issues[:3]]
+                f"{issue.get('type', 'unknown')}: {issue.get('description', 'no description')}"
+                for issue in issues[:3]
+            ]
             error_msg = f"Memorization quality failed: {', '.join(issue_summaries)}"
         else:
             error_msg = f"Memorization quality failed: score {result4.memorization_quality.memorization_score:.2f}"

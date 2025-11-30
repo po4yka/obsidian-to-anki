@@ -128,8 +128,7 @@ async def autofix_node(state: PipelineState) -> PipelineState:
         # Get configuration
         config = get_config(state)
         note_content = state.get("note_content", "")
-        file_path = Path(state["file_path"]) if state.get(
-            "file_path") else None
+        file_path = Path(state["file_path"]) if state.get("file_path") else None
 
         # Get note index for link validation (if available from config)
         note_index = getattr(config, "note_index", None) or set()
@@ -239,17 +238,17 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
             enable_content_generation=getattr(
                 config, "parser_repair_generate_content", True
             ),
-            repair_missing_sections=getattr(
-                config, "repair_missing_sections", True),
+            repair_missing_sections=getattr(config, "repair_missing_sections", True),
         )
 
         # Perform proactive analysis and correction
         note_content = state.get("note_content", "")
-        file_path = Path(state["file_path"]) if state.get(
-            "file_path") else None
+        file_path = Path(state["file_path"]) if state.get("file_path") else None
 
-        correction_result = await correction_agent.analyze_and_correct_proactively_async(
-            content=note_content, file_path=file_path
+        correction_result = (
+            await correction_agent.analyze_and_correct_proactively_async(
+                content=note_content, file_path=file_path
+            )
         )
 
         # Update state with correction result
@@ -355,8 +354,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             state["pre_validation"] = pre_result.model_dump()
             state["stage_times"]["pre_validation"] = pre_result.validation_time
             state["current_stage"] = "generation"
-            state["messages"].append(
-                f"Pre-validation: {pre_result.error_type}")
+            state["messages"].append(f"Pre-validation: {pre_result.error_type}")
             return state
 
     # Create pre-validator agent
@@ -372,8 +370,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
         )
         pre_result.validation_time = time.time() - start_time
     except PreValidationError as e:
-        logger.error("langgraph_pre_validation_error",
-                     error=str(e), details=e.details)
+        logger.error("langgraph_pre_validation_error", error=str(e), details=e.details)
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -395,8 +392,7 @@ async def pre_validation_node(state: PipelineState) -> PipelineState:
             validation_time=time.time() - start_time,
         )
     except Exception as e:
-        logger.exception(
-            "langgraph_pre_validation_unexpected_error", error=str(e))
+        logger.exception("langgraph_pre_validation_unexpected_error", error=str(e))
         pre_result = PreValidationResult(
             is_valid=False,
             error_type="structure",
@@ -474,14 +470,12 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
             model_name = config.get_model_for_agent("card_splitting")
             model = create_openrouter_model_from_env(model_name=model_name)
         except (ValueError, KeyError) as e:
-            logger.warning(
-                "failed_to_create_card_splitting_model", error=str(e))
+            logger.warning("failed_to_create_card_splitting_model", error=str(e))
             # Fallback: skip card splitting analysis
             state["card_splitting"] = None
             state["current_stage"] = "generation"
             state["stage_times"]["card_splitting"] = time.time() - start_time
-            state["messages"].append(
-                "Card splitting skipped (model unavailable)")
+            state["messages"].append("Card splitting skipped (model unavailable)")
             return state
 
     # Create card splitting agent
@@ -545,8 +539,7 @@ async def card_splitting_node(state: PipelineState) -> PipelineState:
         # Apply preferred size bias
         if preferred_size == "small" and not splitting_result.should_split:
             # Prefer smaller cards - encourage splitting
-            logger.debug(
-                "card_splitting_preferred_size_small_encouraging_split")
+            logger.debug("card_splitting_preferred_size_small_encouraging_split")
         elif preferred_size == "large" and splitting_result.should_split:
             # Prefer larger cards - might want to discourage splitting
             # But respect the agent's decision unless confidence is low
@@ -619,12 +612,10 @@ async def split_validation_node(state: PipelineState) -> PipelineState:
     model = get_model(state, "split_validator")
     if model is None:
         try:
-            model_name = get_config(
-                state).get_model_for_agent("split_validator")
+            model_name = get_config(state).get_model_for_agent("split_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning(
-                "failed_to_create_split_validator_model", error=str(e))
+            logger.warning("failed_to_create_split_validator_model", error=str(e))
             # Skip validation if model unavailable
             state["current_stage"] = "generation"
             return state
@@ -716,8 +707,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
     # RAG: Enrich context and get few-shot examples before generation
     rag_enrichment = None
     rag_examples = None
-    rag_integration = get_rag_integration(
-        state) if state.get("enable_rag") else None
+    rag_integration = get_rag_integration(state) if state.get("enable_rag") else None
 
     if state.get("enable_rag") and rag_integration:
         metadata_dict = state["metadata_dict"]
@@ -812,8 +802,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
     if agent_selector:
         # Use unified agent interface
-        generator_agent = agent_selector.get_agent(
-            agent_framework, "generator")
+        generator_agent = agent_selector.get_agent(agent_framework, "generator")
         logger.info(
             "using_unified_agent", framework=agent_framework, agent_type="generator"
         )
@@ -838,7 +827,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
 
             # Split Q&A pairs into chunks
             chunks = [
-                qa_pairs[i: i + BATCH_SIZE]
+                qa_pairs[i : i + BATCH_SIZE]
                 for i in range(0, len(qa_pairs), BATCH_SIZE)
             ]
 
@@ -1154,8 +1143,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     if not increment_step_count(state, "post_validation"):
         return state
 
-    logger.info("langgraph_post_validation_start",
-                retry_count=state["retry_count"])
+    logger.info("langgraph_post_validation_start", retry_count=state["retry_count"])
     start_time = time.time()
 
     # Deserialize data
@@ -1174,12 +1162,10 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     if model is None:
         try:
             # Fallback: create model on demand if not cached
-            model_name = get_config(
-                state).get_model_for_agent("post_validator")
+            model_name = get_config(state).get_model_for_agent("post_validator")
             model = create_openrouter_model_from_env(model_name=model_name)
         except Exception as e:
-            logger.warning(
-                "failed_to_create_post_validator_model", error=str(e))
+            logger.warning("failed_to_create_post_validator_model", error=str(e))
             # Assume valid if validator unavailable
             post_result = PostValidationResult(
                 is_valid=True,
@@ -1272,8 +1258,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
 
     state["post_validation"] = post_result.model_dump()
     state["stage_times"]["post_validation"] = (
-        state["stage_times"].get("post_validation", 0.0) +
-        post_result.validation_time
+        state["stage_times"].get("post_validation", 0.0) + post_result.validation_time
     )
 
     # Determine next stage based on validation result
@@ -1354,13 +1339,11 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
         model = get_model(state, "context_enrichment")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = get_config(state).get_model_for_agent(
-                "context_enrichment")
+            model_name = get_config(state).get_model_for_agent("context_enrichment")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create enrichment agent
-        enrichment_agent = ContextEnrichmentAgentAI(
-            model=model, temperature=0.3)
+        enrichment_agent = ContextEnrichmentAgentAI(model=model, temperature=0.3)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -1394,8 +1377,7 @@ async def context_enrichment_node(state: PipelineState) -> PipelineState:
                 enriched_cards.append(card)  # Keep original
 
         # Update generation with enriched cards
-        state["generation"]["cards"] = [card.model_dump()
-                                        for card in enriched_cards]
+        state["generation"]["cards"] = [card.model_dump() for card in enriched_cards]
 
         # Create enrichment result summary
         enrichment_result = ContextEnrichmentResult(
@@ -1472,13 +1454,11 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
         model = get_model(state, "memorization_quality")
         if model is None:
             # Fallback: create model on demand if not cached
-            model_name = get_config(state).get_model_for_agent(
-                "memorization_quality")
+            model_name = get_config(state).get_model_for_agent("memorization_quality")
             model = create_openrouter_model_from_env(model_name=model_name)
 
         # Create memorization quality agent
-        quality_agent = MemorizationQualityAgentAI(
-            model=model, temperature=0.0)
+        quality_agent = MemorizationQualityAgentAI(model=model, temperature=0.0)
 
         # Deserialize metadata and cards
         metadata = NoteMetadata(**state["metadata_dict"])
@@ -1534,8 +1514,7 @@ async def memorization_quality_node(state: PipelineState) -> PipelineState:
     if mem_quality is not None and isinstance(mem_quality, dict):
         mem_score = mem_quality.get("memorization_score")
         if mem_score is not None:
-            state["messages"].append(
-                f"Memorization quality: score={mem_score:.2f}")
+            state["messages"].append(f"Memorization quality: score={mem_score:.2f}")
 
     return state
 
@@ -1589,8 +1568,7 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
         and get_rag_integration(state)
     ):
         rag_integration = get_rag_integration(state)
-        logger.info("rag_duplicate_detection_start",
-                    cards_count=len(new_cards))
+        logger.info("rag_duplicate_detection_start", cards_count=len(new_cards))
 
         for card in new_cards:
             try:
@@ -1668,8 +1646,7 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
 
     # Check if we have existing cards to compare against (for LLM-based detection)
     if not state.get("existing_cards_dicts") and cards_to_check_with_llm:
-        logger.info("duplicate_detection_skipped",
-                    reason="no_existing_cards_for_llm")
+        logger.info("duplicate_detection_skipped", reason="no_existing_cards_for_llm")
         # Return RAG results if available
         if rag_duplicate_results:
             detection_time = time.time() - start_time
@@ -1705,8 +1682,7 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
                 model = create_openrouter_model_from_env(model_name=model_name)
 
             # Create duplicate detection agent
-            detection_agent = DuplicateDetectionAgentAI(
-                model=model, temperature=0.0)
+            detection_agent = DuplicateDetectionAgentAI(model=model, temperature=0.0)
 
             # Get existing cards for LLM comparison
             existing_cards_dicts = state.get("existing_cards_dicts")
@@ -1853,8 +1829,7 @@ async def highlight_node(state: PipelineState) -> PipelineState:
             state["highlight_result"] = None
             state["stage_times"]["highlight"] = 0.0
             state["current_stage"] = "failed"
-            state["messages"].append(
-                "Highlight agent unavailable (model missing)")
+            state["messages"].append("Highlight agent unavailable (model missing)")
             return state
 
     max_candidates = getattr(config, "highlight_max_candidates", 3)
@@ -1880,8 +1855,7 @@ async def highlight_node(state: PipelineState) -> PipelineState:
         state["messages"].append("Highlight agent failed to analyze the note")
         return state
 
-    highlight_time = highlight_result.analysis_time or (
-        time.time() - start_time)
+    highlight_time = highlight_result.analysis_time or (time.time() - start_time)
     state["highlight_result"] = highlight_result.model_dump()
     state["stage_times"]["highlight"] = highlight_time
     state["messages"].append(

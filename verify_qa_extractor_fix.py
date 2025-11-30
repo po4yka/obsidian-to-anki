@@ -1,6 +1,5 @@
-
-import sys
 import os
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -8,8 +7,9 @@ from unittest.mock import MagicMock
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.sync.engine import SyncEngine
 from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.sync.engine import SyncEngine
+
 
 def verify_fix():
     print("Verifying QA Extractor Fix...")
@@ -61,10 +61,11 @@ def verify_fix():
 
         # Actually, let's check if the provider is NOT the dummy one from LangGraphOrchestrator
         if "LangGraphCompatibilityProvider" in str(type(provider)):
-             print("FAIL: Still using LangGraphCompatibilityProvider")
-             return
+            print("FAIL: Still using LangGraphCompatibilityProvider")
+            return
 
         print("SUCCESS: QA Extractor initialized with a real provider")
+
 
 if __name__ == "__main__":
     try:
@@ -72,4 +73,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()

@@ -44,8 +44,7 @@ class AsyncioRunner:
     def run(self, coro: Coroutine[Any, Any, Any]) -> Any:
         """Execute a coroutine on the background loop and wait for result."""
 
-        future: Future[Any] = asyncio.run_coroutine_threadsafe(
-            coro, self._loop)
+        future: Future[Any] = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result()
 
     def stop(self) -> None:

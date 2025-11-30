@@ -224,8 +224,7 @@ class ProblematicNotesArchiver:
                 "processing_stage": processing_stage,
                 "content_hash": content_hash,
                 "traceback": "".join(
-                    traceback.format_exception(
-                        type(error), error, error.__traceback__)
+                    traceback.format_exception(type(error), error, error.__traceback__)
                 ),
                 "context": context or {},
             }
@@ -303,8 +302,7 @@ class ProblematicNotesArchiver:
             notes = [n for n in notes if n.get("category") == category]
 
         if date:
-            notes = [n for n in notes if n.get(
-                "timestamp", "").startswith(date)]
+            notes = [n for n in notes if n.get("timestamp", "").startswith(date)]
 
         # Sort by timestamp (newest first)
         notes.sort(key=lambda x: x.get("timestamp", ""), reverse=True)

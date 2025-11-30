@@ -63,7 +63,9 @@ class AutoFixRegistry:
             "section_order": SectionOrderHandler(ai_fixer=ai_fixer),
             "missing_related_questions": MissingRelatedQuestionsHandler(),
             "broken_wikilink": BrokenWikilinkHandler(note_index=self.note_index),
-            "broken_related_entry": BrokenRelatedEntryHandler(note_index=self.note_index),
+            "broken_related_entry": BrokenRelatedEntryHandler(
+                note_index=self.note_index
+            ),
         }
 
         # Filter to enabled handlers
@@ -123,7 +125,9 @@ class AutoFixRegistry:
             logger.warning("yaml_parse_error", error=str(e))
             return None
 
-    def detect_all(self, content: str, file_path: Path | None = None) -> list[AutoFixIssue]:
+    def detect_all(
+        self, content: str, file_path: Path | None = None
+    ) -> list[AutoFixIssue]:
         """Detect all issues using all enabled handlers.
 
         Args:

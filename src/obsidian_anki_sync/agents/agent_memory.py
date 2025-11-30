@@ -102,7 +102,9 @@ class AgentMemoryStore:
                 from obsidian_anki_sync.rag.embedding_provider import EmbeddingProvider
 
                 self._embedding_provider = EmbeddingProvider(self.config)
-                self._embedding_function = RAGEmbeddingFunction(self._embedding_provider)
+                self._embedding_function = RAGEmbeddingFunction(
+                    self._embedding_provider
+                )
                 logger.info(
                     "agent_memory_embeddings_initialized",
                     provider=self.config.llm_provider,
@@ -332,8 +334,7 @@ class AgentMemoryStore:
 
             # Format results
             similar_failures = []
-            ids: list[list[str]] = cast(
-                "list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
                 "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
             )
@@ -351,16 +352,13 @@ class AgentMemoryStore:
                     # Safe access with bounds checking
                     memory_id = ids[0][i] if i < len(ids[0]) else None
                     metadata = (
-                        metadatas[0][i] if metadatas and len(
-                            metadatas[0]) > i else {}
+                        metadatas[0][i] if metadatas and len(metadatas[0]) > i else {}
                     )
                     document = (
-                        documents[0][i] if documents and len(
-                            documents[0]) > i else ""
+                        documents[0][i] if documents and len(documents[0]) > i else ""
                     )
                     distance = (
-                        distances[0][i] if distances and len(
-                            distances[0]) > i else None
+                        distances[0][i] if distances and len(distances[0]) > i else None
                     )
 
                     if memory_id is None:
@@ -422,8 +420,7 @@ class AgentMemoryStore:
                 )
 
             # Extract recommendation with safe access
-            ids: list[list[str]] = cast(
-                "list[list[str]]", results.get("ids", [[]]))
+            ids: list[list[str]] = cast("list[list[str]]", results.get("ids", [[]]))
             metadatas: list[list[dict[str, Any]]] = cast(
                 "list[list[dict[str, Any]]]", results.get("metadatas", [[]])
             )

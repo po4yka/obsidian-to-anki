@@ -154,9 +154,7 @@ class ProgressTracker:
             self.db.save_progress(self.progress)
             logger.info("new_sync_session", session_id=session_id)
 
-    def _validate_resume_state(
-        self, progress: "SyncProgress", session_id: str
-    ) -> None:
+    def _validate_resume_state(self, progress: "SyncProgress", session_id: str) -> None:
         """Validate that a session can be safely resumed.
 
         Checks:
