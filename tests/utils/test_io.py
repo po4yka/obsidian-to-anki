@@ -41,7 +41,8 @@ def test_atomic_write_failure_cleanup(tmp_path):
     try:
         with atomic_write(target_file) as f:
             f.write("New content")
-            raise RuntimeError("Simulated failure")
+            msg = "Simulated failure"
+            raise RuntimeError(msg)
     except RuntimeError:
         pass
 

@@ -37,7 +37,7 @@ class TestCircuitBreaker:
     def test_circuit_breaker_closed_state(self):
         """Test circuit breaker in closed state allows calls."""
         cb = CircuitBreaker(
-            "test", CircuitBreakerConfig(failure_threshold=3, timeout=60)
+            "test", CircuitBreakerConfig(failure_threshold=3, recovery_timeout=60)
         )
 
         def success_func():
@@ -50,7 +50,7 @@ class TestCircuitBreaker:
     def test_circuit_breaker_opens_after_threshold(self):
         """Test circuit breaker opens after failure threshold."""
         cb = CircuitBreaker(
-            "test", CircuitBreakerConfig(failure_threshold=2, timeout=60)
+            "test", CircuitBreakerConfig(failure_threshold=2, recovery_timeout=60)
         )
 
         def failing_func():
@@ -74,7 +74,7 @@ class TestCircuitBreaker:
     def test_circuit_breaker_half_open_recovery(self):
         """Test circuit breaker transitions to half-open and recovers."""
         cb = CircuitBreaker(
-            "test", CircuitBreakerConfig(failure_threshold=2, timeout=1)
+            "test", CircuitBreakerConfig(failure_threshold=2, recovery_timeout=1)
         )
 
         def failing_func():

@@ -40,7 +40,7 @@ class AutoFixRegistry:
         note_index: set[str] | None = None,
         enabled_handlers: list[str] | None = None,
         write_back: bool = False,
-        ai_fixer: "AIFixer | None" = None,
+        ai_fixer: AIFixer | None = None,
     ):
         """Initialize the registry.
 

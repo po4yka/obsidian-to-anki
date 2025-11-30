@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Test script to verify error message extraction works correctly."""
 
 from obsidian_anki_sync.agents.models import (

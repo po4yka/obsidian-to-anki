@@ -279,7 +279,7 @@ class TestConsoleNoiseFilterProcessor:
         try:
             result3 = processor(None, "info", event_dict.copy())
             # Should not reach here
-            assert False, "Event should have been dropped"
+            pytest.fail("Event should have been dropped")
         except structlog.DropEvent:
             # Expected
             pass

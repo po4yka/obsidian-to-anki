@@ -303,6 +303,10 @@ exclude = [
 "conftest.py" = ["F401"]  # conftest.py often has unused imports
 "src/obsidian_anki_sync/validation/scripts/**" = ["F401"]  # validation scripts may have unused imports
 "tests/test_*.py" = ["F401"]  # test files often have unused imports
+# Debugging and verification scripts at project root
+"reproduce_*.py" = ["T201", "SLF001", "F401", "PTH100", "SIM115", "S101"]  # reproduction scripts
+"verify_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # verification scripts
+"test_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # test scripts at root (not in tests/)
 
 [tool.ruff.lint.mccabe]
 # Maximum complexity for functions/methods

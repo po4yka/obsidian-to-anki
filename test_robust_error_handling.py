@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Test script to verify robust error handling works correctly."""
 
 from obsidian_anki_sync.agents.models import (
@@ -165,8 +164,8 @@ def test_robust_error_handling():
 
         def __getattr__(self, name):
             if name == "generation":
-                raise RuntimeError("Simulated error during attribute access")
-            return None
+                msg = "Simulated error during attribute access"
+                raise RuntimeError(msg)
 
     result7 = BadResult()
     error_msg7 = generator._extract_pipeline_error_message(result7)
