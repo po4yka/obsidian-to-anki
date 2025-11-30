@@ -136,10 +136,15 @@ class NoteValidator:
         try:
             content, frontmatter = self.parse_note(filepath)
         except Exception as e:
+            logger.exception(
+                "validation_failed_unexpectedly",
+                filepath=str(filepath),
+                error=str(e),
+            )
             return {
                 "file": str(filepath),
                 "success": False,
-                "error": str(e),
+                "error": f"Unexpected error: {e}",
                 "issues": {},
                 "passed": [],
                 "fixes": [],
@@ -239,6 +244,7 @@ class NoteValidator:
                     fix_description=fix.description,
                     error=str(e),
                     error_type=type(e).__name__,
+                    exc_info=True,
                 )
                 continue
 

@@ -194,12 +194,17 @@ class CacheManager:
             Total size in bytes
         """
         total_size = 0
+        total_size = 0
         try:
             for file_path in directory.rglob("*"):
                 if file_path.is_file():
                     total_size += file_path.stat().st_size
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning(
+                "error_calculating_directory_size",
+                directory=str(directory),
+                error=str(e),
+            )
         return total_size
 
     def cleanup_expired_cache_entries(self, max_age_seconds: int = 86400 * 30) -> int:

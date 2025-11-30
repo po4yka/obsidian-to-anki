@@ -7,15 +7,15 @@ The CardTransaction class ensures that either both operations succeed,
 or both are rolled back to maintain consistency.
 """
 
-import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 from obsidian_anki_sync.anki.client import AnkiClient
+from obsidian_anki_sync.utils.logging import get_logger
 
 from .state_db import StateDB
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -168,10 +168,15 @@ class CardTransaction:
                                     note_id=note_id,
                                     reason="Note still exists after deletion",
                                 )
-                        except Exception:
-                            # If notes_info fails, assume deletion worked
-                            action.verified = True
-                            report.verified += 1
+                        except Exception as e:
+                            # If verification fails, we can't be sure
+                            action.verified = False
+                            logger.warning(
+                                "rollback_verification_error",
+                                action=action_type,
+                                note_id=note_id,
+                                error=str(e),
+                            )
 
                 elif action_type == "delete_db_card":
                     slug = args[0]

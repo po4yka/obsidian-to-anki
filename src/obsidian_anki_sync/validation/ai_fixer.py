@@ -176,7 +176,7 @@ Respond with JSON: {{"language": "<language>", "confidence": "<high|medium|low>"
             return None
 
         except Exception as e:
-            logger.error("code_language_detection_failed", error=str(e))
+            logger.error("code_language_detection_failed", error=str(e), exc_info=True)
             return None
 
     def generate_bilingual_title(
@@ -252,7 +252,7 @@ Generate a bilingual title. Respond with JSON: {{"en_title": "<English>", "ru_ti
             return (parsed.en_title, parsed.ru_title)
 
         except Exception as e:
-            logger.error("bilingual_title_generation_failed", error=str(e))
+            logger.error("bilingual_title_generation_failed", error=str(e), exc_info=True)
             return None
 
     def fix_note_structure(self, content: str) -> tuple[str, list[str]]:
@@ -319,7 +319,7 @@ Respond with JSON: {{"fixed_content": "<full markdown content>", "changes_made":
             return parsed.fixed_content, parsed.changes_made
 
         except Exception as e:
-            logger.error("structure_fix_failed", error=str(e))
+            logger.error("structure_fix_failed", error=str(e), exc_info=True)
             return content, []
 
 
