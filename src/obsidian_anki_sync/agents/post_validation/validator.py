@@ -8,6 +8,7 @@ from obsidian_anki_sync.agents.llm_errors import (
     log_llm_error,
 )
 from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.agents.repair_learning import get_repair_learning_system
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.providers.base import BaseLLMProvider
 from obsidian_anki_sync.utils.logging import get_logger
@@ -17,6 +18,7 @@ from .error_categories import ErrorCategory
 from .prompts import AUTOFIX_SYSTEM_PROMPT, build_autofix_prompt
 from .semantic_validator import semantic_validation
 from .syntax_validator import syntax_validation
+from .validation_models import ValidationError
 
 logger = get_logger(__name__)
 
@@ -43,6 +45,7 @@ class PostValidatorAgent:
         self.ollama_client = ollama_client
         self.model = model
         self.temperature = temperature
+        self.repair_learning = get_repair_learning_system()
         logger.info("post_validator_agent_initialized", model=model)
 
     def validate(
@@ -79,20 +82,11 @@ class PostValidatorAgent:
             error_by_type: dict[str, int] = {}
             error_by_category: dict[str, int] = {}
             for error in syntax_errors:
-                # Extract error type from error message
-                if "APF format:" in error:
-                    error_type = error.split("APF format:")[1].strip().split()[0:3]
-                    error_key = " ".join(error_type) if error_type else "unknown"
-                elif "HTML:" in error:
-                    error_key = "HTML validation"
-                else:
-                    error_key = "other"
+                error_key = error.code
                 error_by_type[error_key] = error_by_type.get(error_key, 0) + 1
                 # Categorize error
-                category = ErrorCategory.from_error_string(error)
-                error_by_category[category.value] = (
-                    error_by_category.get(category.value, 0) + 1
-                )
+                category = error.category.value
+                error_by_category[category] = error_by_category.get(category, 0) + 1
 
             # Log error summary
             logger.warning(
@@ -104,7 +98,9 @@ class PostValidatorAgent:
 
             # Log each error individually (up to 20 to avoid spam)
             for i, error in enumerate(syntax_errors[:20]):
-                logger.warning("validation_error_detail", error_num=i + 1, error=error)
+                logger.warning(
+                    "validation_error_detail", error_num=i + 1, error=str(error)
+                )
 
             if len(syntax_errors) > 20:
                 logger.warning(
@@ -117,9 +113,10 @@ class PostValidatorAgent:
             return PostValidationResult(
                 is_valid=False,
                 error_type="syntax",
-                error_details="; ".join(syntax_errors),
+                error_details="; ".join([e.message for e in syntax_errors]),
                 corrected_cards=None,
                 validation_time=validation_time,
+                structured_errors=[e.__dict__ for e in syntax_errors],
             )
 
         # Step 2: Semantic validation (AI-powered)
@@ -148,6 +145,7 @@ class PostValidatorAgent:
                 error_details=semantic_result.error_details,
                 corrected_cards=semantic_result.corrected_cards,
                 validation_time=validation_time,
+                structured_errors=semantic_result.structured_errors,
             )
 
         except Exception as e:
@@ -184,132 +182,88 @@ class PostValidatorAgent:
             )
 
     def attempt_auto_fix(
-        self, cards: list[GeneratedCard], error_details: str
+        self,
+        cards: list[GeneratedCard],
+        error_details: str,
+        structured_errors: list[dict] | None = None,
     ) -> list[GeneratedCard] | None:
         """Attempt to auto-fix validation errors using intelligent recovery strategy.
-
-        Recovery strategy with error classification:
-        1. Classify errors by type (template, syntax, semantic, factual)
-        2. Route to appropriate fixer based on error type
-        3. Fall back to progressive recovery if classification fails
 
         Args:
             cards: Original cards with errors
             error_details: Description of errors
+            structured_errors: Optional list of structured error dicts
 
         Returns:
             Corrected cards if successful, None otherwise
         """
         try:
-            # Classify errors to determine best fixing approach
-            error_classification = self._classify_errors(error_details)
+            # Reconstruct ValidationError objects if available
+            validation_errors = []
+            if structured_errors:
+                for err_dict in structured_errors:
+                    try:
+                        # Handle enum reconstruction
+                        if isinstance(err_dict.get("category"), str):
+                            err_dict["category"] = ErrorCategory(err_dict["category"])
+                        validation_errors.append(ValidationError(**err_dict))
+                    except Exception as e:
+                        logger.warning("failed_to_reconstruct_error", error=str(e))
 
-            # Route to appropriate fixer based on error type
-            if error_classification == "template_header":
-                # Header format issues - try rule-based first
-                logger.debug("auto_fix_classified_template_header")
-                fixed_cards = RuleBasedHeaderFixer.apply_fixes(cards)
-                if fixed_cards:
-                    logger.info("auto_fix_header_success", cards_fixed=len(fixed_cards))
-                    return fixed_cards
+            # Determine primary error category/type for strategy lookup
+            primary_error = validation_errors[0] if validation_errors else None
+            error_category = (
+                primary_error.category.value if primary_error else "unknown"
+            )
+            error_type = primary_error.code if primary_error else "unknown"
 
-            elif error_classification == "template_structure":
-                # Missing fields, extra content - deterministic fixes
-                logger.debug("auto_fix_classified_template_structure")
-                fixed_cards = DeterministicFixer.apply_fixes(cards, error_details)
-                if fixed_cards:
-                    logger.info(
-                        "auto_fix_structure_success", cards_fixed=len(fixed_cards)
-                    )
-                    return fixed_cards
+            # Ask learning system for best strategy
+            suggested_strategy = self.repair_learning.suggest_strategy(
+                error_category, error_type, error_details
+            )
 
-            elif error_classification == "template_content":
-                # Placeholder content, wrong section names - LLM needed
-                logger.debug("auto_fix_classified_template_content")
-                fixed_cards = self._llm_based_fix(cards, error_details)
-                if fixed_cards:
-                    logger.info(
-                        "auto_fix_content_success", cards_fixed=len(fixed_cards)
-                    )
-                    return fixed_cards
+            strategies = [
+                ("deterministic", self._apply_deterministic_fix),
+                ("rule_based", self._apply_rule_based_fix),
+                ("llm", self._apply_llm_fix),
+                ("aggressive", self._apply_aggressive_fix),
+            ]
 
-            elif error_classification == "bilingual_consistency":
-                # Bilingual consistency issues - use LLM to fix RU cards based on EN structure
-                logger.debug("auto_fix_bilingual_with_llm")
-                fixed_cards = self._llm_based_fix(cards, error_details)
-                if fixed_cards:
-                    logger.info(
-                        "auto_fix_bilingual_llm_success", cards_fixed=len(fixed_cards)
-                    )
-                    return fixed_cards
+            # Reorder strategies based on suggestion
+            if suggested_strategy:
+                # Move suggested strategy to front
+                strategies.sort(
+                    key=lambda x: 0 if x[0] == suggested_strategy else 1
+                )
+                logger.info(
+                    "using_suggested_repair_strategy",
+                    strategy=suggested_strategy,
+                    error_category=error_category,
+                )
 
-            elif error_classification in [
-                "html_syntax",
-                "apf_sentinel",
-                "section_header",
-            ]:
-                # Complex syntax/structure issues - use LLM
-                logger.debug(f"auto_fix_classified_{error_classification}")
-                fixed_cards = self._llm_based_fix(cards, error_details)
+            # Try strategies in order
+            for strategy_name, strategy_func in strategies:
+                logger.debug(f"auto_fix_attempting_{strategy_name}")
+                fixed_cards = strategy_func(cards, error_details, validation_errors)
+
                 if fixed_cards:
                     logger.info(
-                        f"auto_fix_{error_classification}_success",
+                        f"auto_fix_{strategy_name}_success",
                         cards_fixed=len(fixed_cards),
                     )
-                    return fixed_cards
-
-            # Fallback: Progressive recovery strategy for unclassified or complex errors
-            logger.debug("auto_fix_fallback_progressive_recovery")
-
-            # Strategy 1: Try deterministic fixes first (fastest, most reliable)
-            logger.debug("auto_fix_strategy_1_deterministic")
-            fixed_cards = DeterministicFixer.apply_fixes(cards, error_details)
-            if fixed_cards:
-                logger.info(
-                    "auto_fix_deterministic_success", cards_fixed=len(fixed_cards)
-                )
-                return fixed_cards
-
-            # Strategy 2: Try rule-based header fixes
-            if (
-                "Invalid card header format" in error_details
-                or "card header" in error_details.lower()
-            ):
-                logger.debug("auto_fix_strategy_2_rule_based")
-                fixed_cards = RuleBasedHeaderFixer.apply_fixes(cards)
-                if fixed_cards:
-                    logger.info(
-                        "auto_fix_rule_based_success", cards_fixed=len(fixed_cards)
+                    # Learn from success
+                    self.repair_learning.learn_from_success(
+                        error_category=error_category,
+                        error_type=error_type,
+                        error_message=error_details,
+                        strategy_used=strategy_name,
                     )
                     return fixed_cards
-
-            # Strategy 3: LLM-based fix for complex issues
-            logger.debug("auto_fix_strategy_3_llm")
-            fixed_cards = self._llm_based_fix(cards, error_details)
-            if fixed_cards:
-                logger.info("auto_fix_llm_success", cards_fixed=len(fixed_cards))
-                return fixed_cards
-
-            # Strategy 4: Aggressive deterministic fixes (last resort)
-            logger.debug("auto_fix_strategy_4_aggressive_deterministic")
-            fixed_cards = AggressiveFixer.apply_fixes(cards, error_details)
-            if fixed_cards:
-                logger.info(
-                    "auto_fix_aggressive_deterministic_success",
-                    cards_fixed=len(fixed_cards),
-                )
-                return fixed_cards
 
             logger.warning(
                 "auto_fix_all_strategies_failed",
-                error_classification=error_classification,
-                strategies_attempted=[
-                    "classified_routing",
-                    "deterministic",
-                    "rule_based",
-                    "llm",
-                    "aggressive_deterministic",
-                ],
+                error_category=error_category,
+                strategies_attempted=[s[0] for s in strategies],
             )
             return None
 
@@ -317,108 +271,62 @@ class PostValidatorAgent:
             logger.error("auto_fix_failed", error=str(e))
             return None
 
-    def _classify_errors(self, error_details: str) -> str:
-        """Classify errors to determine appropriate fixing strategy.
+    def _apply_deterministic_fix(
+        self,
+        cards: list[GeneratedCard],
+        error_details: str,
+        errors: list[ValidationError],
+    ) -> list[GeneratedCard] | None:
+        """Apply deterministic fixes."""
+        # Check if errors seem fixable by deterministic fixer
+        if errors:
+            if any(
+                e.category
+                in [ErrorCategory.APF_FORMAT, ErrorCategory.HTML, ErrorCategory.SYNTAX]
+                for e in errors
+            ):
+                return DeterministicFixer.apply_fixes(cards, error_details)
+        # Fallback to string check if no structured errors
+        elif "Missing" in error_details or "Tag" in error_details:
+            return DeterministicFixer.apply_fixes(cards, error_details)
+        return None
 
-        Args:
-            error_details: Error description from validation
+    def _apply_rule_based_fix(
+        self,
+        cards: list[GeneratedCard],
+        error_details: str,
+        errors: list[ValidationError],
+    ) -> list[GeneratedCard] | None:
+        """Apply rule-based fixes."""
+        if errors:
+            if any(e.category == ErrorCategory.APF_FORMAT for e in errors):
+                return RuleBasedHeaderFixer.apply_fixes(cards)
+        elif "header" in error_details.lower():
+            return RuleBasedHeaderFixer.apply_fixes(cards)
+        return None
 
-        Returns:
-            Error classification: "template_header", "template_structure", "template_content", "unknown"
-        """
-        # Template header issues (format, capitalization, spacing)
-        header_indicators = [
-            "Invalid card header format",
-            "Use 'CardType:' not 'type:'",
-            "Use 'CardType:' with capital C and T",
-            "Header must have spaces around pipe",
-            "Tags must be space-separated",
-            "card header",  # lowercase for broader matching
-        ]
+    def _apply_llm_fix(
+        self,
+        cards: list[GeneratedCard],
+        error_details: str,
+        errors: list[ValidationError],
+    ) -> list[GeneratedCard] | None:
+        """Apply LLM-based fix with progressive temperature."""
+        return self._llm_based_fix(cards, error_details)
 
-        if any(indicator in error_details for indicator in header_indicators):
-            return "template_header"
-
-        # HTML syntax issues
-        html_indicators = [
-            "HTML validation failed",
-            "Tag '",
-            "is not closed",
-            "Unclosed tag",
-            "Unexpected close tag",
-            "Malformed tag",
-        ]
-
-        if any(indicator in error_details for indicator in html_indicators):
-            return "html_syntax"
-
-        # APF sentinel issues
-        sentinel_indicators = [
-            "Missing '<!-- PROMPT_VERSION:",
-            "Missing '<!-- BEGIN_CARDS -->'",
-            "Missing '<!-- END_CARDS -->'",
-            "Missing final 'END_OF_CARDS' line",
-            "Extra 'END_OF_CARDS' text",
-            "Missing manifest",
-        ]
-
-        if any(indicator in error_details for indicator in sentinel_indicators):
-            return "apf_sentinel"
-
-        # Section header issues
-        section_indicators = [
-            "Missing '<!-- Title -->'",
-            "Missing '<!-- Key point -->'",
-            "Missing '<!--",
-            "Section header format",
-        ]
-
-        if any(indicator in error_details for indicator in section_indicators):
-            return "section_header"
-
-        # Template structure issues (remaining)
-        structure_indicators = [
-            "Missing required field header",
-            "Tag '",
-            "not in snake_case format",
-        ]
-
-        if any(indicator in error_details for indicator in structure_indicators):
-            return "template_structure"
-
-        # Bilingual consistency issues (EN/RU structural mismatches)
-        bilingual_indicators = [
-            "Key point notes count mismatch",
-            "Other notes count mismatch",
-            "Card type mismatch",
-            "Code block presence mismatch",
-            "Preference statement mismatch",
-            "bilingual_consistency",
-        ]
-
-        if any(indicator in error_details for indicator in bilingual_indicators):
-            return "bilingual_consistency"
-
-        # Template content issues (placeholders, wrong section names)
-        content_indicators = [
-            "contains placeholder",
-            "incorrectly labeled",
-            "Sample (code block or image)",
-            "Sample (code block)",
-            "wrong section",
-            "APF v2.1 requires",
-            "Markdown code block found",
-        ]
-
-        if any(indicator in error_details for indicator in content_indicators):
-            return "template_content"
-
-        return "unknown"
+    def _apply_aggressive_fix(
+        self,
+        cards: list[GeneratedCard],
+        error_details: str,
+        errors: list[ValidationError],
+    ) -> list[GeneratedCard] | None:
+        """Apply aggressive deterministic fixes."""
+        return AggressiveFixer.apply_fixes(cards, error_details)
 
     def _llm_based_fix(
         self, cards: list[GeneratedCard], error_details: str
     ) -> list[GeneratedCard] | None:
-        """Attempt LLM-based fix for complex issues.
+        """Attempt LLM-based fix for complex issues with progressive temperature.
 
         Args:
             cards: Cards to fix
@@ -433,53 +341,48 @@ class PostValidatorAgent:
             # Build prompt
             prompt = build_autofix_prompt(cards, error_details)
 
-            # Use slightly higher temperature for auto-fix to allow creativity
-            # but keep it low for consistency
-            base_temperature = self.temperature if self.temperature is not None else 0.0
-            auto_fix_temperature = max(0.1, base_temperature)
+            # Progressive temperature strategy
+            temperatures = [0.1, 0.3, 0.5]
+            base_temp = self.temperature if self.temperature is not None else 0.0
+            if base_temp > 0.1:
+                temperatures = [base_temp, base_temp + 0.2, base_temp + 0.4]
 
-            logger.info(
-                "attempting_manual_auto_fix",
-                model=self.model,
-                temperature=auto_fix_temperature,
-                cards_to_fix=len(cards[:10]),
-            )
-
-            result = self.ollama_client.generate_json(
-                model=self.model,
-                prompt=prompt,
-                system=AUTOFIX_SYSTEM_PROMPT,
-                temperature=auto_fix_temperature,
-            )
-
-            llm_duration = time.time() - llm_start_time
-
-            logger.info(
-                "auto_fix_llm_complete",
-                duration=round(llm_duration, 2),
-                result_type=type(result).__name__,
-            )
-
-            # Handle case where model returns empty or invalid JSON
-            if not result or not isinstance(result, dict):
-                logger.warning(
-                    "auto_fix_invalid_response",
-                    response_type=type(result).__name__,
-                    response=str(result)[:200],
+            for temp in temperatures:
+                logger.info(
+                    "attempting_llm_auto_fix",
+                    model=self.model,
+                    temperature=temp,
+                    cards_to_fix=len(cards[:10]),
                 )
-                return None
 
-            corrected_data = result.get("corrected_cards", [])
-            if not corrected_data:
-                logger.warning(
-                    "auto_fix_no_corrections",
-                    result_keys=list(result.keys()),
-                    result_preview=str(result)[:200],
-                )
-                return None
+                try:
+                    result = self.ollama_client.generate_json(
+                        model=self.model,
+                        prompt=prompt,
+                        system=AUTOFIX_SYSTEM_PROMPT,
+                        temperature=temp,
+                    )
 
-            logger.info("auto_fix_success", corrected_cards_count=len(corrected_data))
-            return [GeneratedCard(**card) for card in corrected_data]
+                    if result and isinstance(result, dict):
+                        corrected_data = result.get("corrected_cards", [])
+                        if corrected_data:
+                            llm_duration = time.time() - llm_start_time
+                            logger.info(
+                                "auto_fix_llm_success",
+                                duration=round(llm_duration, 2),
+                                temperature=temp,
+                                cards_fixed=len(corrected_data),
+                            )
+                            return [GeneratedCard(**card) for card in corrected_data]
+
+                except Exception as e:
+                    logger.warning(
+                        "auto_fix_llm_attempt_failed", temperature=temp, error=str(e)
+                    )
+                    continue
+
+            logger.warning("auto_fix_llm_all_attempts_failed")
+            return None
 
         except Exception as llm_error:
             llm_duration = time.time() - llm_start_time
@@ -496,13 +399,6 @@ class PostValidatorAgent:
                 categorized_error,
                 cards_to_fix=len(cards[:10]),
                 error_details_length=len(error_details),
-            )
-
-            logger.error(
-                "auto_fix_llm_error",
-                error_type=categorized_error.error_type.value,
-                error=str(categorized_error),
-                user_message=format_llm_error_for_user(categorized_error),
             )
 
             return None

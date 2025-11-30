@@ -8,7 +8,9 @@ from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.providers.base import BaseLLMProvider
 from obsidian_anki_sync.utils.logging import get_logger
 
+from .error_categories import ErrorCategory
 from .prompts import SEMANTIC_VALIDATION_SYSTEM_PROMPT, build_semantic_prompt
+from .validation_models import ValidationError
 
 logger = get_logger(__name__)
 
@@ -129,16 +131,16 @@ def _filter_false_positives(error_details: str) -> tuple[str, bool]:
     return result, removed_any
 
 
-def _check_bilingual_consistency(cards: list[GeneratedCard]) -> list[str]:
+def _check_bilingual_consistency(cards: list[GeneratedCard]) -> list[ValidationError]:
     """Check for consistency between English and Russian cards with same card_index.
 
     Args:
         cards: All generated cards
 
     Returns:
-        List of consistency error messages
+        List of consistency errors
     """
-    errors = []
+    errors: list[ValidationError] = []
 
     # Group cards by card_index
     cards_by_index = {}
@@ -235,7 +237,7 @@ def _parse_card_for_comparison(apf_html: str) -> dict:
 
 def _compare_card_structures(
     card_index: int, en_parsed: dict, ru_parsed: dict
-) -> list[str]:
+) -> list[ValidationError]:
     """Compare parsed structures of EN and RU cards for consistency.
 
     Args:
@@ -244,39 +246,75 @@ def _compare_card_structures(
         ru_parsed: Parsed Russian card structure
 
     Returns:
-        List of consistency error messages
+        List of consistency errors
     """
-    errors = []
+    errors: list[ValidationError] = []
 
     # Check key point notes count
     if en_parsed["key_point_notes_count"] != ru_parsed["key_point_notes_count"]:
         errors.append(
-            f"Card {card_index}: Key point notes count mismatch - "
-            f"EN has {en_parsed['key_point_notes_count']}, "
-            f"RU has {ru_parsed['key_point_notes_count']}"
+            ValidationError(
+                category=ErrorCategory.SEMANTIC,
+                message=f"Card {card_index}: Key point notes count mismatch - "
+                f"EN has {en_parsed['key_point_notes_count']}, "
+                f"RU has {ru_parsed['key_point_notes_count']}",
+                code="bilingual_notes_count_mismatch",
+                context={
+                    "card_index": card_index,
+                    "en_count": en_parsed["key_point_notes_count"],
+                    "ru_count": ru_parsed["key_point_notes_count"],
+                },
+            )
         )
 
     # Check other notes count (if present)
     if en_parsed["other_notes_count"] != ru_parsed["other_notes_count"]:
         errors.append(
-            f"Card {card_index}: Other notes count mismatch - "
-            f"EN has {en_parsed['other_notes_count']}, "
-            f"RU has {ru_parsed['other_notes_count']}"
+            ValidationError(
+                category=ErrorCategory.SEMANTIC,
+                message=f"Card {card_index}: Other notes count mismatch - "
+                f"EN has {en_parsed['other_notes_count']}, "
+                f"RU has {ru_parsed['other_notes_count']}",
+                code="bilingual_other_notes_count_mismatch",
+                context={
+                    "card_index": card_index,
+                    "en_count": en_parsed["other_notes_count"],
+                    "ru_count": ru_parsed["other_notes_count"],
+                },
+            )
         )
 
     # Check card type consistency
     if en_parsed["card_type"] != ru_parsed["card_type"]:
         errors.append(
-            f"Card {card_index}: Card type mismatch - "
-            f"EN is {en_parsed['card_type']}, RU is {ru_parsed['card_type']}"
+            ValidationError(
+                category=ErrorCategory.SEMANTIC,
+                message=f"Card {card_index}: Card type mismatch - "
+                f"EN is {en_parsed['card_type']}, RU is {ru_parsed['card_type']}",
+                code="bilingual_card_type_mismatch",
+                context={
+                    "card_index": card_index,
+                    "en_type": en_parsed["card_type"],
+                    "ru_type": ru_parsed["card_type"],
+                },
+            )
         )
 
     # Check code block presence
     if en_parsed["has_key_point_code"] != ru_parsed["has_key_point_code"]:
         errors.append(
-            f"Card {card_index}: Code block presence mismatch - "
-            f"EN {'has' if en_parsed['has_key_point_code'] else 'lacks'} code block, "
-            f"RU {'has' if ru_parsed['has_key_point_code'] else 'lacks'} code block"
+            ValidationError(
+                category=ErrorCategory.SEMANTIC,
+                message=f"Card {card_index}: Code block presence mismatch - "
+                f"EN {'has' if en_parsed['has_key_point_code'] else 'lacks'} code block, "
+                f"RU {'has' if ru_parsed['has_key_point_code'] else 'lacks'} code block",
+                code="bilingual_code_block_mismatch",
+                context={
+                    "card_index": card_index,
+                    "en_has_code": en_parsed["has_key_point_code"],
+                    "ru_has_code": ru_parsed["has_key_point_code"],
+                },
+            )
         )
 
     # Check for preference statements in key point notes (common source of inconsistency)
@@ -298,9 +336,18 @@ def _compare_card_structures(
 
         if en_has_term != ru_has_term:
             errors.append(
-                f"Card {card_index}: Preference statement mismatch - "
-                f"EN {'has' if en_has_term else 'lacks'} '{en_term}' preference, "
-                f"RU {'has' if ru_has_term else 'lacks'} '{ru_term}' preference"
+                ValidationError(
+                    category=ErrorCategory.SEMANTIC,
+                    message=f"Card {card_index}: Preference statement mismatch - "
+                    f"EN {'has' if en_has_term else 'lacks'} '{en_term}' preference, "
+                    f"RU {'has' if ru_has_term else 'lacks'} '{ru_term}' preference",
+                    code="bilingual_preference_mismatch",
+                    context={
+                        "card_index": card_index,
+                        "en_term": en_term,
+                        "ru_term": ru_term,
+                    },
+                )
             )
 
     return errors
@@ -329,15 +376,18 @@ def semantic_validation(
     """
     # First, check bilingual consistency (fast, deterministic)
     bilingual_errors = _check_bilingual_consistency(cards)
+    structured_errors: list[ValidationError] = []
+    structured_errors.extend(bilingual_errors)
 
     # If we have bilingual errors and are in strict mode, fail immediately
     if bilingual_errors and strict_mode:
         return PostValidationResult(
             is_valid=False,
-            error_type="bilingual_consistency",
-            error_details="; ".join(bilingual_errors),
+            error_type="semantic",  # Mapped to semantic for PostValidationResult literal
+            error_details="; ".join([str(e) for e in bilingual_errors]),
             corrected_cards=None,
             validation_time=0.0,  # Will be set by caller
+            structured_errors=[e.__dict__ for e in structured_errors],
         )
 
     # Build validation prompt
@@ -361,22 +411,8 @@ def semantic_validation(
     error_details = result.get("error_details", "")
     corrected_cards_data = result.get("corrected_cards")
 
-    # Include bilingual errors in the final result
-    all_error_details = []
-    if bilingual_errors:
-        all_error_details.extend(bilingual_errors)
-    if error_details:
-        all_error_details.append(error_details)
-
-    combined_error_details = "; ".join(all_error_details) if all_error_details else ""
-
-    # If we have bilingual errors, validation should fail
-    if bilingual_errors:
-        is_valid = False
-        error_type = "bilingual_consistency"
-
     # Filter out known false positive errors (LLM hallucinations) from LLM-generated errors only
-    if error_details and not bilingual_errors:  # Only filter if no bilingual errors
+    if error_details:
         filtered_errors, had_false_positives = _filter_false_positives(error_details)
 
         if had_false_positives:
@@ -389,12 +425,34 @@ def semantic_validation(
                 )
                 is_valid = True
                 error_type = "none"
-                combined_error_details = ""
+                error_details = ""
             else:
                 # Some real errors remain
-                combined_error_details = filtered_errors
+                error_details = filtered_errors
 
-    error_details = combined_error_details
+    # If LLM reports error, add to structured errors
+    if not is_valid and error_details:
+        # Try to categorize LLM error string
+        category = ErrorCategory.from_error_string(error_details)
+        structured_errors.append(
+            ValidationError(
+                category=category,
+                message=error_details,
+                code=f"llm_{category.value}_error",
+                context={"raw_error": error_details},
+            )
+        )
+
+    # Combine all error details
+    all_error_details = [e.message for e in structured_errors]
+    combined_error_details = "; ".join(all_error_details)
+
+    # If we have any errors, validation should fail
+    if structured_errors:
+        is_valid = False
+        if error_type == "none":
+            # If LLM said valid but we found bilingual errors, use semantic
+            error_type = "semantic"
 
     # Convert corrected cards if provided
     corrected_cards = None
@@ -409,7 +467,8 @@ def semantic_validation(
     return PostValidationResult(
         is_valid=is_valid,
         error_type=error_type,
-        error_details=error_details,
+        error_details=combined_error_details,
         corrected_cards=corrected_cards,
         validation_time=0.0,  # Will be set by caller
+        structured_errors=[e.__dict__ for e in structured_errors],
     )

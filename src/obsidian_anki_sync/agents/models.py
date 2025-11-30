@@ -129,6 +129,9 @@ class PostValidationResult(BaseModel):
     error_details: str = ""
     corrected_cards: list[GeneratedCard] | None = None
     validation_time: float = 0.0
+    structured_errors: list[dict] | None = Field(
+        default=None, description="Structured validation errors"
+    )
 
 
 class MemorizationQualityResult(BaseModel):
@@ -585,6 +588,7 @@ class AutoFixIssue(BaseModel):
         "broken_related_entry",
         "missing_concept_links",
         "related_count",
+        "unknown_error",
     ] = Field(description="Type of issue detected")
     severity: Literal["info", "warning", "error"] = Field(
         default="warning", description="Issue severity"

@@ -658,3 +658,47 @@ class BrokenRelatedEntryHandler(AutoFixHandler):
                 issue.fix_description = "No broken entries found to remove"
 
         return fixed_content, issues
+
+
+class UnknownErrorHandler(AutoFixHandler):
+    """Handler for logging unknown errors for future analysis.
+
+    This handler doesn't fix anything but logs the error details
+    to a file so we can implement new handlers later.
+    """
+
+    issue_type = "unknown_error"
+    description = "Log unknown errors for future automation"
+
+    def __init__(self, log_file: str = "unknown_errors.log"):
+        self.log_file = log_file
+
+    def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
+        # This handler is special - it doesn't detect issues in content
+        # It's called explicitly when other handlers fail
+        return []
+
+    def fix(
+        self, content: str, issues: list[AutoFixIssue], metadata: dict | None = None
+    ) -> tuple[str, list[AutoFixIssue]]:
+        if not issues:
+            return content, issues
+
+        # Log issues to file
+        try:
+            with open(self.log_file, "a") as f:
+                for issue in issues:
+                    f.write(f"--- Unknown Error ---\n")
+                    f.write(f"Type: {issue.issue_type}\n")
+                    f.write(f"Description: {issue.description}\n")
+                    f.write(f"Location: {issue.location}\n")
+                    f.write(f"Content snippet: {content[:200]}...\n\n")
+
+            for issue in issues:
+                issue.auto_fixed = False
+                issue.fix_description = f"Logged to {self.log_file} for analysis"
+
+        except Exception as e:
+            logger.error("failed_to_log_unknown_error", error=str(e))
+
+        return content, issues

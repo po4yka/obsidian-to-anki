@@ -5,10 +5,13 @@ from obsidian_anki_sync.apf.html_validator import validate_card_html
 from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.utils.logging import get_logger
 
+from .error_categories import ErrorCategory
+from .validation_models import ValidationError
+
 logger = get_logger(__name__)
 
 
-def syntax_validation(cards: list[GeneratedCard]) -> list[str]:
+def syntax_validation(cards: list[GeneratedCard]) -> list[ValidationError]:
     """Perform syntax validation using existing linters.
 
     Args:
@@ -17,7 +20,7 @@ def syntax_validation(cards: list[GeneratedCard]) -> list[str]:
     Returns:
         List of validation errors (empty if valid)
     """
-    all_errors = []
+    all_errors: list[ValidationError] = []
 
     for card in cards:
         # DEBUG: Log first 500 chars of the card for debugging
@@ -40,12 +43,26 @@ def syntax_validation(cards: list[GeneratedCard]) -> list[str]:
                 errors=apf_result.errors,
             )
             for error in apf_result.errors:
-                all_errors.append(f"[{card.slug}] APF format: {error}")
+                all_errors.append(
+                    ValidationError(
+                        category=ErrorCategory.APF_FORMAT,
+                        message=f"[{card.slug}] APF format: {error}",
+                        code="apf_format_error",
+                        context={"slug": card.slug, "raw_error": error},
+                    )
+                )
 
         # Validate HTML structure
         html_errors = validate_card_html(card.apf_html)
 
         for error in html_errors:
-            all_errors.append(f"[{card.slug}] HTML: {error}")
+            all_errors.append(
+                ValidationError(
+                    category=ErrorCategory.HTML,
+                    message=f"[{card.slug}] HTML: {error}",
+                    code="html_syntax_error",
+                    context={"slug": card.slug, "raw_error": error},
+                )
+            )
 
     return all_errors

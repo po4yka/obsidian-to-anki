@@ -6,7 +6,7 @@ providing automatic retry with fixing for structured outputs that fail validatio
 
 import json
 import re
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-class OutputFixingParser[T: BaseModel]:
+class OutputFixingParser(Generic[T]):
     """Wrapper for PydanticAI agents that automatically fixes validation errors.
 
     Implements LangChain's OutputFixingParser pattern:
@@ -432,7 +432,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         }
 
 
-def wrap_agent_with_fixing[T: BaseModel](
+def wrap_agent_with_fixing(
     agent: Agent[T],
     fix_model: Model | None = None,
     max_fix_attempts: int = 2,
