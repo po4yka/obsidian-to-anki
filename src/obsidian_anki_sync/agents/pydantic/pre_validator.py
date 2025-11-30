@@ -8,13 +8,13 @@ from pathlib import Path
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
+from obsidian_anki_sync.agents.autofix.registry import AutoFixRegistry
 from obsidian_anki_sync.agents.exceptions import (
     ModelError,
     PreValidationError,
     StructuredOutputError,
 )
 from obsidian_anki_sync.agents.improved_prompts import PRE_VALIDATION_SYSTEM_PROMPT
-from obsidian_anki_sync.agents.autofix.registry import AutoFixRegistry
 from obsidian_anki_sync.agents.models import PreValidationResult
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.logging import get_logger
@@ -57,11 +57,12 @@ class PreValidatorAgentAI:
             AutoFixRegistry(ai_fixer=ai_fixer) if enable_autofix else None
         )
 
-        # Create PydanticAI agent with structured output
+        # Create PydanticAI agent with structured output and increased retry limit
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
             output_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
+            retries=3,  # Allow more retries for output validation failures
         )
 
         logger.info(

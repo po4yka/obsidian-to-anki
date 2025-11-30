@@ -42,11 +42,12 @@ class GeneratorAgentAI:
         # Use improved system prompt with few-shot examples
         self.system_prompt = CARD_GENERATION_SYSTEM_PROMPT
 
-        # Create PydanticAI agent
+        # Create PydanticAI agent with increased retry limit for output validation
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
             model=self.model,
             output_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
+            retries=3,  # Allow more retries for output validation failures
         )
 
         logger.info("pydantic_ai_generator_initialized", model=str(model))

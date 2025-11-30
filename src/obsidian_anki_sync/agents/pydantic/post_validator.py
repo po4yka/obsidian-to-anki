@@ -38,11 +38,12 @@ class PostValidatorAgentAI:
         self.model = model
         self.temperature = temperature
 
-        # Create PydanticAI agent
+        # Create PydanticAI agent with increased retry limit for output validation
         self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
             output_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
+            retries=3,  # Allow more retries for output validation failures
         )
 
         logger.info("pydantic_ai_post_validator_initialized", model=str(model))
