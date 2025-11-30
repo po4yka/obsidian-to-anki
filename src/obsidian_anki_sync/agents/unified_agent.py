@@ -104,18 +104,22 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
         """
         if agent_type not in self._agents:
             try:
+                from ..providers.pydantic_ai_models import (
+                    create_openrouter_model_from_env,
+                )
+
                 if agent_type == "generator":
-                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.generator import GeneratorAgentAI
 
-                    model = get_model_for_agent(self.config, "generator")
+                    model_name = self.config.get_model_for_agent("generator")
+                    model = create_openrouter_model_from_env(model_name)
                     self._agents[agent_type] = GeneratorAgentAI(model)
                 elif agent_type == "pre_validator":
-                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from ..validation.ai_fixer import AIFixer
                     from .pydantic.pre_validator import PreValidatorAgentAI
 
-                    model = get_model_for_agent(self.config, "pre_validator")
+                    model_name = self.config.get_model_for_agent("pre_validator")
+                    model = create_openrouter_model_from_env(model_name)
                     # Check if auto-fix is enabled in config
                     enable_autofix = getattr(self.config, "enable_ai_fix", False)
 
@@ -129,16 +133,16 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                         ai_fixer=ai_fixer
                     )
                 elif agent_type == "post_validator":
-                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.post_validator import PostValidatorAgentAI
 
-                    model = get_model_for_agent(self.config, "post_validator")
+                    model_name = self.config.get_model_for_agent("post_validator")
+                    model = create_openrouter_model_from_env(model_name)
                     self._agents[agent_type] = PostValidatorAgentAI(model)
                 elif agent_type == "context_enrichment":
-                    from ..domain.interfaces.llm_config import get_model_for_agent
                     from .pydantic.context_enrichment import ContextEnrichmentAgentAI
 
-                    model = get_model_for_agent(self.config, "context_enrichment")
+                    model_name = self.config.get_model_for_agent("context_enrichment")
+                    model = create_openrouter_model_from_env(model_name)
                     self._agents[agent_type] = ContextEnrichmentAgentAI(model)
                 else:
                     msg = f"Unknown PydanticAI agent type: {agent_type}"

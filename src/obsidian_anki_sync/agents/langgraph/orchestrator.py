@@ -13,9 +13,8 @@ from typing import TYPE_CHECKING
 from langgraph.checkpoint.memory import MemorySaver
 
 if TYPE_CHECKING:
-    from obsidian_anki_sync.agents.models import Card
     from obsidian_anki_sync.config import Config
-    from obsidian_anki_sync.models import NoteMetadata, QAPair
+    from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
 
     from .state import PipelineState
 
@@ -297,8 +296,8 @@ class LangGraphOrchestrator:
         """
         import hashlib
 
-        from obsidian_anki_sync.agents.models import Card, Manifest
-        from obsidian_anki_sync.agents.sync.slug_generator import compute_content_hash
+        from obsidian_anki_sync.models import Card, Manifest
+        from obsidian_anki_sync.utils.content_hash import compute_content_hash
 
         cards: list[Card] = []
         qa_lookup = {qa.card_index: qa for qa in qa_pairs}

@@ -909,37 +909,52 @@ async def generation_node(state: PipelineState) -> PipelineState:
                 model_used=str(model),
             )
 
-        else:
-            # Sequential generation (single batch)
-            if agent_selector:
-                # Use unified agent interface
-                qa_dicts = [qa.model_dump() for qa in qa_pairs]
-                unified_result = await generator_agent.generate_cards(
-                    note_content=state["note_content"],
-                    metadata=metadata.model_dump(),
-                    qa_pairs=qa_dicts,
-                    slug_base=state["slug_base"],
+        # Sequential generation (single batch)
+        elif agent_selector:
+            # Use unified agent interface
+            qa_dicts = [qa.model_dump() for qa in qa_pairs]
+            unified_result = await generator_agent.generate_cards(
+                note_content=state["note_content"],
+                metadata=metadata.model_dump(),
+                qa_pairs=qa_dicts,
+                slug_base=state["slug_base"],
+            )
+            # Convert unified result to GenerationResult
+            gen_result = unified_result.data
+            # Handle case where generation failed and data is None
+            if gen_result is None:
+                logger.error(
+                    "langgraph_generation_returned_none",
+                    success=unified_result.success,
+                    reasoning=unified_result.reasoning,
                 )
-                # Convert unified result to GenerationResult
-                gen_result = unified_result.data
+                # Create empty result to allow graceful continuation
+                gen_result = GenerationResult(
+                    cards=[],
+                    total_cards=0,
+                    generation_time=time.time() - start_time,
+                    model_used=str(model),
+                )
+            else:
                 # Add warnings from unified result
-                if hasattr(gen_result, "warnings") and unified_result.warnings:
+                if unified_result.warnings:
                     if (
                         not hasattr(gen_result, "warnings")
                         or gen_result.warnings is None
                     ):
                         gen_result.warnings = []
                     gen_result.warnings.extend(unified_result.warnings)
-            else:
-                # Legacy PydanticAI agent (with RAG context)
-                gen_result = await generator.generate_cards(
-                    note_content=state["note_content"],
-                    metadata=metadata,
-                    qa_pairs=qa_pairs,
-                    slug_base=state["slug_base"],
-                    rag_enrichment=rag_enrichment,
-                    rag_examples=rag_examples,
-                )
+                gen_result.generation_time = time.time() - start_time
+        else:
+            # Legacy PydanticAI agent (with RAG context)
+            gen_result = await generator.generate_cards(
+                note_content=state["note_content"],
+                metadata=metadata,
+                qa_pairs=qa_pairs,
+                slug_base=state["slug_base"],
+                rag_enrichment=rag_enrichment,
+                rag_examples=rag_examples,
+            )
             gen_result.generation_time = time.time() - start_time
 
         # Validate against split plan if available
