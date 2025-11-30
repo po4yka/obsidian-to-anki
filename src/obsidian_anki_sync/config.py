@@ -29,7 +29,8 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path(), description="Source directory within vault"
     )
@@ -83,7 +84,8 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -100,7 +102,8 @@ class Config(BaseSettings):
     )
 
     # Runtime settings
-    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -181,6 +184,16 @@ class Config(BaseSettings):
     queue_circuit_breaker_timeout: int = Field(
         default=60,
         description="Seconds to wait before retrying after circuit breaker opens",
+    )
+    worker_generation_timeout_seconds: float = Field(
+        default=360.0,
+        ge=60.0,
+        description="SLA (seconds) for generation stage before worker flags a timeout",
+    )
+    worker_validation_timeout_seconds: float = Field(
+        default=180.0,
+        ge=30.0,
+        description="SLA (seconds) for post-validation stage before worker flags a timeout",
     )
 
     # Optional fields (with defaults)
@@ -474,6 +487,21 @@ class Config(BaseSettings):
     post_validator_model: str = ""
     post_validator_temperature: float | None = None
     post_validator_max_tokens: int | None = None
+    post_validator_timeout_seconds: float = Field(
+        default=45.0,
+        ge=5.0,
+        description="Per-attempt timeout for post-validation agent calls (seconds)",
+    )
+    post_validator_retry_backoff_seconds: float = Field(
+        default=3.0,
+        ge=0.0,
+        description="Base delay (seconds) before retrying post-validation",
+    )
+    post_validator_retry_jitter_seconds: float = Field(
+        default=1.5,
+        ge=0.0,
+        description="Maximum jitter (seconds) added to the backoff delay",
+    )
     # Context Enrichment
     context_enrichment_model: str = ""
     # Memorization Quality
@@ -859,7 +887,8 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
+        config = get_model_config(
+            model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -890,7 +919,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -1131,7 +1161,8 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_searching", source="environment_variable", path=env_path
             )
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
         logger.debug(
             "config_searching",
@@ -1143,7 +1174,8 @@ def load_config(config_path: Path | None = None) -> Config:
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
-            logger.info("config_file_found", config_path=str(resolved_config_path))
+            logger.info("config_file_found",
+                        config_path=str(resolved_config_path))
             break
 
     if not resolved_config_path:
@@ -1246,7 +1278,8 @@ def load_config(config_path: Path | None = None) -> Config:
             config = Config(**config_kwargs)
             logger.info(
                 "config_loaded",
-                vault_path=str(config.vault_path) if config.vault_path else None,
+                vault_path=str(
+                    config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
                 use_agents=getattr(config, "use_agents", False),
                 use_langgraph=getattr(config, "use_langgraph", False),
@@ -1256,7 +1289,8 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_validation_error",
                 error=str(e),
                 error_type=type(e).__name__,
-                config_path=str(resolved_config_path) if resolved_config_path else None,
+                config_path=str(
+                    resolved_config_path) if resolved_config_path else None,
             )
             raise
 

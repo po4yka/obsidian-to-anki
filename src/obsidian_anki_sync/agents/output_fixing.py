@@ -15,6 +15,7 @@ from pydantic_ai.models import Model
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .exceptions import StructuredOutputError
+from .models import normalize_enrichment_label
 
 logger = get_logger(__name__)
 
@@ -143,6 +144,19 @@ class OutputFixingParser[T: BaseModel]:
                 # Our code raises StructuredOutputError
                 last_error = e
                 last_output = self._extract_output_from_error(e)
+                (
+                    last_output,
+                    validated_output,
+                ) = self._auto_correct_literal_errors(last_output)
+                if validated_output is not None:
+                    logger.info(
+                        "output_literal_autocorrect_success",
+                        attempt=attempt,
+                        error_type=(
+                            type(last_error).__name__ if last_error else "unknown"
+                        ),
+                    )
+                    return validated_output
                 attempt += 1
                 self.repair_attempts += 1
 
@@ -334,6 +348,72 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             # Return original if we can't fix it
             logger.warning("fallback_fix_failed", error=error)
             return invalid_output
+
+    def _auto_correct_literal_errors(
+        self, raw_output: str | None
+    ) -> tuple[str | None, T | None]:
+        """Sanitize known literal errors such as enrichment aliases."""
+        if not raw_output:
+            return raw_output, None
+
+        sanitized = self._sanitize_enrichment_literals(raw_output)
+        if sanitized == raw_output:
+            return raw_output, None
+
+        validated = self._revalidate_output(sanitized)
+        return sanitized, validated
+
+    def _sanitize_enrichment_literals(self, raw_output: str) -> str:
+        """Normalize enrichment_type values in serialized output."""
+        try:
+            payload = json.loads(raw_output)
+        except json.JSONDecodeError:
+            return raw_output
+
+        changed = False
+
+        def _walk(node: Any) -> None:
+            nonlocal changed
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "enrichment_type" and isinstance(value, list):
+                        normalized: list[str] = []
+                        for item in value:
+                            normalized_value = normalize_enrichment_label(
+                                str(item), apply_aliases=True
+                            )
+                            if normalized_value != item:
+                                changed = True
+                            normalized.append(normalized_value)
+                        node[key] = normalized
+                    else:
+                        _walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    _walk(item)
+
+        _walk(payload)
+
+        if not changed:
+            return raw_output
+
+        return json.dumps(payload, ensure_ascii=False)
+
+    def _revalidate_output(self, serialized: str) -> T | None:
+        """Attempt to validate sanitized output without another LLM call."""
+        try:
+            parsed = json.loads(serialized)
+        except json.JSONDecodeError:
+            return None
+
+        output_type = getattr(self.agent, "output_type", None)
+        if not isinstance(output_type, type) or not issubclass(output_type, BaseModel):
+            return None
+
+        try:
+            return output_type.model_validate(parsed)
+        except Exception:
+            return None
 
     def get_repair_metrics(self) -> dict[str, Any]:
         """Get repair success metrics.

@@ -1,5 +1,7 @@
 """Worker for processing card generation jobs via Redis queue."""
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Any
@@ -76,6 +78,11 @@ async def process_note_job(
 
     logger.info("worker_processing_job", file=relative_path)
 
+    generation_sla = getattr(
+        config, "worker_generation_timeout_seconds", 360.0)
+    validation_sla = getattr(
+        config, "worker_validation_timeout_seconds", 180.0)
+
     try:
         path_obj = Path(file_path)
         if not path_obj.exists():
@@ -111,6 +118,31 @@ async def process_note_job(
             existing_cards=existing_cards,
         )
 
+        pipeline_context = {
+            "total_time": round(result.total_time, 3),
+            "retry_count": result.retry_count,
+            "stage_times": result.stage_times,
+            "last_error": result.last_error,
+            "generation_sla": generation_sla,
+            "validation_sla": validation_sla,
+        }
+
+        sla_violation = _detect_stage_sla(
+            result.stage_times, generation_sla, validation_sla)
+        if sla_violation is not None:
+            logger.error(
+                "pipeline_stage_timeout",
+                file=relative_path,
+                stage=sla_violation["stage"],
+                elapsed=round(sla_violation["elapsed"], 2),
+                budget=sla_violation["budget"],
+            )
+            return {
+                "success": False,
+                "error": sla_violation["message"],
+                "cards": [],
+            }
+
         if not result.success or not result.generation:
             # Build detailed error message from pipeline result
             error_details = []
@@ -131,8 +163,18 @@ async def process_note_job(
             elif result.generation.total_cards == 0:
                 error_details.append("Generator returned zero cards")
 
+            if result.post_validation:
+                logger.warning(
+                    "post_validation_payload",
+                    file=relative_path,
+                    is_valid=result.post_validation.is_valid,
+                    error_type=result.post_validation.error_type,
+                    error_details=result.post_validation.error_details[:500],
+                )
+
             error_msg = (
-                "; ".join(error_details) if error_details else "Unknown pipeline error"
+                "; ".join(
+                    error_details) if error_details else "Unknown pipeline error"
             )
             logger.warning(
                 "pipeline_generation_failed",
@@ -144,6 +186,9 @@ async def process_note_job(
                 post_valid=result.post_validation.is_valid
                 if result.post_validation
                 else None,
+                stage_times=result.stage_times,
+                retry_count=result.retry_count,
+                last_error=result.last_error,
             )
             return {
                 "success": False,
@@ -160,6 +205,14 @@ async def process_note_job(
         # We return dicts because Card objects might not be pickleable or we want to be safe
         cards_dicts = [card.model_dump() for card in cards]
 
+        logger.info(
+            "pipeline_generation_succeeded",
+            file=relative_path,
+            cards=len(cards_dicts),
+            slugs=[card.slug for card in cards],
+            **pipeline_context,
+        )
+
         return {"success": True, "cards": cards_dicts, "slugs": [c.slug for c in cards]}
 
     except Exception as e:
@@ -173,10 +226,38 @@ class WorkerSettings:
     functions = [process_note_job]
     on_startup = startup
     on_shutdown = shutdown
-    job_timeout = 600  # 10 minutes
+    _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "360"))
+    _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "180"))
+    job_timeout = int(_gen_budget + _val_budget + 60)
 
     # Use environment variables with defaults
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
     max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "5"))
+
+
+def _detect_stage_sla(
+    stage_times: dict[str, float] | None,
+    generation_sla: float,
+    validation_sla: float,
+) -> dict[str, Any] | None:
+    """Return metadata when a stage exceeds its configured budget."""
+    stage_times = stage_times or {}
+    generation_time = stage_times.get("generation")
+    if generation_time is not None and generation_time > generation_sla:
+        return {
+            "stage": "generation",
+            "elapsed": generation_time,
+            "budget": generation_sla,
+            "message": f"generation exceeded {generation_sla:.0f}s SLA (took {generation_time:.1f}s)",
+        }
+    validation_time = stage_times.get("post_validation")
+    if validation_time is not None and validation_time > validation_sla:
+        return {
+            "stage": "post_validation",
+            "elapsed": validation_time,
+            "budget": validation_sla,
+            "message": f"post_validation exceeded {validation_sla:.0f}s SLA (took {validation_time:.1f}s)",
+        }
+    return None

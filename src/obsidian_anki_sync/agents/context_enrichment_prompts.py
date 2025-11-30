@@ -16,7 +16,7 @@ Your task is to enhance flashcards by adding:
 3. **Visual Structure**: Formatting, bullet points, emphasis
 4. **Related Concepts**: Context and connections
 5. **Practical Tips**: Best practices and common pitfalls
-6. **Math/Science Context**: Units, alternative formulas, derivations
+6. **Math & Science Context**: When you add units, derivations, or formula notes, classify the enrichment as **related** (concept links) or **practical** (applied guidance). Never invent new labels.
 
 ## Enrichment Principles
 
@@ -180,7 +180,7 @@ useEffect(() => { fetchData(id); }, [id]);
 
 ---
 
-### 6. Math/Science Context
+### 6. Math & Science Context (use `related` or `practical`)
 
 **Why**: Formulas and scientific facts need context (units, constraints, derivations) to be meaningful.
 
@@ -257,7 +257,7 @@ SKIP: Context is domain-specific jargon
 
 Return structured JSON with:
 - should_enrich: bool
-- enrichment_type: list[string] (example/mnemonic/visual/related/practical/math_science)
+- enrichment_type: list[string] (example/mnemonic/visual/related/practical only — do **not** invent new tags)
 - enriched_answer: string (enhanced answer with Extra section)
 - enriched_extra: string (new or enhanced Extra section)
 - additions_summary: string (what was added)

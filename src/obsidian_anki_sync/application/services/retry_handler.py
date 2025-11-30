@@ -62,6 +62,7 @@ class RetryResult:
         attempts: int = 0,
         total_time: float = 0.0,
         retry_delays: list[float] | None = None,
+        context: dict[str, Any] | None = None,
     ):
         """Initialize retry result.
 
@@ -79,6 +80,7 @@ class RetryResult:
         self.attempts = attempts
         self.total_time = total_time
         self.retry_delays = retry_delays or []
+        self.context = context or {}
 
 
 class RetryHandler:
@@ -142,6 +144,7 @@ class RetryHandler:
                 result=result,
                 attempts=1,
                 total_time=total_time,
+                context=context,
             )
 
         except self.config.retry_on_exceptions as e:
@@ -187,6 +190,7 @@ class RetryHandler:
                     attempts=attempt + 2,
                     total_time=total_time,
                     retry_delays=self._retry_delays[: attempt + 1],
+                    context=context,
                 )
 
             except self.config.retry_on_exceptions as e:
@@ -216,6 +220,7 @@ class RetryHandler:
             attempts=self.config.max_retries + 1,
             total_time=total_time,
             retry_delays=self._retry_delays,
+            context=context,
         )
 
     def get_adaptive_config(
@@ -244,7 +249,8 @@ class RetryHandler:
             "semantic": 2,  # Semantic errors are harder to fix
         }
 
-        max_retries = base_config.get(error_type) or defaults.get(error_type, 3)
+        max_retries = base_config.get(
+            error_type) or defaults.get(error_type, 3)
         if max_retries is None:
             max_retries = 3
 
@@ -290,7 +296,8 @@ class RetryHandler:
             error_type = error_type_getter(e)
 
             # Get adaptive config for this error type
-            adaptive_config = self.get_adaptive_config(error_type, base_retry_config)
+            adaptive_config = self.get_adaptive_config(
+                error_type, base_retry_config)
 
             logger.debug(
                 "adaptive_retry_start",

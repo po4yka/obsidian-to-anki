@@ -129,7 +129,7 @@ Provide your enrichment assessment."""
                 # Create additions list
                 for enrich_type in output.enrichment_type:
                     addition = EnrichmentAddition(
-                        enrichment_type=enrich_type,  # type: ignore[arg-type]
+                        enrichment_type=enrich_type,
                         content=(
                             output.enriched_extra[:200] + "..."
                             if len(output.enriched_extra) > 200
@@ -159,7 +159,8 @@ Provide your enrichment assessment."""
             return enrichment_result
 
         except Exception as e:
-            logger.error("pydantic_ai_enrichment_failed", error=str(e), slug=card.slug)
+            logger.error("pydantic_ai_enrichment_failed",
+                         error=str(e), slug=card.slug)
             # Return safe fallback
             return ContextEnrichmentResult(
                 should_enrich=False,
@@ -176,12 +177,14 @@ Provide your enrichment assessment."""
         answer = ""
 
         # Extract Front (question)
-        front_match = re.search(r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
+        front_match = re.search(
+            r'<div class="front">(.*?)</div>', apf_html, re.DOTALL)
         if front_match:
             question = re.sub(r"<[^>]+>", "", front_match.group(1)).strip()
 
         # Extract Back (answer)
-        back_match = re.search(r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
+        back_match = re.search(
+            r'<div class="back">(.*?)</div>', apf_html, re.DOTALL)
         if back_match:
             answer = re.sub(r"<[^>]+>", "", back_match.group(1)).strip()
 
@@ -189,7 +192,8 @@ Provide your enrichment assessment."""
 
     def _extract_extra_from_apf(self, apf_html: str) -> str:
         """Extract Extra section from APF HTML."""
-        extra_match = re.search(r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
+        extra_match = re.search(
+            r'<div class="extra">(.*?)</div>', apf_html, re.DOTALL)
         if extra_match:
             return re.sub(r"<[^>]+>", "", extra_match.group(1)).strip()
         return ""

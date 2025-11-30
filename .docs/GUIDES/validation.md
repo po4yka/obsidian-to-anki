@@ -4,9 +4,9 @@ AI validation provides intelligent fixes for Q&A notes using LLM providers.
 
 ## Features
 
-- **Code block language detection** - Identifies programming languages
-- **Bilingual title generation** - Creates English/Russian title pairs
-- **List formatting fixes** - Normalizes markdown list formatting
+-   **Code block language detection** - Identifies programming languages
+-   **Bilingual title generation** - Creates English/Russian title pairs
+-   **List formatting fixes** - Normalizes markdown list formatting
 
 ## Configuration
 
@@ -23,6 +23,7 @@ ai_validation:
 ```
 
 Or via environment:
+
 ```bash
 export ENABLE_AI_VALIDATION=true
 export AI_VALIDATION_MODEL="openai/gpt-4o-mini"
@@ -55,26 +56,34 @@ for fix in validator.get_safe_fixes():
 ## Safety Levels
 
 **Safe fixes (auto-apply):**
-- Code block language detection
-- List formatting normalization
+
+-   Code block language detection
+-   List formatting normalization
 
 **Unsafe fixes (require confirmation):**
-- Bilingual title generation
-- Content restructuring
+
+-   Bilingual title generation
+-   Content restructuring
 
 ## Performance
 
-| Operation | Time |
-|-----------|------|
-| Code detection | 1-2s per block |
+| Operation        | Time           |
+| ---------------- | -------------- |
+| Code detection   | 1-2s per block |
 | Title generation | 2-3s per title |
-| List formatting | <0.1s (regex) |
+| List formatting  | <0.1s (regex)  |
 
 **Tips:** Use faster models (gpt-4o-mini), batch processing, caching.
 
 ## Error Handling
 
 Errors are gracefully handled - AI features disable on failure, basic validation continues.
+
+## Post-Validation Resilience
+
+-   `post_validator_timeout_seconds` (default **45s**) caps every validator call so hung LLMs cannot block the worker queue.
+-   `post_validator_retry_backoff_seconds` and `post_validator_retry_jitter_seconds` drive the exponential backoff helper in `utils/resilience.py`, spacing retries with bounded jitter to avoid thundering herds.
+-   When the validator emits `corrected_cards`, the pipeline now preserves those cards even if the final validation status is `False`, ensuring highlight/fix agents can inspect the best-known HTML.
 
 ---
 

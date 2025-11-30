@@ -13,6 +13,7 @@ from obsidian_anki_sync.agents.exceptions import (
 )
 from obsidian_anki_sync.agents.improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
 from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
+from obsidian_anki_sync.agents.output_fixing import OutputFixingParser
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -45,6 +46,11 @@ class PostValidatorAgentAI:
             system_prompt=self._get_system_prompt(),
             retries=3,  # Allow more retries for output validation failures
         )
+        self.fixing_parser = OutputFixingParser(
+            agent=self.agent,
+            max_fix_attempts=1,
+            fix_temperature=temperature,
+        )
 
         logger.info("pydantic_ai_post_validator_initialized", model=str(model))
 
@@ -68,7 +74,8 @@ class PostValidatorAgentAI:
         Returns:
             PostValidationResult with validation outcome
         """
-        logger.info("pydantic_ai_post_validation_start", cards_count=len(cards))
+        logger.info("pydantic_ai_post_validation_start",
+                    cards_count=len(cards))
 
         # Create dependencies
         deps = PostValidationDeps(
@@ -95,8 +102,7 @@ Cards to validate:
 
         try:
             # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: PostValidationOutput = result.output
+            output = await self.fixing_parser.run(prompt, deps=deps)
 
             # Convert suggested corrections to GeneratedCard list
             corrected_cards: list[GeneratedCard] | None = None
@@ -128,11 +134,19 @@ Cards to validate:
             return validation_result
 
         except ValueError as e:
-            logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            logger.error(
+                "pydantic_ai_post_validation_parse_error", error=str(e))
             msg = "Failed to parse post-validation output"
             raise StructuredOutputError(
                 msg,
                 details={"error": str(e), "cards_count": len(cards)},
+            ) from e
+        except StructuredOutputError as e:
+            logger.error(
+                "pydantic_ai_post_validation_structured_error", error=str(e))
+            msg = "Post-validation structured output failed"
+            raise PostValidationError(
+                msg, details={"cards_count": len(cards), "error": str(e)}
             ) from e
         except TimeoutError as e:
             logger.error("pydantic_ai_post_validation_timeout", error=str(e))
@@ -141,4 +155,5 @@ Cards to validate:
         except Exception as e:
             logger.error("pydantic_ai_post_validation_failed", error=str(e))
             msg = f"Post-validation failed: {e!s}"
-            raise PostValidationError(msg, details={"cards_count": len(cards)}) from e
+            raise PostValidationError(
+                msg, details={"cards_count": len(cards)}) from e

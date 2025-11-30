@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 
     from .state import PipelineState
 
+from obsidian_anki_sync.agents.agent_monitoring import (
+    PerformanceTracker,
+    get_pipeline_performance_tracker,
+)
 from obsidian_anki_sync.agents.models import (
     AgentPipelineResult,
     CardSplittingResult,
@@ -96,6 +100,9 @@ class LangGraphOrchestrator:
             agent_framework: Agent framework to use ("pydantic_ai" or "langchain", uses config if None)
         """
         self.config = config
+        self.performance_tracker: PerformanceTracker | None = (
+            get_pipeline_performance_tracker(config)
+        )
         # Use config values as defaults if not explicitly provided
         self.max_retries = (
             max_retries if max_retries is not None else config.langgraph_max_retries
@@ -131,8 +138,10 @@ class LangGraphOrchestrator:
                 config, "enable_duplicate_detection", False
             )  # Default to False
         )
-        self.enable_highlight_agent = getattr(config, "enable_highlight_agent", True)
-        self.highlight_max_candidates = getattr(config, "highlight_max_candidates", 3)
+        self.enable_highlight_agent = getattr(
+            config, "enable_highlight_agent", True)
+        self.highlight_max_candidates = getattr(
+            config, "highlight_max_candidates", 3)
 
         # NEW: Agent framework selection (can be overridden by memory)
         self.agent_framework = (
@@ -160,7 +169,8 @@ class LangGraphOrchestrator:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(
+                    config, "enable_semantic_search", True)
 
                 self.memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
@@ -172,7 +182,8 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning("langgraph_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "langgraph_memory_store_init_failed", error=str(e))
 
         # NEW: Advanced MongoDB memory store (deferred connection)
         self.advanced_memory_store = None
@@ -193,7 +204,8 @@ class LangGraphOrchestrator:
                 )
                 logger.info("advanced_memory_store_deferred_connection")
             except Exception as e:
-                logger.warning("advanced_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "advanced_memory_store_init_failed", error=str(e))
 
         # NEW: Enhanced observability system
         self.observability = None
@@ -205,7 +217,8 @@ class LangGraphOrchestrator:
                 self.observability = EnhancedObservabilitySystem(config)
                 logger.info("enhanced_observability_system_initialized")
             except Exception as e:
-                logger.warning("enhanced_observability_init_failed", error=str(e))
+                logger.warning(
+                    "enhanced_observability_init_failed", error=str(e))
 
         # RAG integration for context enrichment and duplicate detection
         self.rag_integration = None
@@ -272,7 +285,8 @@ class LangGraphOrchestrator:
                     logger.warning("advanced_memory_store_connection_failed")
                     self.advanced_memory_store = None
             except Exception as e:
-                logger.warning("advanced_memory_store_async_setup_failed", error=str(e))
+                logger.warning(
+                    "advanced_memory_store_async_setup_failed", error=str(e))
                 self.advanced_memory_store = None
 
     def convert_to_cards(
@@ -316,7 +330,8 @@ class LangGraphOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(
+                    qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
@@ -473,6 +488,82 @@ class LangGraphOrchestrator:
                 optimal_framework = self.agent_framework
 
         return optimal_framework
+
+    def _average_generation_confidence(
+        self, generation: GenerationResult | None
+    ) -> float:
+        """Compute the average confidence emitted by the generator."""
+        if not generation or not generation.cards:
+            return 0.0
+
+        total_confidence = sum(card.confidence for card in generation.cards)
+        return total_confidence / max(len(generation.cards), 1)
+
+    def _stage_success(
+        self,
+        stage_name: str,
+        pre_validation: PreValidationResult | None,
+        generation: GenerationResult | None,
+        post_validation: PostValidationResult | None,
+        final_state: PipelineState,
+    ) -> bool:
+        """Heuristically determine whether a stage succeeded."""
+        match stage_name:
+            case "pre_validation":
+                return bool(pre_validation and pre_validation.is_valid)
+            case "generation":
+                return bool(generation and generation.total_cards > 0)
+            case "post_validation":
+                return bool(post_validation and post_validation.is_valid)
+            case "linter_validation":
+                return bool(final_state.get("linter_valid", False))
+            case _:
+                # Consider other stages successful if they recorded time
+                return True
+
+    def _record_pipeline_metrics(
+        self,
+        *,
+        success: bool,
+        total_time: float,
+        stage_times: dict[str, float],
+        pre_validation: PreValidationResult | None,
+        generation: GenerationResult | None,
+        post_validation: PostValidationResult | None,
+        final_state: PipelineState,
+    ) -> None:
+        """Record per-stage metrics using the shared performance tracker."""
+        if not self.performance_tracker:
+            return
+
+        pipeline_confidence = self._average_generation_confidence(generation)
+        error_type = final_state.get("last_error_severity")
+        if not error_type and post_validation and not post_validation.is_valid:
+            error_type = f"post_validation.{post_validation.error_type}"
+
+        self.performance_tracker.record_call(
+            agent_name="langgraph_pipeline",
+            success=success,
+            confidence=pipeline_confidence,
+            response_time=total_time,
+            error_type=error_type,
+        )
+
+        for stage_name, duration in stage_times.items():
+            stage_success = self._stage_success(
+                stage_name,
+                pre_validation,
+                generation,
+                post_validation,
+                final_state,
+            )
+            self.performance_tracker.record_call(
+                agent_name=f"langgraph_stage_{stage_name}",
+                success=stage_success,
+                confidence=1.0 if stage_success else 0.0,
+                response_time=duration,
+                error_type=None if stage_success else stage_name,
+            )
 
     async def process_note(
         self,
@@ -656,6 +747,15 @@ class LangGraphOrchestrator:
             "enable_highlight_agent": self.enable_highlight_agent,
             "retry_count": 0,
             "max_retries": self.max_retries,
+            "post_validator_timeout_seconds": getattr(
+                self.config, "post_validator_timeout_seconds", 45.0
+            ),
+            "post_validator_retry_backoff_seconds": getattr(
+                self.config, "post_validator_retry_backoff_seconds", 3.0
+            ),
+            "post_validator_retry_jitter_seconds": getattr(
+                self.config, "post_validator_retry_jitter_seconds", 1.5
+            ),
             "auto_fix_enabled": self.auto_fix_enabled,
             "strict_mode": self.strict_mode,
             # Cycle protection (best practice: add hard stops)
@@ -725,6 +825,7 @@ class LangGraphOrchestrator:
             else None
         )
 
+        stage_times = final_state.get("stage_times", {})
         result = AgentPipelineResult(
             success=success,
             pre_validation=pre_validation
@@ -737,10 +838,11 @@ class LangGraphOrchestrator:
             highlight_result=highlight_result,
             total_time=total_time,
             retry_count=final_state["retry_count"],
+            stage_times=stage_times,
+            last_error=final_state.get("last_error"),
         )
 
         nodes_executed = final_state.get("step_count", 0)
-        stage_times = final_state.get("stage_times", {})
         logger.info(
             "pipeline_completed",
             pipeline_id=pipeline_id,
@@ -754,6 +856,16 @@ class LangGraphOrchestrator:
             cards_generated=len(generation.cards)
             if generation and generation.cards
             else 0,
+        )
+
+        self._record_pipeline_metrics(
+            success=success,
+            total_time=total_time,
+            stage_times=stage_times,
+            pre_validation=pre_validation,
+            generation=generation,
+            post_validation=post_validation,
+            final_state=final_state,
         )
 
         # NEW: Record observability metrics
@@ -783,7 +895,8 @@ class LangGraphOrchestrator:
                 self.observability.record_metrics(metrics)
                 logger.info("observability_metrics_recorded")
             except Exception as e:
-                logger.warning("observability_metrics_recording_failed", error=str(e))
+                logger.warning(
+                    "observability_metrics_recording_failed", error=str(e))
 
         # NEW: Learn from execution if advanced memory is enabled
         if self.advanced_memory_store and self.advanced_memory_store.connected:
