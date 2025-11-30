@@ -474,7 +474,11 @@ class LangGraphOrchestrator:
 
             except Exception as e:
                 logger.warning(
-                    f"Memory-based routing failed, using default: {e}")
+                    "memory_based_routing_failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    fallback=self.agent_framework,
+                )
                 optimal_framework = self.agent_framework
 
         return optimal_framework
@@ -940,7 +944,13 @@ class LangGraphOrchestrator:
                 )
 
         except Exception as e:
-            logger.error(f"Failed to learn user preferences: {e}")
+            logger.warning(
+                "user_preferences_learning_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=getattr(metadata, "user_id", "default"),
+                topic=getattr(metadata, "topic", "general"),
+            )
 
     async def _store_memorization_feedback(
         self,
@@ -997,7 +1007,13 @@ class LangGraphOrchestrator:
                 )
 
         except Exception as e:
-            logger.error(f"Failed to store memorization feedback: {e}")
+            logger.warning(
+                "memorization_feedback_storage_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                cards_count=len(generation.cards) if generation.cards else 0,
+                topic=getattr(metadata, "topic", "general"),
+            )
 
     def _generate_slug_base(self, metadata: NoteMetadata) -> str:
         """Generate base slug from note metadata using collision-safe helper."""

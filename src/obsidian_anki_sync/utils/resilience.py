@@ -1,10 +1,12 @@
 """Resilience patterns for specialized agent system.
 
-Provides circuit breaker, retry with jitter, rate limiting, bulkhead isolation,
+Provides retry with backoff (via tenacity), rate limiting, bulkhead isolation,
 and confidence validation to prevent cascading failures and ensure system reliability.
+
+Note: Circuit breaker pattern is implemented using tenacity's retry_error_callback
+and custom state tracking. For simpler use cases, use create_retry_decorator().
 """
 
-import random
 import threading
 import time
 from collections.abc import Callable
@@ -12,11 +14,26 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypeVar
 
+from tenacity import (
+    RetryCallState,
+    RetryError,
+    Retrying,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+
+
+# ============================================================================
+# Circuit Breaker Pattern (Tenacity-based)
+# ============================================================================
 
 
 class CircuitBreakerState(str, Enum):
@@ -64,13 +81,14 @@ class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
     failure_threshold: int = 5
-    timeout: int = 60
+    recovery_timeout: int = 60
     half_open_max_calls: int = 1
 
 
 class CircuitBreaker:
-    """Circuit breaker pattern implementation.
+    """Circuit breaker pattern implementation using tenacity.
 
+    Wraps tenacity retry logic with circuit breaker state management.
     Prevents cascading failures by stopping requests to failing services.
     """
 
@@ -83,11 +101,17 @@ class CircuitBreaker:
         """
         self.name = name
         self.config = config or CircuitBreakerConfig()
-        self.state = CircuitBreakerState.CLOSED
-        self.failure_count = 0
-        self.last_failure_time: float | None = None
-        self.half_open_calls = 0
-        self.lock = threading.Lock()
+        self._state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time: float | None = None
+        self._half_open_calls = 0
+        self._lock = threading.Lock()
+
+    @property
+    def state(self) -> CircuitBreakerState:
+        """Get current circuit breaker state (thread-safe)."""
+        with self._lock:
+            return self._state
 
     def call(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         """Execute function with circuit breaker protection.
@@ -103,75 +127,80 @@ class CircuitBreaker:
         Raises:
             CircuitBreakerError: If circuit is open
         """
-        with self.lock:
-            # Check if circuit should transition from OPEN to HALF_OPEN
-            if self.state == CircuitBreakerState.OPEN:
-                if self.last_failure_time and (
-                    time.time() - self.last_failure_time > self.config.timeout
-                ):
-                    self.state = CircuitBreakerState.HALF_OPEN
-                    self.half_open_calls = 0
-                    logger.info(
-                        "circuit_breaker_half_open",
-                        name=self.name,
-                        timeout=self.config.timeout,
-                    )
-                else:
-                    msg = f"Circuit breaker '{self.name}' is OPEN"
-                    raise CircuitBreakerError(msg)
+        with self._lock:
+            self._check_state_transition()
 
-            # Check half-open call limit
-            if self.state == CircuitBreakerState.HALF_OPEN:
-                if self.half_open_calls >= self.config.half_open_max_calls:
+            if self._state == CircuitBreakerState.OPEN:
+                msg = f"Circuit breaker '{self.name}' is OPEN"
+                raise CircuitBreakerError(msg)
+
+            if self._state == CircuitBreakerState.HALF_OPEN:
+                if self._half_open_calls >= self.config.half_open_max_calls:
                     msg = f"Circuit breaker '{self.name}' HALF_OPEN call limit reached"
                     raise CircuitBreakerError(msg)
+                self._half_open_calls += 1
 
-        # Execute the function
+        # Execute with tenacity retry
         try:
-            result = func(*args, **kwargs)
-            self.record_success()
+            for attempt in Retrying(
+                stop=stop_after_attempt(1),  # No retry, circuit breaker handles it
+                reraise=True,
+            ):
+                with attempt:
+                    result = func(*args, **kwargs)
+            self._record_success()
             return result
         except Exception:
-            self.record_failure()
+            self._record_failure()
             raise
 
-    def record_success(self) -> None:
+    def _check_state_transition(self) -> None:
+        """Check if circuit should transition states (must hold lock)."""
+        if self._state == CircuitBreakerState.OPEN:
+            if self._last_failure_time and (
+                time.time() - self._last_failure_time > self.config.recovery_timeout
+            ):
+                self._state = CircuitBreakerState.HALF_OPEN
+                self._half_open_calls = 0
+                logger.info(
+                    "circuit_breaker_half_open",
+                    name=self.name,
+                    recovery_timeout=self.config.recovery_timeout,
+                )
+
+    def _record_success(self) -> None:
         """Record successful call."""
-        with self.lock:
-            if self.state == CircuitBreakerState.HALF_OPEN:
-                # Success in half-open state - close the circuit
-                self.state = CircuitBreakerState.CLOSED
-                self.failure_count = 0
-                self.half_open_calls = 0
+        with self._lock:
+            if self._state == CircuitBreakerState.HALF_OPEN:
+                self._state = CircuitBreakerState.CLOSED
+                self._failure_count = 0
+                self._half_open_calls = 0
                 logger.info("circuit_breaker_closed", name=self.name)
-            elif self.state == CircuitBreakerState.CLOSED:
-                # Reset failure count on success
-                self.failure_count = 0
+            elif self._state == CircuitBreakerState.CLOSED:
+                self._failure_count = 0
 
-    def record_failure(self) -> None:
+    def _record_failure(self) -> None:
         """Record failed call."""
-        with self.lock:
-            self.failure_count += 1
-            self.last_failure_time = time.time()
+        with self._lock:
+            self._failure_count += 1
+            self._last_failure_time = time.time()
 
-            if self.state == CircuitBreakerState.HALF_OPEN:
-                # Failure in half-open - open the circuit
-                self.state = CircuitBreakerState.OPEN
+            if self._state == CircuitBreakerState.HALF_OPEN:
+                self._state = CircuitBreakerState.OPEN
                 logger.warning(
                     "circuit_breaker_opened_from_half_open",
                     name=self.name,
-                    failure_count=self.failure_count,
+                    failure_count=self._failure_count,
                 )
             elif (
-                self.state == CircuitBreakerState.CLOSED
-                and self.failure_count >= self.config.failure_threshold
+                self._state == CircuitBreakerState.CLOSED
+                and self._failure_count >= self.config.failure_threshold
             ):
-                # Too many failures - open the circuit
-                self.state = CircuitBreakerState.OPEN
+                self._state = CircuitBreakerState.OPEN
                 logger.warning(
                     "circuit_breaker_opened",
                     name=self.name,
-                    failure_count=self.failure_count,
+                    failure_count=self._failure_count,
                     threshold=self.config.failure_threshold,
                 )
 
@@ -183,11 +212,68 @@ class CircuitBreaker:
         """Get current circuit breaker state."""
         return self.state
 
+    def reset(self) -> None:
+        """Reset circuit breaker to closed state."""
+        with self._lock:
+            self._state = CircuitBreakerState.CLOSED
+            self._failure_count = 0
+            self._last_failure_time = None
+            self._half_open_calls = 0
+            logger.info("circuit_breaker_reset", name=self.name)
+
+
+# ============================================================================
+# Tenacity-based Retry Helpers
+# ============================================================================
+
+
+def create_retry_decorator(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0,
+    jitter: float = 1.0,
+    retry_exceptions: tuple[type[Exception], ...] = (Exception,),
+) -> Callable:
+    """Create a tenacity retry decorator with exponential backoff and jitter.
+
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds (tenacity 'min' parameter)
+        max_delay: Maximum delay cap in seconds
+        jitter: Maximum jitter to add (in seconds)
+        retry_exceptions: Tuple of exceptions to retry on
+
+    Returns:
+        Configured retry decorator
+    """
+    return retry(
+        stop=stop_after_attempt(max_retries),
+        wait=wait_exponential_jitter(
+            initial=initial_delay,
+            max=max_delay,
+            jitter=jitter,
+        ),
+        retry=retry_if_exception_type(retry_exceptions),
+        before_sleep=_log_retry_attempt,
+        reraise=True,
+    )
+
+
+def _log_retry_attempt(retry_state: RetryCallState) -> None:
+    """Log retry attempts for observability."""
+    logger.warning(
+        "tenacity_retry",
+        attempt=retry_state.attempt_number,
+        wait_seconds=round(retry_state.next_action.sleep if retry_state.next_action else 0, 2),
+        error=str(retry_state.outcome.exception()) if retry_state.outcome else None,
+    )
+
 
 class RetryWithJitter:
-    """Retry logic with exponential backoff and jitter.
+    """Retry logic with exponential backoff and jitter using tenacity.
 
-    Prevents retry storms by adding randomness to delays.
+    This is a wrapper class for backward compatibility. For new code,
+    prefer using create_retry_decorator() directly.
     """
 
     def __init__(
@@ -195,9 +281,9 @@ class RetryWithJitter:
         max_retries: int = 3,
         initial_delay: float = 1.0,
         max_delay: float = 60.0,
-        exponential_base: float = 2.0,
+        exponential_base: float = 2.0,  # Kept for API compatibility, not used
         jitter: bool = True,
-        jitter_range: float = 0.1,
+        jitter_range: float = 0.1,  # Kept for API compatibility
     ):
         """Initialize retry with jitter.
 
@@ -205,21 +291,20 @@ class RetryWithJitter:
             max_retries: Maximum number of retry attempts
             initial_delay: Initial delay in seconds
             max_delay: Maximum delay cap in seconds
-            exponential_base: Base for exponential backoff
+            exponential_base: Base for exponential backoff (ignored, tenacity uses 2)
             jitter: Whether to add jitter to delays
-            jitter_range: Jitter range as fraction of delay (0.1 = 10%)
+            jitter_range: Jitter range as fraction of delay (converted to seconds)
         """
         self.max_retries = max_retries
         self.initial_delay = initial_delay
         self.max_delay = max_delay
-        self.exponential_base = exponential_base
-        self.jitter = jitter
-        self.jitter_range = jitter_range
+        # Convert jitter_range (fraction) to seconds for tenacity
+        self._jitter_seconds = max_delay * jitter_range if jitter else 0
 
     def execute(
         self,
         func: Callable[..., T],
-        exceptions: tuple = (Exception,),
+        exceptions: tuple[type[Exception], ...] = (Exception,),
         *args: Any,
         **kwargs: Any,
     ) -> T:
@@ -237,47 +322,32 @@ class RetryWithJitter:
         Raises:
             Last exception if all retries exhausted
         """
-        delay = self.initial_delay
-        last_exception = None
+        retryer = Retrying(
+            stop=stop_after_attempt(self.max_retries),
+            wait=wait_exponential_jitter(
+                initial=self.initial_delay,
+                max=self.max_delay,
+                jitter=self._jitter_seconds,
+            ),
+            retry=retry_if_exception_type(exceptions),
+            before_sleep=_log_retry_attempt,
+            reraise=True,
+        )
 
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                return func(*args, **kwargs)
-            except exceptions as e:
-                last_exception = e
+        try:
+            for attempt in retryer:
+                with attempt:
+                    return func(*args, **kwargs)
+        except RetryError as e:
+            logger.error(
+                "retry_exhausted",
+                func=func.__name__,
+                attempts=self.max_retries,
+                error=str(e.last_attempt.exception()) if e.last_attempt else "unknown",
+            )
+            raise
 
-                if attempt == self.max_retries:
-                    logger.error(
-                        "retry_exhausted",
-                        func=func.__name__,
-                        attempts=attempt,
-                        error=str(e),
-                    )
-                    raise
-
-                # Calculate delay with exponential backoff
-                delay = min(delay * self.exponential_base, self.max_delay)
-
-                # Add jitter if enabled
-                if self.jitter:
-                    jitter_amount = delay * self.jitter_range
-                    delay = delay + random.uniform(-jitter_amount, jitter_amount)
-                    delay = max(0.1, delay)  # Ensure positive delay
-
-                logger.warning(
-                    "retry_with_jitter",
-                    func=func.__name__,
-                    attempt=attempt,
-                    max_retries=self.max_retries,
-                    delay=round(delay, 2),
-                    error=str(e),
-                )
-
-                time.sleep(delay)
-
-        # Should never reach here
-        if last_exception:
-            raise last_exception
+        # Should never reach here, but satisfy type checker
         return func(*args, **kwargs)
 
 

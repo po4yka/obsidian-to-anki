@@ -373,96 +373,9 @@ def calculate_repair_backoff(attempt: int, base_interval: float = 0.5) -> float:
     return min(delay + jitter, 10.0)  # Cap at 10 seconds
 
 
-class CircuitBreaker:
-    """Circuit breaker pattern for repair operations.
-
-    Prevents repeated failures from overwhelming the system by temporarily
-    disabling repair attempts after a threshold of failures.
-    """
-
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        recovery_timeout: float = 60.0,
-        half_open_max_attempts: int = 2,
-    ):
-        """Initialize circuit breaker.
-
-        Args:
-            failure_threshold: Number of failures before opening circuit
-            recovery_timeout: Seconds before attempting recovery (half-open)
-            half_open_max_attempts: Max attempts in half-open state
-        """
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
-        self.half_open_max_attempts = half_open_max_attempts
-
-        self.failure_count = 0
-        self.last_failure_time: float | None = None
-        self.state = "closed"  # closed, open, half_open
-        self.half_open_attempts = 0
-
-    def record_success(self) -> None:
-        """Record a successful operation."""
-        if self.state == "half_open":
-            # Success in half-open: close the circuit
-            self.state = "closed"
-            self.failure_count = 0
-            self.half_open_attempts = 0
-        elif self.state == "closed":
-            # Reset failure count on success
-            self.failure_count = 0
-
-    def record_failure(self) -> None:
-        """Record a failed operation."""
-        import time
-
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-
-        if self.state == "half_open":
-            self.half_open_attempts += 1
-            if self.half_open_attempts >= self.half_open_max_attempts:
-                # Too many failures in half-open: open again
-                self.state = "open"
-                self.half_open_attempts = 0
-        elif self.state == "closed":
-            if self.failure_count >= self.failure_threshold:
-                # Threshold reached: open the circuit
-                self.state = "open"
-
-    def can_attempt(self) -> bool:
-        """Check if repair attempt is allowed.
-
-        Returns:
-            True if attempt is allowed, False if circuit is open
-        """
-        import time
-
-        if self.state == "closed":
-            return True
-
-        if self.state == "open":
-            # Check if recovery timeout has passed
-            if (
-                self.last_failure_time is not None
-                and time.time() - self.last_failure_time >= self.recovery_timeout
-            ):
-                # Move to half-open state
-                self.state = "half_open"
-                self.half_open_attempts = 0
-                return True
-            return False
-
-        return self.state == "half_open"
-
-    def get_state(self) -> str:
-        """Get current circuit breaker state.
-
-        Returns:
-            State string (closed/open/half_open)
-        """
-        return self.state
+# CircuitBreaker implementation is in obsidian_anki_sync.utils.resilience
+# Import from there for consistent tenacity-based circuit breaker pattern:
+# from obsidian_anki_sync.utils.resilience import CircuitBreaker, CircuitBreakerConfig
 
 
 def get_adaptive_retry_count(error: Exception, base_max_retries: int = 3) -> int:

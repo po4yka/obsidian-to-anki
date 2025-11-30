@@ -15,6 +15,8 @@ Security Note:
 import json
 import sqlite3
 import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -153,6 +155,33 @@ class StateDB(IStateRepository):
                 error_type=type(e).__name__,
                 query_preview=query[:100],
             )
+            raise
+
+    @contextmanager
+    def transaction(self) -> Generator[sqlite3.Connection]:
+        """Execute operations within a transaction with automatic rollback on error.
+
+        This context manager provides ACID guarantees for database operations:
+        - Auto-commits on successful exit
+        - Auto-rolls back on any exception
+        - Re-raises the original exception after rollback
+
+        Usage:
+            with db.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO ...")
+                cursor.execute("UPDATE ...")
+            # Commits automatically if no exception
+
+        Yields:
+            SQLite connection for the current thread
+        """
+        conn = self._get_connection()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
             raise
 
     def _init_schema(self) -> None:
@@ -436,6 +465,7 @@ class StateDB(IStateRepository):
                 duration=round(duration, 4),
             )
         except sqlite3.Error as e:
+            conn.rollback()
             duration = time.time() - start_time
             logger.error(
                 "db_transaction_error",
@@ -450,26 +480,37 @@ class StateDB(IStateRepository):
     def update_card(self, card: ModelCard) -> None:
         """Update existing card record."""
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE cards
-            SET content_hash = ?,
-                note_title = ?,
-                note_type = ?,
-                card_guid = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE slug = ?
-        """,
-            (
-                card.content_hash,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-                card.slug,
-            ),
-        )
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE cards
+                SET content_hash = ?,
+                    note_title = ?,
+                    note_type = ?,
+                    card_guid = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE slug = ?
+            """,
+                (
+                    card.content_hash,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    card.slug,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="update_card",
+                slug=card.slug,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def get_by_slug(self, slug: str) -> dict | None:
         """Get card by slug."""
@@ -580,9 +621,20 @@ class StateDB(IStateRepository):
     def delete_card(self, slug: str) -> None:
         """Delete a card record."""
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cards WHERE slug = ?", (slug,))
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="delete_card",
+                slug=slug,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def insert_card_extended(
         self,
@@ -604,97 +656,17 @@ class StateDB(IStateRepository):
             apf_html: Full APF HTML content
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO cards (
-                slug, slug_base, lang, source_path, source_anchor,
-                card_index, anki_guid, content_hash, note_id, note_title,
-                note_type, card_guid, apf_html, fields_json, tags_json,
-                deck_name, creation_status, synced_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """,
-            (
-                card.slug,
-                card.manifest.slug_base,
-                card.lang,
-                card.manifest.source_path,
-                card.manifest.source_anchor,
-                card.manifest.card_index,
-                anki_guid,
-                card.content_hash,
-                card.manifest.note_id,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-                apf_html,
-                json.dumps(fields),
-                json.dumps(tags),
-                deck_name,
-                "success",
-            ),
-        )
-        conn.commit()
-
-    def update_card_extended(
-        self, card: ModelCard, fields: dict[str, str], tags: list[str], apf_html: str
-    ) -> None:
-        """Update card with full content for atomicity support.
-
-        Args:
-            card: Card object to update
-            fields: Mapped fields dict
-            tags: List of tags
-            apf_html: Full APF HTML content
-        """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE cards
-            SET content_hash = ?,
-                note_title = ?,
-                note_type = ?,
-                card_guid = ?,
-                apf_html = ?,
-                fields_json = ?,
-                tags_json = ?,
-                updated_at = CURRENT_TIMESTAMP,
-                synced_at = CURRENT_TIMESTAMP
-            WHERE slug = ?
-            """,
-            (
-                card.content_hash,
-                card.manifest.note_title,
-                card.note_type,
-                card.guid,
-                apf_html,
-                json.dumps(fields),
-                json.dumps(tags),
-                card.slug,
-            ),
-        )
-        conn.commit()
-
-    def insert_cards_batch(
-        self,
-        cards_data: list[tuple[ModelCard, int, dict[str, str], list[str], str]],
-        deck_name: str,
-    ) -> None:
-        """Insert multiple cards in a single batch operation.
-
-        Args:
-            cards_data: List of tuples (card, anki_guid, fields, tags, apf_html)
-            deck_name: Target deck name
-        """
-        if not cards_data:
-            return
-
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        insert_data = []
-        for card, anki_guid, fields, tags, apf_html in cards_data:
-            insert_data.append(
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO cards (
+                    slug, slug_base, lang, source_path, source_anchor,
+                    card_index, anki_guid, content_hash, note_id, note_title,
+                    note_type, card_guid, apf_html, fields_json, tags_json,
+                    deck_name, creation_status, synced_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
                 (
                     card.slug,
                     card.manifest.slug_base,
@@ -713,22 +685,135 @@ class StateDB(IStateRepository):
                     json.dumps(tags),
                     deck_name,
                     "success",
-                )
+                ),
             )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="insert_card_extended",
+                slug=card.slug,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
-        cursor.executemany(
-            """
-            INSERT INTO cards (
-                slug, slug_base, lang, source_path, source_anchor,
-                card_index, anki_guid, content_hash, note_id, note_title,
-                note_type, card_guid, apf_html, fields_json, tags_json,
-                deck_name, creation_status, synced_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """,
-            insert_data,
-        )
-        conn.commit()
-        logger.info("cards_inserted_batch", count=len(cards_data))
+    def update_card_extended(
+        self, card: ModelCard, fields: dict[str, str], tags: list[str], apf_html: str
+    ) -> None:
+        """Update card with full content for atomicity support.
+
+        Args:
+            card: Card object to update
+            fields: Mapped fields dict
+            tags: List of tags
+            apf_html: Full APF HTML content
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE cards
+                SET content_hash = ?,
+                    note_title = ?,
+                    note_type = ?,
+                    card_guid = ?,
+                    apf_html = ?,
+                    fields_json = ?,
+                    tags_json = ?,
+                    updated_at = CURRENT_TIMESTAMP,
+                    synced_at = CURRENT_TIMESTAMP
+                WHERE slug = ?
+                """,
+                (
+                    card.content_hash,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    apf_html,
+                    json.dumps(fields),
+                    json.dumps(tags),
+                    card.slug,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="update_card_extended",
+                slug=card.slug,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
+
+    def insert_cards_batch(
+        self,
+        cards_data: list[tuple[ModelCard, int, dict[str, str], list[str], str]],
+        deck_name: str,
+    ) -> None:
+        """Insert multiple cards in a single batch operation.
+
+        Args:
+            cards_data: List of tuples (card, anki_guid, fields, tags, apf_html)
+            deck_name: Target deck name
+        """
+        if not cards_data:
+            return
+
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            insert_data = []
+            for card, anki_guid, fields, tags, apf_html in cards_data:
+                insert_data.append(
+                    (
+                        card.slug,
+                        card.manifest.slug_base,
+                        card.lang,
+                        card.manifest.source_path,
+                        card.manifest.source_anchor,
+                        card.manifest.card_index,
+                        anki_guid,
+                        card.content_hash,
+                        card.manifest.note_id,
+                        card.manifest.note_title,
+                        card.note_type,
+                        card.guid,
+                        apf_html,
+                        json.dumps(fields),
+                        json.dumps(tags),
+                        deck_name,
+                        "success",
+                    )
+                )
+
+            cursor.executemany(
+                """
+                INSERT INTO cards (
+                    slug, slug_base, lang, source_path, source_anchor,
+                    card_index, anki_guid, content_hash, note_id, note_title,
+                    note_type, card_guid, apf_html, fields_json, tags_json,
+                    deck_name, creation_status, synced_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                insert_data,
+            )
+            conn.commit()
+            logger.info("cards_inserted_batch", count=len(cards_data))
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="insert_cards_batch",
+                count=len(cards_data),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def update_cards_batch(
         self,
@@ -743,40 +828,51 @@ class StateDB(IStateRepository):
             return
 
         conn = self._get_connection()
-        cursor = conn.cursor()
-        update_data = []
-        for card, fields, tags in cards_data:
-            update_data.append(
-                (
-                    card.content_hash,
-                    card.manifest.note_title,
-                    card.note_type,
-                    card.guid,
-                    card.apf_html,
-                    json.dumps(fields),
-                    json.dumps(tags),
-                    card.slug,
+        try:
+            cursor = conn.cursor()
+            update_data = []
+            for card, fields, tags in cards_data:
+                update_data.append(
+                    (
+                        card.content_hash,
+                        card.manifest.note_title,
+                        card.note_type,
+                        card.guid,
+                        card.apf_html,
+                        json.dumps(fields),
+                        json.dumps(tags),
+                        card.slug,
+                    )
                 )
-            )
 
-        cursor.executemany(
-            """
-            UPDATE cards
-            SET content_hash = ?,
-                note_title = ?,
-                note_type = ?,
-                card_guid = ?,
-                apf_html = ?,
-                fields_json = ?,
-                tags_json = ?,
-                updated_at = CURRENT_TIMESTAMP,
-                synced_at = CURRENT_TIMESTAMP
-            WHERE slug = ?
-            """,
-            update_data,
-        )
-        conn.commit()
-        logger.info("cards_updated_batch", count=len(cards_data))
+            cursor.executemany(
+                """
+                UPDATE cards
+                SET content_hash = ?,
+                    note_title = ?,
+                    note_type = ?,
+                    card_guid = ?,
+                    apf_html = ?,
+                    fields_json = ?,
+                    tags_json = ?,
+                    updated_at = CURRENT_TIMESTAMP,
+                    synced_at = CURRENT_TIMESTAMP
+                WHERE slug = ?
+                """,
+                update_data,
+            )
+            conn.commit()
+            logger.info("cards_updated_batch", count=len(cards_data))
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="update_cards_batch",
+                count=len(cards_data),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def delete_cards_batch(self, slugs: list[str]) -> None:
         """Delete multiple cards in a single batch operation.
@@ -788,13 +884,24 @@ class StateDB(IStateRepository):
             return
 
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.executemany(
-            "DELETE FROM cards WHERE slug = ?",
-            [(slug,) for slug in slugs],
-        )
-        conn.commit()
-        logger.info("cards_deleted_batch", count=len(slugs))
+        try:
+            cursor = conn.cursor()
+            cursor.executemany(
+                "DELETE FROM cards WHERE slug = ?",
+                [(slug,) for slug in slugs],
+            )
+            conn.commit()
+            logger.info("cards_deleted_batch", count=len(slugs))
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="delete_cards_batch",
+                count=len(slugs),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def update_card_status(
         self,
@@ -812,31 +919,43 @@ class StateDB(IStateRepository):
             increment_retry: Whether to increment retry counter
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        if increment_retry:
-            cursor.execute(
-                """
-                UPDATE cards
-                SET creation_status = ?,
-                    last_error = ?,
-                    retry_count = retry_count + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE slug = ?
-                """,
-                (status, error_message, slug),
+        try:
+            cursor = conn.cursor()
+            if increment_retry:
+                cursor.execute(
+                    """
+                    UPDATE cards
+                    SET creation_status = ?,
+                        last_error = ?,
+                        retry_count = retry_count + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE slug = ?
+                    """,
+                    (status, error_message, slug),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE cards
+                    SET creation_status = ?,
+                        last_error = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE slug = ?
+                    """,
+                    (status, error_message, slug),
+                )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="update_card_status",
+                slug=slug,
+                status=status,
+                error=str(e),
+                error_type=type(e).__name__,
             )
-        else:
-            cursor.execute(
-                """
-                UPDATE cards
-                SET creation_status = ?,
-                    last_error = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE slug = ?
-                """,
-                (status, error_message, slug),
-            )
-        conn.commit()
+            raise
 
     def save_progress(self, progress: "SyncProgress") -> None:
         """Save sync progress state.
@@ -845,56 +964,67 @@ class StateDB(IStateRepository):
             progress: SyncProgress instance
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        # Serialize note progress
-        note_progress_json = json.dumps(
-            {
-                key: {
-                    "source_path": note.source_path,
-                    "card_index": note.card_index,
-                    "lang": note.lang,
-                    "status": note.status,
-                    "error": note.error,
-                    "started_at": (
-                        note.started_at.isoformat() if note.started_at else None
-                    ),
-                    "completed_at": (
-                        note.completed_at.isoformat() if note.completed_at else None
-                    ),
+            # Serialize note progress
+            note_progress_json = json.dumps(
+                {
+                    key: {
+                        "source_path": note.source_path,
+                        "card_index": note.card_index,
+                        "lang": note.lang,
+                        "status": note.status,
+                        "error": note.error,
+                        "started_at": (
+                            note.started_at.isoformat() if note.started_at else None
+                        ),
+                        "completed_at": (
+                            note.completed_at.isoformat() if note.completed_at else None
+                        ),
+                    }
+                    for key, note in progress.note_progress.items()
                 }
-                for key, note in progress.note_progress.items()
-            }
-        )
+            )
 
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO sync_progress (
-                session_id, phase, started_at, updated_at, completed_at,
-                total_notes, notes_processed, cards_generated,
-                cards_created, cards_updated, cards_deleted,
-                cards_restored, cards_skipped, errors, note_progress
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                progress.session_id,
-                progress.phase.value,
-                progress.started_at.isoformat(),
-                progress.updated_at.isoformat(),
-                progress.completed_at.isoformat() if progress.completed_at else None,
-                progress.total_notes,
-                progress.notes_processed,
-                progress.cards_generated,
-                progress.cards_created,
-                progress.cards_updated,
-                progress.cards_deleted,
-                progress.cards_restored,
-                progress.cards_skipped,
-                progress.errors,
-                note_progress_json,
-            ),
-        )
-        conn.commit()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO sync_progress (
+                    session_id, phase, started_at, updated_at, completed_at,
+                    total_notes, notes_processed, cards_generated,
+                    cards_created, cards_updated, cards_deleted,
+                    cards_restored, cards_skipped, errors, note_progress
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    progress.session_id,
+                    progress.phase.value,
+                    progress.started_at.isoformat(),
+                    progress.updated_at.isoformat(),
+                    progress.completed_at.isoformat() if progress.completed_at else None,
+                    progress.total_notes,
+                    progress.notes_processed,
+                    progress.cards_generated,
+                    progress.cards_created,
+                    progress.cards_updated,
+                    progress.cards_deleted,
+                    progress.cards_restored,
+                    progress.cards_skipped,
+                    progress.errors,
+                    note_progress_json,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="save_progress",
+                session_id=progress.session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def get_progress(self, session_id: str) -> "SyncProgress | None":
         """Get sync progress by session ID.
@@ -1043,9 +1173,22 @@ class StateDB(IStateRepository):
             session_id: Session identifier
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM sync_progress WHERE session_id = ?", (session_id,))
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM sync_progress WHERE session_id = ?", (session_id,)
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="delete_progress",
+                session_id=session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     # Note Index Methods
 
@@ -1073,35 +1216,46 @@ class StateDB(IStateRepository):
             metadata_json: JSON string of full metadata
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO note_index (
-                source_path, note_id, note_title, topic, language_tags,
-                qa_pair_count, file_modified_at, metadata_json, last_indexed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(source_path) DO UPDATE SET
-                note_id = excluded.note_id,
-                note_title = excluded.note_title,
-                topic = excluded.topic,
-                language_tags = excluded.language_tags,
-                qa_pair_count = excluded.qa_pair_count,
-                file_modified_at = excluded.file_modified_at,
-                metadata_json = excluded.metadata_json,
-                last_indexed_at = CURRENT_TIMESTAMP
-        """,
-            (
-                source_path,
-                note_id,
-                note_title,
-                topic,
-                ",".join(language_tags) if language_tags else "",
-                qa_pair_count,
-                file_modified_at.isoformat() if file_modified_at else None,
-                metadata_json,
-            ),
-        )
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO note_index (
+                    source_path, note_id, note_title, topic, language_tags,
+                    qa_pair_count, file_modified_at, metadata_json, last_indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_path) DO UPDATE SET
+                    note_id = excluded.note_id,
+                    note_title = excluded.note_title,
+                    topic = excluded.topic,
+                    language_tags = excluded.language_tags,
+                    qa_pair_count = excluded.qa_pair_count,
+                    file_modified_at = excluded.file_modified_at,
+                    metadata_json = excluded.metadata_json,
+                    last_indexed_at = CURRENT_TIMESTAMP
+            """,
+                (
+                    source_path,
+                    note_id,
+                    note_title,
+                    topic,
+                    ",".join(language_tags) if language_tags else "",
+                    qa_pair_count,
+                    file_modified_at.isoformat() if file_modified_at else None,
+                    metadata_json,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="upsert_note_index",
+                source_path=source_path,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def update_note_sync_status(
         self, source_path: str, status: str, error_message: str | None = None
@@ -1114,18 +1268,30 @@ class StateDB(IStateRepository):
             error_message: Optional error message if failed
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE note_index
-            SET sync_status = ?,
-                error_message = ?,
-                last_synced_at = CURRENT_TIMESTAMP
-            WHERE source_path = ?
-        """,
-            (status, error_message, source_path),
-        )
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE note_index
+                SET sync_status = ?,
+                    error_message = ?,
+                    last_synced_at = CURRENT_TIMESTAMP
+                WHERE source_path = ?
+            """,
+                (status, error_message, source_path),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="update_note_sync_status",
+                source_path=source_path,
+                status=status,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def get_note_index(self, source_path: str) -> dict | None:
         """Get note index entry.
@@ -1204,42 +1370,55 @@ class StateDB(IStateRepository):
             in_database: Whether card exists in sync database
         """
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO card_index (
-                source_path, card_index, lang, slug, anki_guid, note_id,
-                note_title, content_hash, status, in_obsidian, in_anki,
-                in_database, last_indexed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(source_path, card_index, lang) DO UPDATE SET
-                slug = excluded.slug,
-                anki_guid = excluded.anki_guid,
-                note_id = excluded.note_id,
-                note_title = excluded.note_title,
-                content_hash = excluded.content_hash,
-                status = excluded.status,
-                in_obsidian = excluded.in_obsidian,
-                in_anki = excluded.in_anki,
-                in_database = excluded.in_database,
-                last_indexed_at = CURRENT_TIMESTAMP
-        """,
-            (
-                source_path,
-                card_index,
-                lang,
-                slug,
-                anki_guid,
-                note_id,
-                note_title,
-                content_hash,
-                status,
-                in_obsidian,
-                in_anki,
-                in_database,
-            ),
-        )
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO card_index (
+                    source_path, card_index, lang, slug, anki_guid, note_id,
+                    note_title, content_hash, status, in_obsidian, in_anki,
+                    in_database, last_indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_path, card_index, lang) DO UPDATE SET
+                    slug = excluded.slug,
+                    anki_guid = excluded.anki_guid,
+                    note_id = excluded.note_id,
+                    note_title = excluded.note_title,
+                    content_hash = excluded.content_hash,
+                    status = excluded.status,
+                    in_obsidian = excluded.in_obsidian,
+                    in_anki = excluded.in_anki,
+                    in_database = excluded.in_database,
+                    last_indexed_at = CURRENT_TIMESTAMP
+            """,
+                (
+                    source_path,
+                    card_index,
+                    lang,
+                    slug,
+                    anki_guid,
+                    note_id,
+                    note_title,
+                    content_hash,
+                    status,
+                    in_obsidian,
+                    in_anki,
+                    in_database,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="upsert_card_index",
+                source_path=source_path,
+                card_index=card_index,
+                lang=lang,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     def get_card_index_by_source(self, source_path: str) -> list[dict]:
         """Get all cards for a note.
@@ -1320,10 +1499,20 @@ class StateDB(IStateRepository):
     def clear_index(self) -> None:
         """Clear all index data (for rebuilding)."""
         conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM note_index")
-        cursor.execute("DELETE FROM card_index")
-        conn.commit()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM note_index")
+            cursor.execute("DELETE FROM card_index")
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="clear_index",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     # Checkpoint methods removed (were unused dead code)
     # Table sync_checkpoints kept for backward compatibility

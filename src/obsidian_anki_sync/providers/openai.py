@@ -9,6 +9,7 @@ import httpx
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .base import BaseLLMProvider
+from .retry_utils import calculate_retry_wait, is_retryable_status, log_retry
 
 logger = get_logger(__name__)
 
@@ -204,7 +205,7 @@ class OpenAIProvider(BaseLLMProvider):
             timeout=self.timeout,
         )
 
-        # Retry logic
+        # Retry logic with exponential backoff and Retry-After header support
         last_exception: httpx.HTTPStatusError | httpx.RequestError | None = None
         for attempt in range(self.max_retries):
             try:
@@ -217,13 +218,19 @@ class OpenAIProvider(BaseLLMProvider):
                 break
             except httpx.HTTPStatusError as e:
                 last_exception = e
-                if e.response.status_code >= 500 and attempt < self.max_retries - 1:
-                    # Retry on server errors
-                    wait_time = 2**attempt  # Exponential backoff
-                    logger.warning(
-                        "openai_retry",
+                status_code = e.response.status_code
+                # Retry on rate limits (429) and server errors (5xx)
+                if is_retryable_status(status_code) and attempt < self.max_retries - 1:
+                    wait_time = calculate_retry_wait(
+                        status_code=status_code,
+                        attempt=attempt,
+                        response=e.response,
+                    )
+                    log_retry(
+                        provider_name="openai",
                         attempt=attempt + 1,
-                        status_code=e.response.status_code,
+                        max_retries=self.max_retries,
+                        status_code=status_code,
                         wait_time=wait_time,
                     )
                     time.sleep(wait_time)
@@ -232,12 +239,18 @@ class OpenAIProvider(BaseLLMProvider):
             except httpx.RequestError as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = 2**attempt
-                    logger.warning(
-                        "openai_retry_request_error",
+                    wait_time = calculate_retry_wait(
+                        status_code=0,
+                        attempt=attempt,
+                        response=None,
+                    )
+                    log_retry(
+                        provider_name="openai",
                         attempt=attempt + 1,
-                        error=str(e),
+                        max_retries=self.max_retries,
+                        status_code=None,
                         wait_time=wait_time,
+                        error=str(e),
                     )
                     time.sleep(wait_time)
                     continue

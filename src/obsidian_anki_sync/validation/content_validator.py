@@ -5,7 +5,11 @@ from typing import Any
 
 from langdetect import DetectorFactory, detect
 
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseValidator, Severity
+
+logger = get_logger(__name__)
 
 # Set seed for consistent language detection results
 DetectorFactory.seed = 0
@@ -233,9 +237,16 @@ class ContentValidator(BaseValidator):
                                     section=section_name,
                                 )
                                 reversed_sections.append(section_name)
-                    except Exception:
-                        # Not enough text or detection failed
-                        pass
+                    except Exception as e:
+                        # Not enough text or detection failed - log at debug level
+                        logger.debug(
+                            "language_detection_failed",
+                            section=section_name,
+                            expected_lang=expected_lang,
+                            text_length=len(text_clean.strip()),
+                            error=str(e),
+                            error_type=type(e).__name__,
+                        )
 
         # If both EN and RU sections appear reversed, suggest swap
         if len(reversed_sections) >= 2:

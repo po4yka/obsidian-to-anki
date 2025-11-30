@@ -10,6 +10,8 @@ from typing import Any
 import yaml
 from tqdm import tqdm
 
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .android_validator import AndroidValidator
 from .base import AutoFix, Severity
 from .content_validator import ContentValidator
@@ -20,6 +22,8 @@ from .parallel_validator import ParallelConfig, ParallelValidator
 from .report_generator import ReportGenerator
 from .taxonomy_loader import TaxonomyLoader
 from .yaml_validator import YAMLValidator
+
+logger = get_logger(__name__)
 
 
 class NoteValidator:
@@ -228,7 +232,14 @@ class NoteValidator:
                 current_frontmatter = new_frontmatter
                 applied_fixes.append(fix.description)
             except Exception as e:
-                # Skip this fix if it fails
+                # Log the failure but continue with other fixes
+                logger.warning(
+                    "fix_application_failed",
+                    filepath=str(filepath),
+                    fix_description=fix.description,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 continue
 
         # Only write if content changed
@@ -236,6 +247,13 @@ class NoteValidator:
             try:
                 filepath.write_text(current_content, encoding="utf-8")
             except Exception as e:
+                logger.error(
+                    "file_write_failed",
+                    filepath=str(filepath),
+                    fixes_to_apply=len(applied_fixes),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return 0, []
 
         return len(applied_fixes), applied_fixes
