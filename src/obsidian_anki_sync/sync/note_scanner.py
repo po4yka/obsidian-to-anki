@@ -930,8 +930,12 @@ class NoteScanner:
                     try:
                         result = await job.result()
                     except Exception as e:
+                        error_str = str(e) if str(e) else f"{type(e).__name__}: (no message)"
                         logger.error(
-                            "job_result_fetch_failed", job_id=job_id, error=str(e)
+                            "job_result_fetch_failed",
+                            job_id=job_id,
+                            error=error_str,
+                            exception_type=type(e).__name__,
                         )
                         self.stats["errors"] = self.stats.get("errors", 0) + 1
                         done_this_loop.add(job_id)

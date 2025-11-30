@@ -112,9 +112,36 @@ async def process_note_job(
         )
 
         if not result.success or not result.generation:
+            # Build detailed error message from pipeline result
+            error_details = []
+            if not result.success:
+                error_details.append("Pipeline marked as failed")
+            if result.pre_validation and not result.pre_validation.is_valid:
+                error_details.append(
+                    f"Pre-validation failed ({result.pre_validation.error_type}): "
+                    f"{result.pre_validation.error_details}"
+                )
+            if result.post_validation and not result.post_validation.is_valid:
+                error_details.append(
+                    f"Post-validation failed ({result.post_validation.error_type}): "
+                    f"{result.post_validation.error_details}"
+                )
+            if not result.generation:
+                error_details.append("No cards generated")
+            elif result.generation.total_cards == 0:
+                error_details.append("Generator returned zero cards")
+
+            error_msg = "; ".join(error_details) if error_details else "Unknown pipeline error"
+            logger.warning(
+                "pipeline_generation_failed",
+                file=relative_path,
+                error=error_msg,
+                pre_valid=result.pre_validation.is_valid if result.pre_validation else None,
+                post_valid=result.post_validation.is_valid if result.post_validation else None,
+            )
             return {
                 "success": False,
-                "error": "Pipeline failed to generate cards",
+                "error": error_msg,
                 "cards": [],
             }
 
