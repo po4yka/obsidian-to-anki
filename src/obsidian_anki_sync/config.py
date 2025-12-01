@@ -531,7 +531,7 @@ class Config(BaseSettings):
     post_validator_temperature: float | None = None
     post_validator_max_tokens: int | None = None
     post_validator_timeout_seconds: float = Field(
-        default=120.0,
+        default=300.0,
         ge=5.0,
         description="Per-attempt timeout for post-validation agent calls (seconds)",
     )

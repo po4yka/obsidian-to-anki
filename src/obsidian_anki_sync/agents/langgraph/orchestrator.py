@@ -748,7 +748,7 @@ class LangGraphOrchestrator:
             "retry_count": 0,
             "max_retries": self.max_retries,
             "post_validator_timeout_seconds": getattr(
-                self.config, "post_validator_timeout_seconds", 45.0
+                self.config, "post_validator_timeout_seconds", 300.0
             ),
             "post_validator_retry_backoff_seconds": getattr(
                 self.config, "post_validator_retry_backoff_seconds", 3.0

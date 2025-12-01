@@ -1147,7 +1147,7 @@ async def _sleep_post_validation_backoff(state: PipelineState) -> None:
     delay = compute_jittered_backoff(
         attempt,
         initial_delay=state.get("post_validator_retry_backoff_seconds", 3.0),
-        max_delay=(state.get("post_validator_timeout_seconds", 45.0) / 2),
+        max_delay=(state.get("post_validator_timeout_seconds", 300.0) / 2),
         jitter=state.get("post_validator_retry_jitter_seconds", 1.5),
     )
     if delay <= 0:
@@ -1222,7 +1222,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     # Create post-validator agent
     post_validator = PostValidatorAgentAI(model=model, temperature=0.0)
 
-    timeout_seconds = state.get("post_validator_timeout_seconds", 45.0)
+    timeout_seconds = state.get("post_validator_timeout_seconds", 300.0)
 
     # Run validation
     try:

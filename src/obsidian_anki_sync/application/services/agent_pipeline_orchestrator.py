@@ -40,7 +40,7 @@ class AgentPipelineOrchestrator:
         self.retry_handler = retry_handler
         self.cache_strategy = cache_strategy
         self.config = config or {}
-        self.config.setdefault("post_validator_timeout_seconds", 45.0)
+        self.config.setdefault("post_validator_timeout_seconds", 300.0)
         self.config.setdefault("post_validator_retry_backoff_seconds", 3.0)
         self.config.setdefault("post_validator_retry_jitter_seconds", 1.5)
 
