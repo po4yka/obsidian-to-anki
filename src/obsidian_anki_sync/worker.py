@@ -226,9 +226,12 @@ class WorkerSettings:
     functions = [process_note_job]
     on_startup = startup
     on_shutdown = shutdown
-    _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "360"))
-    _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "180"))
-    job_timeout = int(_gen_budget + _val_budget + 60)
+    # Increased timeouts for complex notes with multiple LLM calls
+    # Generation includes: pre-validation, card-splitting, generation, linter
+    # Validation includes: post-validation with retries, context enrichment
+    _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "600"))
+    _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "300"))
+    job_timeout = int(_gen_budget + _val_budget + 60)  # 960s = 16 minutes total
 
     # Use environment variables with defaults
     redis_settings = RedisSettings.from_dsn(

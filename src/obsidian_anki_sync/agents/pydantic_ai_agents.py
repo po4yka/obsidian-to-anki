@@ -571,7 +571,7 @@ class PostValidatorAgentAI:
             cards=cards, metadata=metadata, strict_mode=strict_mode
         )
 
-        # Build validation prompt
+        # Build validation prompt with FULL card content
         prompt = f"""Validate these {len(cards)} generated APF cards:
 
 Metadata:
@@ -581,12 +581,16 @@ Metadata:
 
 Cards to validate:
 """
-        for card in cards[:3]:  # Show first 3 for context
-            prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
-            prompt += f"HTML Preview: {card.apf_html[:200]}...\n"
+        # Include full HTML content for proper validation (up to 3 cards to avoid token limits)
+        for card in cards[:3]:
+            prompt += f"\n--- Card {card.card_index} ({card.lang}): {card.slug} ---\n"
+            prompt += f"```html\n{card.apf_html}\n```\n"
+
+        if len(cards) > 3:
+            prompt += f"\n(Plus {len(cards) - 3} more cards with similar structure)\n"
 
         prompt += (
-            f"\nValidate all {len(cards)} cards for correctness, accuracy, and quality."
+            f"\nValidate all {len(cards)} cards for APF v2.1 compliance, correctness, and quality."
         )
 
         try:

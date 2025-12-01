@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -11,6 +12,49 @@ if TYPE_CHECKING:
     from obsidian_anki_sync.agents.models import CardCorrection, GeneratedCard
 
 logger = get_logger(__name__)
+
+
+def _decode_html_entities(value: str) -> str:
+    """Decode HTML entities only if APF structure markers are incorrectly escaped.
+
+    APF cards have two types of content:
+    1. APF structure (<!-- Title -->, <pre><code>) - should be raw HTML
+    2. Code content inside <code> blocks - should use &lt; &gt; for literal display
+
+    This function only decodes if APF STRUCTURE markers are HTML-escaped,
+    indicating the LLM incorrectly escaped the entire APF structure.
+    Entities inside code blocks (which are correct) are preserved.
+
+    Args:
+        value: The APF HTML value that might have escaped structure markers
+
+    Returns:
+        Value with APF structure decoded, code content entities preserved
+    """
+    # Only decode if APF structure markers are HTML-escaped
+    # This indicates the LLM incorrectly escaped the entire APF structure
+    apf_structure_escaped = (
+        "&lt;!--" in value  # Escaped APF comment marker
+        or "&lt;pre&gt;" in value  # Escaped <pre> tag
+        or "&lt;ul&gt;" in value  # Escaped <ul> tag
+        or "&lt;li&gt;" in value  # Escaped <li> tag
+        or "&lt;p&gt;" in value  # Escaped <p> tag
+    )
+
+    if not apf_structure_escaped:
+        # Entities are only in code content (correct) - don't decode
+        return value
+
+    # LLM escaped everything - decode the entire value
+    # Note: &amp;lt; will decode to &lt; (correct for code content)
+    decoded = html.unescape(value)
+    if decoded != value:
+        logger.warning(
+            "apf_structure_decoded",
+            original_preview=value[:100],
+            decoded_preview=decoded[:100],
+        )
+    return decoded
 
 # Fields that can be patched on GeneratedCard
 PATCHABLE_FIELDS = {"slug", "lang", "apf_html", "confidence"}
@@ -56,14 +100,29 @@ def apply_corrections(
             )
             continue
 
-        # Get current value for logging
+        # Get current value for comparison and logging
         old_value = getattr(card, correction.field_name, None)
 
         try:
+            # Decode HTML entities if the LLM incorrectly HTML-escaped the content
+            suggested_value = correction.suggested_value
+            if correction.field_name == "apf_html" and isinstance(suggested_value, str):
+                suggested_value = _decode_html_entities(suggested_value)
+
+            # Skip no-op corrections (after decoding, value is same as original)
+            if old_value == suggested_value:
+                logger.debug(
+                    "correction_skipped_noop",
+                    card_index=correction.card_index,
+                    field=correction.field_name,
+                    rationale=correction.rationale,
+                )
+                continue
+
             # Apply the correction with proper validation/coercion
             # Use model_validate to ensure type coercion (e.g., str -> float for confidence)
             current_data = card.model_dump()
-            current_data[correction.field_name] = correction.suggested_value
+            current_data[correction.field_name] = suggested_value
 
             # Import here to avoid circular imports at module level
             from obsidian_anki_sync.agents.models import GeneratedCard as CardModel
@@ -71,9 +130,9 @@ def apply_corrections(
             updated_card = CardModel.model_validate(current_data)
             card_map[correction.card_index] = updated_card
 
-            # Build human-readable change description
+            # Build human-readable change description (use decoded value, not raw LLM response)
             old_preview = _truncate_value(old_value)
-            new_preview = _truncate_value(correction.suggested_value)
+            new_preview = _truncate_value(suggested_value)
             change_desc = (
                 f"Card {correction.card_index}: "
                 f"{correction.field_name} '{old_preview}' -> '{new_preview}'"

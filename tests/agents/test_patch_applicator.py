@@ -229,6 +229,134 @@ class TestApplyCorrections:
         assert "..." in changes[0]  # Truncation indicator
 
 
+class TestHtmlEntityDecoding:
+    """Tests for HTML entity decoding in corrections.
+
+    APF cards have two types of content:
+    1. APF structure (<!-- Title -->, <pre><code>) - should be raw HTML
+    2. Code content inside <code> blocks - should use &lt; &gt; for literal display
+
+    Decoding only happens when APF STRUCTURE markers are HTML-escaped.
+    """
+
+    def test_apf_structure_entities_decoded(
+        self, sample_cards: list[GeneratedCard]
+    ) -> None:
+        """APF structure entities are decoded when LLM escapes entire structure."""
+        corrections = [
+            CardCorrection(
+                card_index=1,
+                field_name="apf_html",
+                # LLM escaped APF structure (including <!-- comment -->)
+                suggested_value="&lt;!-- Title --&gt;\n&lt;p&gt;Fixed&lt;/p&gt;",
+                rationale="Fix HTML",
+            )
+        ]
+
+        corrected, changes = apply_corrections(sample_cards, corrections)
+
+        # APF structure should be decoded
+        assert corrected[0].apf_html == "<!-- Title -->\n<p>Fixed</p>"
+        assert len(changes) == 1
+
+    def test_code_content_entities_preserved(
+        self, sample_cards: list[GeneratedCard]
+    ) -> None:
+        """Entities in code content are preserved (not decoded).
+
+        When LLM suggests &lt; inside code blocks for literal display,
+        these should NOT be decoded - Anki needs them escaped.
+        """
+        corrections = [
+            CardCorrection(
+                card_index=1,
+                field_name="apf_html",
+                # Proper APF: structure is raw HTML, code content has entities
+                suggested_value="<pre><code>if (x &lt; y) { }</code></pre>",
+                rationale="Fix code display",
+            )
+        ]
+
+        corrected, changes = apply_corrections(sample_cards, corrections)
+
+        # Code content entities should be preserved for Anki display
+        assert corrected[0].apf_html == "<pre><code>if (x &lt; y) { }</code></pre>"
+        assert len(changes) == 1
+
+    def test_double_escaped_entities_decoded_correctly(
+        self, sample_cards: list[GeneratedCard]
+    ) -> None:
+        """When LLM escapes everything, double-escaped entities decode correctly.
+
+        If code content should have &lt; and LLM escapes the whole thing:
+        &amp;lt; decodes to &lt; (which is correct for Anki display)
+        """
+        corrections = [
+            CardCorrection(
+                card_index=1,
+                field_name="apf_html",
+                # LLM escaped entire structure including code content
+                suggested_value="&lt;pre&gt;&lt;code&gt;x &amp;lt; y&lt;/code&gt;&lt;/pre&gt;",
+                rationale="Fix code",
+            )
+        ]
+
+        corrected, changes = apply_corrections(sample_cards, corrections)
+
+        # Structure decoded, code entity preserved as &lt;
+        assert corrected[0].apf_html == "<pre><code>x &lt; y</code></pre>"
+        assert len(changes) == 1
+
+    def test_noop_correction_skipped_after_decode(
+        self, sample_cards: list[GeneratedCard]
+    ) -> None:
+        """Correction is skipped if decoded value equals original."""
+        # Create a card with APF structure
+        cards = [
+            GeneratedCard(
+                card_index=1,
+                slug="test",
+                lang="en",
+                apf_html="<!-- Title -->\n<p>Test</p>",
+                confidence=0.9,
+            )
+        ]
+
+        # LLM suggests the same value but with escaped APF structure
+        corrections = [
+            CardCorrection(
+                card_index=1,
+                field_name="apf_html",
+                suggested_value="&lt;!-- Title --&gt;\n&lt;p&gt;Test&lt;/p&gt;",
+                rationale="No-op fix",
+            )
+        ]
+
+        corrected, changes = apply_corrections(cards, corrections)
+
+        # No changes should be applied (it's a no-op after decoding)
+        assert changes == []
+        assert corrected[0].apf_html == "<!-- Title -->\n<p>Test</p>"
+
+    def test_noop_correction_skipped_for_identical_value(
+        self, sample_cards: list[GeneratedCard]
+    ) -> None:
+        """Correction is skipped if suggested value equals original exactly."""
+        corrections = [
+            CardCorrection(
+                card_index=1,
+                field_name="apf_html",
+                suggested_value="<p>Original content 1</p>",  # Same as original
+                rationale="No actual change",
+            )
+        ]
+
+        corrected, changes = apply_corrections(sample_cards, corrections)
+
+        # No changes should be applied
+        assert changes == []
+
+
 class TestPatchableFields:
     """Tests for PATCHABLE_FIELDS constant."""
 

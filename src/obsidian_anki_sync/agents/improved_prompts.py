@@ -422,38 +422,63 @@ CORRECT: Update metadata when using `{{c1::...}}`
 # Post-Validation Prompts
 # ============================================================================
 
-POST_VALIDATION_SYSTEM_PROMPT = """You are a post-validation agent for APF (Active Prompt Format) flashcards.
+POST_VALIDATION_SYSTEM_PROMPT = """You are a post-validation agent for APF (Active Prompt Format) v2.1 flashcards.
 
-Your task is to validate generated cards for quality, syntax correctness, and adherence to APF format.
+Your task is to validate generated cards for quality, syntax correctness, and adherence to APF v2.1 format.
+
+## APF v2.1 Structure (IMPORTANT - know this format!)
+
+Valid APF v2.1 cards have this structure:
+```
+<!-- PROMPT_VERSION: apf-v2.1 -->    <-- VALID marker, do not flag as error
+<!-- BEGIN_CARDS -->
+
+<!-- Card N | slug: ... | CardType: Simple/Missing/Draw | Tags: tag1 tag2 -->
+
+<!-- Title -->
+Question text
+
+<!-- Key point (code block / image) -->
+<pre><code>...</code></pre>
+
+<!-- Key point notes -->
+<ul><li>...</li></ul>
+
+<!-- manifest: {...} -->
+<!-- END_CARDS -->
+END_OF_CARDS                          <-- VALID sentinel, do not flag as error
+```
 
 ## Validation Criteria
 
-1. **APF Syntax Correctness**
-   - Proper HTML structure
-   - Required comments (BEGIN_CARDS, Card metadata, END_CARDS)
-   - Valid Front/Back/Extra sections
-   - Proper HTML escaping
+1. **APF v2.1 Syntax Correctness**
+   - Required sentinels: `<!-- PROMPT_VERSION: apf-v2.1 -->`, `<!-- BEGIN_CARDS -->`, `<!-- END_CARDS -->`, `END_OF_CARDS` are ALL VALID
+   - Required comments: Card metadata header, manifest comment
+   - Required sections: `<!-- Title -->`, `<!-- Key point -->` or `<!-- Key point (code block / image) -->`, `<!-- Key point notes -->`
+   - Valid CardTypes: Simple, Missing, Draw (NOT Basic/Front/Back - those are old format)
+   - Proper HTML structure and nesting
    - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Cloze
    - **MathJax**: Valid `\\(...\\)` or `\\[...\\]` syntax
 
 2. **Factual Accuracy**
-   - Answer matches the question
+   - Answer in Key point notes matches the question in Title
    - Information is correct and complete
    - No contradictions or errors
 
 3. **Semantic Coherence**
    - Card makes sense standalone
-   - Question is clear and unambiguous
-   - Answer is well-structured
+   - Title (question) is clear and unambiguous
+   - Key point notes (answer) are well-structured
 
 4. **Template Compliance**
-   - Follows APF v2.1 format exactly
+   - Follows APF v2.1 format (NOT old Front/Back format)
    - Metadata includes required fields (slug, CardType, Tags)
-   - Slugs are properly formatted
+   - Slugs are properly formatted with language suffix (-en, -ru)
+   - Manifest JSON matches card header
 
 5. **Language Consistency**
-   - Content matches declared language tag
-   - No mixing of languages within a card
+   - Content matches declared language tag in slug suffix
+   - No mixing of languages within a card (technical terms in English are OK)
    - Proper character encoding (UTF-8)
 
 ## Response Format
@@ -467,9 +492,11 @@ Return structured JSON with:
   - card_index: 0-based index of the card to fix
   - field_name: name of the field to correct (e.g., "apf_html", "slug", "lang")
   - current_value: current value of the field (optional)
-  - suggested_value: corrected value for the field
+  - suggested_value: corrected value for the field (IMPORTANT: use raw HTML, NOT HTML-escaped entities like &lt; or &gt;)
   - rationale: reason for the correction
 - confidence: 0.0-1.0 (confidence in this validation)
+
+CRITICAL: In suggested_value, use raw HTML characters (< > &), NOT HTML entities (&lt; &gt; &amp;). The content is JSON-encoded, not HTML-encoded.
 
 ## Examples
 
@@ -477,22 +504,28 @@ Return structured JSON with:
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: python-lists-1-en | CardType: Basic | Tags: python lists interview -->
+<!-- Card 1 | slug: python-lists-1-en | CardType: Simple | Tags: python lists interview -->
 
-<!-- Front -->
-<p>How do you create an empty list in Python?</p>
+<!-- Title -->
+How do you create an empty list in Python?
 
-<!-- Back -->
-<p>Use empty square brackets <code>[]</code> or the <code>list()</code> constructor.</p>
-<pre><code>empty1 = []
+<!-- Key point (code block / image) -->
+<pre><code class="language-python">empty1 = []
 empty2 = list()</code></pre>
 
+<!-- Key point notes -->
+<ul>
+  <li>Use empty square brackets <code>[]</code></li>
+  <li>Or the <code>list()</code> constructor</li>
+</ul>
+
+<!-- manifest: {"slug":"python-lists-1-en","lang":"en","type":"Simple","tags":["python","lists","interview"]} -->
 <!-- END_CARDS -->
 ```
 
 Reasoning:
-- APF syntax is correct
-- All required comments present
+- APF v2.1 syntax is correct with Title, Key point, Key point notes sections
+- All required comments present (BEGIN_CARDS, Card header, END_CARDS, manifest)
 - Question is clear, answer is accurate
 - Proper HTML formatting with code tags
 - Factually correct
@@ -514,11 +547,13 @@ Input Card:
 ```html
 <!-- BEGIN_CARDS -->
 
-<!-- Front -->
-<p>What is polymorphism?</p>
+<!-- Title -->
+What is polymorphism?
 
-<!-- Back -->
-<p>The ability of objects to take multiple forms.</p>
+<!-- Key point notes -->
+<ul>
+  <li>The ability of objects to take multiple forms</li>
+</ul>
 
 <!-- END_CARDS -->
 ```
@@ -526,6 +561,7 @@ Input Card:
 Reasoning:
 - Missing Card metadata comment (required by APF v2.1)
 - Should have: <!-- Card 1 | slug: ... | CardType: ... | Tags: ... -->
+- Missing manifest comment
 - Content is okay, but format violation
 
 Output:
@@ -533,7 +569,7 @@ Output:
 {
   "is_valid": false,
   "error_type": "template",
-  "error_details": "Missing required card metadata comment after BEGIN_CARDS",
+  "error_details": "Missing required card metadata comment and manifest after BEGIN_CARDS",
   "card_issues": [
     {
       "card_index": 0,
@@ -544,9 +580,9 @@ Output:
     {
       "card_index": 0,
       "field_name": "apf_html",
-      "current_value": "<!-- BEGIN_CARDS -->\\n\\n<!-- Front -->\\n<p>What is polymorphism?</p>\\n\\n<!-- Back -->\\n<p>The ability of objects to take multiple forms.</p>\\n\\n<!-- END_CARDS -->",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Basic | Tags: oop polymorphism interview -->\\n\\n<!-- Front -->\\n<p>What is polymorphism?</p>\\n\\n<!-- Back -->\\n<p>The ability of objects to take multiple forms.</p>\\n\\n<!-- END_CARDS -->",
-      "rationale": "Added missing card metadata comment with slug, CardType, and Tags"
+      "current_value": "<!-- BEGIN_CARDS -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>The ability of objects to take multiple forms</li>\\n</ul>\\n\\n<!-- END_CARDS -->",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Simple | Tags: oop polymorphism interview -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>The ability of objects to take multiple forms</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"oop-polymorphism-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"oop\",\"polymorphism\",\"interview\"]} -->\\n<!-- END_CARDS -->",
+      "rationale": "Added missing card metadata comment with slug, CardType, Tags, and manifest"
     }
   ],
   "confidence": 0.92
@@ -557,20 +593,23 @@ Output:
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Basic | Tags: algorithms sorting interview -->
+<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Simple | Tags: algorithms sorting interview -->
 
-<!-- Front -->
-<p>What is the time complexity of bubble sort?</p>
+<!-- Title -->
+What is the time complexity of bubble sort?
 
-<!-- Back -->
-<p>O(n) in all cases</p>
+<!-- Key point notes -->
+<ul>
+  <li>O(n) in all cases</li>
+</ul>
 
+<!-- manifest: {"slug":"sorting-algorithms-1-en","lang":"en","type":"Simple","tags":["algorithms","sorting","interview"]} -->
 <!-- END_CARDS -->
 ```
 
 Reasoning:
-- APF format is correct
-- BUT factual error: bubble sort is O(n²) worst/average case, O(n) best case only
+- APF v2.1 format is correct
+- BUT factual error: bubble sort is O(n^2) worst/average case, O(n) best case only
 - Answer is misleading and incorrect
 
 Output:
@@ -589,8 +628,8 @@ Output:
     {
       "card_index": 1,
       "field_name": "apf_html",
-      "current_value": "...\\n<!-- Back -->\\n<p>O(n) in all cases</p>\\n...",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Basic | Tags: algorithms sorting interview -->\\n\\n<!-- Front -->\\n<p>What is the time complexity of bubble sort?</p>\\n\\n<!-- Back -->\\n<p><strong>Best case:</strong> O(n) - already sorted</p>\\n<p><strong>Average case:</strong> O(n^2)</p>\\n<p><strong>Worst case:</strong> O(n^2)</p>\\n\\n<!-- END_CARDS -->",
+      "current_value": "...<!-- Key point notes -->\\n<ul>\\n  <li>O(n) in all cases</li>\\n</ul>...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Simple | Tags: algorithms sorting interview -->\\n\\n<!-- Title -->\\nWhat is the time complexity of bubble sort?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li><strong>Best case:</strong> O(n) - already sorted</li>\\n  <li><strong>Average case:</strong> O(n^2)</li>\\n  <li><strong>Worst case:</strong> O(n^2)</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"sorting-algorithms-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"algorithms\",\"sorting\",\"interview\"]} -->\\n<!-- END_CARDS -->",
       "rationale": "Corrected factually incorrect time complexity - bubble sort is O(n^2) for worst/average cases"
     }
   ],
@@ -602,19 +641,22 @@ Output:
 Input Card:
 ```html
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: web-html-1-en | CardType: Basic | Tags: web html interview -->
+<!-- Card 1 | slug: web-html-1-en | CardType: Simple | Tags: web html interview -->
 
-<!-- Front -->
-<p>What is the <div> tag used for?
+<!-- Title -->
+What is the <div> tag used for?
 
-<!-- Back -->
-<p>A <div> tag is a container for grouping HTML elements.</p>
+<!-- Key point notes -->
+<ul>
+  <li>A <div> tag is a container for grouping HTML elements</p>
+</ul>
 
+<!-- manifest: {"slug":"web-html-1-en","lang":"en","type":"Simple","tags":["web","html","interview"]} -->
 <!-- END_CARDS -->
 ```
 
 Reasoning:
-- Missing closing </p> tag in Front section
+- Mismatched HTML tags in Key point notes (</p> inside <li>)
 - HTML is malformed
 - Content is correct but syntax error
 
@@ -623,20 +665,20 @@ Output:
 {
   "is_valid": false,
   "error_type": "syntax",
-  "error_details": "Malformed HTML in Front section: unclosed <p> tag",
+  "error_details": "Malformed HTML in Key point notes: mismatched tags",
   "card_issues": [
     {
       "card_index": 1,
-      "issue": "Front section has unclosed <p> tag"
+      "issue": "Key point notes section has mismatched HTML tags (</p> inside <li>)"
     }
   ],
   "suggested_corrections": [
     {
       "card_index": 1,
       "field_name": "apf_html",
-      "current_value": "...<!-- Front -->\\n<p>What is the <div> tag used for?\\n\\n<!-- Back -->...",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: web-html-1-en | CardType: Basic | Tags: web html interview -->\\n\\n<!-- Front -->\\n<p>What is the &lt;div&gt; tag used for?</p>\\n\\n<!-- Back -->\\n<p>A &lt;div&gt; tag is a container for grouping HTML elements.</p>\\n\\n<!-- END_CARDS -->",
-      "rationale": "Fixed unclosed <p> tag and escaped HTML entities in tag names"
+      "current_value": "...<!-- Key point notes -->\\n<ul>\\n  <li>A <div> tag is a container for grouping HTML elements</p>\\n</ul>...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: web-html-1-en | CardType: Simple | Tags: web html interview -->\\n\\n<!-- Title -->\\nWhat is the <div> tag used for?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>A <div> tag is a container for grouping HTML elements</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"web-html-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"web\",\"html\",\"interview\"]} -->\\n<!-- END_CARDS -->",
+      "rationale": "Fixed mismatched HTML tags - replaced </p> with </li>"
     }
   ],
   "confidence": 0.93
