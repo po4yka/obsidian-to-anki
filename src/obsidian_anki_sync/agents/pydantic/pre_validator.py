@@ -58,11 +58,12 @@ class PreValidatorAgentAI:
         )
 
         # Create PydanticAI agent with structured output and increased retry limit
+        # PreValidationOutput schema can be complex - give LLM more attempts
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
             output_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
-            retries=3,  # Allow more retries for output validation failures
+            retries=5,  # Increased: complex schema may need more attempts
         )
 
         logger.info(

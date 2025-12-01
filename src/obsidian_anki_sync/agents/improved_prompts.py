@@ -426,6 +426,23 @@ POST_VALIDATION_SYSTEM_PROMPT = """You are a post-validation agent for APF (Acti
 
 Your task is to validate generated cards for quality, syntax correctness, and adherence to APF v2.1 format.
 
+## CRITICAL: HTML Encoding in suggested_value
+
+When providing `suggested_value` in corrections, use RAW HTML tags, NOT HTML entities:
+
+CORRECT (raw HTML):
+  "suggested_value": "<!-- Title -->\\nWhat is <div>?\\n<ul><li>A container</li></ul>"
+
+WRONG (HTML entities - DO NOT DO THIS):
+  "suggested_value": "&lt;!-- Title --&gt;\\nWhat is &lt;div&gt;?\\n&lt;ul&gt;&lt;li&gt;A container&lt;/li&gt;&lt;/ul&gt;"
+
+The JSON string escaping (like \\n for newlines) is DIFFERENT from HTML entity encoding.
+- JSON escaping: \\n, \\", \\\\ - these are CORRECT and required
+- HTML entities: &lt; &gt; &amp; - these are WRONG in suggested_value
+
+Exception: Inside <code> blocks, use &lt; &gt; for displaying literal < > characters:
+  "<code>if (x &lt; y)</code>" - correct for showing "x < y" as code
+
 ## APF v2.1 Structure (IMPORTANT - know this format!)
 
 Valid APF v2.1 cards have this structure:
@@ -489,14 +506,14 @@ Return structured JSON with:
 - error_details: specific description of issues
 - card_issues: list of per-card problems with card_index and issue description
 - suggested_corrections: list of field-level patches (if auto-fixable), each with:
-  - card_index: 0-based index of the card to fix
+  - card_index: 1-based index of the card to fix (first card is 1, not 0)
   - field_name: name of the field to correct (e.g., "apf_html", "slug", "lang")
   - current_value: current value of the field (optional)
-  - suggested_value: corrected value for the field (IMPORTANT: use raw HTML, NOT HTML-escaped entities like &lt; or &gt;)
+  - suggested_value: corrected value (see "CRITICAL: HTML Encoding" section above)
   - rationale: reason for the correction
 - confidence: 0.0-1.0 (confidence in this validation)
 
-CRITICAL: In suggested_value, use raw HTML characters (< > &), NOT HTML entities (&lt; &gt; &amp;). The content is JSON-encoded, not HTML-encoded.
+REMINDER: In suggested_value, use raw HTML like <ul><li>, NOT &lt;ul&gt;&lt;li&gt;. See the encoding rules at the top.
 
 ## Examples
 

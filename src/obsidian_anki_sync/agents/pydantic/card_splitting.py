@@ -13,6 +13,7 @@ from obsidian_anki_sync.agents.card_splitting_prompts import (
 )
 from obsidian_anki_sync.agents.exceptions import ModelError, StructuredOutputError
 from obsidian_anki_sync.agents.models import CardSplitPlan, CardSplittingResult
+from obsidian_anki_sync.agents.output_fixing import OutputFixingParser
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -38,11 +39,19 @@ class CardSplittingAgentAI:
         self.model = model
         self.temperature = temperature
 
-        # Create PydanticAI agent
+        # Create PydanticAI agent with retries for complex nested output
         self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(
             model=self.model,
             output_type=CardSplittingOutput,
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
+            retries=5,  # CardSplittingOutput has nested CardSplitPlanOutput list
+        )
+
+        # Add OutputFixingParser for better error recovery
+        self.fixing_parser = OutputFixingParser(
+            agent=self.agent,
+            max_fix_attempts=2,
+            fix_temperature=temperature,
         )
 
         logger.info("pydantic_ai_card_splitting_agent_initialized", model=str(model))
@@ -96,9 +105,8 @@ Questions:
         try:
             start_time = time.time()
 
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: CardSplittingOutput = result.output
+            # Run agent with OutputFixingParser for better error recovery
+            output: CardSplittingOutput = await self.fixing_parser.run(prompt, deps=deps)
 
             # Convert split plan
             split_plans = []

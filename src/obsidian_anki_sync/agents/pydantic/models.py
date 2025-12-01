@@ -26,8 +26,12 @@ from obsidian_anki_sync.models import NoteMetadata, QAPair
 class CardIssue(BaseModel):
     """Issue found in a specific card during validation."""
 
-    card_index: int = Field(ge=0, description="0-based card index")
-    issue_description: str = Field(min_length=1, description="Description of the issue")
+    card_index: int = Field(ge=1, description="1-based card index (first card is 1)")
+    issue_description: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Description of the issue (max 500 chars)",
+    )
 
 
 # =============================================================================
@@ -132,10 +136,14 @@ class CardSplitPlanOutput(BaseModel):
     """Single card plan in split output."""
 
     card_number: int = Field(default=1, ge=1)
-    concept: str
-    question: str
-    answer_summary: str
-    rationale: str
+    concept: str = Field(max_length=200, description="Core concept (max 200 chars)")
+    question: str = Field(max_length=500, description="Question text (max 500 chars)")
+    answer_summary: str = Field(
+        max_length=500, description="Brief answer summary (max 500 chars)"
+    )
+    rationale: str = Field(
+        max_length=300, description="Why this card exists (max 300 chars)"
+    )
 
 
 class CardSplittingOutput(BaseModel):
@@ -144,20 +152,33 @@ class CardSplittingOutput(BaseModel):
     should_split: bool = Field(
         description="Whether to split into multiple cards")
     card_count: int = Field(
-        default=1, ge=1, description="Number of cards to generate")
+        default=1, ge=1, le=10, description="Number of cards to generate (1-10)"
+    )
     splitting_strategy: str = Field(
-        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware"
+        max_length=50,
+        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware",
     )
     split_plan: list[CardSplitPlanOutput] = Field(
         default_factory=list, description="Plan for each card"
     )
-    reasoning: str = Field(description="Explanation of the decision")
+    reasoning: str = Field(
+        max_length=500, description="Explanation of the decision (max 500 chars)"
+    )
     confidence: float = Field(
         ge=0.0, le=1.0, default=0.5, description="Decision confidence (0.0-1.0)"
     )
     fallback_strategy: str | None = Field(
-        default=None, description="Fallback strategy if primary fails"
+        default=None, max_length=50, description="Fallback strategy if primary fails"
     )
+
+    @model_validator(mode="after")
+    def validate_split_plan_count(self) -> "CardSplittingOutput":
+        """Ensure split_plan length matches card_count when splitting."""
+        if self.should_split and self.split_plan:
+            if len(self.split_plan) != self.card_count:
+                # Auto-correct card_count to match actual plan
+                object.__setattr__(self, "card_count", len(self.split_plan))
+        return self
 
 
 class DuplicateMatchOutput(BaseModel):

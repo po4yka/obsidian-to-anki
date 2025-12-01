@@ -41,15 +41,17 @@ class PostValidatorAgentAI:
         self.temperature = temperature
 
         # Create PydanticAI agent with increased retry limit for output validation
+        # PostValidationOutput has nested CardCorrection objects which LLMs sometimes
+        # struggle to produce correctly on first attempt - give more attempts
         self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
             output_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
-            retries=3,  # Allow more retries for output validation failures
+            retries=5,  # Increased: complex nested schema needs more attempts
         )
         self.fixing_parser = OutputFixingParser(
             agent=self.agent,
-            max_fix_attempts=1,
+            max_fix_attempts=2,  # Increased: allow one more fix attempt
             fix_temperature=temperature,
         )
 

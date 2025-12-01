@@ -17,11 +17,24 @@ class CardCorrection(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_index: int = Field(ge=0, description="0-based card index")
-    field_name: str = Field(min_length=1, description="Name of the field to correct")
-    current_value: str | None = Field(default=None, description="Current field value")
-    suggested_value: str = Field(description="Suggested corrected value")
-    rationale: str = Field(default="", description="Reason for the correction")
+    card_index: int = Field(ge=1, description="1-based card index (first card is 1)")
+    field_name: str = Field(
+        min_length=1,
+        max_length=50,
+        description="Name of the field to correct (e.g., apf_html, slug, lang)",
+    )
+    current_value: str | None = Field(
+        default=None,
+        description="Current field value (optional, for context)",
+    )
+    suggested_value: str = Field(
+        description="Suggested corrected value (use raw HTML, not entities)"
+    )
+    rationale: str = Field(
+        default="",
+        max_length=300,
+        description="Reason for the correction (max 300 chars)",
+    )
 
 
 class NoteMetadata(BaseModel):
