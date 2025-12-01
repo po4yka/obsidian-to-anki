@@ -156,7 +156,7 @@ class CardSplittingOutput(BaseModel):
     )
     splitting_strategy: str = Field(
         max_length=50,
-        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware",
+        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/prerequisite_aware/cloze",
     )
     split_plan: list[CardSplitPlanOutput] = Field(
         default_factory=list, description="Plan for each card"

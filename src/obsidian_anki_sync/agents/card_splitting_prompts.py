@@ -247,7 +247,7 @@ Split:
 Return structured JSON with:
 - should_split: true/false
 - card_count: int (1 for single, N for split)
-- splitting_strategy: string (concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/cloze/none)
+- splitting_strategy: string (concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/prerequisite_aware/cloze/none)
 - split_plan: list of card specifications
   - Each card: {card_number, concept, question, answer_summary, rationale}
 - reasoning: string explaining the decision

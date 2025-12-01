@@ -223,6 +223,8 @@ class CardSplittingResult(BaseModel):
         "difficulty",
         "prerequisite",
         "context_aware",
+        "prerequisite_aware",
+        "cloze",
     ]
     split_plan: list[CardSplitPlan] = Field(default_factory=list)
     reasoning: str = ""
