@@ -38,7 +38,7 @@ from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .model_factory import ModelFactory
-from .state import PipelineState, register_runtime_resources
+from .state import PipelineState, cleanup_runtime_resources, register_runtime_resources
 from .workflow_builder import WorkflowBuilder
 
 # Optional agent memory and observability (requires chromadb, motor, langsmith)
@@ -250,11 +250,12 @@ class LangGraphOrchestrator:
         # Build the workflow graph
         self.workflow = self.workflow_builder.build_workflow()
 
-        # Initialize checkpoint saver for state persistence
-        self.checkpointer = MemorySaver()
-
         # Compile the graph
-        self.app = self.workflow.compile(checkpointer=self.checkpointer)
+        # Note: We do not use a checkpointer (MemorySaver) here because:
+        # 1. We don't need to resume interrupted workflows
+        # 2. MemorySaver accumulates state history indefinitely, causing memory leaks in long-running processes
+        # 3. We use ainvoke for single-shot execution
+        self.app = self.workflow.compile()
 
         # Provider compatibility - create a dummy provider for compatibility
         # The LangGraph orchestrator uses PydanticAI models internally
@@ -630,159 +631,171 @@ class LangGraphOrchestrator:
             rag_integration=self.rag_integration,
         )
 
-        # Initialize state
-        # Best practice: Initialize all state fields explicitly
-        initial_state: PipelineState = {
-            # Pipeline tracking
-            "pipeline_id": pipeline_id,
-            # Input data
-            "note_content": note_content,
-            "metadata_dict": metadata.model_dump(),
-            "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
-            "file_path": str(file_path) if file_path else None,
-            "slug_base": slug_base,
-            "runtime_key": runtime_key,
-            "config_snapshot": self.config.model_dump(mode="json"),
-            "existing_cards_dicts": (
-                [card.model_dump() for card in existing_cards]
-                if existing_cards
-                else None
-            ),
-            # NEW: Agent framework configuration (dynamically determined)
-            "agent_framework": optimal_framework,
-            "agent_selector": runtime_key,  # Present for backward compatibility
-            # Cached model names (models fetched via runtime registry)
-            "pre_validator_model": self.config.get_model_for_agent("pre_validator"),
-            "card_splitting_model": self.config.get_model_for_agent("card_splitting"),
-            "generator_model": self.config.get_model_for_agent("generator"),
-            "post_validator_model": self.config.get_model_for_agent("post_validator"),
-            "context_enrichment_model": self.config.get_model_for_agent(
-                "context_enrichment"
-            ),
-            "memorization_quality_model": self.config.get_model_for_agent(
-                "memorization_quality"
-            ),
-            "duplicate_detection_model": self.config.get_model_for_agent(
-                "duplicate_detection"
-            ),
-            "split_validator_model": self.config.get_model_for_agent("split_validator"),
-            "highlight_model": self.config.get_model_for_agent("highlight"),
-            # Chain of Thought (CoT) configuration
-            "enable_cot_reasoning": getattr(self.config, "enable_cot_reasoning", False),
-            "store_reasoning_traces": getattr(
-                self.config, "store_reasoning_traces", True
-            ),
-            "log_reasoning_traces": getattr(self.config, "log_reasoning_traces", False),
-            "cot_enabled_stages": getattr(
-                self.config,
-                "cot_enabled_stages",
-                ["pre_validation", "generation", "post_validation"],
-            ),
-            "reasoning_model": self.config.get_model_for_agent("reasoning"),
-            "reasoning_traces": {},
-            "current_reasoning": None,
-            # Self-Reflection configuration
-            "enable_self_reflection": getattr(
-                self.config, "enable_self_reflection", False
-            ),
-            "store_reflection_traces": getattr(
-                self.config, "store_reflection_traces", True
-            ),
-            "log_reflection_traces": getattr(
-                self.config, "log_reflection_traces", False
-            ),
-            "reflection_enabled_stages": getattr(
-                self.config,
-                "reflection_enabled_stages",
-                ["generation", "context_enrichment"],
-            ),
-            "reflection_model": self.config.get_model_for_agent("reflection"),
-            "reflection_traces": {},
-            "current_reflection": None,
-            "revision_count": 0,
-            "max_revisions": getattr(self.config, "max_revisions", 2),
-            "stage_revision_counts": {},
-            # Domain Detection and Smart Skipping
-            "detected_domain": None,  # Will be set by first reflection node
-            "reflection_skipped": False,
-            "reflection_skip_reason": None,
-            "revision_strategy": None,
-            # RAG (Retrieval-Augmented Generation) configuration
-            "enable_rag": self.enable_rag,
-            "rag_context_enrichment": getattr(
-                self.config, "rag_context_enrichment", True
-            ),
-            "rag_duplicate_detection": getattr(
-                self.config, "rag_duplicate_detection", True
-            ),
-            "rag_few_shot_examples": getattr(
-                self.config, "rag_few_shot_examples", True
-            ),
-            "rag_integration": runtime_key,
-            "rag_enrichment": None,
-            "rag_examples": None,
-            "rag_duplicate_results": None,
-            # Auto-Fix configuration (autofix always runs as first step)
-            "autofix_write_back": getattr(self.config, "autofix_write_back", False),
-            "autofix_handlers": getattr(self.config, "autofix_handlers", None),
-            # Pipeline stage results
-            "autofix": None,  # Will be populated by autofix_node
-            "pre_validation": None,
-            "note_correction": None,
-            "card_splitting": None,
-            "generation": None,
-            "linter_valid": False,  # Will be set by linter_validation_node
-            "linter_results": [],  # Will be populated by linter_validation_node
-            "post_validation": None,
-            "context_enrichment": None,
-            "memorization_quality": None,
-            "duplicate_detection": None,
-            "highlight_result": None,
-            # Workflow control
-            "current_stage": self._determine_entry_stage(),
-            "enable_card_splitting": self.enable_card_splitting,
-            "enable_context_enrichment": self.enable_context_enrichment,
-            "enable_memorization_quality": self.enable_memorization_quality,
-            "enable_duplicate_detection": self.enable_duplicate_detection,
-            "enable_highlight_agent": self.enable_highlight_agent,
-            "retry_count": 0,
-            "max_retries": self.max_retries,
-            "post_validator_timeout_seconds": getattr(
-                self.config, "post_validator_timeout_seconds", 600.0  # Increased for complex notes
-            ),
-            "post_validator_retry_backoff_seconds": getattr(
-                self.config, "post_validator_retry_backoff_seconds", 3.0
-            ),
-            "post_validator_retry_jitter_seconds": getattr(
-                self.config, "post_validator_retry_jitter_seconds", 1.5
-            ),
-            "auto_fix_enabled": self.auto_fix_enabled,
-            "strict_mode": self.strict_mode,
-            # Cycle protection (best practice: add hard stops)
-            "step_count": 0,
-            "max_steps": getattr(self.config, "langgraph_max_steps", 20),
-            # Error tracking (best practice: track errors for debugging)
-            "last_error": None,
-            "last_error_severity": None,
-            "errors": [],
-            # Timing
-            "start_time": start_time,
-            "stage_times": {},
-            "messages": [],
-        }
+        try:
+            # Initialize state
+            # Best practice: Initialize all state fields explicitly
+            initial_state: PipelineState = {
+                # Pipeline tracking
+                "pipeline_id": pipeline_id,
+                # Input data
+                "note_content": note_content,
+                "metadata_dict": metadata.model_dump(),
+                "qa_pairs_dicts": [qa.model_dump() for qa in qa_pairs],
+                "file_path": str(file_path) if file_path else None,
+                "slug_base": slug_base,
+                "runtime_key": runtime_key,
+                "config_snapshot": self.config.model_dump(mode="json"),
+                "existing_cards_dicts": (
+                    [card.model_dump() for card in existing_cards]
+                    if existing_cards
+                    else None
+                ),
+                # NEW: Agent framework configuration (dynamically determined)
+                "agent_framework": optimal_framework,
+                "agent_selector": runtime_key,  # Present for backward compatibility
+                # Cached model names (models fetched via runtime registry)
+                "pre_validator_model": self.config.get_model_for_agent("pre_validator"),
+                "card_splitting_model": self.config.get_model_for_agent("card_splitting"),
+                "generator_model": self.config.get_model_for_agent("generator"),
+                "post_validator_model": self.config.get_model_for_agent("post_validator"),
+                "context_enrichment_model": self.config.get_model_for_agent(
+                    "context_enrichment"
+                ),
+                "memorization_quality_model": self.config.get_model_for_agent(
+                    "memorization_quality"
+                ),
+                "duplicate_detection_model": self.config.get_model_for_agent(
+                    "duplicate_detection"
+                ),
+                "split_validator_model": self.config.get_model_for_agent(
+                    "split_validator"
+                ),
+                "highlight_model": self.config.get_model_for_agent("highlight"),
+                # Chain of Thought (CoT) configuration
+                "enable_cot_reasoning": getattr(
+                    self.config, "enable_cot_reasoning", False
+                ),
+                "store_reasoning_traces": getattr(
+                    self.config, "store_reasoning_traces", True
+                ),
+                "log_reasoning_traces": getattr(
+                    self.config, "log_reasoning_traces", False
+                ),
+                "cot_enabled_stages": getattr(
+                    self.config,
+                    "cot_enabled_stages",
+                    ["pre_validation", "generation", "post_validation"],
+                ),
+                "reasoning_model": self.config.get_model_for_agent("reasoning"),
+                "reasoning_traces": {},
+                "current_reasoning": None,
+                # Self-Reflection configuration
+                "enable_self_reflection": getattr(
+                    self.config, "enable_self_reflection", False
+                ),
+                "store_reflection_traces": getattr(
+                    self.config, "store_reflection_traces", True
+                ),
+                "log_reflection_traces": getattr(
+                    self.config, "log_reflection_traces", False
+                ),
+                "reflection_enabled_stages": getattr(
+                    self.config,
+                    "reflection_enabled_stages",
+                    ["generation", "context_enrichment"],
+                ),
+                "reflection_model": self.config.get_model_for_agent("reflection"),
+                "reflection_traces": {},
+                "current_reflection": None,
+                "revision_count": 0,
+                "max_revisions": getattr(self.config, "max_revisions", 2),
+                "stage_revision_counts": {},
+                # Domain Detection and Smart Skipping
+                "detected_domain": None,  # Will be set by first reflection node
+                "reflection_skipped": False,
+                "reflection_skip_reason": None,
+                "revision_strategy": None,
+                # RAG (Retrieval-Augmented Generation) configuration
+                "enable_rag": self.enable_rag,
+                "rag_context_enrichment": getattr(
+                    self.config, "rag_context_enrichment", True
+                ),
+                "rag_duplicate_detection": getattr(
+                    self.config, "rag_duplicate_detection", True
+                ),
+                "rag_few_shot_examples": getattr(
+                    self.config, "rag_few_shot_examples", True
+                ),
+                "rag_integration": runtime_key,
+                "rag_enrichment": None,
+                "rag_examples": None,
+                "rag_duplicate_results": None,
+                # Auto-Fix configuration (autofix always runs as first step)
+                "autofix_write_back": getattr(self.config, "autofix_write_back", False),
+                "autofix_handlers": getattr(self.config, "autofix_handlers", None),
+                # Pipeline stage results
+                "autofix": None,  # Will be populated by autofix_node
+                "pre_validation": None,
+                "note_correction": None,
+                "card_splitting": None,
+                "generation": None,
+                "linter_valid": False,  # Will be set by linter_validation_node
+                "linter_results": [],  # Will be populated by linter_validation_node
+                "post_validation": None,
+                "context_enrichment": None,
+                "memorization_quality": None,
+                "duplicate_detection": None,
+                "highlight_result": None,
+                # Workflow control
+                "current_stage": self._determine_entry_stage(),
+                "enable_card_splitting": self.enable_card_splitting,
+                "enable_context_enrichment": self.enable_context_enrichment,
+                "enable_memorization_quality": self.enable_memorization_quality,
+                "enable_duplicate_detection": self.enable_duplicate_detection,
+                "enable_highlight_agent": self.enable_highlight_agent,
+                "retry_count": 0,
+                "max_retries": self.max_retries,
+                "post_validator_timeout_seconds": getattr(
+                    self.config,
+                    "post_validator_timeout_seconds",
+                    600.0,  # Increased for complex notes
+                ),
+                "post_validator_retry_backoff_seconds": getattr(
+                    self.config, "post_validator_retry_backoff_seconds", 3.0
+                ),
+                "post_validator_retry_jitter_seconds": getattr(
+                    self.config, "post_validator_retry_jitter_seconds", 1.5
+                ),
+                "auto_fix_enabled": self.auto_fix_enabled,
+                "strict_mode": self.strict_mode,
+                # Cycle protection (best practice: add hard stops)
+                "step_count": 0,
+                "max_steps": getattr(self.config, "langgraph_max_steps", 20),
+                # Error tracking (best practice: track errors for debugging)
+                "last_error": None,
+                "last_error_severity": None,
+                "errors": [],
+                # Timing
+                "start_time": start_time,
+                "stage_times": {},
+                "messages": [],
+            }
 
-        # Execute workflow with async invocation
-        # Use unique thread ID with UUID to avoid collisions
-        thread_id = f"note-{metadata.title}-{uuid.uuid4().hex[:8]}"
-        # LangGraph's ainvoke type checking is imperfect with TypedDict states
-        final_state = await self.app.ainvoke(
-            initial_state,
-            config={"configurable": {"thread_id": thread_id}},
-        )
+            # Execute workflow with async invocation
+            # Use unique thread ID with full UUID to avoid collisions
+            thread_id = f"note-{metadata.title}-{uuid.uuid4().hex}"
+            # LangGraph's ainvoke type checking is imperfect with TypedDict states
+            final_state = await self.app.ainvoke(
+                initial_state,
+                config={"configurable": {"thread_id": thread_id}},
+            )
 
-        # Build result
-        total_time = time.time() - start_time
-        success = final_state["current_stage"] == "complete"
+            # Build result
+            total_time = time.time() - start_time
+            success = final_state["current_stage"] == "complete"
+        finally:
+            # Clean up runtime resources to prevent memory leak
+            cleanup_runtime_resources(runtime_key)
 
         # Deserialize results
         pre_validation = (

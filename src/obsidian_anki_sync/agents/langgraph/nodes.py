@@ -1067,10 +1067,14 @@ async def linter_validation_node(state: PipelineState) -> PipelineState:
     all_valid = True
     total_errors = 0
     total_warnings = 0
+    loop = asyncio.get_running_loop()
 
     for card in cards:
         try:
-            result = validate_apf(card.apf_html, card.slug)
+            # Run CPU-bound linter in executor to avoid blocking the loop
+            result = await loop.run_in_executor(
+                None, validate_apf, card.apf_html, card.slug
+            )
             card_result = {
                 "slug": card.slug,
                 "is_valid": not result.errors,  # Only errors block, not warnings
