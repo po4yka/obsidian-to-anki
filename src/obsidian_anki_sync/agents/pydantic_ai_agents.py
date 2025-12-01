@@ -441,7 +441,7 @@ Q&A Pairs ({len(qa_pairs)}):
             result = await self.agent.run(prompt, deps=deps)
             output: CardGenerationOutput = result.data
 
-            # Convert cards to GeneratedCard instances
+            # Convert cards to GeneratedCard instances with content hashes
             generated_cards: list[GeneratedCard] = []
             qa_lookup = {qa.card_index: qa for qa in qa_pairs}
             for card_dict in output.cards:
@@ -459,8 +459,7 @@ Q&A Pairs ({len(qa_pairs)}):
                         slug=card_dict["slug"],
                         lang=lang,
                         apf_html=card_dict["apf_html"],
-                        confidence=card_dict.get(
-                            "confidence", output.confidence),
+                        confidence=card_dict.get("confidence", output.confidence),
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)

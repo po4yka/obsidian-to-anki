@@ -134,30 +134,29 @@ Slug Base: {slug_base}
             result = await self.agent.run(prompt, deps=deps)
             output: CardGenerationOutput = result.output
 
-            # Convert cards to GeneratedCard instances
+            # Convert cards to GeneratedCard instances with content hashes
             generated_cards: list[GeneratedCard] = []
             qa_lookup = {qa.card_index: qa for qa in qa_pairs}
-            for card_dict in output.cards:
+            for card in output.cards:
                 try:
-                    card_index = card_dict["card_index"]
-                    lang = card_dict["lang"]
-                    qa_pair = qa_lookup.get(card_index)
+                    qa_pair = qa_lookup.get(card.card_index)
                     content_hash = ""
                     if qa_pair is not None:
-                        content_hash = compute_content_hash(qa_pair, metadata, lang)
+                        content_hash = compute_content_hash(qa_pair, metadata, card.lang)
 
+                    # Create new card with computed content_hash
                     generated_card = GeneratedCard(
-                        card_index=card_index,
-                        slug=card_dict["slug"],
-                        lang=lang,
-                        apf_html=card_dict["apf_html"],
-                        confidence=card_dict.get("confidence", output.confidence),
+                        card_index=card.card_index,
+                        slug=card.slug,
+                        lang=card.lang,
+                        apf_html=card.apf_html,
+                        confidence=card.confidence if card.confidence else output.confidence,
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)
-                except (KeyError, ValueError) as e:
+                except (AttributeError, ValueError) as e:
                     logger.warning(
-                        "invalid_generated_card", error=str(e), card=card_dict
+                        "invalid_generated_card", error=str(e), card=str(card)
                     )
                     continue
 
