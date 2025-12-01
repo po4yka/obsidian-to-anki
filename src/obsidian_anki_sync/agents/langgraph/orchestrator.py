@@ -752,7 +752,7 @@ class LangGraphOrchestrator:
                 "post_validator_timeout_seconds": getattr(
                     self.config,
                     "post_validator_timeout_seconds",
-                    600.0,  # Increased for complex notes
+                    900.0,  # Increased for complex notes
                 ),
                 "post_validator_retry_backoff_seconds": getattr(
                     self.config, "post_validator_retry_backoff_seconds", 3.0

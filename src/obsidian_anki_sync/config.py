@@ -231,12 +231,12 @@ class Config(BaseSettings):
         description="Seconds to wait before retrying after circuit breaker opens",
     )
     worker_generation_timeout_seconds: float = Field(
-        default=600.0,
+        default=900.0,
         ge=60.0,
         description="SLA (seconds) for generation stage before worker flags a timeout",
     )
     worker_validation_timeout_seconds: float = Field(
-        default=400.0,
+        default=900.0,
         ge=30.0,
         description="SLA (seconds) for post-validation stage before worker flags a timeout",
     )
@@ -528,7 +528,7 @@ class Config(BaseSettings):
     post_validator_temperature: float | None = None
     post_validator_max_tokens: int | None = None
     post_validator_timeout_seconds: float = Field(
-        default=300.0,
+        default=900.0,
         ge=5.0,
         description="Per-attempt timeout for post-validation agent calls (seconds)",
     )

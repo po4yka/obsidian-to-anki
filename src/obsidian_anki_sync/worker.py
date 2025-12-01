@@ -78,8 +78,8 @@ async def process_note_job(
 
     logger.info("worker_processing_job", file=relative_path)
 
-    generation_sla = getattr(config, "worker_generation_timeout_seconds", 360.0)
-    validation_sla = getattr(config, "worker_validation_timeout_seconds", 180.0)
+    generation_sla = getattr(config, "worker_generation_timeout_seconds", 900.0)
+    validation_sla = getattr(config, "worker_validation_timeout_seconds", 900.0)
 
     try:
         path_obj = Path(file_path)
@@ -227,9 +227,9 @@ class WorkerSettings:
     # Increased timeouts for complex notes with multiple LLM calls
     # Generation includes: pre-validation, card-splitting, generation, linter
     # Validation includes: post-validation with retries, context enrichment
-    _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "600"))
-    _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "300"))
-    job_timeout = int(_gen_budget + _val_budget + 60)  # 960s = 16 minutes total
+    _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "900"))
+    _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "900"))
+    job_timeout = int(_gen_budget + _val_budget + 60)  # 1860s = 31 minutes total
 
     # Use environment variables with defaults
     redis_settings = RedisSettings.from_dsn(
