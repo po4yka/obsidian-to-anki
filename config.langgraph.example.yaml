@@ -87,7 +87,6 @@ duplicate_detection_model: qwen/qwen-2.5-32b-instruct
 langgraph_max_retries: 3 # Maximum post-validation retry attempts
 langgraph_auto_fix: true # Enable automatic error fixing
 langgraph_strict_mode: true # Use strict validation rules
-langgraph_checkpoint_enabled: true # Enable state persistence
 
 # =============================================================================
 # Agent Settings
