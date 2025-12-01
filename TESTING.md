@@ -51,6 +51,14 @@ Or with uv directly (without activating venv):
 uv run pytest
 ```
 
+**Using Makefile shortcuts:**
+
+```bash
+make test      # Run pytest
+make test-cov  # Coverage run
+make test-fast # Skip tests marked as slow
+```
+
 ### Run with Coverage
 
 ```bash
@@ -87,6 +95,16 @@ pytest -m unit
 # Skip slow tests
 pytest -m "not slow"
 ```
+
+### Quick Reference
+
+| Goal | Command |
+| --- | --- |
+| Lint + type-check + tests | `make check` |
+| Run a single test file | `pytest tests/test_parser.py -v` |
+| Inspect slowest tests | `pytest --durations=10` |
+| Generate coverage HTML | `pytest --cov=src/obsidian_anki_sync --cov-report=html` |
+| Analyze logs after failures | `obsidian-anki-sync analyze-logs` |
 
 ## Test Coverage
 

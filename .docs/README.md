@@ -4,6 +4,7 @@
 
 - **[Getting Started](GETTING_STARTED.md)** - Setup guide
 - **[README](../README.md)** - Project overview
+- **Note format** - See [README → Note format](../README.md#note-format-obsidian)
 
 ## Architecture
 
@@ -17,6 +18,7 @@
 - **[Configuration](GUIDES/configuration.md)** - Model presets and settings
 - **[Synchronization](GUIDES/synchronization.md)** - Change management
 - **[AI Validation](GUIDES/validation.md)** - Automated validation
+- **Troubleshooting** - Quick checks in [README → Troubleshooting](../README.md#troubleshooting)
 
 ## Reference
 
@@ -40,3 +42,4 @@
 - **[Testing](../TESTING.md)** - Test structure and execution
 - **[AnkiConnect API](../ANKICONNECT_API.md)** - Anki integration
 - **[CLAUDE.md](../CLAUDE.md)** - Development standards
+- **Makefile targets** - See [README → Makefile shortcuts](../README.md#makefile-shortcuts)
