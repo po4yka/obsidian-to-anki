@@ -158,100 +158,95 @@ sequenceDiagram
 ### Prerequisites
 
 -   Python 3.13+
--   Anki with AnkiConnect plugin
--   uv package manager (recommended) or pip
+-   Anki with the AnkiConnect add-on (code: `2055492159`)
+-   Obsidian notes written as Q&A pairs
+-   `uv` package manager (recommended) or `pip`
 
-### Installation
+### Quick Start Checklist
 
-```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+1. **Install tooling**
 
-# Setup
-git clone https://github.com/po4yka/obsidian-to-anki.git
-cd obsidian-to-anki
-uv sync --all-extras
-source .venv/bin/activate
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    git clone https://github.com/po4yka/obsidian-to-anki.git
+    cd obsidian-to-anki
+    uv sync --all-extras
+    source .venv/bin/activate
+    ```
 
-# Or with pip
-pip install -e .
-````
+    Prefer `uv` for isolated virtualenvs and reproducible installs. If you use `pip`, run `pip install -e .` instead of `uv sync`.
 
-### Anki Setup
+2. **Set up Anki**
 
-1. Install [Anki](https://apps.ankiweb.net/)
-2. Install AnkiConnect addon (code: `2055492159`)
-3. Restart Anki
+    - Install [Anki](https://apps.ankiweb.net/)
+    - Install AnkiConnect → Tools → Add-ons → Get Add-ons → `2055492159`
+    - Keep Anki running; the add-on listens on `http://localhost:8765`
 
-### Configuration
+3. **Pick an LLM provider**
 
-#### 1. Choose LLM Provider
+    Local (private, recommended):
 
-**Local (Recommended)** - Ollama:
+    ```bash
+    brew install ollama
+    ollama serve
+    ollama pull llama3.2:3b qwen2.5:7b qwen2.5:14b
+    ```
 
-```bash
-brew install ollama
-ollama serve
-ollama pull llama3.2:3b qwen2.5:7b qwen2.5:14b
+    Cloud:
+
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    ```
+
+4. **Create `config.yaml`** (start from `config.example.yaml`)
+
+    ```yaml
+    vault_path: "~/Documents/ObsidianVault"
+    source_dir: "Notes"        # Folder containing Q&A notes
+    anki_deck_name: "My Deck"
+
+    llm_provider: "ollama"     # ollama|openai|anthropic|openrouter|lm_studio
+    use_langgraph: true
+    use_pydantic_ai: true
+
+    pre_validator_model: "llama3.2:3b"
+    generator_model: "qwen2.5:14b"
+    post_validator_model: "qwen2.5:7b"
+    ```
+
+5. **Run your first sync**
+
+    ```bash
+    obsidian-anki-sync test-run --count 3   # sanity check
+    obsidian-anki-sync sync                 # full sync
+    obsidian-anki-sync sync --dry-run       # inspect changes only
+    ```
+
+6. **View logs and progress**
+
+    - Logs: `.logs/sync.log` (or `logs/sync.log` if you use the config example)
+    - Progress and stats: `obsidian-anki-sync progress` or `make progress`
+
+### Note format (Obsidian)
+
+The parser expects Q&A pairs in Markdown. A minimal note looks like:
+
+```markdown
+---
+id: biology-cell-01
+tags: [biology, cells]
+deck: General Biology
+---
+
+Q: What is the powerhouse of the cell?
+A: The mitochondrion produces most cellular ATP.
+
+Q: Which organelle handles protein folding?
+A: The endoplasmic reticulum folds and processes proteins.
 ```
 
-**Cloud** - OpenAI:
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-**Cloud** - Anthropic:
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-#### 2. Create Config File
-
-Create `config.yaml`:
-
-```yaml
-# Vault config
-vault_path: "~/Documents/ObsidianVault"
-source_dir: "Notes"
-anki_deck_name: "My Deck"
-
-# Provider settings
-llm_provider: "ollama" # Options: ollama, openai, anthropic, openrouter, lm_studio
-
-# Agent config
-use_langgraph: true # LangGraph orchestration
-use_pydantic_ai: true # Structured AI responses
-
-# Models
-pre_validator_model: "llama3.2:3b" # Fast model
-generator_model: "qwen2.5:14b" # Main model
-post_validator_model: "qwen2.5:7b" # Validation model
-
-# Optional overrides
-# generator_model: "gpt-4-turbo-preview"  # OpenAI
-# generator_model: "claude-3-5-sonnet-20241022"  # Anthropic
-```
-
-### Usage
-
-```bash
-# Full sync
-obsidian-anki-sync sync
-
-# Preview changes
-obsidian-anki-sync sync --dry-run
-
-# Sync changed notes only
-obsidian-anki-sync sync --incremental
-
-# Test with N samples
-obsidian-anki-sync test-run --count 5
-
-# Validate note
-obsidian-anki-sync validate "path/to/note.md"
-```
+Frontmatter is optional but helps with deterministic IDs, decks, and tags.
 
 ## Providers Comparison
 
@@ -385,7 +380,18 @@ obsidian-anki-sync analyze-logs      # Analyze logs
 obsidian-anki-sync list-problematic-notes # List issues
 ```
 
-    style F fill:#e2e3e5
+```
+
+### Makefile shortcuts
+
+If you prefer `make`, the repo ships common targets:
+
+```bash
+make install           # uv sync
+make validate-fix      # Validate vault and auto-fix safe issues
+make sync-dry-run      # Preview sync changes without writing to Anki
+make test-cov          # Run tests with coverage
+make logs              # Analyze recent logs
 ```
 
 ## Task Queue (Advanced)
@@ -461,24 +467,20 @@ uv run pre-commit run --all-files
 
 ## Troubleshooting
 
-**Ollama connection**:
+-   **Connection checks**
 
-```bash
-curl http://localhost:11434/api/tags
-ollama serve
-```
+    ```bash
+    curl http://localhost:11434/api/tags   # Ollama responding?
+    lsof -i :8765                          # Is AnkiConnect listening?
+    ```
 
-**AnkiConnect issues**:
+-   **Config sanity**: `obsidian-anki-sync check` (or `make check-setup`) validates provider keys and vault paths.
 
-1. Ensure Anki is running
-2. Check addon in Tools → Add-ons
-3. Verify port 8765
+-   **Note parsing problems**: Run `obsidian-anki-sync validate path/to/note.md` to see frontmatter or Q/A format errors. The [note format](#note-format-obsidian) example above is the expected structure.
 
-**Import errors**:
+-   **LLM timeouts**: Lower `max_concurrent_requests` in `config.yaml` or temporarily switch to the `fast` preset in `.docs/GUIDES/configuration.md`.
 
-```bash
-uv sync --all-extras
-```
+-   **Stale state**: `obsidian-anki-sync clean-progress` clears cached sync progress; restart Anki after large deck changes.
 
 ## Documentation
 
@@ -486,6 +488,7 @@ uv sync --all-extras
 -   **[Getting Started](.docs/GETTING_STARTED.md)** - Setup guide
 -   **[Configuration](.docs/GUIDES/configuration.md)** - Provider setup
 -   **[Synchronization](.docs/GUIDES/synchronization.md)** - Change management
+-   **[Testing Guide](TESTING.md)** - Test layout and commands
 -   **[Architecture](.docs/ARCHITECTURE/README.md)** - System design
 -   **[APF Format](.docs/ARCHITECTURE/apf.md)** - Card specification
 -   **[Agent System](.docs/ARCHITECTURE/agents.md)** - Multi-agent architecture
