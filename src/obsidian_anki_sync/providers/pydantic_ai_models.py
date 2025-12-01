@@ -13,6 +13,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.providers.openrouter.retry_handler import RetryTransport
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -81,14 +82,21 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
         if site_name:
             http_headers["X-Title"] = site_name
 
-        # Create explicitly configured async HTTP client
-        http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=10.0),
+        # Create retry transport with connection pooling
+        retry_transport = RetryTransport(
             limits=httpx.Limits(
                 max_keepalive_connections=5,
                 max_connections=10,
                 keepalive_expiry=30.0,
             ),
+            max_retries=5,
+            initial_delay=2.0,  # Start with 2s delay for rate limits
+        )
+
+        # Create explicitly configured async HTTP client
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            transport=retry_transport,
             headers=http_headers if http_headers else None,
         )
 
@@ -218,15 +226,22 @@ class PydanticAIModelFactory:
         if site_name:
             http_headers["X-Title"] = site_name
 
-        # Create explicitly configured async HTTP client
-        # This ensures proper timeout and connection pooling configuration
-        http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0, connect=10.0),
+        # Create retry transport with connection pooling
+        retry_transport = RetryTransport(
             limits=httpx.Limits(
                 max_keepalive_connections=5,
                 max_connections=10,
                 keepalive_expiry=30.0,
             ),
+            max_retries=5,
+            initial_delay=2.0,
+        )
+
+        # Create explicitly configured async HTTP client
+        # This ensures proper timeout and connection pooling configuration
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            transport=retry_transport,
             headers=http_headers if http_headers else None,
         )
 

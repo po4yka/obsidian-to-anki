@@ -1,11 +1,14 @@
-"""Retry logic and backoff calculation for OpenRouter API."""
-
+import asyncio
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 import httpx
 
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .models import HTTP_STATUS_RETRYABLE
+
+logger = get_logger(__name__)
 
 
 def calculate_retry_backoff(
@@ -78,3 +81,86 @@ def parse_retry_after_header(response: httpx.Response) -> float | None:
             pass
 
     return None
+
+
+class RetryTransport(httpx.AsyncHTTPTransport):
+    """Custom transport to handle 429 retries transparently.
+
+    This is used to inject retry logic into clients that don't support it natively
+    or where we need consistent behavior (like PydanticAI integration).
+    """
+
+    def __init__(
+        self,
+        *args,
+        max_retries: int = 5,
+        initial_delay: float = 1.0,
+        backoff_factor: float = 2.0,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.max_retries = max_retries
+        self.initial_delay = initial_delay
+        self.backoff_factor = backoff_factor
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        retries = 0
+        delay = self.initial_delay
+
+        while True:
+            try:
+                # Call the parent implementation to perform the request
+                response = await super().handle_async_request(request)
+
+                # Check for 429 Rate Limit
+                if response.status_code == 429:
+                    if retries >= self.max_retries:
+                        # Exhausted retries, return the 429 response
+                        return response
+
+                    # Calculate wait time
+                    wait_time = parse_retry_after_header(response)
+                    if wait_time is None:
+                        wait_time = delay
+
+                    # Read response body to log error details if available
+                    # We need to be careful not to consume the stream if it's not already read
+                    # But handle_async_request returns a response where we can read content
+                    # For logging purposes, we peek at it.
+                    # Note: PydanticAI/httpx might expect to read the response.
+                    # If we read it here, we should ensure it's still available.
+                    # httpx response.read() caches content.
+                    try:
+                        await response.read()
+                        error_text = response.text[:500]
+                    except Exception:
+                        error_text = "(could not read response body)"
+
+                    logger.warning(
+                        "openrouter_rate_limit_retry_transport",
+                        status_code=429,
+                        attempt=retries + 1,
+                        max_retries=self.max_retries,
+                        wait_time=round(wait_time, 2),
+                        url=str(request.url),
+                        body_preview=error_text,
+                    )
+
+                    # Wait
+                    await asyncio.sleep(wait_time)
+
+                    # Prepare for next attempt
+                    retries += 1
+                    delay *= self.backoff_factor
+                    
+                    # Close the previous response
+                    await response.aclose()
+                    
+                    continue
+
+                # For other status codes, return immediately
+                return response
+
+            except Exception:
+                # Let other exceptions bubble up
+                raise
