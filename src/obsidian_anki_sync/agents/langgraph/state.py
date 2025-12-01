@@ -219,6 +219,15 @@ def register_runtime_resources(
     return runtime_key
 
 
+def cleanup_runtime_resources(runtime_key: str) -> None:
+    """Clean up runtime resources for a specific key.
+
+    Should be called when the pipeline finishes to prevent memory leaks.
+    """
+    if runtime_key in _RUNTIME_RESOURCES:
+        del _RUNTIME_RESOURCES[runtime_key]
+
+
 def _get_resource(state: PipelineState, name: str) -> Any:
     runtime_key = state.get("runtime_key")
     if not runtime_key:
