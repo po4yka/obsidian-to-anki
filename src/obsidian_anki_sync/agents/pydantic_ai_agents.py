@@ -592,23 +592,19 @@ Cards to validate:
             result = await self.agent.run(prompt, deps=deps)
             output: PostValidationOutput = result.data
 
-            # Convert suggested corrections to GeneratedCard list
-            corrected_cards: list[GeneratedCard] | None = None
+            # Log suggested corrections if any (they're patches, not full card data)
             if output.suggested_corrections:
-                corrected_cards = []
-                for correction in output.suggested_corrections:
-                    try:
-                        corrected_card = GeneratedCard(**correction)
-                        corrected_cards.append(corrected_card)
-                    except (KeyError, ValueError) as e:
-                        logger.warning("invalid_correction", error=str(e))
-                        continue
+                logger.info(
+                    "post_validation_corrections_suggested",
+                    count=len(output.suggested_corrections),
+                    corrections=[c.model_dump() for c in output.suggested_corrections],
+                )
 
             validation_result = PostValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
                 error_details=output.error_details,
-                corrected_cards=corrected_cards,
+                corrected_cards=None,  # CardCorrection patches can't be converted to full cards
                 validation_time=0.0,
             )
 
