@@ -40,15 +40,33 @@ class PerformanceTracker:
             Dictionary mapping note IDs to performance metrics
         """
         try:
-            # Get cards info for these notes
-            cards_info = self.anki_client.notes_info(note_ids)
+            if not note_ids:
+                return {}
+
+            # Get card IDs for these notes (batch operation)
+            # AnkiConnect notesToCards takes a list of note IDs
+            card_ids_list = self.anki_client.invoke("notesToCards", {"notes": note_ids})
+            
+            all_card_ids = []
+            if card_ids_list:
+                for ids in card_ids_list:
+                    if ids:
+                        all_card_ids.extend(ids)
+            
+            if not all_card_ids:
+                return {}
+
+            # Get cards info for these cards
+            cards_info = self.anki_client.cards_info(all_card_ids)
 
             performance_data = {}
 
             for card_info in cards_info:
-                note_id = card_info.get("noteId")
+                note_id = card_info.get("note")  # AnkiConnect uses 'note' for note ID
                 if note_id:
                     metrics = self._calculate_card_metrics(card_info)
+                    # For simplicity with 1:1 mapping, simple assignment works.
+                    # For 1:N, this stores the last card's metrics.
                     performance_data[note_id] = metrics
 
             return performance_data
@@ -93,16 +111,36 @@ class PerformanceTracker:
         issues = defaultdict(list)
 
         try:
+            # Map note_id -> Card for analysis
+            card_map: dict[int, Card] = {}
             note_ids: list[int] = []
 
-            if note_ids:
-                # TODO: Use performance data for analysis
-                self.get_card_performance(note_ids)
+            # Resolve note IDs from cards
+            for card in cards:
+                if not card.guid:
+                    continue
+                try:
+                    # Find note ID by GUID
+                    # This might be slow for many cards, but necessary if we don't have ID stored
+                    found_ids = self.anki_client.find_notes(f"guid:{card.guid}")
+                    if found_ids:
+                        # Assuming 1:1 mapping for simple cards
+                        note_id = found_ids[0]
+                        card_map[note_id] = card
+                        note_ids.append(note_id)
+                except Exception:
+                    # Ignore cards that can't be found
+                    continue
 
-                for card in cards:
-                    card_issues = self._analyze_single_card_performance(card, {})
-                    for issue_type, affected_cards in card_issues.items():
-                        issues[issue_type].extend(affected_cards)
+            if note_ids:
+                performance_data = self.get_card_performance(note_ids)
+
+                for note_id, metrics in performance_data.items():
+                    card = card_map.get(note_id)
+                    if card:
+                        card_issues = self._analyze_single_card_performance(card, metrics)
+                        for issue_type, affected_cards in card_issues.items():
+                            issues[issue_type].extend(affected_cards)
 
         except Exception as e:
             logger.warning("card_pattern_analysis_failed", error=str(e))
@@ -125,7 +163,10 @@ class PerformanceTracker:
             reviews = card_info.get("reviews", 0)
             lapses = card_info.get("lapses", 0)
             interval = card_info.get("interval", 0)
-            ease_factor = card_info.get("factor", 2.5)  # Default ease factor
+            
+            # Anki returns factor in permille (e.g. 2500 for 2.5)
+            raw_factor = card_info.get("factor", 2500)
+            ease_factor = raw_factor / 1000.0
 
             # Calculate derived metrics
             if reviews > 0:

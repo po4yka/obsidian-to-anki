@@ -801,16 +801,17 @@ async def generation_node(state: PipelineState) -> PipelineState:
     agent_framework = state.get("agent_framework", "pydantic_ai")
     agent_selector = get_agent_selector(state)
 
-    if agent_selector:
-        # Use unified agent interface
-        generator_agent = agent_selector.get_agent(agent_framework, "generator")
-        logger.info(
-            "using_unified_agent", framework=agent_framework, agent_type="generator"
-        )
-    else:
-        # Fallback to direct PydanticAI agent (legacy behavior)
-        logger.warning("agent_selector_not_available_fallback_to_pydantic_ai")
-        generator = GeneratorAgentAI(model=model, temperature=0.3)
+    if not agent_selector:
+        logger.error("agent_selector_missing_in_state")
+        state["current_stage"] = "failed"
+        state["messages"].append("Generation failed: Agent selector missing")
+        return state
+
+    # Use unified agent interface
+    generator_agent = agent_selector.get_agent(agent_framework, "generator")
+    logger.info(
+        "using_unified_agent", framework=agent_framework, agent_type="generator"
+    )
 
     # Run generation
     try:
@@ -835,29 +836,16 @@ async def generation_node(state: PipelineState) -> PipelineState:
             # Create tasks for each chunk
             tasks = []
             for chunk in chunks:
-                if agent_selector:
-                    # Use unified agent interface
-                    qa_dicts = [qa.model_dump() for qa in chunk]
-                    tasks.append(
-                        generator_agent.generate_cards(
-                            note_content=state["note_content"],
-                            metadata=metadata.model_dump(),
-                            qa_pairs=qa_dicts,
-                            slug_base=state["slug_base"],
-                        )
+                # Use unified agent interface
+                qa_dicts = [qa.model_dump() for qa in chunk]
+                tasks.append(
+                    generator_agent.generate_cards(
+                        note_content=state["note_content"],
+                        metadata=metadata.model_dump(),
+                        qa_pairs=qa_dicts,
+                        slug_base=state["slug_base"],
                     )
-                else:
-                    # Legacy PydanticAI agent (with RAG context)
-                    tasks.append(
-                        generator.generate_cards(
-                            note_content=state["note_content"],
-                            metadata=metadata,
-                            qa_pairs=chunk,
-                            slug_base=state["slug_base"],
-                            rag_enrichment=rag_enrichment,
-                            rag_examples=rag_examples,
-                        )
-                    )
+                )
 
             # Run tasks in parallel
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -884,12 +872,6 @@ async def generation_node(state: PipelineState) -> PipelineState:
                     )
                     if hasattr(res, "warnings") and res.warnings:
                         all_warnings.extend(res.warnings)
-                else:
-                    # Legacy GenerationResult
-                    all_cards.extend(res.cards)
-                    total_gen_time = max(total_gen_time, res.generation_time)
-                    if hasattr(res, "warnings") and res.warnings:
-                        all_warnings.extend(res.warnings)
 
             # Create merged result
             gen_result = GenerationResult(
@@ -900,7 +882,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
             )
 
         # Sequential generation (single batch)
-        elif agent_selector:
+        else:
             # Use unified agent interface
             qa_dicts = [qa.model_dump() for qa in qa_pairs]
             unified_result = await generator_agent.generate_cards(
@@ -935,17 +917,6 @@ async def generation_node(state: PipelineState) -> PipelineState:
                         gen_result.warnings = []
                     gen_result.warnings.extend(unified_result.warnings)
                 gen_result.generation_time = time.time() - start_time
-        else:
-            # Legacy PydanticAI agent (with RAG context)
-            gen_result = await generator.generate_cards(
-                note_content=state["note_content"],
-                metadata=metadata,
-                qa_pairs=qa_pairs,
-                slug_base=state["slug_base"],
-                rag_enrichment=rag_enrichment,
-                rag_examples=rag_examples,
-            )
-            gen_result.generation_time = time.time() - start_time
 
         # Validate against split plan if available
         if expected_card_count is not None:
