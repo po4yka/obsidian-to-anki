@@ -4,28 +4,23 @@ Contains all BaseModel output types and dependency models used across agents.
 """
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from obsidian_anki_sync.agents.models import normalize_enrichment_label
+from obsidian_anki_sync.agents.models import (
+    CardCorrection,
+    GeneratedCard,
+    normalize_enrichment_label,
+)
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 # =============================================================================
 # Structured Card Models
 # =============================================================================
 
-
-class GeneratedCard(BaseModel):
-    """A single generated flashcard with APF fields."""
-
-    card_index: int = Field(ge=1, description="1-based card index")
-    slug: str = Field(min_length=1, description="Unique card slug identifier")
-    lang: Literal["en", "ru"] = Field(description="Card language code")
-    apf_html: str = Field(min_length=1, description="Full APF HTML content")
-    confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Generation confidence"
-    )
+# NOTE: GeneratedCard and CardCorrection are defined in agents/models.py
+# (single source of truth) and re-exported here for convenience.
 
 
 class CardIssue(BaseModel):
@@ -33,16 +28,6 @@ class CardIssue(BaseModel):
 
     card_index: int = Field(ge=0, description="0-based card index")
     issue_description: str = Field(min_length=1, description="Description of the issue")
-
-
-class CardCorrection(BaseModel):
-    """Suggested correction for a card field."""
-
-    card_index: int = Field(ge=0, description="0-based card index")
-    field_name: str = Field(min_length=1, description="Name of the field to correct")
-    current_value: str | None = Field(default=None, description="Current field value")
-    suggested_value: str = Field(description="Suggested corrected value")
-    rationale: str = Field(default="", description="Reason for the correction")
 
 
 # =============================================================================

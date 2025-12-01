@@ -463,7 +463,12 @@ Return structured JSON with:
 - error_type: "none" | "syntax" | "factual" | "semantic" | "template"
 - error_details: specific description of issues
 - card_issues: list of per-card problems with card_index and issue description
-- suggested_corrections: list of corrected cards (if auto-fixable)
+- suggested_corrections: list of field-level patches (if auto-fixable), each with:
+  - card_index: 0-based index of the card to fix
+  - field_name: name of the field to correct (e.g., "apf_html", "slug", "lang")
+  - current_value: current value of the field (optional)
+  - suggested_value: corrected value for the field
+  - rationale: reason for the correction
 - confidence: 0.0-1.0 (confidence in this validation)
 
 ## Examples
@@ -538,10 +543,10 @@ Output:
   "suggested_corrections": [
     {
       "card_index": 0,
-      "slug": "oop-polymorphism-1-en",
-      "lang": "en",
-      "apf_html": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Basic | Tags: oop polymorphism interview -->\\n\\n<!-- Front -->\\n<p>What is polymorphism?</p>\\n\\n<!-- Back -->\\n<p>The ability of objects to take multiple forms.</p>\\n\\n<!-- END_CARDS -->",
-      "confidence": 0.85
+      "field_name": "apf_html",
+      "current_value": "<!-- BEGIN_CARDS -->\\n\\n<!-- Front -->\\n<p>What is polymorphism?</p>\\n\\n<!-- Back -->\\n<p>The ability of objects to take multiple forms.</p>\\n\\n<!-- END_CARDS -->",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Basic | Tags: oop polymorphism interview -->\\n\\n<!-- Front -->\\n<p>What is polymorphism?</p>\\n\\n<!-- Back -->\\n<p>The ability of objects to take multiple forms.</p>\\n\\n<!-- END_CARDS -->",
+      "rationale": "Added missing card metadata comment with slug, CardType, and Tags"
     }
   ],
   "confidence": 0.92
@@ -577,16 +582,16 @@ Output:
   "card_issues": [
     {
       "card_index": 1,
-      "issue": "Answer states 'O(n) in all cases' but bubble sort is O(n²) worst/average case and O(n) best case only"
+      "issue": "Answer states 'O(n) in all cases' but bubble sort is O(n^2) worst/average case and O(n) best case only"
     }
   ],
   "suggested_corrections": [
     {
       "card_index": 1,
-      "slug": "sorting-algorithms-1-en",
-      "lang": "en",
-      "apf_html": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Basic | Tags: algorithms sorting interview -->\\n\\n<!-- Front -->\\n<p>What is the time complexity of bubble sort?</p>\\n\\n<!-- Back -->\\n<p><strong>Best case:</strong> O(n) - already sorted</p>\\n<p><strong>Average case:</strong> O(n²)</p>\\n<p><strong>Worst case:</strong> O(n²)</p>\\n\\n<!-- END_CARDS -->",
-      "confidence": 0.9
+      "field_name": "apf_html",
+      "current_value": "...\\n<!-- Back -->\\n<p>O(n) in all cases</p>\\n...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Basic | Tags: algorithms sorting interview -->\\n\\n<!-- Front -->\\n<p>What is the time complexity of bubble sort?</p>\\n\\n<!-- Back -->\\n<p><strong>Best case:</strong> O(n) - already sorted</p>\\n<p><strong>Average case:</strong> O(n^2)</p>\\n<p><strong>Worst case:</strong> O(n^2)</p>\\n\\n<!-- END_CARDS -->",
+      "rationale": "Corrected factually incorrect time complexity - bubble sort is O(n^2) for worst/average cases"
     }
   ],
   "confidence": 0.95
@@ -628,10 +633,10 @@ Output:
   "suggested_corrections": [
     {
       "card_index": 1,
-      "slug": "web-html-1-en",
-      "lang": "en",
-      "apf_html": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: web-html-1-en | CardType: Basic | Tags: web html interview -->\\n\\n<!-- Front -->\\n<p>What is the &lt;div&gt; tag used for?</p>\\n\\n<!-- Back -->\\n<p>A &lt;div&gt; tag is a container for grouping HTML elements.</p>\\n\\n<!-- END_CARDS -->",
-      "confidence": 0.88
+      "field_name": "apf_html",
+      "current_value": "...<!-- Front -->\\n<p>What is the <div> tag used for?\\n\\n<!-- Back -->...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: web-html-1-en | CardType: Basic | Tags: web html interview -->\\n\\n<!-- Front -->\\n<p>What is the &lt;div&gt; tag used for?</p>\\n\\n<!-- Back -->\\n<p>A &lt;div&gt; tag is a container for grouping HTML elements.</p>\\n\\n<!-- END_CARDS -->",
+      "rationale": "Fixed unclosed <p> tag and escaped HTML entities in tag names"
     }
   ],
   "confidence": 0.93

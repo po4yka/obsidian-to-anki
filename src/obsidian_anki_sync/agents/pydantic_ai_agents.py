@@ -38,6 +38,7 @@ from .improved_prompts import (
 )
 from .memorization_prompts import MEMORIZATION_QUALITY_PROMPT
 from .models import (
+    CardCorrection,
     CardSplitPlan,
     CardSplittingResult,
     ContextEnrichmentResult,
@@ -50,6 +51,7 @@ from .models import (
     PostValidationResult,
     PreValidationResult,
 )
+from .patch_applicator import apply_corrections
 
 logger = get_logger(__name__)
 
@@ -126,8 +128,8 @@ class PostValidationOutput(BaseModel):
         default_factory=list,
         description="Per-card issues with card_index and issue description",
     )
-    suggested_corrections: list[dict[str, Any]] = Field(
-        default_factory=list, description="Suggested card corrections"
+    suggested_corrections: list[CardCorrection] = Field(
+        default_factory=list, description="Field-level card corrections"
     )
     confidence: float = Field(
         default=0.5, description="Confidence in validation result"
@@ -592,19 +594,27 @@ Cards to validate:
             result = await self.agent.run(prompt, deps=deps)
             output: PostValidationOutput = result.data
 
-            # Log suggested corrections if any (they're patches, not full card data)
+            # Apply suggested corrections if any
+            corrected_cards = None
+            applied_changes: list[str] = []
+
             if output.suggested_corrections:
+                corrected_cards, applied_changes = apply_corrections(
+                    cards, output.suggested_corrections
+                )
                 logger.info(
-                    "post_validation_corrections_suggested",
-                    count=len(output.suggested_corrections),
-                    corrections=[c.model_dump() for c in output.suggested_corrections],
+                    "post_validation_corrections_applied",
+                    suggested_count=len(output.suggested_corrections),
+                    applied_count=len(applied_changes),
                 )
 
             validation_result = PostValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
                 error_details=output.error_details,
-                corrected_cards=None,  # CardCorrection patches can't be converted to full cards
+                suggested_corrections=output.suggested_corrections,
+                corrected_cards=corrected_cards,
+                applied_changes=applied_changes,
                 validation_time=0.0,
             )
 
@@ -613,6 +623,7 @@ Cards to validate:
                 is_valid=output.is_valid,
                 confidence=output.confidence,
                 issues_found=len(output.card_issues),
+                corrections_applied=len(applied_changes),
             )
 
             return validation_result

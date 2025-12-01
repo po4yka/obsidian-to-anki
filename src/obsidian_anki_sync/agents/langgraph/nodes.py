@@ -1323,7 +1323,11 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
                            for card in post_result.corrected_cards]
         state["generation"]["cards"] = corrected_dicts
         state["generation"]["total_cards"] = len(corrected_dicts)
-        logger.info("applied_corrected_cards", count=len(corrected_dicts))
+        logger.info(
+            "applied_corrected_cards",
+            count=len(corrected_dicts),
+            applied_changes=post_result.applied_changes,
+        )
 
     # Determine next stage based on validation result
     if post_result.is_valid:

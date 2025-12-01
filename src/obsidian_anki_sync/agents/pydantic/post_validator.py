@@ -14,6 +14,7 @@ from obsidian_anki_sync.agents.exceptions import (
 from obsidian_anki_sync.agents.improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
 from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
 from obsidian_anki_sync.agents.output_fixing import OutputFixingParser
+from obsidian_anki_sync.agents.patch_applicator import apply_corrections
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -104,23 +105,27 @@ Cards to validate:
             # Run agent
             output = await self.fixing_parser.run(prompt, deps=deps)
 
-            # Convert suggested corrections to GeneratedCard list
-            corrected_cards: list[GeneratedCard] | None = None
+            # Apply suggested corrections if any
+            corrected_cards = None
+            applied_changes: list[str] = []
+
             if output.suggested_corrections:
-                corrected_cards = []
-                for correction in output.suggested_corrections:
-                    try:
-                        corrected_card = GeneratedCard(**correction)
-                        corrected_cards.append(corrected_card)
-                    except (KeyError, ValueError) as e:
-                        logger.warning("invalid_correction", error=str(e))
-                        continue
+                corrected_cards, applied_changes = apply_corrections(
+                    cards, output.suggested_corrections
+                )
+                logger.info(
+                    "post_validation_corrections_applied",
+                    suggested_count=len(output.suggested_corrections),
+                    applied_count=len(applied_changes),
+                )
 
             validation_result = PostValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
                 error_details=output.error_details,
+                suggested_corrections=output.suggested_corrections,
                 corrected_cards=corrected_cards,
+                applied_changes=applied_changes,
                 validation_time=0.0,
             )
 
@@ -129,6 +134,7 @@ Cards to validate:
                 is_valid=output.is_valid,
                 confidence=output.confidence,
                 issues_found=len(output.card_issues),
+                corrections_applied=len(applied_changes),
             )
 
             return validation_result

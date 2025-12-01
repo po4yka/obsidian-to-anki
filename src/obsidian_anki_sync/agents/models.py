@@ -8,6 +8,22 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class CardCorrection(BaseModel):
+    """Suggested correction for a card field (patch model).
+
+    This represents a field-level patch, not a full card replacement.
+    Use with apply_corrections() to apply patches to GeneratedCard objects.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    card_index: int = Field(ge=0, description="0-based card index")
+    field_name: str = Field(min_length=1, description="Name of the field to correct")
+    current_value: str | None = Field(default=None, description="Current field value")
+    suggested_value: str = Field(description="Suggested corrected value")
+    rationale: str = Field(default="", description="Reason for the correction")
+
+
 class NoteMetadata(BaseModel):
     """Lightweight metadata model used by agent components."""
 
@@ -120,6 +136,7 @@ class PostValidationResult(BaseModel):
     """Result from post-validator agent.
 
     Validates generated cards for syntax, factual accuracy, and coherence.
+    Supports field-level patches via suggested_corrections.
     """
 
     model_config = ConfigDict(frozen=False)
@@ -127,7 +144,18 @@ class PostValidationResult(BaseModel):
     is_valid: bool
     error_type: Literal["syntax", "factual", "semantic", "template", "none"]
     error_details: str = ""
-    corrected_cards: list[GeneratedCard] | None = None
+    suggested_corrections: list[CardCorrection] = Field(
+        default_factory=list,
+        description="Field-level corrections suggested by validator",
+    )
+    corrected_cards: list[GeneratedCard] | None = Field(
+        default=None,
+        description="Cards after applying suggested_corrections patches",
+    )
+    applied_changes: list[str] = Field(
+        default_factory=list,
+        description="Human-readable descriptions of applied corrections",
+    )
     validation_time: float = 0.0
     structured_errors: list[dict] | None = Field(
         default=None, description="Structured validation errors"
