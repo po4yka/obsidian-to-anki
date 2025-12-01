@@ -43,16 +43,23 @@ def _decode_html_entities(value: str) -> str:
 
     if not apf_structure_escaped:
         # Entities are only in code content (correct) - don't decode
+        logger.debug(
+            "html_entities_preserved",
+            reason="no_apf_structure_escaped",
+            has_code_entities="&lt;" in value or "&gt;" in value,
+        )
         return value
 
     # LLM escaped everything - decode the entire value
     # Note: &amp;lt; will decode to &lt; (correct for code content)
     decoded = html.unescape(value)
     if decoded != value:
-        logger.warning(
+        logger.info(
             "apf_structure_decoded",
-            original_preview=value[:100],
-            decoded_preview=decoded[:100],
+            reason="llm_escaped_apf_markers",
+            original_preview=value[:150],
+            decoded_preview=decoded[:150],
+            chars_changed=len(value) - len(decoded),
         )
     return decoded
 

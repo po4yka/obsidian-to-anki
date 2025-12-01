@@ -144,6 +144,17 @@ class OutputFixingParser(Generic[T]):
                 # Our code raises StructuredOutputError
                 last_error = e
                 last_output = self._extract_output_from_error(e)
+
+                # Log the raw LLM output that failed validation for debugging
+                logger.warning(
+                    "output_validation_failed",
+                    attempt=attempt,
+                    error_type=type(e).__name__,
+                    error_message=str(e)[:500],
+                    raw_output_preview=last_output[:500] if last_output else None,
+                    output_length=len(last_output) if last_output else 0,
+                )
+
                 (
                     last_output,
                     validated_output,
@@ -163,9 +174,12 @@ class OutputFixingParser(Generic[T]):
                 if attempt > self.max_fix_attempts:
                     self.repair_failures += 1
                     logger.error(
-                        "output_fixing_failed",
+                        "output_fixing_exhausted",
                         attempts=attempt,
-                        error=str(e),
+                        max_attempts=self.max_fix_attempts,
+                        error_type=type(e).__name__,
+                        error_message=str(e)[:500],
+                        raw_output_preview=last_output[:300] if last_output else None,
                     )
                     msg = f"Failed to fix output after {attempt} attempts: {e!s}"
                     raise StructuredOutputError(

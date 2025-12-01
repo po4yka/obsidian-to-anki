@@ -1176,8 +1176,13 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     if not increment_step_count(state, "post_validation"):
         return state
 
-    logger.info("langgraph_post_validation_start",
-                retry_count=state["retry_count"])
+    cards_count = len(state.get("generation", {}).get("cards", []))
+    logger.info(
+        "langgraph_post_validation_start",
+        retry_count=state["retry_count"],
+        cards_count=cards_count,
+        timeout_seconds=state.get("post_validator_timeout_seconds", 600.0),
+    )
     start_time = time.time()
 
     # Deserialize data
@@ -1302,14 +1307,19 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             )
 
     # Log validation decision for tracking
+    corrections_count = len(post_result.suggested_corrections or [])
+    applied_count = len(post_result.applied_changes or [])
     logger.info(
         "langgraph_post_validation_complete",
         is_valid=post_result.is_valid,
         retry_count=state["retry_count"],
-        time=post_result.validation_time,
+        time=round(post_result.validation_time, 2),
         linter_valid=linter_valid,
         llm_error_type=post_result.error_type if not post_result.is_valid else "none",
+        llm_error_details=post_result.error_details[:300] if post_result.error_details else "",
         llm_template_overridden=llm_template_overridden,
+        corrections_suggested=corrections_count,
+        corrections_applied=applied_count,
     )
 
     state["post_validation"] = post_result.model_dump()

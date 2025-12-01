@@ -116,6 +116,20 @@ Cards to validate:
             applied_changes: list[str] = []
 
             if output.suggested_corrections:
+                # Log detailed info about each suggested correction
+                for i, corr in enumerate(output.suggested_corrections):
+                    suggested_preview = corr.suggested_value[:200] if corr.suggested_value else ""
+                    has_html_entities = "&lt;" in suggested_preview or "&gt;" in suggested_preview
+                    logger.info(
+                        "post_validation_correction_suggested",
+                        correction_index=i,
+                        card_index=corr.card_index,
+                        field_name=corr.field_name,
+                        rationale=corr.rationale[:100] if corr.rationale else "",
+                        has_html_entities=has_html_entities,
+                        suggested_preview=suggested_preview,
+                    )
+
                 corrected_cards, applied_changes = apply_corrections(
                     cards, output.suggested_corrections
                 )
@@ -123,6 +137,7 @@ Cards to validate:
                     "post_validation_corrections_applied",
                     suggested_count=len(output.suggested_corrections),
                     applied_count=len(applied_changes),
+                    skipped_count=len(output.suggested_corrections) - len(applied_changes),
                 )
 
             validation_result = PostValidationResult(
