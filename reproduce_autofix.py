@@ -6,7 +6,7 @@ from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.agents.post_validation.validator import PostValidatorAgent
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_ollama_client():
     client = MagicMock()
     # Mock response for _llm_based_fix
@@ -24,7 +24,7 @@ def mock_ollama_client():
     return client
 
 
-@pytest.fixture
+@pytest.fixture()
 def validator(mock_ollama_client):
     return PostValidatorAgent(ollama_client=mock_ollama_client)
 

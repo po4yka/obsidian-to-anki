@@ -38,8 +38,7 @@ def _build_pipeline_result(
     success: bool = True,
 ) -> AgentPipelineResult:
     """Construct a minimal AgentPipelineResult with custom stage timings."""
-    pre = PreValidationResult(
-        is_valid=True, error_type="none", validation_time=0.0)
+    pre = PreValidationResult(is_valid=True, error_type="none", validation_time=0.0)
     generation = GenerationResult(
         cards=[],
         total_cards=0,
@@ -71,14 +70,13 @@ def _build_pipeline_result(
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_worker_flags_generation_sla(tmp_path: Path) -> None:
     """Generation overruns should be surfaced as actionable errors."""
     note_path = tmp_path / "note.md"
     note_path.write_text("# demo")
 
-    result = _build_pipeline_result(
-        generation_seconds=500.0, validation_seconds=5.0)
+    result = _build_pipeline_result(generation_seconds=500.0, validation_seconds=5.0)
     metadata_dict = {
         "id": "note-gen",
         "title": "Demo",
@@ -103,21 +101,24 @@ async def test_worker_flags_generation_sla(tmp_path: Path) -> None:
     }
 
     response = await process_note_job(
-        ctx, str(note_path), "note.md", metadata_dict=metadata_dict, qa_pairs_dicts=[qa_dict]
+        ctx,
+        str(note_path),
+        "note.md",
+        metadata_dict=metadata_dict,
+        qa_pairs_dicts=[qa_dict],
     )
 
     assert response["success"] is False
     assert "generation" in response["error"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_worker_flags_validation_sla(tmp_path: Path) -> None:
     """Post-validation overruns should be reported with stage metadata."""
     note_path = tmp_path / "note.md"
     note_path.write_text("# demo")
 
-    result = _build_pipeline_result(
-        generation_seconds=5.0, validation_seconds=999.0)
+    result = _build_pipeline_result(generation_seconds=5.0, validation_seconds=999.0)
     metadata_dict = {
         "id": "note-val",
         "title": "Demo",
@@ -142,7 +143,11 @@ async def test_worker_flags_validation_sla(tmp_path: Path) -> None:
     }
 
     response = await process_note_job(
-        ctx, str(note_path), "note.md", metadata_dict=metadata_dict, qa_pairs_dicts=[qa_dict]
+        ctx,
+        str(note_path),
+        "note.md",
+        metadata_dict=metadata_dict,
+        qa_pairs_dicts=[qa_dict],
     )
 
     assert response["success"] is False

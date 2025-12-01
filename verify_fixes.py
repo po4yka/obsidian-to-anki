@@ -10,6 +10,7 @@ from obsidian_anki_sync.sync.transactions import CardTransaction, RollbackAction
 # Configure logging to capture output
 logging.basicConfig(level=logging.INFO)
 
+
 class TestFixes(unittest.TestCase):
     def setUp(self):
         self.test_dir = Path("test_cache_fix")
@@ -38,11 +39,15 @@ class TestFixes(unittest.TestCase):
 
         with patch("pathlib.Path.rglob", return_value=[mock_path]):
             # This should NOT raise exception but SHOULD log warning
-            with self.assertLogs("obsidian_anki_sync.infrastructure.cache.cache_manager", level="WARNING") as cm_logs:
+            with self.assertLogs(
+                "obsidian_anki_sync.infrastructure.cache.cache_manager", level="WARNING"
+            ) as cm_logs:
                 info = cm.get_cache_size_info()
 
             print("Logs captured:", cm_logs.output)
-            self.assertTrue(any("error_calculating_directory_size" in log for log in cm_logs.output))
+            self.assertTrue(
+                any("error_calculating_directory_size" in log for log in cm_logs.output)
+            )
             self.assertEqual(info["agent_cache_size"], 0)
 
     def test_transaction_rollback_verification_failure(self):
@@ -65,18 +70,23 @@ class TestFixes(unittest.TestCase):
         anki_mock.notes_info.side_effect = Exception("Network error")
 
         # Perform rollback
-        with self.assertLogs("obsidian_anki_sync.sync.transactions", level="WARNING") as txn_logs:
+        with self.assertLogs(
+            "obsidian_anki_sync.sync.transactions", level="WARNING"
+        ) as txn_logs:
             report = txn.rollback(verify=True)
 
         print("Logs captured:", txn_logs.output)
 
         # Check results
-        self.assertTrue(report.all_succeeded) # The action itself succeeded
-        self.assertFalse(report.all_verified) # But verification failed
+        self.assertTrue(report.all_succeeded)  # The action itself succeeded
+        self.assertFalse(report.all_verified)  # But verification failed
         self.assertEqual(report.verified, 0)
 
         # Check logs
-        self.assertTrue(any("rollback_verification_error" in log for log in txn_logs.output))
+        self.assertTrue(
+            any("rollback_verification_error" in log for log in txn_logs.output)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

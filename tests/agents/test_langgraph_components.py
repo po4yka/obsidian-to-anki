@@ -10,7 +10,7 @@ from obsidian_anki_sync.agents.langgraph.workflow_builder import (
 from obsidian_anki_sync.config import Config
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_config():
     config = MagicMock(spec=Config)
     config.get_model_for_agent.return_value = "gpt-4o"

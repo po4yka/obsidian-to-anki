@@ -63,6 +63,7 @@ def _decode_html_entities(value: str) -> str:
         )
     return decoded
 
+
 # Fields that can be patched on GeneratedCard
 PATCHABLE_FIELDS = {"slug", "lang", "apf_html", "confidence"}
 
@@ -162,9 +163,7 @@ def apply_corrections(
             )
 
     # Return cards in original order (sorted by card_index)
-    corrected_cards = [
-        card_map[idx] for idx in sorted(card_map.keys())
-    ]
+    corrected_cards = [card_map[idx] for idx in sorted(card_map.keys())]
 
     return corrected_cards, applied_changes
 

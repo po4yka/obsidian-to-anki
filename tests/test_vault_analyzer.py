@@ -11,7 +11,7 @@ from obsidian_anki_sync.obsidian.vault_analyzer import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_vault(tmp_path: Path) -> Path:
     """Create a sample Obsidian vault for testing."""
     vault_path = tmp_path / "test_vault"

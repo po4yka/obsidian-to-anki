@@ -49,7 +49,7 @@ class ProblematicNotesArchiver:
         if the main index is corrupted.
         """
         if not self.index_file.exists():
-            self.index = {"notes": [], "last_updated": None}
+            self.index: dict[str, Any] = {"notes": [], "last_updated": None}
             return
 
         backup_file = self.index_file.with_suffix(".json.bak")
@@ -329,9 +329,10 @@ class ProblematicNotesArchiver:
 
         # Remove old entries from index
         original_count = len(self.index.get("notes", []))
+        notes = self.index.get("notes") or []
         self.index["notes"] = [
             n
-            for n in self.index.get("notes", [])
+            for n in notes
             if datetime.fromisoformat(n.get("timestamp", "")).timestamp() > cutoff_date
         ]
         cleaned = original_count - len(self.index["notes"])

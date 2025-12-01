@@ -1254,7 +1254,7 @@ def load_config(config_path: Path | None = None) -> Config:
                 original_env[env_key] = os.environ.get(env_key, "")
                 if value is not None:
                     # Handle special types
-                    if isinstance(value, (list, dict)):
+                    if isinstance(value, list | dict):
                         # For complex types, we'll handle them in the Config model
                         continue
                     elif isinstance(value, Path):

@@ -16,7 +16,7 @@ def test_validate_file_logs_unexpected_exception(caplog):
 
     # Mock parse_note to raise an exception
     with (
-        patch.object(validator, 'parse_note', side_effect=ValueError("Test error")),
+        patch.object(validator, "parse_note", side_effect=ValueError("Test error")),
         caplog.at_level(logging.ERROR),
     ):
         result = validator.validate_file(mock_path)
@@ -32,7 +32,12 @@ def test_validate_file_logs_unexpected_exception(caplog):
     # Note: caplog.text might not contain the full traceback string depending on formatter,
     # but the presence of the message logged via logger.exception implies exc_info=True.
     # We can check if the log record has exc_info set.
-    assert any(record.exc_info for record in caplog.records if "validation_failed_unexpectedly" in record.message)
+    assert any(
+        record.exc_info
+        for record in caplog.records
+        if "validation_failed_unexpectedly" in record.message
+    )
+
 
 def test_apply_fixes_logs_exception(caplog):
     """Test that apply_fixes logs exceptions during fix application."""

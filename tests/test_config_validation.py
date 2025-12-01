@@ -690,7 +690,7 @@ class TestConfigurationDefaults:
         assert config.max_concurrent_generations == 5
 
 
-@pytest.fixture
+@pytest.fixture()
 def temp_dir():
     """Create a temporary directory for tests."""
     with tempfile.TemporaryDirectory() as tmpdir:

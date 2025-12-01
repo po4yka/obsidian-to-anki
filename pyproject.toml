@@ -133,7 +133,7 @@ select = [
     "SLOT",# flake8-slots
     "SIM", # flake8-simplify
     "TID", # flake8-tidy-imports
-    "TC",  # flake8-type-checking
+    "TCH", # flake8-type-checking
     "INT", # flake8-gettext
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
@@ -211,7 +211,7 @@ ignore = [
     "B905",      # zip without strict parameter (Python 3.10+ feature, not always needed)
     "PTH123",    # open() should be Path.open() (sometimes os operations are necessary)
     "PTH116",    # os.stat() should be Path.stat() (sometimes os operations are necessary)
-    "PT028",     # test function parameter defaults (common in CLI functions)
+
     "TRY004",    # prefer TypeError (style preference)
     "PYI036",    # context manager annotations (complex to fix everywhere)
     "DTZ007",    # naive datetime construction (acceptable for parsing)
@@ -221,9 +221,8 @@ ignore = [
     "G201",      # logging exception style (style preference)
     "PGH003",    # type ignore comments (fixed where practical)
     "DTZ006",    # datetime.fromtimestamp without tz (acceptable for file timestamps)
-    "TRY203",    # exception handler immediately re-raises (style preference)
-    "UP046",     # PEP 695 type parameter syntax for classes (requires refactoring)
-    "UP047",     # PEP 695 type parameter syntax for functions (requires refactoring)
+
+
     "B009",      # getattr with constant (style preference)
     "F841",      # unused variables (common in exception handlers)
     "S112",      # try-except-continue (sometimes appropriate)
@@ -247,7 +246,7 @@ fixable = [
     "E", "F", "W", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "A", "COM",
     "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP",
     "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM",
-    "TID", "TC", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY",
+    "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY",
     "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"
 ]
 
@@ -295,9 +294,9 @@ exclude = [
     "S101",      # assert statements in tests
     "ARG001",    # unused function argument in fixtures
     "SLF001",    # private member access in tests
-    "TC001",     # move import to type-checking block
-    "TC002",     # move import to type-checking block
-    "TC003",     # move import to type-checking block
+    "TCH001",    # move import to type-checking block
+    "TCH002",    # move import to type-checking block
+    "TCH003",    # move import to type-checking block
 ]
 "src/obsidian_anki_sync/cli.py" = ["T201"]  # print statements in CLI
 "scripts/**" = ["T201", "S603", "S607"]  # scripts may use print and subprocess
@@ -309,6 +308,7 @@ exclude = [
 "reproduce_*.py" = ["T201", "SLF001", "F401", "PTH100", "SIM115", "S101"]  # reproduction scripts
 "verify_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101", "PT009"]  # verification scripts
 "test_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # test scripts at root (not in tests/)
+"inspect_agent.py" = ["T201"]
 
 [tool.ruff.lint.mccabe]
 # Maximum complexity for functions/methods

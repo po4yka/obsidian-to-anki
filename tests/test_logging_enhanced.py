@@ -14,7 +14,7 @@ from obsidian_anki_sync.utils.logging import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def temp_dir(tmp_path):
     """Alias for pytest's tmp_path fixture."""
     return tmp_path
@@ -160,9 +160,9 @@ class TestEnhancedLogging:
             except json.JSONDecodeError:
                 continue
 
-        assert found_message, (
-            "Test message not found in log file with correct JSON structure"
-        )
+        assert (
+            found_message
+        ), "Test message not found in log file with correct JSON structure"
 
     def test_structured_fields_preserved(self, temp_dir):
         """Test that structured fields are preserved in logs."""

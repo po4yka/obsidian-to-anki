@@ -8,14 +8,14 @@ from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent
 from obsidian_anki_sync.exceptions import ParserError
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_ollama_provider():
     """Create a mock Ollama provider."""
     mock_provider = MagicMock()
     return mock_provider
 
 
-@pytest.fixture
+@pytest.fixture()
 def enhanced_parser_repair_agent(mock_ollama_provider):
     """Create an enhanced ParserRepairAgent instance."""
     return ParserRepairAgent(
@@ -27,7 +27,7 @@ def enhanced_parser_repair_agent(mock_ollama_provider):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def malformed_note_with_quality_issues():
     """Create a malformed note with quality issues."""
     return """---
@@ -47,7 +47,7 @@ Testing is verification process.
 """
 
 
-@pytest.fixture
+@pytest.fixture()
 def repaired_note_high_quality():
     """Create a high-quality repaired note."""
     return """---

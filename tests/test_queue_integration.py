@@ -13,7 +13,7 @@ from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.worker import process_note_job
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_config():
     config = Config()
     config.enable_queue = True
@@ -21,7 +21,7 @@ def mock_config():
     return config
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_pool():
     pool = AsyncMock(spec=ArqRedis)
     # Add ping method for health check
@@ -116,7 +116,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
         mock_job_class.assert_called_with(job_id="test-job-id", redis=mock_pool)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_process_note_job():
     """Test worker job processing."""
 

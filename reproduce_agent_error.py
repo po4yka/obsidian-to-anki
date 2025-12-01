@@ -1,18 +1,21 @@
-
 import asyncio
 import os
+
+from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic import BaseModel
 
 # Set dummy API key to avoid validation error if it checks env
 os.environ["OPENAI_API_KEY"] = "sk-test"
 
+
 class Deps(BaseModel):
     pass
 
+
 class Output(BaseModel):
     foo: str
+
 
 async def main():
     try:
@@ -21,10 +24,7 @@ async def main():
 
         print("Initializing Agent with output_retries=5...")
         agent = Agent(
-            model=model,
-            output_type=Output,
-            system_prompt="test",
-            output_retries=5
+            model=model, output_type=Output, system_prompt="test", output_retries=5
         )
         print("Agent initialized successfully.")
 
@@ -41,6 +41,7 @@ async def main():
 
     except Exception as e:
         print(f"Caught exception: {type(e).__name__}: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

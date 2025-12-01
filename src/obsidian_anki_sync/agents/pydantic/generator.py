@@ -143,7 +143,9 @@ Slug Base: {slug_base}
                     qa_pair = qa_lookup.get(card.card_index)
                     content_hash = ""
                     if qa_pair is not None:
-                        content_hash = compute_content_hash(qa_pair, metadata, card.lang)
+                        content_hash = compute_content_hash(
+                            qa_pair, metadata, card.lang
+                        )
 
                     # Create new card with computed content_hash
                     generated_card = GeneratedCard(
@@ -151,7 +153,9 @@ Slug Base: {slug_base}
                         slug=card.slug,
                         lang=card.lang,
                         apf_html=card.apf_html,
-                        confidence=card.confidence if card.confidence else output.confidence,
+                        confidence=card.confidence
+                        if card.confidence
+                        else output.confidence,
                         content_hash=content_hash,
                     )
                     generated_cards.append(generated_card)

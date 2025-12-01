@@ -58,9 +58,13 @@ async def test_note(note_path: str) -> None:
         print(f"  Error type: {pipeline_result.post_validation.error_type}")
         print(f"  Details: {pipeline_result.post_validation.error_details}")
         if pipeline_result.post_validation.corrected_cards:
-            print(f"  Corrected cards: {len(pipeline_result.post_validation.corrected_cards)}")
+            print(
+                f"  Corrected cards: {len(pipeline_result.post_validation.corrected_cards)}"
+            )
         if pipeline_result.post_validation.applied_changes:
-            print(f"  Applied changes: {pipeline_result.post_validation.applied_changes}")
+            print(
+                f"  Applied changes: {pipeline_result.post_validation.applied_changes}"
+            )
 
     print(f"\nStage times: {pipeline_result.stage_times}")
 

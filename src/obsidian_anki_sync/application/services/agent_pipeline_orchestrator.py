@@ -89,8 +89,7 @@ class AgentPipelineOrchestrator:
             result["stages"]["pre_validation"] = pre_val_result
 
             if not pre_val_result["success"]:
-                result["error"] = pre_val_result.get(
-                    "error", "Pre-validation failed")
+                result["error"] = pre_val_result.get("error", "Pre-validation failed")
                 return self._finalize_result(result, start_time)
 
             # Stage 2: Card Generation
@@ -115,8 +114,7 @@ class AgentPipelineOrchestrator:
             if result["success"]:
                 result["cards"] = post_val_result["cards"]
             else:
-                result["error"] = post_val_result.get(
-                    "error", "Post-validation failed")
+                result["error"] = post_val_result.get("error", "Post-validation failed")
 
         except Exception as e:
             result["error"] = str(e)
@@ -146,8 +144,7 @@ class AgentPipelineOrchestrator:
         Returns:
             Pre-validation result
         """
-        pre_validation_enabled = self.config.get(
-            "pre_validation_enabled", True)
+        pre_validation_enabled = self.config.get("pre_validation_enabled", True)
 
         if not pre_validation_enabled:
             return {
@@ -160,8 +157,7 @@ class AgentPipelineOrchestrator:
 
         # Basic validation logic
         is_valid = (
-            len(qa_pairs) > 0 and metadata.topic and len(
-                metadata.language_tags) > 0
+            len(qa_pairs) > 0 and metadata.topic and len(metadata.language_tags) > 0
         )
 
         result = {
@@ -204,8 +200,7 @@ class AgentPipelineOrchestrator:
             cached_result = self.cache_strategy.get(cache_key)
 
             if cached_result:
-                logger.debug("using_cached_generation",
-                             correlation_id=correlation_id)
+                logger.debug("using_cached_generation", correlation_id=correlation_id)
                 return {
                     "success": True,
                     "cards": cached_result,
@@ -259,8 +254,7 @@ class AgentPipelineOrchestrator:
         # Use retry handler for post-validation
         retry_result = self.retry_handler.execute_with_retry(
             validate_operation,
-            context={"correlation_id": correlation_id,
-                     "stage": "post_validation"},
+            context={"correlation_id": correlation_id, "stage": "post_validation"},
         )
 
         if retry_result.success:
@@ -277,7 +271,8 @@ class AgentPipelineOrchestrator:
                 "error": str(retry_result.error),
                 "retry_count": retry_result.attempts - 1,
                 "time": retry_result.total_time,
-                "needs_highlight": retry_result.context.get("stage") == "post_validation",
+                "needs_highlight": retry_result.context.get("stage")
+                == "post_validation",
             }
 
     def _generate_cards_with_llm(

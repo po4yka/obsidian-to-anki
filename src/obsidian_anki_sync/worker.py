@@ -78,10 +78,8 @@ async def process_note_job(
 
     logger.info("worker_processing_job", file=relative_path)
 
-    generation_sla = getattr(
-        config, "worker_generation_timeout_seconds", 360.0)
-    validation_sla = getattr(
-        config, "worker_validation_timeout_seconds", 180.0)
+    generation_sla = getattr(config, "worker_generation_timeout_seconds", 360.0)
+    validation_sla = getattr(config, "worker_validation_timeout_seconds", 180.0)
 
     try:
         path_obj = Path(file_path)
@@ -128,7 +126,8 @@ async def process_note_job(
         }
 
         sla_violation = _detect_stage_sla(
-            result.stage_times, generation_sla, validation_sla)
+            result.stage_times, generation_sla, validation_sla
+        )
         if sla_violation is not None:
             logger.error(
                 "pipeline_stage_timeout",
@@ -173,8 +172,7 @@ async def process_note_job(
                 )
 
             error_msg = (
-                "; ".join(
-                    error_details) if error_details else "Unknown pipeline error"
+                "; ".join(error_details) if error_details else "Unknown pipeline error"
             )
             logger.warning(
                 "pipeline_generation_failed",

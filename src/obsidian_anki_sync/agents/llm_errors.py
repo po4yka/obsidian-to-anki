@@ -69,7 +69,7 @@ def categorize_llm_error(
 
     # Timeout errors
     if isinstance(
-        error, (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout)
+        error, httpx.TimeoutException | httpx.ConnectTimeout | httpx.ReadTimeout
     ):
         return LLMError(
             message=f"LLM request timed out after {duration:.1f}s for {operation}",
@@ -80,7 +80,7 @@ def categorize_llm_error(
         )
 
     # Network errors
-    if isinstance(error, (httpx.NetworkError, httpx.ConnectError)):
+    if isinstance(error, httpx.NetworkError | httpx.ConnectError):
         return LLMError(
             message=f"Network error during {operation}: {error!s}",
             error_type=LLMErrorType.NETWORK,

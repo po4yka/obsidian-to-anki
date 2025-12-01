@@ -18,7 +18,7 @@ from obsidian_anki_sync.agents.pydantic.split_validator import SplitValidationRe
 from obsidian_anki_sync.config import Config
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_config():
     """Create a mock configuration."""
     config = MagicMock(spec=Config)
@@ -26,7 +26,7 @@ def mock_config():
     return config
 
 
-@pytest.fixture
+@pytest.fixture()
 def pipeline_state(mock_config):
     """Create a sample pipeline state."""
     # Create a mock model factory
@@ -64,7 +64,7 @@ def pipeline_state(mock_config):
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_split_validation_node_skipped_no_split(pipeline_state):
     """Test that validation is skipped if no split is proposed."""
     pipeline_state["card_splitting"] = None
@@ -75,7 +75,7 @@ async def test_split_validation_node_skipped_no_split(pipeline_state):
     assert "split_validation" not in new_state or new_state["split_validation"] is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_split_validation_node_approved(pipeline_state):
     """Test that validation approves a valid split."""
     # Setup splitting result
@@ -127,7 +127,7 @@ async def test_split_validation_node_approved(pipeline_state):
     assert new_state["card_splitting"]["should_split"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_split_validation_node_rejected(pipeline_state):
     """Test that validation rejects an invalid split and reverts to single card."""
     # Setup splitting result

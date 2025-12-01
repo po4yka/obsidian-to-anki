@@ -538,7 +538,9 @@ ALWAYS:
                 )
                 return None
             except Exception as e:
-                logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
+                logger.error(
+                    "parser_repair_llm_failed", file=str(file_path), error=str(e)
+                )
                 return None
 
         # Check if repairable

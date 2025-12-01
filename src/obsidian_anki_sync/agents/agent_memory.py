@@ -574,7 +574,7 @@ class AgentMemoryStore:
                                 timestamp_raw = metadata.get("timestamp", "0")
                                 try:
                                     # Handle various possible types safely
-                                    if isinstance(timestamp_raw, (int, float)):
+                                    if isinstance(timestamp_raw, int | float):
                                         timestamp = float(timestamp_raw)
                                     elif isinstance(timestamp_raw, str):
                                         timestamp = (

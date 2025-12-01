@@ -9,7 +9,7 @@ from obsidian_anki_sync.agents.generator import GeneratorAgent
 from obsidian_anki_sync.models import Manifest, NoteMetadata
 
 
-@pytest.fixture
+@pytest.fixture()
 def generator_agent(mock_ollama_provider):
     """Create a GeneratorAgent instance for testing."""
     return GeneratorAgent(
@@ -17,7 +17,7 @@ def generator_agent(mock_ollama_provider):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_metadata():
     """Sample note metadata for testing."""
     return NoteMetadata(
@@ -33,7 +33,7 @@ def sample_metadata():
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_manifest():
     """Sample manifest for testing."""
     return Manifest(

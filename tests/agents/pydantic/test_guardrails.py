@@ -12,7 +12,7 @@ from obsidian_anki_sync.agents.pydantic_ai_agents import (
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_generator_agent_retries_on_invalid_apf():
     """Test that GeneratorAgentAI retries when generated APF is invalid."""
 
@@ -73,7 +73,7 @@ END_OF_CARDS"""
     assert output.cards[0]["slug"] == "test-card"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_generator_agent_integration_mock():
     """Verify the agent integration with a mocked run method."""
     # This tests that the agent is set up correctly to use the model

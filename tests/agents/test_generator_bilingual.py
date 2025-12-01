@@ -8,7 +8,7 @@ from obsidian_anki_sync.agents.generator import GeneratorAgent, ParsedCardStruct
 from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
 
 
-@pytest.fixture
+@pytest.fixture()
 def bilingual_generator_agent(mock_llm_provider):
     """Create a GeneratorAgent instance for bilingual testing."""
     return GeneratorAgent(
@@ -16,7 +16,7 @@ def bilingual_generator_agent(mock_llm_provider):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def kotlin_singleton_metadata():
     """Metadata based on kotlin-224 note."""
     return NoteMetadata(
@@ -39,7 +39,7 @@ def kotlin_singleton_metadata():
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def kotlin_singleton_qa_pairs():
     """QA pairs from kotlin-224 note."""
     return [

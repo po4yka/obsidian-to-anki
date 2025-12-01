@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field, SecretStr
 class BaseProviderConfig(BaseModel):
     """Base configuration for all LLM providers."""
 
-    timeout: float = Field(default=240.0, ge=1.0, description="Request timeout in seconds")
+    timeout: float = Field(
+        default=240.0, ge=1.0, description="Request timeout in seconds"
+    )
     max_retries: int = Field(default=3, ge=0, description="Maximum retry attempts")
     verbose_logging: bool = Field(default=False, description="Enable verbose logging")
 

@@ -392,53 +392,53 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 progress_display.update_operation("Extracting Q&A pairs", note_name)
 
             try:
-            # Retry logic for JSON errors
-            max_retries = 3
-            last_error = None
+                # Retry logic for JSON errors
+                max_retries = 3
+                last_error = None
 
-            import json
+                import json
 
-            for attempt in range(max_retries):
-                try:
-                    result = self.llm_provider.generate_json(
-                        model=self.model,
-                        prompt=prompt,
-                        system=system_prompt,
-                        temperature=self.temperature,
-                        json_schema=json_schema,
-                        reasoning_enabled=self.reasoning_enabled,
-                    )
-                    break
-                except json.JSONDecodeError as e:
-                    last_error = e
-                    logger.warning(
-                        "qa_extraction_json_error",
-                        attempt=attempt + 1,
-                        max_retries=max_retries,
-                        error=str(e),
-                    )
-                    if attempt == max_retries - 1:
-                        raise last_error
-                    time.sleep(1)  # Brief pause before retry
+                for attempt in range(max_retries):
+                    try:
+                        result = self.llm_provider.generate_json(
+                            model=self.model,
+                            prompt=prompt,
+                            system=system_prompt,
+                            temperature=self.temperature,
+                            json_schema=json_schema,
+                            reasoning_enabled=self.reasoning_enabled,
+                        )
+                        break
+                    except json.JSONDecodeError as e:
+                        last_error = e
+                        logger.warning(
+                            "qa_extraction_json_error",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            error=str(e),
+                        )
+                        if attempt == max_retries - 1:
+                            raise last_error
+                        time.sleep(1)  # Brief pause before retry
 
-                # Extract and display reflections if available
-                if progress_display:
-                    from obsidian_anki_sync.utils.progress_display import (
-                        extract_reasoning_from_response,
-                    )
-
-                    reasoning = extract_reasoning_from_response(result, self.model)
-                    if reasoning:
-                        progress_display.add_reflection(
-                            f"Extraction reasoning: {reasoning[:200]}"
+                    # Extract and display reflections if available
+                    if progress_display:
+                        from obsidian_anki_sync.utils.progress_display import (
+                            extract_reasoning_from_response,
                         )
 
-                    # Also check extraction_notes
-                    extraction_notes = result.get("extraction_notes", "")
-                    if extraction_notes and len(extraction_notes) > 30:
-                        progress_display.add_reflection(
-                            f"Extraction notes: {extraction_notes[:200]}"
-                        )
+                        reasoning = extract_reasoning_from_response(result, self.model)
+                        if reasoning:
+                            progress_display.add_reflection(
+                                f"Extraction reasoning: {reasoning[:200]}"
+                            )
+
+                        # Also check extraction_notes
+                        extraction_notes = result.get("extraction_notes", "")
+                        if extraction_notes and len(extraction_notes) > 30:
+                            progress_display.add_reflection(
+                                f"Extraction notes: {extraction_notes[:200]}"
+                            )
             finally:
                 # Restore original max_tokens
                 if (

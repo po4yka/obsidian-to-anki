@@ -7,7 +7,7 @@ import respx
 from obsidian_anki_sync.anki.client import AnkiClient, AnkiConnectError
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_anki_url():
     """Mock AnkiConnect URL."""
     return "http://localhost:8765"

@@ -475,12 +475,12 @@ def configure_logging(
 
     # Use user-friendly renderer when not in verbose mode for cleaner output
     if verbose:
-        console_renderer = _create_console_renderer()
+        renderer: Any = _create_console_renderer()
     else:
-        console_renderer = UserFriendlyConsoleRenderer()
+        renderer = UserFriendlyConsoleRenderer()
 
     console_formatter = structlog.stdlib.ProcessorFormatter(
-        processor=console_renderer,
+        processor=renderer,
         foreign_pre_chain=console_pre_chain,
     )
     console_handler.setFormatter(console_formatter)

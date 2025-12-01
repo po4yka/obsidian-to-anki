@@ -78,8 +78,7 @@ class PostValidatorAgentAI:
         Returns:
             PostValidationResult with validation outcome
         """
-        logger.info("pydantic_ai_post_validation_start",
-                    cards_count=len(cards))
+        logger.info("pydantic_ai_post_validation_start", cards_count=len(cards))
 
         # Create dependencies
         deps = PostValidationDeps(
@@ -104,9 +103,7 @@ Cards to validate:
         if len(cards) > 3:
             prompt += f"\n(Plus {len(cards) - 3} more cards with similar structure)\n"
 
-        prompt += (
-            f"\nValidate all {len(cards)} cards for APF v2.1 compliance, correctness, and quality."
-        )
+        prompt += f"\nValidate all {len(cards)} cards for APF v2.1 compliance, correctness, and quality."
 
         try:
             # Run agent
@@ -119,8 +116,12 @@ Cards to validate:
             if output.suggested_corrections:
                 # Log detailed info about each suggested correction
                 for i, corr in enumerate(output.suggested_corrections):
-                    suggested_preview = corr.suggested_value[:200] if corr.suggested_value else ""
-                    has_html_entities = "&lt;" in suggested_preview or "&gt;" in suggested_preview
+                    suggested_preview = (
+                        corr.suggested_value[:200] if corr.suggested_value else ""
+                    )
+                    has_html_entities = (
+                        "&lt;" in suggested_preview or "&gt;" in suggested_preview
+                    )
                     logger.info(
                         "post_validation_correction_suggested",
                         correction_index=i,
@@ -138,7 +139,8 @@ Cards to validate:
                     "post_validation_corrections_applied",
                     suggested_count=len(output.suggested_corrections),
                     applied_count=len(applied_changes),
-                    skipped_count=len(output.suggested_corrections) - len(applied_changes),
+                    skipped_count=len(output.suggested_corrections)
+                    - len(applied_changes),
                 )
 
             validation_result = PostValidationResult(
@@ -171,7 +173,11 @@ Cards to validate:
             msg = "Failed to parse post-validation output"
             raise StructuredOutputError(
                 msg,
-                details={"error": str(e), "cards_count": len(cards), "model": str(self.model)},
+                details={
+                    "error": str(e),
+                    "cards_count": len(cards),
+                    "model": str(self.model),
+                },
             ) from e
         except StructuredOutputError as e:
             logger.error(
@@ -182,7 +188,12 @@ Cards to validate:
             )
             msg = "Post-validation structured output failed"
             raise PostValidationError(
-                msg, details={"cards_count": len(cards), "error": str(e), "model": str(self.model)}
+                msg,
+                details={
+                    "cards_count": len(cards),
+                    "error": str(e),
+                    "model": str(self.model),
+                },
             ) from e
         except TimeoutError as e:
             logger.error(
@@ -192,7 +203,9 @@ Cards to validate:
                 cards_count=len(cards),
             )
             msg = "Post-validation timed out"
-            raise ModelError(msg, details={"cards_count": len(cards), "model": str(self.model)}) from e
+            raise ModelError(
+                msg, details={"cards_count": len(cards), "model": str(self.model)}
+            ) from e
         except Exception as e:
             logger.error(
                 "pydantic_ai_post_validation_failed",
@@ -203,4 +216,5 @@ Cards to validate:
             )
             msg = f"Post-validation failed: {e!s}"
             raise PostValidationError(
-                msg, details={"cards_count": len(cards), "model": str(self.model)}) from e
+                msg, details={"cards_count": len(cards), "model": str(self.model)}
+            ) from e

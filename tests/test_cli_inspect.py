@@ -10,7 +10,7 @@ from obsidian_anki_sync.cli import app
 from obsidian_anki_sync.config import Config
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_note_content():
     """Sample note content for CLI lint tests."""
     return """---
@@ -42,7 +42,7 @@ Unit testing is testing individual components.
 """
 
 
-@pytest.fixture
+@pytest.fixture()
 def test_config(tmp_path):
     source_dir = Path("InterviewQuestions")
     (tmp_path / source_dir).mkdir(parents=True, exist_ok=True)
@@ -63,13 +63,13 @@ def test_config(tmp_path):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def runner():
     return CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def patch_logging(monkeypatch):
+def _patch_logging(monkeypatch):
     monkeypatch.setattr(
         "obsidian_anki_sync.cli_commands.shared.configure_logging",
         lambda *args, **kwargs: None,

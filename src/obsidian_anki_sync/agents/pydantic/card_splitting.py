@@ -107,7 +107,9 @@ Questions:
             start_time = time.time()
 
             # Run agent with OutputFixingParser for better error recovery
-            output: CardSplittingOutput = await self.fixing_parser.run(prompt, deps=deps)
+            output: CardSplittingOutput = await self.fixing_parser.run(
+                prompt, deps=deps
+            )
 
             # Convert split plan
             split_plans = []

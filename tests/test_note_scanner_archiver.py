@@ -13,7 +13,7 @@ from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
 
-@pytest.fixture
+@pytest.fixture()
 def fake_config(tmp_path):
     """Provide a minimal config namespace for NoteScanner tests."""
     return SimpleNamespace(

@@ -14,7 +14,7 @@ from obsidian_anki_sync.providers.openrouter import OpenRouterProvider
 BASE_URL = "https://mock.openrouter.ai/api/v1"
 
 
-@pytest.fixture
+@pytest.fixture()
 def openrouter_provider() -> OpenRouterProvider:
     """Provide an OpenRouterProvider instance configured for tests."""
     return OpenRouterProvider(

@@ -249,8 +249,7 @@ class RetryHandler:
             "semantic": 2,  # Semantic errors are harder to fix
         }
 
-        max_retries = base_config.get(
-            error_type) or defaults.get(error_type, 3)
+        max_retries = base_config.get(error_type) or defaults.get(error_type, 3)
         if max_retries is None:
             max_retries = 3
 
@@ -296,8 +295,7 @@ class RetryHandler:
             error_type = error_type_getter(e)
 
             # Get adaptive config for this error type
-            adaptive_config = self.get_adaptive_config(
-                error_type, base_retry_config)
+            adaptive_config = self.get_adaptive_config(error_type, base_retry_config)
 
             logger.debug(
                 "adaptive_retry_start",

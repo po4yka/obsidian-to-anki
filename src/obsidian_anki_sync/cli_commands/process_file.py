@@ -150,7 +150,7 @@ def process_card_with_llm(
     # Substitute variables in prompt
     prompt = prompt_template
     for key, value in card.items():
-        if isinstance(value, (str, int, float)):
+        if isinstance(value, str | int | float):
             prompt = prompt.replace(f"{{{key}}}", str(value))
 
     # Call LLM

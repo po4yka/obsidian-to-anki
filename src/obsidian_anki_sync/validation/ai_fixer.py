@@ -6,9 +6,9 @@ This module provides AI-driven fixes for common validation issues:
 - List formatting fixes
 """
 
+import json
 import re
 import time
-import json
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -290,7 +290,9 @@ Generate a bilingual title. Respond with JSON: {{"en_title": "<English>", "ru_ti
             return (parsed.en_title, parsed.ru_title)
 
         except Exception as e:
-            logger.error("bilingual_title_generation_failed", error=str(e), exc_info=True)
+            logger.error(
+                "bilingual_title_generation_failed", error=str(e), exc_info=True
+            )
             return None
 
     def fix_note_structure(self, content: str) -> tuple[str, list[str]]:

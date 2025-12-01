@@ -8,7 +8,7 @@ from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.sync.card_generator import CardGenerator
 
 
-@pytest.fixture
+@pytest.fixture()
 def card_generator() -> CardGenerator:
     config = MagicMock(spec=Config)
     config.vault_path = Path()

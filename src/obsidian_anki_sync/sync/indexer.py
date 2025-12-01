@@ -153,20 +153,16 @@ class VaultIndexer:
                             self.config, "repair_missing_sections", True
                         )
 
-                        try:
-                            metadata, qa_pairs = parse_note_with_repair(
-                                file_path=file_path,
-                                ollama_client=llm_provider_for_repair,
-                                repair_model=repair_model,
-                                enable_repair=repair_enabled
-                                and llm_provider_for_repair is not None,
-                                tolerant_parsing=tolerant_parsing,
-                                enable_content_generation=enable_content_generation,
-                                repair_missing_sections=repair_missing_sections,
-                            )
-                        except ParserError:
-                            # If repair also fails, fall back to regular parse for error reporting
-                            raise
+                        metadata, qa_pairs = parse_note_with_repair(
+                            file_path=file_path,
+                            ollama_client=llm_provider_for_repair,
+                            repair_model=repair_model,
+                            enable_repair=repair_enabled
+                            and llm_provider_for_repair is not None,
+                            tolerant_parsing=tolerant_parsing,
+                            enable_content_generation=enable_content_generation,
+                            repair_missing_sections=repair_missing_sections,
+                        )
                     else:
                         # Parse without repair
                         metadata, qa_pairs = parse_note(file_path)

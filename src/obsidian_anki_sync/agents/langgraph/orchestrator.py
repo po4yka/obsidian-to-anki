@@ -10,8 +10,6 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from langgraph.checkpoint.memory import MemorySaver
-
 if TYPE_CHECKING:
     from obsidian_anki_sync.config import Config
     from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
@@ -138,10 +136,8 @@ class LangGraphOrchestrator:
                 config, "enable_duplicate_detection", False
             )  # Default to False
         )
-        self.enable_highlight_agent = getattr(
-            config, "enable_highlight_agent", True)
-        self.highlight_max_candidates = getattr(
-            config, "highlight_max_candidates", 3)
+        self.enable_highlight_agent = getattr(config, "enable_highlight_agent", True)
+        self.highlight_max_candidates = getattr(config, "highlight_max_candidates", 3)
 
         # NEW: Agent framework selection (can be overridden by memory)
         self.agent_framework = (
@@ -169,8 +165,7 @@ class LangGraphOrchestrator:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(config, "enable_semantic_search", True)
 
                 self.memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
@@ -182,8 +177,7 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning(
-                    "langgraph_memory_store_init_failed", error=str(e))
+                logger.warning("langgraph_memory_store_init_failed", error=str(e))
 
         # NEW: Advanced MongoDB memory store (deferred connection)
         self.advanced_memory_store = None
@@ -204,8 +198,7 @@ class LangGraphOrchestrator:
                 )
                 logger.info("advanced_memory_store_deferred_connection")
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_init_failed", error=str(e))
+                logger.warning("advanced_memory_store_init_failed", error=str(e))
 
         # NEW: Enhanced observability system
         self.observability = None
@@ -217,8 +210,7 @@ class LangGraphOrchestrator:
                 self.observability = EnhancedObservabilitySystem(config)
                 logger.info("enhanced_observability_system_initialized")
             except Exception as e:
-                logger.warning(
-                    "enhanced_observability_init_failed", error=str(e))
+                logger.warning("enhanced_observability_init_failed", error=str(e))
 
         # RAG integration for context enrichment and duplicate detection
         self.rag_integration = None
@@ -286,8 +278,7 @@ class LangGraphOrchestrator:
                     logger.warning("advanced_memory_store_connection_failed")
                     self.advanced_memory_store = None
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_async_setup_failed", error=str(e))
+                logger.warning("advanced_memory_store_async_setup_failed", error=str(e))
                 self.advanced_memory_store = None
 
     def convert_to_cards(
@@ -331,8 +322,7 @@ class LangGraphOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(
-                    qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
@@ -655,9 +645,13 @@ class LangGraphOrchestrator:
                 "agent_selector": runtime_key,  # Present for backward compatibility
                 # Cached model names (models fetched via runtime registry)
                 "pre_validator_model": self.config.get_model_for_agent("pre_validator"),
-                "card_splitting_model": self.config.get_model_for_agent("card_splitting"),
+                "card_splitting_model": self.config.get_model_for_agent(
+                    "card_splitting"
+                ),
                 "generator_model": self.config.get_model_for_agent("generator"),
-                "post_validator_model": self.config.get_model_for_agent("post_validator"),
+                "post_validator_model": self.config.get_model_for_agent(
+                    "post_validator"
+                ),
                 "context_enrichment_model": self.config.get_model_for_agent(
                     "context_enrichment"
                 ),
@@ -908,8 +902,7 @@ class LangGraphOrchestrator:
                 self.observability.record_metrics(metrics)
                 logger.info("observability_metrics_recorded")
             except Exception as e:
-                logger.warning(
-                    "observability_metrics_recording_failed", error=str(e))
+                logger.warning("observability_metrics_recording_failed", error=str(e))
 
         # NEW: Learn from execution if advanced memory is enabled
         if self.advanced_memory_store and self.advanced_memory_store.connected:

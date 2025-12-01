@@ -166,7 +166,7 @@ class ContentHashService:
                 return ContentHashService._normalize_dict(value)
             elif isinstance(value, list):
                 return ",".join(sorted(str(normalize_value(item)) for item in value))
-            elif isinstance(value, (int, float)):
+            elif isinstance(value, int | float):
                 return str(value)
             elif isinstance(value, str):
                 return value.strip()

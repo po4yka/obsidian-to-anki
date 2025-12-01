@@ -1,6 +1,7 @@
-
 import inspect
+
 from pydantic_ai import Agent
+
 
 def main():
     print("Inspecting Agent...")
@@ -15,6 +16,7 @@ def main():
     # Check if AbstractAgent is in bases
     for base in Agent.__mro__:
         print(f"Base: {base.__name__}")
+
 
 if __name__ == "__main__":
     main()

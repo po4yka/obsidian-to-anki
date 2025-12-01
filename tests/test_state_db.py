@@ -6,7 +6,7 @@ from obsidian_anki_sync.models import Card, Manifest
 from obsidian_anki_sync.sync.state_db import StateDB
 
 
-@pytest.fixture
+@pytest.fixture()
 def temp_dir(tmp_path):
     """Alias for pytest's tmp_path fixture."""
     return tmp_path

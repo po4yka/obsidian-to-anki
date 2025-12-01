@@ -5,8 +5,9 @@ and exponential backoff with jitter for rate limit handling.
 """
 
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import Any
 
 import httpx
 
@@ -55,8 +56,8 @@ def parse_retry_after_header(response: httpx.Response) -> float | None:
         try:
             retry_datetime = parsedate_to_datetime(retry_after)
             if retry_datetime.tzinfo is None:
-                retry_datetime = retry_datetime.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                retry_datetime = retry_datetime.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             delta = (retry_datetime - now).total_seconds()
             if delta > 0:
                 return float(delta)
@@ -107,7 +108,7 @@ def calculate_retry_wait(
         jitter_amount = delay * random.uniform(0, 0.25)
         delay += jitter_amount
 
-    return min(delay, max_delay)
+    return float(min(delay, max_delay))
 
 
 def log_retry(
@@ -128,7 +129,7 @@ def log_retry(
         wait_time: Wait time before retry
         error: Error message (if available)
     """
-    log_data = {
+    log_data: dict[str, Any] = {
         "attempt": attempt,
         "max_retries": max_retries,
         "wait_seconds": round(wait_time, 2),

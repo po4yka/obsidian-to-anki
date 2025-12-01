@@ -163,7 +163,9 @@ class OutputFixingParser(Generic[T]):
                 # Get output type name for debugging
                 output_type_name = "unknown"
                 if hasattr(self.agent, "output_type"):
-                    output_type_name = getattr(self.agent.output_type, "__name__", str(self.agent.output_type))
+                    output_type_name = getattr(
+                        self.agent.output_type, "__name__", str(self.agent.output_type)
+                    )
 
                 # Log the raw LLM output that failed validation for debugging
                 logger.warning(
@@ -201,7 +203,9 @@ class OutputFixingParser(Generic[T]):
                         max_attempts=self.max_fix_attempts,
                         error_type=type(e).__name__,
                         error_message=error_message[:500],
-                        error_body_preview=str(error_body)[:300] if error_body else None,
+                        error_body_preview=str(error_body)[:300]
+                        if error_body
+                        else None,
                         raw_output_preview=last_output[:300] if last_output else None,
                         output_type=output_type_name,
                     )
@@ -228,7 +232,9 @@ class OutputFixingParser(Generic[T]):
                 # Get output type name for debugging
                 output_type_name = "unknown"
                 if hasattr(self.agent, "output_type"):
-                    output_type_name = getattr(self.agent.output_type, "__name__", str(self.agent.output_type))
+                    output_type_name = getattr(
+                        self.agent.output_type, "__name__", str(self.agent.output_type)
+                    )
                 logger.error(
                     "output_fixing_unexpected_error",
                     error=str(e)[:500],
@@ -467,7 +473,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             return None
 
         try:
-            return output_type.model_validate(parsed)
+            return output_type.model_validate(parsed)  # type: ignore[return-value]
         except Exception:
             return None
 
