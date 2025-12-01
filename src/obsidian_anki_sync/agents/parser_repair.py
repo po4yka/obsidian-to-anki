@@ -507,28 +507,39 @@ ALWAYS:
 </constraints>"""
 
         # Call LLM for repair analysis
-        try:
-            # Get JSON schema for structured output
-            json_schema = get_parser_repair_schema()
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Get JSON schema for structured output
+                json_schema = get_parser_repair_schema()
 
-            repair_result = self.ollama_client.generate_json(
-                model=self.model,
-                prompt=prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=json_schema,
-            )
+                repair_result = self.ollama_client.generate_json(
+                    model=self.model,
+                    prompt=prompt,
+                    system=system_prompt,
+                    temperature=self.temperature,
+                    json_schema=json_schema,
+                )
+                break  # Success, exit retry loop
 
-        except json.JSONDecodeError as e:
-            logger.error(
-                "parser_repair_invalid_json",
-                file=str(file_path),
-                error=str(e),
-            )
-            return None
-        except Exception as e:
-            logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
-            return None
+            except json.JSONDecodeError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        "parser_repair_json_retry",
+                        file=str(file_path),
+                        attempt=attempt + 1,
+                        error=str(e),
+                    )
+                    continue
+                logger.error(
+                    "parser_repair_invalid_json",
+                    file=str(file_path),
+                    error=str(e),
+                )
+                return None
+            except Exception as e:
+                logger.error("parser_repair_llm_failed", file=str(file_path), error=str(e))
+                return None
 
         # Check if repairable
         if not repair_result.get("is_repairable", False):
