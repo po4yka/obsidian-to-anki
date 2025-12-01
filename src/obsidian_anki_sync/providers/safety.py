@@ -24,8 +24,8 @@ class SafetyConfig:
     max_prompt_length: int = 100000  # ~25K tokens
     max_response_length: int = 50000  # ~12.5K tokens
     max_concurrent_requests: int = 3  # Prevent resource exhaustion
-    request_timeout_seconds: float = 600.0  # 10 minutes
-    concurrency_wait_timeout_seconds: float = 60.0  # Max wait for slot
+    request_timeout_seconds: float = 900.0  # 15 minutes
+    concurrency_wait_timeout_seconds: float = 120.0  # Max wait for slot
 
     # Rate limiting
     max_requests_per_minute: int = 60

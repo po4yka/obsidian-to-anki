@@ -5,7 +5,7 @@ and exponential backoff with jitter for rate limit handling.
 """
 
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -55,8 +55,8 @@ def parse_retry_after_header(response: httpx.Response) -> float | None:
         try:
             retry_datetime = parsedate_to_datetime(retry_after)
             if retry_datetime.tzinfo is None:
-                retry_datetime = retry_datetime.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                retry_datetime = retry_datetime.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             delta = (retry_datetime - now).total_seconds()
             if delta > 0:
                 return float(delta)

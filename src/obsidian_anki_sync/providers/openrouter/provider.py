@@ -58,7 +58,7 @@ class OpenRouterProvider(BaseLLMProvider):
         self,
         api_key: str | None = None,
         base_url: str = "https://openrouter.ai/api/v1",
-        timeout: float = 180.0,
+        timeout: float = 300.0,
         max_tokens: int | None = 2048,
         site_url: str | None = None,
         site_name: str | None = None,

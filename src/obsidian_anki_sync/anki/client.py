@@ -28,7 +28,7 @@ class AnkiClient(IAnkiClient):
     def __init__(
         self,
         url: str,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
         enable_health_checks: bool = True,
         async_runner: AsyncioRunner | None = None,
     ):

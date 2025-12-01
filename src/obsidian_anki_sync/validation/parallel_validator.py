@@ -22,7 +22,7 @@ class ParallelConfig:
     max_workers: int | None = None  # None = CPU count
     batch_size: int = 50
     show_progress: bool = True
-    timeout_per_file: float = 30.0  # seconds
+    timeout_per_file: float = 60.0  # seconds
 
     def __post_init__(self) -> None:
         """Set default max_workers based on CPU count."""
