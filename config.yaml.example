@@ -92,7 +92,6 @@ duplicate_detection_model: ""  # Empty = use default
 langgraph_max_retries: 3  # Post-validation retry attempts
 langgraph_auto_fix: true  # Enable automatic error fixing
 langgraph_strict_mode: true  # Strict validation mode
-langgraph_checkpoint_enabled: true  # State persistence
 
 # =============================================================================
 # Enhancement Agents (Quality Improvements)
