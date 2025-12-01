@@ -1,27 +1,31 @@
-from dataclasses import dataclass
-from typing import Optional
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from .error_categories import ErrorCategory
 
 
-@dataclass
-class ValidationError:
+class ValidationError(BaseModel):
     """Structured validation error."""
 
     category: ErrorCategory
     message: str
-    code: str  # Short unique code for the error type (e.g., "html_tag_unclosed")
-    context: Optional[dict] = None  # Additional context for fixing (e.g., {"tag": "div"})
+    code: str = Field(
+        description="Short unique code for the error type (e.g., 'html_tag_unclosed')"
+    )
+    context: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional context for fixing (e.g., {'tag': 'div'})",
+    )
     fixable: bool = True
 
     def __str__(self) -> str:
         return f"[{self.category.value.upper()}] {self.message} ({self.code})"
 
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Result of a validation step."""
 
     is_valid: bool
-    errors: list[ValidationError]
-    validation_time: float = 0.0
+    errors: list[ValidationError] = Field(default_factory=list)
+    validation_time: float = Field(default=0.0, ge=0.0)

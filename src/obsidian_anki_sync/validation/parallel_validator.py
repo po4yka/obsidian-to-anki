@@ -8,26 +8,27 @@ import asyncio
 import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field, model_validator
 from tqdm import tqdm
 
 
-@dataclass
-class ParallelConfig:
+class ParallelConfig(BaseModel):
     """Configuration for parallel validation."""
 
-    max_workers: int | None = None  # None = CPU count
-    batch_size: int = 50
+    max_workers: int | None = Field(default=None, ge=1)  # None = CPU count
+    batch_size: int = Field(default=50, ge=1)
     show_progress: bool = True
-    timeout_per_file: float = 60.0  # seconds
+    timeout_per_file: float = Field(default=60.0, ge=1.0)  # seconds
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def set_default_max_workers(self) -> "ParallelConfig":
         """Set default max_workers based on CPU count."""
         if self.max_workers is None:
-            self.max_workers = min(os.cpu_count() or 4, 8)
+            object.__setattr__(self, "max_workers", min(os.cpu_count() or 4, 8))
+        return self
 
 
 class ParallelValidator:

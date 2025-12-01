@@ -4,12 +4,50 @@ Contains all BaseModel output types and dependency models used across agents.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from obsidian_anki_sync.agents.models import normalize_enrichment_label
 from obsidian_anki_sync.models import NoteMetadata, QAPair
+
+# =============================================================================
+# Structured Card Models
+# =============================================================================
+
+
+class GeneratedCard(BaseModel):
+    """A single generated flashcard with APF fields."""
+
+    card_index: int = Field(ge=1, description="1-based card index")
+    slug: str = Field(min_length=1, description="Unique card slug identifier")
+    lang: Literal["en", "ru"] = Field(description="Card language code")
+    apf_html: str = Field(min_length=1, description="Full APF HTML content")
+    confidence: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Generation confidence"
+    )
+
+
+class CardIssue(BaseModel):
+    """Issue found in a specific card during validation."""
+
+    card_index: int = Field(ge=0, description="0-based card index")
+    issue_description: str = Field(min_length=1, description="Description of the issue")
+
+
+class CardCorrection(BaseModel):
+    """Suggested correction for a card field."""
+
+    card_index: int = Field(ge=0, description="0-based card index")
+    field_name: str = Field(min_length=1, description="Name of the field to correct")
+    current_value: str | None = Field(default=None, description="Current field value")
+    suggested_value: str = Field(description="Suggested corrected value")
+    rationale: str = Field(default="", description="Reason for the correction")
+
+
+# =============================================================================
+# Agent Output Models
+# =============================================================================
 
 
 class PreValidationOutput(BaseModel):
@@ -32,7 +70,7 @@ class PreValidationOutput(BaseModel):
 class CardGenerationOutput(BaseModel):
     """Structured output from card generation agent."""
 
-    cards: list[dict[str, Any]] = Field(
+    cards: list[GeneratedCard] = Field(
         description="Generated cards with all APF fields"
     )
     total_generated: int = Field(
@@ -42,6 +80,14 @@ class CardGenerationOutput(BaseModel):
     )
     confidence: float = Field(
         default=0.5, description="Overall generation confidence")
+
+    @model_validator(mode="after")
+    def validate_card_count(self) -> "CardGenerationOutput":
+        """Ensure total_generated matches actual card count."""
+        if len(self.cards) != self.total_generated:
+            # Auto-correct rather than fail validation
+            object.__setattr__(self, "total_generated", len(self.cards))
+        return self
 
 
 class PostValidationOutput(BaseModel):
@@ -53,15 +99,15 @@ class PostValidationOutput(BaseModel):
     )
     error_details: str = Field(
         default="", description="Detailed validation errors")
-    card_issues: list[dict[str, str]] = Field(
+    card_issues: list[CardIssue] = Field(
         default_factory=list,
         description="Per-card issues with card_index and issue description",
     )
-    suggested_corrections: list[dict[str, Any]] = Field(
+    suggested_corrections: list[CardCorrection] = Field(
         default_factory=list, description="Suggested card corrections"
     )
     confidence: float = Field(
-        default=0.5, description="Confidence in validation result"
+        default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
     )
 
 

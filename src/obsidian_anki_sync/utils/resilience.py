@@ -11,10 +11,10 @@ import random
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypeVar
 
+from pydantic import BaseModel, Field
 from tenacity import (
     RetryCallState,
     RetryError,
@@ -77,13 +77,12 @@ class LowConfidenceError(Exception):
         super().__init__(self.message)
 
 
-@dataclass
-class CircuitBreakerConfig:
+class CircuitBreakerConfig(BaseModel):
     """Configuration for circuit breaker."""
 
-    failure_threshold: int = 5
-    recovery_timeout: int = 60
-    half_open_max_calls: int = 1
+    failure_threshold: int = Field(default=5, ge=1)
+    recovery_timeout: int = Field(default=60, ge=1)
+    half_open_max_calls: int = Field(default=1, ge=1)
 
 
 class CircuitBreaker:
@@ -269,8 +268,7 @@ def compute_jittered_backoff(
     jitter: float = 1.0,
 ) -> float:
     """Calculate an exponential backoff delay with bounded jitter."""
-    if attempt < 1:
-        attempt = 1
+    attempt = max(attempt, 1)
     base_delay = min(max_delay, initial_delay * (2 ** (attempt - 1)))
     if jitter <= 0:
         return base_delay
@@ -478,13 +476,12 @@ class Bulkhead:
             return self.active_count
 
 
-@dataclass
-class ConfidenceValidationResult:
+class ConfidenceValidationResult(BaseModel):
     """Result of confidence validation."""
 
     is_valid: bool
     reason: str = ""
-    suspicious_patterns: list[str] = field(default_factory=list)
+    suspicious_patterns: list[str] = Field(default_factory=list)
 
 
 class ConfidenceValidator:

@@ -80,8 +80,8 @@ How to prohibit object creation?
         errors = _compare_card_structures(1, en_parsed, ru_parsed)
 
         assert len(errors) == 1
-        assert "Key point notes count mismatch" in errors[0]
-        assert "EN has 3, RU has 2" in errors[0]
+        assert "Key point notes count mismatch" in errors[0].message
+        assert "EN has 3, RU has 2" in errors[0].message
 
     def test_compare_missing_code_block(self):
         """Test detection of missing code block in one language."""
@@ -100,7 +100,7 @@ How to prohibit object creation?
         errors = _compare_card_structures(1, en_parsed, ru_parsed)
 
         assert len(errors) == 1
-        assert "Code block presence mismatch" in errors[0]
+        assert "Code block presence mismatch" in errors[0].message
 
     def test_compare_preference_statement_mismatch(self):
         """Test detection of contradictory preference statements."""
@@ -125,9 +125,9 @@ How to prohibit object creation?
         errors = _compare_card_structures(1, en_parsed, ru_parsed)
 
         assert len(errors) == 1
-        assert "Preference statement mismatch" in errors[0]
-        assert "EN has 'prefer' preference" in errors[0]
-        assert "RU lacks 'предпочтительнее' preference" in errors[0]
+        assert "Preference statement mismatch" in errors[0].message
+        assert "EN has 'prefer' preference" in errors[0].message
+        assert "RU lacks 'предпочтительнее' preference" in errors[0].message
 
     def test_bilingual_consistency_check(self):
         """Test full bilingual consistency checking with multiple cards."""
@@ -176,7 +176,7 @@ Russian Title
         errors = _check_bilingual_consistency(cards)
 
         assert len(errors) == 1
-        assert "Key point notes count mismatch" in errors[0]
+        assert "Key point notes count mismatch" in errors[0].message
 
     def test_bilingual_consistency_no_errors(self):
         """Test bilingual consistency with no issues."""

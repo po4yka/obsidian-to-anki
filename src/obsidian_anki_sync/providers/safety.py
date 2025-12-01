@@ -2,13 +2,13 @@
 
 import re
 import time
-from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
 from limits import RateLimitItemPerMinute, RateLimitItemPerSecond
 from limits.storage import MemoryStorage
 from limits.strategies import FixedWindowRateLimiter
+from pydantic import BaseModel, Field
 
 from obsidian_anki_sync.exceptions import ConcurrencyTimeoutError
 from obsidian_anki_sync.utils.logging import get_logger
@@ -16,24 +16,25 @@ from obsidian_anki_sync.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@dataclass
-class SafetyConfig:
+class SafetyConfig(BaseModel):
     """Configuration for safety controls."""
 
     # Resource limits
-    max_prompt_length: int = 100000  # ~25K tokens
-    max_response_length: int = 50000  # ~12.5K tokens
-    max_concurrent_requests: int = 3  # Prevent resource exhaustion
-    request_timeout_seconds: float = 900.0  # 15 minutes
-    concurrency_wait_timeout_seconds: float = 120.0  # Max wait for slot
+    max_prompt_length: int = Field(default=100000, ge=1000)  # ~25K tokens
+    max_response_length: int = Field(default=50000, ge=1000)  # ~12.5K tokens
+    max_concurrent_requests: int = Field(default=3, ge=1)  # Prevent resource exhaustion
+    request_timeout_seconds: float = Field(default=900.0, ge=10.0)  # 15 minutes
+    concurrency_wait_timeout_seconds: float = Field(
+        default=120.0, ge=5.0
+    )  # Max wait for slot
 
     # Rate limiting
-    max_requests_per_minute: int = 60
-    max_tokens_per_minute: int = 500000  # ~125K tokens/min
+    max_requests_per_minute: int = Field(default=60, ge=1)
+    max_tokens_per_minute: int = Field(default=500000, ge=1000)  # ~125K tokens/min
 
     # Memory protection
-    max_memory_mb: int = 8192  # 8GB safety limit for Ollama
-    warn_memory_mb: int = 6144  # Warn at 75%
+    max_memory_mb: int = Field(default=8192, ge=512)  # 8GB safety limit for Ollama
+    warn_memory_mb: int = Field(default=6144, ge=256)  # Warn at 75%
 
     # Content safety
     block_sensitive_patterns: bool = True
@@ -42,7 +43,7 @@ class SafetyConfig:
 
     # Logging safety
     redact_sensitive_logs: bool = True
-    max_log_content_length: int = 500
+    max_log_content_length: int = Field(default=500, ge=10)
 
 
 class RateLimiter:

@@ -7,8 +7,10 @@ The CardTransaction class ensures that either both operations succeed,
 or both are rolled back to maintain consistency.
 """
 
-from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
+
+from pydantic import BaseModel, Field, computed_field
 
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.utils.logging import get_logger
@@ -18,32 +20,43 @@ from .state_db import StateDB
 logger = get_logger(__name__)
 
 
-@dataclass
-class RollbackAction:
+class RollbackActionType(str, Enum):
+    """Types of rollback actions."""
+
+    DELETE_ANKI_NOTE = "delete_anki_note"
+    DELETE_DB_CARD = "delete_db_card"
+    RESTORE_ANKI_NOTE = "restore_anki_note"
+    RESTORE_DB_CARD = "restore_db_card"
+    UPDATE_ANKI_NOTE = "update_anki_note"
+    UPDATE_DB_CARD = "update_db_card"
+
+
+class RollbackAction(BaseModel):
     """Represents a single rollback action and its result."""
 
-    action_type: str
-    args: tuple[Any, ...]
+    action_type: str  # Keep as str for backward compat with existing rollback logic
+    args: tuple[Any, ...] = Field(default_factory=tuple)
     succeeded: bool = False
     verified: bool = False
     error: str | None = None
 
 
-@dataclass
-class RollbackReport:
+class RollbackReport(BaseModel):
     """Report of rollback operation results."""
 
-    total_actions: int = 0
-    succeeded: int = 0
-    failed: int = 0
-    verified: int = 0
-    actions: list[RollbackAction] = field(default_factory=list)
+    total_actions: int = Field(default=0, ge=0)
+    succeeded: int = Field(default=0, ge=0)
+    failed: int = Field(default=0, ge=0)
+    verified: int = Field(default=0, ge=0)
+    actions: list[RollbackAction] = Field(default_factory=list)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def all_succeeded(self) -> bool:
         """Check if all rollback actions succeeded."""
         return self.failed == 0
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def all_verified(self) -> bool:
         """Check if all successful rollbacks were verified."""

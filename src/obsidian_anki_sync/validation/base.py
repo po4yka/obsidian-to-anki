@@ -1,12 +1,13 @@
 """Base validator classes and types for vault validation."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
 
-class Severity(Enum):
+
+class Severity(str, Enum):
     """Validation issue severity levels."""
 
     CRITICAL = "CRITICAL"  # Must fix (breaks required rules)
@@ -15,8 +16,7 @@ class Severity(Enum):
     INFO = "INFO"  # Style suggestions
 
 
-@dataclass
-class ValidationIssue:
+class ValidationIssue(BaseModel):
     """Represents a validation issue found in a note."""
 
     severity: Severity
@@ -34,14 +34,15 @@ class ValidationIssue:
         return f"{location}{self.message}"
 
 
-@dataclass
-class AutoFix:
+class AutoFix(BaseModel):
     """Represents an automatic fix for a validation issue.
 
     Fix functions can either:
     - Take no args and use captured self.content/frontmatter (legacy)
     - Take (content, frontmatter) args for cumulative fixes (preferred)
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     description: str
     fix_function: Callable[..., tuple[str, dict[str, Any]]]
@@ -88,7 +89,14 @@ class BaseValidator:
             line: Optional line number where issue was found
             section: Optional section name where issue was found
         """
-        self.issues.append(ValidationIssue(severity, message, line, section))
+        self.issues.append(
+            ValidationIssue(
+                severity=severity,
+                message=message,
+                line=line,
+                section=section,
+            )
+        )
 
     def add_passed(self, check_name: str) -> None:
         """Record a passed check.
@@ -113,7 +121,14 @@ class BaseValidator:
             severity: Severity of the issue this fix addresses
             safe: Whether fix can be applied without user confirmation
         """
-        self.fixes.append(AutoFix(description, fix_function, severity, safe))
+        self.fixes.append(
+            AutoFix(
+                description=description,
+                fix_function=fix_function,
+                severity=severity,
+                safe=safe,
+            )
+        )
 
     def validate(self) -> list[ValidationIssue]:
         """Perform validation. Override in subclasses.

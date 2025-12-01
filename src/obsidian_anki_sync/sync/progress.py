@@ -4,11 +4,12 @@ import signal
 import sys
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from pydantic import BaseModel, Field, computed_field
 
 if TYPE_CHECKING:
     from .state_db import StateDB
@@ -35,7 +36,7 @@ class ResumeValidationError(Exception):
         self.reason = reason
 
 
-class SyncPhase(Enum):
+class SyncPhase(str, Enum):
     """Phases of sync operation."""
 
     INITIALIZING = "initializing"
@@ -49,12 +50,11 @@ class SyncPhase(Enum):
     FAILED = "failed"
 
 
-@dataclass
-class NoteProgress:
+class NoteProgress(BaseModel):
     """Progress for a single note."""
 
     source_path: str
-    card_index: int
+    card_index: int = Field(ge=0)
     lang: str
     status: str  # 'pending', 'processing', 'completed', 'failed'
     error: str | None = None
@@ -62,31 +62,32 @@ class NoteProgress:
     completed_at: datetime | None = None
 
 
-@dataclass
-class SyncProgress:
+class SyncProgress(BaseModel):
     """Overall sync progress state."""
 
     session_id: str
     phase: SyncPhase
     started_at: datetime
     updated_at: datetime
-    total_notes: int = 0
-    notes_processed: int = 0
-    cards_generated: int = 0
-    cards_created: int = 0
-    cards_updated: int = 0
-    cards_deleted: int = 0
-    cards_restored: int = 0
-    cards_skipped: int = 0
-    errors: int = 0
+    total_notes: int = Field(default=0, ge=0)
+    notes_processed: int = Field(default=0, ge=0)
+    cards_generated: int = Field(default=0, ge=0)
+    cards_created: int = Field(default=0, ge=0)
+    cards_updated: int = Field(default=0, ge=0)
+    cards_deleted: int = Field(default=0, ge=0)
+    cards_restored: int = Field(default=0, ge=0)
+    cards_skipped: int = Field(default=0, ge=0)
+    errors: int = Field(default=0, ge=0)
     completed_at: datetime | None = None
-    note_progress: dict[str, NoteProgress] = field(default_factory=dict)
+    note_progress: dict[str, NoteProgress] = Field(default_factory=dict)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_complete(self) -> bool:
         """Check if sync is complete."""
         return self.phase in (SyncPhase.COMPLETED, SyncPhase.FAILED)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def progress_pct(self) -> float:
         """Calculate progress percentage."""

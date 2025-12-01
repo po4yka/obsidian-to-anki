@@ -127,6 +127,7 @@ async def test_process_note_job():
     mock_result.success = True
     mock_result.generation = MagicMock()
     mock_result.generation.cards = [MagicMock()]
+    mock_result.stage_times = {"generation": 1.0, "validation": 0.5}
     ctx["orchestrator"].process_note.return_value = mock_result
 
     # Mock convert_to_cards

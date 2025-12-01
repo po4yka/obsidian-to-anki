@@ -222,6 +222,8 @@ ignore = [
     "PGH003",    # type ignore comments (fixed where practical)
     "DTZ006",    # datetime.fromtimestamp without tz (acceptable for file timestamps)
     "TRY203",    # exception handler immediately re-raises (style preference)
+    "UP046",     # PEP 695 type parameter syntax for classes (requires refactoring)
+    "UP047",     # PEP 695 type parameter syntax for functions (requires refactoring)
     "B009",      # getattr with constant (style preference)
     "F841",      # unused variables (common in exception handlers)
     "S112",      # try-except-continue (sometimes appropriate)
@@ -305,7 +307,7 @@ exclude = [
 "tests/test_*.py" = ["F401"]  # test files often have unused imports
 # Debugging and verification scripts at project root
 "reproduce_*.py" = ["T201", "SLF001", "F401", "PTH100", "SIM115", "S101"]  # reproduction scripts
-"verify_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # verification scripts
+"verify_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101", "PT009"]  # verification scripts
 "test_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # test scripts at root (not in tests/)
 
 [tool.ruff.lint.mccabe]

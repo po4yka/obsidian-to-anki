@@ -1,11 +1,14 @@
 
-import pytest
 from unittest.mock import MagicMock, patch
-from obsidian_anki_sync.agents.post_validation.validator import PostValidatorAgent
+
+import pytest
+
+from obsidian_anki_sync.agents.autofix.handlers import AutoFixIssue, UnknownErrorHandler
 from obsidian_anki_sync.agents.models import GeneratedCard
-from obsidian_anki_sync.agents.post_validation.validation_models import ValidationError
 from obsidian_anki_sync.agents.post_validation.error_categories import ErrorCategory
-from obsidian_anki_sync.agents.autofix.handlers import UnknownErrorHandler, AutoFixIssue
+from obsidian_anki_sync.agents.post_validation.validation_models import ValidationError
+from obsidian_anki_sync.agents.post_validation.validator import PostValidatorAgent
+
 
 @pytest.fixture
 def mock_ollama_client():

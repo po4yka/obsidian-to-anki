@@ -688,7 +688,7 @@ class UnknownErrorHandler(AutoFixHandler):
         try:
             with open(self.log_file, "a") as f:
                 for issue in issues:
-                    f.write(f"--- Unknown Error ---\n")
+                    f.write("--- Unknown Error ---\n")
                     f.write(f"Type: {issue.issue_type}\n")
                     f.write(f"Description: {issue.description}\n")
                     f.write(f"Location: {issue.location}\n")

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigurationError
@@ -13,6 +13,46 @@ from .utils.path_validator import (
     validate_source_dir,
     validate_vault_path,
 )
+
+# =============================================================================
+# Nested Configuration Models
+# =============================================================================
+
+
+class CircuitBreakerDomainConfig(BaseModel):
+    """Circuit breaker configuration for an agent domain."""
+
+    failure_threshold: int = Field(default=5, ge=1)
+    recovery_timeout: int = Field(default=30, ge=1)
+    half_open_requests: int = Field(default=3, ge=1)
+
+
+class RetryConfig(BaseModel):
+    """Retry configuration for agent operations."""
+
+    max_retries: int = Field(default=3, ge=0)
+    initial_delay: float = Field(default=1.0, ge=0.0)
+    backoff_factor: float = Field(default=2.0, ge=1.0)
+    jitter: bool = True
+
+
+class RateLimitDomainConfig(BaseModel):
+    """Rate limiting configuration for a domain."""
+
+    requests_per_minute: int = Field(default=60, ge=1)
+    burst_size: int = Field(default=10, ge=1)
+
+
+class BulkheadDomainConfig(BaseModel):
+    """Bulkhead configuration for resource isolation."""
+
+    max_concurrent: int = Field(default=3, ge=1)
+    timeout: float = Field(default=30.0, ge=1.0)
+
+
+# =============================================================================
+# Main Configuration Class
+# =============================================================================
 
 
 class Config(BaseSettings):
@@ -51,19 +91,26 @@ class Config(BaseSettings):
             if not v:
                 # Empty string means not set - will be caught by validation
                 return Path()
-            # type: ignore[no-any-return]
             return Path(v).expanduser().resolve()
         if isinstance(v, Path):
-            return v.expanduser().resolve()  # type: ignore[no-any-return]
-        return v  # type: ignore[no-any-return]
+            return v.expanduser().resolve()
+        if v is None:
+            return Path()
+        msg = f"vault_path must be string or Path, got {type(v).__name__}"
+        raise ValueError(msg)
 
     @field_validator("source_dir", "db_path", "data_dir", mode="before")
     @classmethod
     def parse_path(cls, v: Any) -> Path:
         """Convert string to Path."""
         if isinstance(v, str):
-            return Path(v).expanduser()  # type: ignore[no-any-return]
-        return v  # type: ignore[no-any-return]
+            return Path(v).expanduser()
+        if isinstance(v, Path):
+            return v
+        if v is None:
+            return Path()
+        msg = f"Path field must be string or Path, got {type(v).__name__}"
+        raise ValueError(msg)
 
     @field_validator("source_subdirs", mode="before")
     @classmethod
@@ -72,10 +119,11 @@ class Config(BaseSettings):
         if v is None:
             return None
         if isinstance(v, str):
-            return [Path(v)]  # type: ignore[no-any-return]
+            return [Path(v)]
         if isinstance(v, list):
-            return [Path(str(d)) for d in v]  # type: ignore[no-any-return]
-        return v  # type: ignore[no-any-return]
+            return [Path(str(d)) for d in v]
+        msg = f"source_subdirs must be string, list, or None, got {type(v).__name__}"
+        raise ValueError(msg)
 
     # Anki settings
     anki_connect_url: str = Field(
@@ -288,20 +336,15 @@ class Config(BaseSettings):
     # Resilience Configuration for Specialized Agents
     # ============================================================================
     # Circuit breaker configuration per agent domain
-    # Example: {"yaml_frontmatter": {"failure_threshold": 5, "timeout": 60}, "default": {"failure_threshold": 5, "timeout": 60}}
-    circuit_breaker_config: dict[str, dict[str, Any]] = Field(
+    # Example: {"yaml_frontmatter": CircuitBreakerDomainConfig(failure_threshold=5)}
+    circuit_breaker_config: dict[str, CircuitBreakerDomainConfig] = Field(
         default_factory=dict,
         description="Circuit breaker configuration per agent domain",
     )
 
     # Retry configuration for specialized agents
-    retry_config: dict[str, Any] = Field(
-        default_factory=lambda: {
-            "max_retries": 3,
-            "initial_delay": 1.0,
-            "backoff_factor": 2.0,
-            "jitter": True,
-        },
+    retry_config: RetryConfig = Field(
+        default_factory=RetryConfig,
         description="Retry configuration for specialized agents",
     )
 
@@ -311,15 +354,15 @@ class Config(BaseSettings):
         description="Minimum confidence threshold for accepting agent repairs",
     )
 
-    # Rate limiting configuration per agent domain (calls per minute)
-    # Example: {"yaml_frontmatter": 10, "content_corruption": 5, "default": 20}
-    rate_limit_config: dict[str, int] = Field(
+    # Rate limiting configuration per agent domain
+    # Example: {"yaml_frontmatter": RateLimitDomainConfig(requests_per_minute=10)}
+    rate_limit_config: dict[str, RateLimitDomainConfig] = Field(
         default_factory=dict, description="Rate limiting configuration per agent domain"
     )
 
-    # Bulkhead configuration per agent domain (max concurrent calls)
-    # Example: {"yaml_frontmatter": 2, "content_corruption": 1, "default": 3}
-    bulkhead_config: dict[str, int] = Field(
+    # Bulkhead configuration per agent domain
+    # Example: {"yaml_frontmatter": BulkheadDomainConfig(max_concurrent=2)}
+    bulkhead_config: dict[str, BulkheadDomainConfig] = Field(
         default_factory=dict, description="Bulkhead configuration per agent domain"
     )
 

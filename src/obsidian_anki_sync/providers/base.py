@@ -4,9 +4,44 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, cast
 
+from pydantic import BaseModel, Field
+
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class LLMResponse(BaseModel):
+    """Structured response from LLM provider.
+
+    Provides type-safe access to common response fields.
+    """
+
+    response: str = Field(description="The generated text response")
+    tokens_used: int | None = Field(default=None, description="Total tokens consumed")
+    prompt_tokens: int | None = Field(default=None, description="Tokens in the prompt")
+    completion_tokens: int | None = Field(
+        default=None, description="Tokens in the completion"
+    )
+    finish_reason: str | None = Field(
+        default=None, description="Reason for completion (stop, length, etc.)"
+    )
+    model: str | None = Field(default=None, description="Model used for generation")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LLMResponse":
+        """Create LLMResponse from a provider response dict.
+
+        Maps common response formats to the standard structure.
+        """
+        return cls(
+            response=data.get("response", ""),
+            tokens_used=data.get("tokens_used") or data.get("total_tokens"),
+            prompt_tokens=data.get("prompt_tokens"),
+            completion_tokens=data.get("completion_tokens"),
+            finish_reason=data.get("finish_reason") or data.get("done_reason"),
+            model=data.get("model"),
+        )
 
 
 class BaseLLMProvider(ABC):

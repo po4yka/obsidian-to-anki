@@ -1235,7 +1235,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             timeout=timeout_seconds,
         )
         post_result.validation_time = time.time() - start_time
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(
             "langgraph_post_validation_timeout",
             timeout=timeout_seconds,

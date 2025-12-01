@@ -1,8 +1,11 @@
 import logging
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from obsidian_anki_sync.validation.orchestrator import NoteValidator
+
 
 def test_validate_file_logs_unexpected_exception(caplog):
     """Test that validate_file logs unexpected exceptions with traceback."""
@@ -12,9 +15,11 @@ def test_validate_file_logs_unexpected_exception(caplog):
     mock_path.__str__.return_value = "/tmp/vault/note.md"
 
     # Mock parse_note to raise an exception
-    with patch.object(validator, 'parse_note', side_effect=ValueError("Test error")):
-        with caplog.at_level(logging.ERROR):
-            result = validator.validate_file(mock_path)
+    with (
+        patch.object(validator, 'parse_note', side_effect=ValueError("Test error")),
+        caplog.at_level(logging.ERROR),
+    ):
+        result = validator.validate_file(mock_path)
 
     # Verify result
     assert result["success"] is False
