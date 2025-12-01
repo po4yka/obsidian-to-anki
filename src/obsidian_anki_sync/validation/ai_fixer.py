@@ -7,6 +7,8 @@ This module provides AI-driven fixes for common validation issues:
 """
 
 import re
+import time
+import json
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -149,13 +151,31 @@ Respond with JSON: {{"language": "<language>", "confidence": "<high|medium|low>"
                 "required": ["language", "confidence"],
             }
 
-            result = self.provider.generate_json(
-                model=self.model,
-                prompt=user_prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=schema,
-            )
+            # Retry logic for JSON errors
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    result = self.provider.generate_json(
+                        model=self.model,
+                        prompt=user_prompt,
+                        system=system_prompt,
+                        temperature=self.temperature,
+                        json_schema=schema,
+                    )
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(
+                        "code_language_detection_json_error",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                    )
+                    if attempt == max_retries - 1:
+                        raise last_error
+                    time.sleep(1)  # Brief pause before retry
 
             # Validate result matches our expected structure
             parsed = CodeLanguageResult(**result)
@@ -233,13 +253,31 @@ Generate a bilingual title. Respond with JSON: {{"en_title": "<English>", "ru_ti
                 "required": ["en_title", "ru_title"],
             }
 
-            result = self.provider.generate_json(
-                model=self.model,
-                prompt=user_prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=schema,
-            )
+            # Retry logic for JSON errors
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    result = self.provider.generate_json(
+                        model=self.model,
+                        prompt=user_prompt,
+                        system=system_prompt,
+                        temperature=self.temperature,
+                        json_schema=schema,
+                    )
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(
+                        "bilingual_title_generation_json_error",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                    )
+                    if attempt == max_retries - 1:
+                        raise last_error
+                    time.sleep(1)  # Brief pause before retry
 
             # Validate result matches our expected structure
             parsed = BilingualTitleResult(**result)
@@ -307,13 +345,31 @@ Respond with JSON: {{"fixed_content": "<full markdown content>", "changes_made":
                 "required": ["fixed_content", "changes_made"],
             }
 
-            result = self.provider.generate_json(
-                model=self.model,
-                prompt=user_prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=schema,
-            )
+            # Retry logic for JSON errors
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    result = self.provider.generate_json(
+                        model=self.model,
+                        prompt=user_prompt,
+                        system=system_prompt,
+                        temperature=self.temperature,
+                        json_schema=schema,
+                    )
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(
+                        "structure_fix_json_error",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                    )
+                    if attempt == max_retries - 1:
+                        raise last_error
+                    time.sleep(1)  # Brief pause before retry
 
             parsed = StructureFixResult(**result)
             return parsed.fixed_content, parsed.changes_made

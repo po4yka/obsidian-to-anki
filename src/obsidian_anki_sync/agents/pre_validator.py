@@ -307,13 +307,33 @@ DO suggest auto-fixes for:
             # Get JSON schema for structured output
             json_schema = get_pre_validation_schema()
 
-            result = self.ollama_client.generate_json(
-                model=self.model,
-                prompt=prompt,
-                system=system_prompt,
-                temperature=self.temperature,
-                json_schema=json_schema,
-            )
+            # Retry logic for JSON errors
+            max_retries = 3
+            last_error = None
+
+            import json
+
+            for attempt in range(max_retries):
+                try:
+                    result = self.ollama_client.generate_json(
+                        model=self.model,
+                        prompt=prompt,
+                        system=system_prompt,
+                        temperature=self.temperature,
+                        json_schema=json_schema,
+                    )
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(
+                        "pre_validation_json_error",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                    )
+                    if attempt == max_retries - 1:
+                        raise last_error
+                    time.sleep(1)  # Brief pause before retry
 
             llm_duration = time.time() - llm_start_time
             validation_time = time.time() - start_time

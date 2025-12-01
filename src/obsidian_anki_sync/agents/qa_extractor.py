@@ -392,14 +392,34 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 progress_display.update_operation("Extracting Q&A pairs", note_name)
 
             try:
-                result = self.llm_provider.generate_json(
-                    model=self.model,
-                    prompt=prompt,
-                    system=system_prompt,
-                    temperature=self.temperature,
-                    json_schema=json_schema,
-                    reasoning_enabled=self.reasoning_enabled,
-                )
+            # Retry logic for JSON errors
+            max_retries = 3
+            last_error = None
+
+            import json
+
+            for attempt in range(max_retries):
+                try:
+                    result = self.llm_provider.generate_json(
+                        model=self.model,
+                        prompt=prompt,
+                        system=system_prompt,
+                        temperature=self.temperature,
+                        json_schema=json_schema,
+                        reasoning_enabled=self.reasoning_enabled,
+                    )
+                    break
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(
+                        "qa_extraction_json_error",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                    )
+                    if attempt == max_retries - 1:
+                        raise last_error
+                    time.sleep(1)  # Brief pause before retry
 
                 # Extract and display reflections if available
                 if progress_display:
