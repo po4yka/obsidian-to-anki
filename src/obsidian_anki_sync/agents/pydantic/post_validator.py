@@ -40,18 +40,19 @@ class PostValidatorAgentAI:
         self.model = model
         self.temperature = temperature
 
-        # Create PydanticAI agent with increased retry limit for output validation
+        # Create PydanticAI agent
         # PostValidationOutput has nested CardCorrection objects which LLMs sometimes
-        # struggle to produce correctly on first attempt - give more attempts
+        # struggle to produce correctly on first attempt - give more attempts via output_retries
         self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
             model=self.model,
             output_type=PostValidationOutput,
             system_prompt=self._get_system_prompt(),
-            retries=5,  # Increased: complex nested schema needs more attempts
+            output_retries=5,  # PydanticAI output validation retries
         )
+        # OutputFixingParser handles retries at the prompt improvement level
         self.fixing_parser = OutputFixingParser(
             agent=self.agent,
-            max_fix_attempts=2,  # Increased: allow one more fix attempt
+            max_fix_attempts=2,
             fix_temperature=temperature,
         )
 
@@ -162,25 +163,44 @@ Cards to validate:
 
         except ValueError as e:
             logger.error(
-                "pydantic_ai_post_validation_parse_error", error=str(e))
+                "pydantic_ai_post_validation_parse_error",
+                error=str(e),
+                model=str(self.model),
+                cards_count=len(cards),
+            )
             msg = "Failed to parse post-validation output"
             raise StructuredOutputError(
                 msg,
-                details={"error": str(e), "cards_count": len(cards)},
+                details={"error": str(e), "cards_count": len(cards), "model": str(self.model)},
             ) from e
         except StructuredOutputError as e:
             logger.error(
-                "pydantic_ai_post_validation_structured_error", error=str(e))
+                "pydantic_ai_post_validation_structured_error",
+                error=str(e),
+                model=str(self.model),
+                cards_count=len(cards),
+            )
             msg = "Post-validation structured output failed"
             raise PostValidationError(
-                msg, details={"cards_count": len(cards), "error": str(e)}
+                msg, details={"cards_count": len(cards), "error": str(e), "model": str(self.model)}
             ) from e
         except TimeoutError as e:
-            logger.error("pydantic_ai_post_validation_timeout", error=str(e))
+            logger.error(
+                "pydantic_ai_post_validation_timeout",
+                error=str(e),
+                model=str(self.model),
+                cards_count=len(cards),
+            )
             msg = "Post-validation timed out"
-            raise ModelError(msg, details={"cards_count": len(cards)}) from e
+            raise ModelError(msg, details={"cards_count": len(cards), "model": str(self.model)}) from e
         except Exception as e:
-            logger.error("pydantic_ai_post_validation_failed", error=str(e))
+            logger.error(
+                "pydantic_ai_post_validation_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                model=str(self.model),
+                cards_count=len(cards),
+            )
             msg = f"Post-validation failed: {e!s}"
             raise PostValidationError(
-                msg, details={"cards_count": len(cards)}) from e
+                msg, details={"cards_count": len(cards), "model": str(self.model)}) from e

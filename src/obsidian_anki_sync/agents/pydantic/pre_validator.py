@@ -57,13 +57,13 @@ class PreValidatorAgentAI:
             AutoFixRegistry(ai_fixer=ai_fixer) if enable_autofix else None
         )
 
-        # Create PydanticAI agent with structured output and increased retry limit
-        # PreValidationOutput schema can be complex - give LLM more attempts
+        # Create PydanticAI agent with structured output
+        # PreValidationOutput schema can be complex - use output_retries
         self.agent: Agent[PreValidationDeps, PreValidationOutput] = Agent(
             model=self.model,
             output_type=PreValidationOutput,
             system_prompt=self._get_system_prompt(),
-            retries=5,  # Increased: complex schema may need more attempts
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info(
@@ -136,7 +136,7 @@ Note Content Preview:
 Validate the structure, frontmatter, and content quality."""
 
         try:
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
 
             # Convert to PreValidationResult

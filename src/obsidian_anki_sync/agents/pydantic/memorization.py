@@ -39,6 +39,7 @@ class MemorizationQualityAgentAI:
             model=self.model,
             output_type=MemorizationQualityOutput,
             system_prompt=MEMORIZATION_QUALITY_PROMPT,
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info("pydantic_ai_memorization_agent_initialized", model=str(model))
@@ -86,7 +87,7 @@ Cards to assess:
         prompt += f"\nAssess all {len(cards)} cards for memorization effectiveness."
 
         try:
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
             output: MemorizationQualityOutput = result.output
 

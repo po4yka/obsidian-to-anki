@@ -10,6 +10,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.models import Model
 
 from obsidian_anki_sync.utils.logging import get_logger
@@ -101,11 +102,14 @@ class OutputFixingParser(Generic[T]):
             try:
                 if attempt == 0:
                     # First attempt: normal execution
+                    # Note: output_retries is configured in Agent constructor, not in run()
                     if deps is not None:
                         result = await self.agent.run(prompt, deps=deps, **kwargs)
                     else:
                         result = await self.agent.run(
-                            prompt, instructions=system, **kwargs
+                            prompt,
+                            instructions=system,
+                            **kwargs,
                         )
                     return result.output  # type: ignore[no-any-return]
                 else:
@@ -124,10 +128,16 @@ class OutputFixingParser(Generic[T]):
 
                     # Retry with fixed prompt
                     if deps is not None:
-                        result = await self.agent.run(fixed_prompt, deps=deps, **kwargs)
+                        result = await self.agent.run(
+                            fixed_prompt,
+                            deps=deps,
+                            **kwargs,
+                        )
                     else:
                         result = await self.agent.run(
-                            fixed_prompt, instructions=system, **kwargs
+                            fixed_prompt,
+                            instructions=system,
+                            **kwargs,
                         )
                     self.repair_successes += 1
                     logger.info(
@@ -139,20 +149,32 @@ class OutputFixingParser(Generic[T]):
                     )
                     return result.output  # type: ignore[no-any-return]
 
-            except (ValueError, StructuredOutputError) as e:
-                # PydanticAI raises ValueError for validation errors
+            except (ValueError, StructuredOutputError, UnexpectedModelBehavior) as e:
+                # PydanticAI raises UnexpectedModelBehavior for output validation errors
+                # It may also raise ValueError for other validation issues
                 # Our code raises StructuredOutputError
                 last_error = e
                 last_output = self._extract_output_from_error(e)
+
+                # Extract additional details from UnexpectedModelBehavior
+                error_body = getattr(e, "body", None)
+                error_message = getattr(e, "message", str(e))
+
+                # Get output type name for debugging
+                output_type_name = "unknown"
+                if hasattr(self.agent, "output_type"):
+                    output_type_name = getattr(self.agent.output_type, "__name__", str(self.agent.output_type))
 
                 # Log the raw LLM output that failed validation for debugging
                 logger.warning(
                     "output_validation_failed",
                     attempt=attempt,
                     error_type=type(e).__name__,
-                    error_message=str(e)[:500],
+                    error_message=error_message[:500],
+                    error_body_preview=str(error_body)[:300] if error_body else None,
                     raw_output_preview=last_output[:500] if last_output else None,
                     output_length=len(last_output) if last_output else 0,
+                    output_type=output_type_name,
                 )
 
                 (
@@ -178,25 +200,41 @@ class OutputFixingParser(Generic[T]):
                         attempts=attempt,
                         max_attempts=self.max_fix_attempts,
                         error_type=type(e).__name__,
-                        error_message=str(e)[:500],
+                        error_message=error_message[:500],
+                        error_body_preview=str(error_body)[:300] if error_body else None,
                         raw_output_preview=last_output[:300] if last_output else None,
+                        output_type=output_type_name,
                     )
                     msg = f"Failed to fix output after {attempt} attempts: {e!s}"
                     raise StructuredOutputError(
                         msg,
-                        details={"attempts": attempt, "error": str(e)},
+                        details={
+                            "attempts": attempt,
+                            "error": str(e),
+                            "output_type": output_type_name,
+                        },
                     ) from e
 
                 logger.info(
                     "output_fixing_retry",
                     attempt=attempt,
                     max_attempts=self.max_fix_attempts,
-                    error=str(e)[:200],
+                    output_type=output_type_name,
+                    error=error_message[:200],
                 )
 
             except Exception as e:
                 # Non-validation errors: don't retry
-                logger.error("output_fixing_unexpected_error", error=str(e))
+                # Get output type name for debugging
+                output_type_name = "unknown"
+                if hasattr(self.agent, "output_type"):
+                    output_type_name = getattr(self.agent.output_type, "__name__", str(self.agent.output_type))
+                logger.error(
+                    "output_fixing_unexpected_error",
+                    error=str(e)[:500],
+                    error_type=type(e).__name__,
+                    output_type=output_type_name,
+                )
                 raise
         # This should never be reached, but mypy needs it
         msg = "Unexpected loop exit"
@@ -311,20 +349,24 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
         """Extract output string from validation error.
 
         Args:
-            error: Exception (ValueError or StructuredOutputError)
+            error: Exception (ValueError, StructuredOutputError, or UnexpectedModelBehavior)
 
         Returns:
             Output string if extractable, empty string otherwise
         """
-        # Try to extract from error details
-        error_str = str(error)
+        # Try to extract from UnexpectedModelBehavior.body (PydanticAI specific)
+        if hasattr(error, "body") and error.body:
+            return str(error.body)
 
-        # Check if error has details dict
+        # Try to extract from error details dict (our StructuredOutputError)
         if hasattr(error, "details") and isinstance(error.details, dict):
             if "raw_output" in error.details:
                 return str(error.details["raw_output"])
             if "output" in error.details:
                 return str(error.details["output"])
+
+        # Try to extract from error message
+        error_str = str(error)
 
         # Look for JSON-like content in error message
         json_match = re.search(r"\{.*\}", error_str, re.DOTALL)
@@ -462,6 +504,9 @@ def wrap_agent_with_fixing(
 
     Returns:
         OutputFixingParser instance
+
+    Note:
+        Configure output_retries in the Agent constructor, not here.
     """
     return OutputFixingParser(
         agent=agent,

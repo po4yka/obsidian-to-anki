@@ -32,6 +32,7 @@ class HighlightAgentAI:
             model=self.model,
             output_type=HighlightOutput,
             system_prompt=HIGHLIGHT_SYSTEM_PROMPT,
+            output_retries=5,  # PydanticAI output validation retries
         )
         logger.info("highlight_agent_initialized", model=str(model))
 
@@ -65,6 +66,7 @@ Note Content Preview (truncated):\n{preview}
 
         start_time = time.time()
         try:
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
             output: HighlightOutput = result.output
             qa_candidates = [

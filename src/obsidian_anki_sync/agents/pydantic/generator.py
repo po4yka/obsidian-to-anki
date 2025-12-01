@@ -42,13 +42,13 @@ class GeneratorAgentAI:
         # Use improved system prompt with few-shot examples
         self.system_prompt = CARD_GENERATION_SYSTEM_PROMPT
 
-        # Create PydanticAI agent with increased retry limit for output validation
-        # CardGenerationOutput has nested GeneratedCard objects - give more attempts
+        # Create PydanticAI agent
+        # CardGenerationOutput has nested GeneratedCard objects - use output_retries
         self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
             model=self.model,
             output_type=CardGenerationOutput,
             system_prompt=self.system_prompt,
-            retries=5,  # Increased: complex nested schema needs more attempts
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info("pydantic_ai_generator_initialized", model=str(model))
@@ -131,7 +131,7 @@ Slug Base: {slug_base}
         )
 
         try:
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
             output: CardGenerationOutput = result.output
 

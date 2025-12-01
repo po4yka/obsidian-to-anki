@@ -38,6 +38,7 @@ class SplitValidatorAgentAI:
             model=self.model,
             output_type=SplitValidationResult,
             system_prompt=SPLIT_VALIDATION_PROMPT,
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info("pydantic_ai_split_validator_initialized", model=str(model))
@@ -92,7 +93,7 @@ Original Note Content:
         try:
             start_time = time.time()
 
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt)
             output: SplitValidationResult = result.output
             output.validation_time = time.time() - start_time

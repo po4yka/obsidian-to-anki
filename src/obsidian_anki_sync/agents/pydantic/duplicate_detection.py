@@ -45,6 +45,7 @@ class DuplicateDetectionAgentAI:
             model=self.model,
             output_type=DuplicateDetectionOutput,
             system_prompt=DUPLICATE_DETECTION_PROMPT,
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info(
@@ -98,7 +99,7 @@ Analyze similarity and provide your assessment."""
                 existing_slug=existing_card.slug,
             )
 
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
             output: DuplicateDetectionOutput = result.output
 

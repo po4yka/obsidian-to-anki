@@ -39,15 +39,16 @@ class CardSplittingAgentAI:
         self.model = model
         self.temperature = temperature
 
-        # Create PydanticAI agent with retries for complex nested output
+        # Create PydanticAI agent
+        # CardSplittingOutput has nested CardSplitPlanOutput list - use output_retries
         self.agent: Agent[CardSplittingDeps, CardSplittingOutput] = Agent(
             model=self.model,
             output_type=CardSplittingOutput,
             system_prompt=CARD_SPLITTING_DECISION_PROMPT,
-            retries=5,  # CardSplittingOutput has nested CardSplitPlanOutput list
+            output_retries=5,  # PydanticAI output validation retries
         )
 
-        # Add OutputFixingParser for better error recovery
+        # OutputFixingParser handles retries at the prompt improvement level
         self.fixing_parser = OutputFixingParser(
             agent=self.agent,
             max_fix_attempts=2,

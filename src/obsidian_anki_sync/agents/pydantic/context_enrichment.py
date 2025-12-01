@@ -46,6 +46,7 @@ class ContextEnrichmentAgentAI:
             model=self.model,
             output_type=ContextEnrichmentOutput,
             system_prompt=CONTEXT_ENRICHMENT_PROMPT,
+            output_retries=5,  # PydanticAI output validation retries
         )
 
         logger.info(
@@ -101,7 +102,7 @@ Provide your enrichment assessment."""
 
             logger.info("pydantic_ai_enrichment_start", slug=card.slug)
 
-            # Run agent
+            # Run agent (output_retries configured in Agent constructor)
             result = await self.agent.run(prompt, deps=deps)
             output: ContextEnrichmentOutput = result.output
 
