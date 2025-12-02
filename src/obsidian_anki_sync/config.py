@@ -1191,11 +1191,11 @@ class Config(BaseSettings):
                 )
 
         # Validate concurrent generation bounds
-        if self.max_concurrent_generations < 1 or self.max_concurrent_generations > 50:
-            msg = f"max_concurrent_generations must be 1-50: {self.max_concurrent_generations}"
+        if self.max_concurrent_generations < 1 or self.max_concurrent_generations > 500:
+            msg = f"max_concurrent_generations must be 1-500: {self.max_concurrent_generations}"
             raise ConfigurationError(
                 msg,
-                suggestion="Set max_concurrent_generations between 1 and 50.",
+                suggestion="Set max_concurrent_generations between 1 and 500.",
             )
 
         if validated_vault != self.vault_path:

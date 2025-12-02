@@ -12,7 +12,7 @@
 set -e
 
 NUM_WORKERS=${1:-5}
-MAX_JOBS=${2:-100}
+MAX_JOBS=${2:-50}
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 
 echo "Starting $NUM_WORKERS workers with $MAX_JOBS concurrent jobs each..."
