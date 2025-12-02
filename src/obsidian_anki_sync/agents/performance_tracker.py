@@ -46,13 +46,13 @@ class PerformanceTracker:
             # Get card IDs for these notes (batch operation)
             # AnkiConnect notesToCards takes a list of note IDs
             card_ids_list = self.anki_client.invoke("notesToCards", {"notes": note_ids})
-            
+
             all_card_ids = []
             if card_ids_list:
                 for ids in card_ids_list:
                     if ids:
                         all_card_ids.extend(ids)
-            
+
             if not all_card_ids:
                 return {}
 
@@ -138,7 +138,9 @@ class PerformanceTracker:
                 for note_id, metrics in performance_data.items():
                     card = card_map.get(note_id)
                     if card:
-                        card_issues = self._analyze_single_card_performance(card, metrics)
+                        card_issues = self._analyze_single_card_performance(
+                            card, metrics
+                        )
                         for issue_type, affected_cards in card_issues.items():
                             issues[issue_type].extend(affected_cards)
 
@@ -163,7 +165,7 @@ class PerformanceTracker:
             reviews = card_info.get("reviews", 0)
             lapses = card_info.get("lapses", 0)
             interval = card_info.get("interval", 0)
-            
+
             # Anki returns factor in permille (e.g. 2500 for 2.5)
             raw_factor = card_info.get("factor", 2500)
             ease_factor = raw_factor / 1000.0

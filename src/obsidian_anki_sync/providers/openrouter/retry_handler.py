@@ -152,10 +152,10 @@ class RetryTransport(httpx.AsyncHTTPTransport):
                     # Prepare for next attempt
                     retries += 1
                     delay *= self.backoff_factor
-                    
+
                     # Close the previous response
                     await response.aclose()
-                    
+
                     continue
 
                 # For other status codes, return immediately

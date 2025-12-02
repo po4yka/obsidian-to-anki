@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -10,6 +11,22 @@ from obsidian_anki_sync.agents.pydantic_ai_agents import (
     GeneratorAgentAI,
 )
 from obsidian_anki_sync.models import NoteMetadata, QAPair
+
+
+def create_mock_stream_result(data):
+    """Create a mock result object for run_stream that works with async context manager."""
+
+    class MockStreamResult:
+        def __init__(self, output_data):
+            self.data = output_data
+
+        async def stream(self):
+            """Yield mock chunks to simulate streaming."""
+            # Yield a few empty chunks to simulate streaming
+            for _ in range(3):
+                yield {}
+
+    return MockStreamResult(data)
 
 
 @pytest.mark.asyncio()
@@ -96,8 +113,7 @@ Notes
 <!-- END_CARDS -->
 END_OF_CARDS"""
 
-    mock_result = MagicMock()
-    mock_result.data = CardGenerationOutput(
+    output_data = CardGenerationOutput(
         cards=[
             {
                 "card_index": 1,
@@ -112,7 +128,12 @@ END_OF_CARDS"""
         confidence=0.9,
     )
 
-    agent.agent.run = AsyncMock(return_value=mock_result)
+    # Mock run_stream as an async context manager for streaming support
+    @asynccontextmanager
+    async def mock_run_stream(*args, **kwargs):
+        yield create_mock_stream_result(output_data)
+
+    agent.agent.run_stream = mock_run_stream
 
     # Run generation
     now = datetime.now()

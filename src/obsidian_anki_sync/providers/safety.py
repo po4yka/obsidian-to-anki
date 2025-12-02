@@ -23,9 +23,9 @@ class SafetyConfig(BaseModel):
     max_prompt_length: int = Field(default=100000, ge=1000)  # ~25K tokens
     max_response_length: int = Field(default=50000, ge=1000)  # ~12.5K tokens
     max_concurrent_requests: int = Field(default=3, ge=1)  # Prevent resource exhaustion
-    request_timeout_seconds: float = Field(default=900.0, ge=10.0)  # 15 minutes
+    request_timeout_seconds: float = Field(default=2700.0, ge=10.0)  # 45 minutes
     concurrency_wait_timeout_seconds: float = Field(
-        default=120.0, ge=5.0
+        default=360.0, ge=5.0
     )  # Max wait for slot
 
     # Rate limiting
@@ -158,7 +158,7 @@ class RateLimiter:
 class ConcurrencyLimiter:
     """Limits concurrent requests to prevent resource exhaustion."""
 
-    def __init__(self, max_concurrent: int, timeout: float = 60.0):
+    def __init__(self, max_concurrent: int, timeout: float = 180.0):
         """Initialize concurrency limiter.
 
         Args:

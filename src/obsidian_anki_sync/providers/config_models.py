@@ -10,7 +10,7 @@ class BaseProviderConfig(BaseModel):
     """Base configuration for all LLM providers."""
 
     timeout: float = Field(
-        default=240.0, ge=1.0, description="Request timeout in seconds"
+        default=720.0, ge=1.0, description="Request timeout in seconds"
     )
     max_retries: int = Field(default=3, ge=0, description="Maximum retry attempts")
     verbose_logging: bool = Field(default=False, description="Enable verbose logging")
@@ -23,7 +23,7 @@ class OllamaConfig(BaseProviderConfig):
         default="http://localhost:11434", description="Ollama API base URL"
     )
     timeout: float = Field(
-        default=900.0, ge=1.0, description="Request timeout (longer for local models)"
+        default=2700.0, ge=1.0, description="Request timeout (longer for local models)"
     )
 
 
@@ -35,7 +35,7 @@ class OpenAIConfig(BaseProviderConfig):
         default="https://api.openai.com/v1", description="OpenAI API base URL"
     )
     organization: str | None = Field(default=None, description="OpenAI organization ID")
-    timeout: float = Field(default=240.0, ge=1.0, description="Request timeout")
+    timeout: float = Field(default=720.0, ge=1.0, description="Request timeout")
 
 
 class AnthropicConfig(BaseProviderConfig):
@@ -47,7 +47,7 @@ class AnthropicConfig(BaseProviderConfig):
     )
     api_version: str = Field(default="2023-06-01", description="Anthropic API version")
     max_tokens: int = Field(default=4096, ge=1, description="Maximum response tokens")
-    timeout: float = Field(default=240.0, ge=1.0, description="Request timeout")
+    timeout: float = Field(default=720.0, ge=1.0, description="Request timeout")
 
 
 class OpenRouterConfig(BaseProviderConfig):
@@ -67,7 +67,7 @@ class OpenRouterConfig(BaseProviderConfig):
         default=2048, ge=1, description="Maximum response tokens"
     )
     timeout: float = Field(
-        default=300.0, ge=1.0, description="Request timeout (longer for routing)"
+        default=900.0, ge=1.0, description="Request timeout (longer for routing)"
     )
 
 
@@ -78,5 +78,5 @@ class LMStudioConfig(BaseProviderConfig):
         default="http://localhost:1234/v1", description="LM Studio API base URL"
     )
     timeout: float = Field(
-        default=600.0, ge=1.0, description="Request timeout (longer for local models)"
+        default=1800.0, ge=1.0, description="Request timeout (longer for local models)"
     )

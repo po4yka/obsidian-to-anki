@@ -21,7 +21,7 @@ class ParallelConfig(BaseModel):
     max_workers: int | None = Field(default=None, ge=1)  # None = CPU count
     batch_size: int = Field(default=50, ge=1)
     show_progress: bool = True
-    timeout_per_file: float = Field(default=60.0, ge=1.0)  # seconds
+    timeout_per_file: float = Field(default=180.0, ge=1.0)  # seconds
 
     @model_validator(mode="after")
     def set_default_max_workers(self) -> "ParallelConfig":

@@ -23,7 +23,7 @@ class CircuitBreakerDomainConfig(BaseModel):
     """Circuit breaker configuration for an agent domain."""
 
     failure_threshold: int = Field(default=5, ge=1)
-    recovery_timeout: int = Field(default=30, ge=1)
+    recovery_timeout: int = Field(default=90, ge=1)
     half_open_requests: int = Field(default=3, ge=1)
 
 
@@ -47,7 +47,7 @@ class BulkheadDomainConfig(BaseModel):
     """Bulkhead configuration for resource isolation."""
 
     max_concurrent: int = Field(default=3, ge=1)
-    timeout: float = Field(default=30.0, ge=1.0)
+    timeout: float = Field(default=90.0, ge=1.0)
 
 
 # =============================================================================
@@ -211,8 +211,8 @@ class Config(BaseSettings):
         description="Overall timeout for queue polling (5 hours)",
     )
     queue_job_timeout_seconds: int = Field(
-        default=3600,
-        description="Per-job timeout (1 hour)",
+        default=10800,
+        description="Per-job timeout (3 hours)",
     )
     queue_poll_interval: float = Field(
         default=0.5,
@@ -231,12 +231,12 @@ class Config(BaseSettings):
         description="Seconds to wait before retrying after circuit breaker opens",
     )
     worker_generation_timeout_seconds: float = Field(
-        default=900.0,
+        default=2700.0,
         ge=60.0,
         description="SLA (seconds) for generation stage before worker flags a timeout",
     )
     worker_validation_timeout_seconds: float = Field(
-        default=900.0,
+        default=2700.0,
         ge=30.0,
         description="SLA (seconds) for post-validation stage before worker flags a timeout",
     )
@@ -255,7 +255,7 @@ class Config(BaseSettings):
     # Common LLM settings
     llm_temperature: float = 0.2
     llm_top_p: float = 0.3
-    llm_timeout: float = 1200.0  # 20 minutes default for large models
+    llm_timeout: float = 3600.0  # 60 minutes default for large models
     # Reasonable default - models have output token limits separate from context window
     llm_max_tokens: int = 8192
     # Enable reasoning mode for models that support it (e.g., DeepSeek)
@@ -528,7 +528,7 @@ class Config(BaseSettings):
     post_validator_temperature: float | None = None
     post_validator_max_tokens: int | None = None
     post_validator_timeout_seconds: float = Field(
-        default=900.0,
+        default=2700.0,
         ge=5.0,
         description="Per-attempt timeout for post-validation agent calls (seconds)",
     )

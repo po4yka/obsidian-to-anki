@@ -25,14 +25,14 @@ class OllamaProvider(BaseLLMProvider):
     Configuration:
         base_url: API endpoint URL (default: http://localhost:11434)
         api_key: API key for cloud deployments (optional, for cloud only)
-        timeout: Request timeout in seconds (default: 900.0 - 15 minutes)
+        timeout: Request timeout in seconds (default: 2700.0 - 45 minutes)
     """
 
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
         api_key: str | None = None,
-        timeout: float = 900.0,
+        timeout: float = 2700.0,
         enable_safety: bool = True,
         safety_config: SafetyConfig | None = None,
         verbose_logging: bool = False,
@@ -406,7 +406,7 @@ class OllamaProvider(BaseLLMProvider):
             response = self.client.post(
                 f"{self.base_url}/api/pull",
                 json={"name": model},
-                timeout=httpx.Timeout(600.0),  # 10 minutes
+                timeout=httpx.Timeout(1800.0),  # 30 minutes
             )
             response.raise_for_status()
 

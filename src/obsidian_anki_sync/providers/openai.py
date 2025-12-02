@@ -26,7 +26,7 @@ class OpenAIProvider(BaseLLMProvider):
         api_key: OpenAI API key (required)
         base_url: API endpoint URL (default: https://api.openai.com/v1)
         organization: Organization ID (optional)
-        timeout: Request timeout in seconds (default: 120.0)
+        timeout: Request timeout in seconds (default: 720.0)
         max_retries: Maximum number of retries (default: 3)
     """
 
@@ -37,7 +37,7 @@ class OpenAIProvider(BaseLLMProvider):
         api_key: str,
         base_url: str = DEFAULT_BASE_URL,
         organization: str | None = None,
-        timeout: float = 240.0,
+        timeout: float = 720.0,
         max_retries: int = 3,
         verbose_logging: bool = False,
         **kwargs: Any,

@@ -6,11 +6,15 @@ This module provides type-safe agents using PydanticAI for:
 3. Post-validation - quality and accuracy checking
 
 All agents use structured outputs and proper type validation.
+Streaming is enabled for all agents to prevent connection timeouts.
 """
 
+import asyncio
+import contextlib
 import re
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
@@ -54,6 +58,181 @@ from .models import (
 from .patch_applicator import apply_corrections
 
 logger = get_logger(__name__)
+
+# Type variable for streaming helper
+OutputT = TypeVar("OutputT", bound=BaseModel)
+DepsT = TypeVar("DepsT")
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate (4 chars per token on average)."""
+    return len(text) // 4
+
+
+def _get_model_name(agent: Agent) -> str:
+    """Extract model name from agent if available."""
+    try:
+        if hasattr(agent, "model") and agent.model:
+            model = agent.model
+            if hasattr(model, "model_name"):
+                return str(model.model_name)
+            if hasattr(model, "name"):
+                return str(model.name)
+            return str(model)
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _truncate_for_log(text: str, max_length: int = 200) -> str:
+    """Truncate text for logging with ellipsis."""
+    if len(text) <= max_length:
+        return text
+    return text[:max_length] + "..."
+
+
+# ============================================================================
+# Streaming Support for Connection Keep-Alive
+# ============================================================================
+
+
+async def run_agent_with_streaming(
+    agent: Agent[DepsT, OutputT],
+    prompt: str,
+    deps: DepsT,
+    operation_name: str = "agent",
+    log_interval: float = 30.0,
+) -> OutputT:
+    """Run an agent with streaming to prevent connection timeouts.
+
+    This function uses PydanticAI's run_stream() to receive SSE chunks,
+    keeping the HTTP connection alive during long-running operations.
+    Progress is logged periodically to show the operation is still active.
+
+    Args:
+        agent: PydanticAI agent instance
+        prompt: Prompt to send to the agent
+        deps: Dependencies for the agent
+        operation_name: Name of the operation for logging
+        log_interval: How often to log progress (seconds)
+
+    Returns:
+        The structured output from the agent
+
+    Raises:
+        Same exceptions as agent.run()
+    """
+    start_time = time.time()
+    last_log_time = start_time
+    chunk_count = 0
+    total_content_length = 0
+
+    # Extract model info
+    model_name = _get_model_name(agent)
+    prompt_tokens_est = _estimate_tokens(prompt)
+
+    # Log LLM call start with details
+    logger.info(
+        "llm_call_start",
+        operation=operation_name,
+        model=model_name,
+        prompt_length=len(prompt),
+        prompt_tokens_est=prompt_tokens_est,
+        prompt_preview=_truncate_for_log(prompt, 150),
+    )
+
+    try:
+        async with agent.run_stream(prompt, deps=deps) as result:
+            # Iterate over stream to keep connection alive
+            # For structured outputs, we consume chunks but use final result
+            async for partial in result.stream():
+                chunk_count += 1
+                current_time = time.time()
+
+                # Track content length if partial has content
+                if partial and hasattr(partial, "__len__"):
+                    with contextlib.suppress(Exception):
+                        total_content_length = len(str(partial))
+
+                # Log progress periodically
+                if current_time - last_log_time >= log_interval:
+                    elapsed = current_time - start_time
+                    tokens_per_sec = (
+                        total_content_length / 4 / elapsed if elapsed > 0 else 0
+                    )
+                    logger.info(
+                        "llm_streaming_progress",
+                        operation=operation_name,
+                        model=model_name,
+                        elapsed_seconds=round(elapsed, 1),
+                        chunks_received=chunk_count,
+                        content_length=total_content_length,
+                        tokens_per_sec=round(tokens_per_sec, 1),
+                    )
+                    last_log_time = current_time
+
+            # Get the final structured output
+            output = result.data
+
+        elapsed = time.time() - start_time
+
+        # Extract usage info if available
+        usage_info = {}
+        if hasattr(result, "usage") and result.usage:
+            usage = result.usage
+            if hasattr(usage, "request_tokens"):
+                usage_info["request_tokens"] = usage.request_tokens
+            if hasattr(usage, "response_tokens"):
+                usage_info["response_tokens"] = usage.response_tokens
+            if hasattr(usage, "total_tokens"):
+                usage_info["total_tokens"] = usage.total_tokens
+            # Try to get usage as dict if individual attrs not available
+            if not usage_info and hasattr(usage, "__dict__"):
+                usage_info["usage"] = str(usage)
+
+        # Prepare output preview
+        output_preview = ""
+        try:
+            output_str = str(output)
+            output_preview = _truncate_for_log(output_str, 200)
+        except Exception:
+            output_preview = "<unable to serialize>"
+
+        # Log completion with full details
+        logger.info(
+            "llm_call_complete",
+            operation=operation_name,
+            model=model_name,
+            elapsed_seconds=round(elapsed, 2),
+            total_chunks=chunk_count,
+            output_preview=output_preview,
+            **usage_info,
+        )
+
+        return output
+
+    except asyncio.CancelledError:
+        elapsed = time.time() - start_time
+        logger.warning(
+            "llm_call_cancelled",
+            operation=operation_name,
+            model=model_name,
+            elapsed_seconds=round(elapsed, 2),
+            chunks_received=chunk_count,
+        )
+        raise
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(
+            "llm_call_failed",
+            operation=operation_name,
+            model=model_name,
+            elapsed_seconds=round(elapsed, 2),
+            chunks_received=chunk_count,
+            error_type=type(e).__name__,
+            error_message=str(e)[:500],
+        )
+        raise
 
 
 # ============================================================================
@@ -309,12 +488,13 @@ Note Content Preview:
 Validate the structure, frontmatter, and content quality."""
 
         try:
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-
-            # Convert to PreValidationResult
-            # result.data is typed as PreValidationOutput by pydantic-ai
-            output: PreValidationOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: PreValidationOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="pre_validation",
+            )
             validation_result = PreValidationResult(
                 is_valid=output.is_valid,
                 error_type=output.error_type,
@@ -429,9 +609,13 @@ Q&A Pairs ({len(qa_pairs)}):
         )
 
         try:
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: CardGenerationOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: CardGenerationOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="card_generation",
+            )
 
             # Convert cards to GeneratedCard instances with content hashes
             generated_cards: list[GeneratedCard] = []
@@ -579,9 +763,13 @@ Cards to validate:
         prompt += f"\nValidate all {len(cards)} cards for APF v2.1 compliance, correctness, and quality."
 
         try:
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: PostValidationOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: PostValidationOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="post_validation",
+            )
 
             # Apply suggested corrections if any
             corrected_cards = None
@@ -703,9 +891,13 @@ Cards to assess:
         prompt += f"\nAssess all {len(cards)} cards for memorization effectiveness."
 
         try:
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: MemorizationQualityOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: MemorizationQualityOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="memorization_quality",
+            )
 
             # Convert to MemorizationQualityResult
             issues_list = [issue.model_dump() for issue in output.issues]
@@ -826,13 +1018,15 @@ Questions:
         prompt += "\n\nShould this note generate one card or split into multiple cards? Provide a detailed splitting plan."
 
         try:
-            import time
-
             start_time = time.time()
 
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: CardSplittingOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: CardSplittingOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="card_splitting",
+            )
 
             # Convert split plan
             split_plans = []
@@ -1030,9 +1224,13 @@ Analyze similarity and provide your assessment."""
                 existing_slug=existing_card.slug,
             )
 
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: DuplicateDetectionOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: DuplicateDetectionOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="duplicate_detection",
+            )
 
             elapsed = time.time() - start_time
 
@@ -1293,9 +1491,13 @@ Provide your enrichment assessment."""
 
             logger.info("pydantic_ai_enrichment_start", slug=card.slug)
 
-            # Run agent
-            result = await self.agent.run(prompt, deps=deps)
-            output: ContextEnrichmentOutput = result.data
+            # Run agent with streaming to prevent connection timeouts
+            output: ContextEnrichmentOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="context_enrichment",
+            )
 
             # If enrichment recommended, create enriched card
             enriched_card = None

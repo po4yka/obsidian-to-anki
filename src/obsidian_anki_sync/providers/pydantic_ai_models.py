@@ -95,7 +95,7 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
 
         # Create explicitly configured async HTTP client
         http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=10.0),
+            timeout=httpx.Timeout(180.0, connect=30.0),
             transport=retry_transport,
             headers=http_headers if http_headers else None,
         )
@@ -240,7 +240,7 @@ class PydanticAIModelFactory:
         # Create explicitly configured async HTTP client
         # This ensures proper timeout and connection pooling configuration
         http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0, connect=10.0),
+            timeout=httpx.Timeout(90.0, connect=30.0),
             transport=retry_transport,
             headers=http_headers if http_headers else None,
         )
@@ -326,7 +326,7 @@ class PydanticAIModelFactory:
 
             # Create explicitly configured async HTTP client for local providers
             http_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(30.0, connect=10.0),
+                timeout=httpx.Timeout(90.0, connect=30.0),
                 limits=httpx.Limits(
                     max_keepalive_connections=5,
                     max_connections=10,

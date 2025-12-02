@@ -37,7 +37,6 @@ from obsidian_anki_sync.agents.pydantic import (
     CardSplittingAgentAI,
     ContextEnrichmentAgentAI,
     DuplicateDetectionAgentAI,
-    GeneratorAgentAI,
     HighlightAgentAI,
     MemorizationQualityAgentAI,
     PostValidatorAgentAI,
@@ -1109,7 +1108,7 @@ async def _sleep_post_validation_backoff(state: PipelineState) -> None:
     delay = compute_jittered_backoff(
         attempt,
         initial_delay=state.get("post_validator_retry_backoff_seconds", 3.0),
-        max_delay=(state.get("post_validator_timeout_seconds", 600.0) / 2),
+        max_delay=(state.get("post_validator_timeout_seconds", 2700.0) / 2),
         jitter=state.get("post_validator_retry_jitter_seconds", 1.5),
     )
     if delay <= 0:
@@ -1138,12 +1137,15 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     if not increment_step_count(state, "post_validation"):
         return state
 
+    # Track timeout errors for retry logic (timeouts are transient and should retry)
+    is_timeout_error = False
+
     cards_count = len(state.get("generation", {}).get("cards", []))
     logger.info(
         "langgraph_post_validation_start",
         retry_count=state["retry_count"],
         cards_count=cards_count,
-        timeout_seconds=state.get("post_validator_timeout_seconds", 600.0),
+        timeout_seconds=state.get("post_validator_timeout_seconds", 2700.0),
     )
     start_time = time.time()
 
@@ -1187,7 +1189,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     # Create post-validator agent
     post_validator = PostValidatorAgentAI(model=model, temperature=0.0)
 
-    timeout_seconds = state.get("post_validator_timeout_seconds", 600.0)
+    timeout_seconds = state.get("post_validator_timeout_seconds", 2700.0)
 
     # Run validation
     try:
@@ -1215,6 +1217,7 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
             corrected_cards=None,
             validation_time=time.time() - start_time,
         )
+        is_timeout_error = True  # Mark for retry (timeouts are transient)
     except Exception as e:
         logger.exception("langgraph_post_validation_error", error=str(e))
         post_result = PostValidationResult(
@@ -1306,14 +1309,15 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
         else:
             state["current_stage"] = "complete"
         state["messages"].append("Post-validation passed")
-    elif (state.get("retry_count") or 0) < (
-        state.get("max_retries") or 3
-    ) and state.get("auto_fix_enabled", False):
+    elif (state.get("retry_count") or 0) < (state.get("max_retries") or 3) and (
+        state.get("auto_fix_enabled", True) or is_timeout_error
+    ):
         await _sleep_post_validation_backoff(state)
         state["retry_count"] = (state.get("retry_count") or 0) + 1
         state["current_stage"] = "post_validation"
+        retry_reason = "timeout, retrying" if is_timeout_error else "applied fixes"
         state["messages"].append(
-            f"Applied fixes, re-validating (attempt {state['retry_count']})"
+            f"{retry_reason}, re-validating (attempt {state['retry_count']})"
         )
     else:
         state["current_stage"] = "failed"
@@ -1714,9 +1718,9 @@ async def duplicate_detection_node(state: PipelineState) -> PipelineState:
 
             # Get existing cards for LLM comparison
             existing_cards_dicts = state.get("existing_cards_dicts")
-            assert (
-                existing_cards_dicts is not None
-            ), "existing_cards_dicts should not be None"
+            assert existing_cards_dicts is not None, (
+                "existing_cards_dicts should not be None"
+            )
             existing_cards = [
                 GeneratedCard(**card_dict) for card_dict in existing_cards_dicts
             ]
