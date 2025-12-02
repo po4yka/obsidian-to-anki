@@ -29,7 +29,7 @@ def create_mock_stream_result(data):
     return MockStreamResult(data)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generator_agent_retries_on_invalid_apf():
     """Test that GeneratorAgentAI retries when generated APF is invalid."""
 
@@ -90,7 +90,47 @@ END_OF_CARDS"""
     assert output.cards[0]["slug"] == "test-card"
 
 
-@pytest.mark.asyncio()
+def test_card_generation_output_decodes_html_entities() -> None:
+    """HTML-encoded APF should be decoded before validation."""
+    encoded_apf = """&lt;!-- PROMPT_VERSION: apf-v2.1 --&gt;
+&lt;!-- BEGIN_CARDS --&gt;
+
+&lt;!-- Card 1 | slug: encoded-card | CardType: Simple | Tags: python testing unit_test --&gt;
+&lt;!-- manifest: {"slug": "encoded-card", "lang": "en", "type": "Simple", "tags": ["python", "testing", "unit_test"]} --&gt;
+
+&lt;!-- Title --&gt;
+Encoded Card
+
+&lt;!-- Key point --&gt;
+Key Point
+
+&lt;!-- Key point notes --&gt;
+Notes
+
+&lt;!-- END_CARDS --&gt;
+END_OF_CARDS"""
+
+    output = CardGenerationOutput(
+        cards=[
+            {
+                "card_index": 1,
+                "slug": "encoded-card",
+                "lang": "en",
+                "apf_html": encoded_apf,
+                "confidence": 0.9,
+            }
+        ],
+        total_generated=1,
+        generation_notes="Test",
+        confidence=0.9,
+    )
+
+    decoded_apf = output.cards[0]["apf_html"]
+    assert "<!-- BEGIN_CARDS -->" in decoded_apf
+    assert decoded_apf.strip().startswith("<!-- PROMPT_VERSION: apf-v2.1 -->")
+
+
+@pytest.mark.asyncio
 async def test_generator_agent_integration_mock():
     """Verify the agent integration with a mocked run method."""
     # This tests that the agent is set up correctly to use the model

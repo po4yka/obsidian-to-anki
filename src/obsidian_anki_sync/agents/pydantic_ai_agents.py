@@ -305,21 +305,26 @@ class CardGenerationOutput(BaseModel):
     def validate_apf_format(cls, cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Validate that generated cards comply with APF format."""
         errors = []
+        normalized_cards: list[dict[str, Any]] = []
         for i, card in enumerate(cards):
-            apf_html = card.get("apf_html", "")
+            apf_html_raw = card.get("apf_html", "")
+            decoded_apf_html = _decode_html_encoded_apf(str(apf_html_raw))
+            normalized_card = dict(card)
+            normalized_card["apf_html"] = decoded_apf_html
             slug = card.get("slug")
 
             # Run deterministic linter
-            result = validate_apf(apf_html, slug)
+            result = validate_apf(decoded_apf_html, slug)
 
             if result.errors:
                 errors.append(f"Card {i + 1} ({slug}): {'; '.join(result.errors)}")
+            normalized_cards.append(normalized_card)
 
         if errors:
             msg = f"APF Validation Failed: {'; '.join(errors)}"
             raise ValueError(msg)
 
-        return cards
+        return normalized_cards
 
 
 class PostValidationOutput(BaseModel):
