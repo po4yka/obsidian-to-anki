@@ -455,16 +455,37 @@ Valid APF v2.1 cards have this structure:
 <!-- Title -->
 Question text
 
+<!-- Subtitle (optional) -->              <-- VALID optional section
+Optional subtitle
+
+<!-- Syntax (inline) (optional) -->       <-- VALID optional section
+<code>function_call()</code>
+
+<!-- Sample (caption) (optional) -->      <-- VALID optional section
+Caption for sample below
+
+<!-- Sample (code block or image) (optional) -->  <-- VALID optional section
+<pre><code>example here</code></pre>
+
 <!-- Key point (code block / image) -->
 <pre><code>...</code></pre>
 
 <!-- Key point notes -->
 <ul><li>...</li></ul>
 
+<!-- Other notes (optional) -->           <-- VALID optional section
+Additional notes here
+
+<!-- Markdown (optional) -->              <-- VALID optional section
+Markdown content here
+
 <!-- manifest: {...} -->
 <!-- END_CARDS -->
 END_OF_CARDS                          <-- VALID sentinel, do not flag as error
 ```
+
+**IMPORTANT**: Optional sections (Subtitle, Syntax, Sample, Other notes, Markdown) are VALID parts of APF v2.1.
+Do NOT reject cards for using these optional sections - they are explicitly allowed by the format.
 
 ## Validation Criteria
 
@@ -472,6 +493,13 @@ END_OF_CARDS                          <-- VALID sentinel, do not flag as error
    - Required sentinels: `<!-- PROMPT_VERSION: apf-v2.1 -->`, `<!-- BEGIN_CARDS -->`, `<!-- END_CARDS -->`, `END_OF_CARDS` are ALL VALID
    - Required comments: Card metadata header, manifest comment
    - Required sections: `<!-- Title -->`, `<!-- Key point -->` or `<!-- Key point (code block / image) -->`, `<!-- Key point notes -->`
+   - **Optional sections (ALL VALID - do NOT reject for using these)**:
+     - `<!-- Subtitle (optional) -->`
+     - `<!-- Syntax (inline) (optional) -->`
+     - `<!-- Sample (caption) (optional) -->`
+     - `<!-- Sample (code block or image) (optional) -->`
+     - `<!-- Other notes (optional) -->`
+     - `<!-- Markdown (optional) -->`
    - Valid CardTypes: Simple, Missing, Draw (NOT Basic/Front/Back - those are old format)
    - Proper HTML structure and nesting
    - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Cloze
