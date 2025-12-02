@@ -447,7 +447,20 @@ def configure_logging(
     project_log_dir.mkdir(exist_ok=True, parents=True)
 
     # Console handler - human-readable with colors
-    console_handler = logging.StreamHandler(sys.stderr)
+    import contextlib
+
+    class ResilientStreamHandler(logging.StreamHandler):
+        """StreamHandler that silently ignores I/O errors."""
+
+        def emit(self, record: logging.LogRecord) -> None:
+            """Emit a record, silently ignoring any errors."""
+            with contextlib.suppress(OSError):
+                super().emit(record)
+
+        def handleError(self, record: logging.LogRecord) -> None:  # noqa: N802
+            """Handle errors silently to prevent application crashes."""
+
+    console_handler = ResilientStreamHandler(sys.stderr)
     console_handler.setLevel(level)
 
     # Console processors (without noise filter if disabled, with it if enabled)
@@ -490,8 +503,22 @@ def configure_logging(
     # File handler - JSON format with size-based rotation
     from logging.handlers import RotatingFileHandler
 
+    class ResilientRotatingFileHandler(RotatingFileHandler):
+        """RotatingFileHandler that silently ignores disk errors.
+
+        Prevents logging failures (e.g., disk full) from crashing the application.
+        """
+
+        def emit(self, record: logging.LogRecord) -> None:
+            """Emit a record, silently ignoring any errors."""
+            with contextlib.suppress(OSError):
+                super().emit(record)
+
+        def handleError(self, record: logging.LogRecord) -> None:  # noqa: N802
+            """Handle errors silently to prevent application crashes."""
+
     # Use size-based rotation: 50MB max per file, keep 5 backups (250MB total max)
-    file_handler = RotatingFileHandler(
+    file_handler = ResilientRotatingFileHandler(
         filename=str(log_path),
         maxBytes=50 * 1024 * 1024,  # 50MB
         backupCount=5,
@@ -521,7 +548,7 @@ def configure_logging(
     # Project-level log file handler (skip if same as log_path to avoid duplicate logging)
     project_log_path = project_log_dir / "obsidian-anki-sync.log"
     if project_log_path != log_path:
-        project_handler = RotatingFileHandler(
+        project_handler = ResilientRotatingFileHandler(
             filename=str(project_log_path),
             maxBytes=50 * 1024 * 1024,  # 50MB
             backupCount=5,
@@ -541,7 +568,7 @@ def configure_logging(
         def filter(self, record: logging.LogRecord) -> bool:
             return record.levelno >= logging.ERROR
 
-    error_handler = RotatingFileHandler(
+    error_handler = ResilientRotatingFileHandler(
         filename=str(error_log_path),
         maxBytes=10 * 1024 * 1024,  # 10MB for errors
         backupCount=10,  # Keep more error history
@@ -574,7 +601,7 @@ def configure_logging(
                     "llm" in logger_name or "prompt" in message or "response" in message
                 )
 
-        verbose_handler = RotatingFileHandler(
+        verbose_handler = ResilientRotatingFileHandler(
             filename=str(verbose_log_path),
             maxBytes=100 * 1024 * 1024,  # 100MB for verbose LLM logs
             backupCount=3,
