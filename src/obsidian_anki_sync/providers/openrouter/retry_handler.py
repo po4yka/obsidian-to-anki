@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
@@ -9,6 +10,39 @@ from obsidian_anki_sync.utils.logging import get_logger
 from .models import HTTP_STATUS_RETRYABLE
 
 logger = get_logger(__name__)
+
+
+def is_malformed_chat_completion(response_body: bytes) -> bool:
+    """Check if a 200 response contains a malformed ChatCompletion.
+
+    OpenRouter sometimes returns 200 OK but with null/error fields in the response.
+    This function detects such cases to trigger retry.
+
+    Args:
+        response_body: Raw response body bytes
+
+    Returns:
+        True if response is malformed and should be retried
+    """
+    try:
+        data = json.loads(response_body)
+
+        # Check for error field (OpenRouter error format)
+        if "error" in data:
+            return True
+
+        # Check for required ChatCompletion fields being null/missing
+        # Per OpenAI spec, these are required for a valid response
+        if data.get("id") is None:
+            return True
+        if data.get("choices") is None:
+            return True
+        if data.get("model") is None:
+            return True
+        return data.get("object") is None
+    except (json.JSONDecodeError, TypeError, KeyError):
+        # If we can't parse the response, it's malformed
+        return True
 
 
 def calculate_retry_backoff(
@@ -92,13 +126,13 @@ class RetryTransport(httpx.AsyncHTTPTransport):
 
     def __init__(
         self,
-        *args,
+        *args: object,
         max_retries: int = 5,
         initial_delay: float = 1.0,
         backoff_factor: float = 2.0,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self.max_retries = max_retries
         self.initial_delay = initial_delay
         self.backoff_factor = backoff_factor
@@ -124,14 +158,8 @@ class RetryTransport(httpx.AsyncHTTPTransport):
                         wait_time = delay
 
                     # Read response body to log error details if available
-                    # We need to be careful not to consume the stream if it's not already read
-                    # But handle_async_request returns a response where we can read content
-                    # For logging purposes, we peek at it.
-                    # Note: PydanticAI/httpx might expect to read the response.
-                    # If we read it here, we should ensure it's still available.
-                    # httpx response.read() caches content.
                     try:
-                        await response.read()
+                        await response.aread()
                         error_text = response.text[:500]
                     except Exception:
                         error_text = "(could not read response body)"
@@ -158,9 +186,69 @@ class RetryTransport(httpx.AsyncHTTPTransport):
 
                     continue
 
+                # Check for malformed 200 responses (OpenRouter sometimes returns
+                # 200 OK with null/error fields instead of proper error status)
+                if response.status_code == 200:
+                    try:
+                        await response.aread()
+                        if is_malformed_chat_completion(response.content):
+                            if retries >= self.max_retries:
+                                # Exhausted retries, return the malformed response
+                                # Let PydanticAI handle the error
+                                logger.error(
+                                    "openrouter_malformed_response_exhausted",
+                                    attempt=retries + 1,
+                                    max_retries=self.max_retries,
+                                    url=str(request.url),
+                                    body_preview=response.text[:500],
+                                )
+                                return response
+
+                            logger.warning(
+                                "openrouter_malformed_response_retry",
+                                status_code=200,
+                                attempt=retries + 1,
+                                max_retries=self.max_retries,
+                                wait_time=round(delay, 2),
+                                url=str(request.url),
+                                body_preview=response.text[:500],
+                            )
+
+                            # Wait before retry
+                            await asyncio.sleep(delay)
+
+                            # Prepare for next attempt
+                            retries += 1
+                            delay *= self.backoff_factor
+
+                            # Close the previous response
+                            await response.aclose()
+
+                            continue
+                    except Exception as e:
+                        # If we can't read/check the response, log and return it
+                        logger.debug(
+                            "openrouter_response_check_failed",
+                            error=str(e),
+                            url=str(request.url),
+                        )
+
                 # For other status codes, return immediately
                 return response
 
-            except Exception:
-                # Let other exceptions bubble up
-                raise
+            except httpx.RequestError:
+                # For network errors, retry if we haven't exhausted attempts
+                if retries >= self.max_retries:
+                    raise
+
+                logger.warning(
+                    "openrouter_request_error_retry",
+                    attempt=retries + 1,
+                    max_retries=self.max_retries,
+                    wait_time=round(delay, 2),
+                    url=str(request.url),
+                )
+
+                await asyncio.sleep(delay)
+                retries += 1
+                delay *= self.backoff_factor
