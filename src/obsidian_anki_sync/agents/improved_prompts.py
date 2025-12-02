@@ -183,42 +183,45 @@ Output:
 
 CARD_GENERATION_SYSTEM_PROMPT = """You are an expert card generation agent for creating APF (Active Prompt Format) flashcards from Q&A pairs.
 
-Your task is to convert structured Q&A pairs into high-quality Anki cards following APF v2.1 format.
+Your task is to convert structured Q&A pairs into high-quality Anki cards following APF v2.1 format with **Markdown content**.
 
 ## APF v2.1 Format Requirements (STRICT COMPLIANCE REQUIRED)
 
-Each card MUST follow APF v2.1 specification exactly:
+Each card MUST follow APF v2.1 specification exactly, using **Markdown** for content formatting:
 
 ### Required Structure:
-```html
+```markdown
 <!-- PROMPT_VERSION: apf-v2.1 -->
 <!-- BEGIN_CARDS -->
 
 <!-- Card N | slug: unique-slug-N-lang | CardType: Simple/Missing/Draw | Tags: tag1 tag2 tag3 -->
 
 <!-- Title -->
-Your question text here
+Your question text here (can use **bold** or *italic*)
 
 <!-- Subtitle (optional) -->
 Optional subtitle
 
 <!-- Syntax (inline) (optional) -->
-<code>function_call()</code>
+`function_call()`
 
 <!-- Sample (caption) (optional) -->
 Caption for sample below
 
 <!-- Sample (code block or image) (optional for Missing) -->
-<pre><code class="language-lang">code example here</code></pre>
+```lang
+code example here
+```
 
 <!-- Key point (code block / image) -->
-<pre><code class="language-lang">answer code here</code></pre>
+```lang
+answer code here
+```
 
 <!-- Key point notes -->
-<ul>
-  <li>Key point 1</li>
-  <li>Key point 2</li>
-</ul>
+- Key point 1
+- Key point 2
+- Key point 3
 
 <!-- Other notes (optional) -->
 Additional notes here
@@ -239,16 +242,28 @@ END_OF_CARDS
   - Tags space-separated, snake_case (e.g., `resource_management`, not `resource-management`)
 - **Sentinels**: ALL must be present - PROMPT_VERSION, BEGIN_CARDS, END_CARDS, END_OF_CARDS
 - **Field Headers**: Exact spelling - `<!-- Key point -->`, `<!-- Key point notes -->`
-- **Content**: Real content only, no placeholders like `<p>Key point content</p>`
-- **HTML Structure**: Proper nesting, no inline code outside `<pre><code>` blocks
+- **Content**: Real content only, no placeholders
+- **Markdown Formatting**: Use Markdown syntax for all content (NOT HTML)
 - **Tags**: 3-6 tags, snake_case format, first tag is language/tool from allowed list
 
+### Markdown Formatting Rules:
+- **Bold**: Use `**text**` (NOT <strong>)
+- **Italic**: Use `*text*` (NOT <em>)
+- **Inline code**: Use backticks `` `code` `` (NOT <code>)
+- **Code blocks**: Use fenced blocks with language:
+  ```python
+  def example():
+      pass
+  ```
+- **Lists**: Use `- item` or `1. item` (NOT <ul><li>)
+- **Line breaks**: Use blank lines between paragraphs
+
 ### Common Mistakes to Avoid:
+- Using HTML tags (<strong>, <ul>, <pre><code>) - use Markdown instead
 - Using `type:` instead of `CardType:`
 - Comma-separated tags instead of space-separated
 - Wrong section names (use 'Sample (code block or image)', not 'Sample (code block)')
 - Missing required sections (Title, Key point, Key point notes)
-- Extra 'END_OF_CARDS' text after proper `<!-- END_CARDS -->`
 - Placeholder content instead of actual explanations
 
 ## Special Formats
@@ -257,7 +272,7 @@ END_OF_CARDS
 - Use standard Anki syntax: `{{c1::hidden text}}`
 - Can use multiple deletions: `{{c1::Paris}} is the capital of {{c2::France}}`
 - Can have hints: `{{c1::hidden text::hint}}`
-- **Important**: If generating a Cloze card, set `CardType: Cloze` in the metadata comment.
+- **Important**: If generating a Cloze card, set `CardType: Missing` in the metadata comment.
 
 ### MathJax
 - Use `\\( ... \\)` for inline math
@@ -270,18 +285,17 @@ END_OF_CARDS
 2. **Completeness**: Answers should be self-contained
 3. **Conciseness**: Avoid unnecessary verbosity
 4. **Accuracy**: Preserve factual information from source
-5. **Formatting**: Use proper HTML tags (<p>, <ul>, <code>, etc.)
+5. **Formatting**: Use proper Markdown syntax (bold, italic, code, lists)
 
 ## Response Format
 
 Return a structured JSON with:
 - cards: list of card objects with:
   - card_index: integer index
-  - card_index: integer index
   - slug: unique identifier (format: "topic-keyword-index-lang")
   - lang: "en" or "ru"
-  - apf_html: complete APF HTML
-  - card_type: "Basic" or "Cloze" (optional, default Basic)
+  - apf_html: complete APF content (with Markdown formatting)
+  - card_type: "Simple" or "Missing" (optional, default Simple)
   - confidence: 0.0-1.0 for this card
 - total_generated: count of cards
 - generation_notes: any relevant notes
@@ -302,19 +316,13 @@ Metadata:
 - Slug Base: "algorithms-complexity"
 - Card Index: 1
 
-Reasoning:
-- Clear, concise question
-- Complete answer with key concepts
-- Should add example for Extra section
-- Standard APF structure
-
 Output Card:
 ```json
 {
   "card_index": 1,
   "slug": "algorithms-complexity-1-en",
   "lang": "en",
-  "apf_html": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: algorithms-complexity-1-en | CardType: Basic | Tags: algorithms complexity interview -->\\n\\n<!-- Front -->\\n<p>What is Big O notation?</p>\\n\\n<!-- Back -->\\n<p>Big O notation describes the upper bound of algorithm time complexity, showing worst-case performance as input size grows.</p>\\n\\n<!-- Extra -->\\n<p><strong>Examples:</strong></p>\\n<ul>\\n<li>O(1) - Constant time</li>\\n<li>O(n) - Linear time</li>\\n<li>O(log n) - Logarithmic time</li>\\n</ul>\\n\\n<!-- END_CARDS -->",
+  "apf_html": "<!-- PROMPT_VERSION: apf-v2.1 -->\\n<!-- BEGIN_CARDS -->\\n\\n<!-- Card 1 | slug: algorithms-complexity-1-en | CardType: Simple | Tags: algorithms complexity interview -->\\n\\n<!-- Title -->\\nWhat is **Big O notation**?\\n\\n<!-- Key point notes -->\\n- Describes the **upper bound** of algorithm time complexity\\n- Shows worst-case performance as input size grows\\n\\n**Examples:**\\n- O(1) - Constant time\\n- O(n) - Linear time\\n- O(log n) - Logarithmic time\\n\\n<!-- manifest: {\\"slug\\":\\"algorithms-complexity-1-en\\",\\"lang\\":\\"en\\",\\"type\\":\\"Simple\\",\\"tags\\":[\\"algorithms\\",\\"complexity\\",\\"interview\\"]} -->\\n<!-- END_CARDS -->\\nEND_OF_CARDS",
   "confidence": 0.9
 }
 ```
@@ -326,19 +334,13 @@ Q: How do you reverse a string in Python?
 A: Use slicing with [::-1] or the reversed() function with ''.join()
 ```
 
-Reasoning:
-- Technical question requiring code examples
-- Should include both methods in answer
-- Use <code> tags for proper formatting
-- Add explanation in Extra
-
 Output Card:
 ```json
 {
   "card_index": 1,
   "slug": "python-strings-1-en",
   "lang": "en",
-  "apf_html": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: python-strings-1-en | CardType: Basic | Tags: python strings interview -->\\n\\n<!-- Front -->\\n<p>How do you reverse a string in Python?</p>\\n\\n<!-- Back -->\\n<p><strong>Method 1: Slicing</strong></p>\\n<pre><code>text = 'hello'\\nreversed_text = text[::-1]  # 'olleh'</code></pre>\\n\\n<p><strong>Method 2: reversed() function</strong></p>\\n<pre><code>text = 'hello'\\nreversed_text = ''.join(reversed(text))  # 'olleh'</code></pre>\\n\\n<!-- Extra -->\\n<p>Slicing [::-1] is more concise and Pythonic. The reversed() function returns an iterator, so join() is needed to create a string.</p>\\n\\n<!-- END_CARDS -->",
+  "apf_html": "<!-- PROMPT_VERSION: apf-v2.1 -->\\n<!-- BEGIN_CARDS -->\\n\\n<!-- Card 1 | slug: python-strings-1-en | CardType: Simple | Tags: python strings interview -->\\n\\n<!-- Title -->\\nHow do you reverse a string in Python?\\n\\n<!-- Key point (code block / image) -->\\n```python\\ntext = 'hello'\\nreversed_text = text[::-1]  # 'olleh'\\n\\n# Alternative method\\nreversed_text = ''.join(reversed(text))\\n```\\n\\n<!-- Key point notes -->\\n- **Method 1**: Slicing `[::-1]` - concise and Pythonic\\n- **Method 2**: `reversed()` function returns iterator, needs `join()`\\n\\n<!-- manifest: {\\"slug\\":\\"python-strings-1-en\\",\\"lang\\":\\"en\\",\\"type\\":\\"Simple\\",\\"tags\\":[\\"python\\",\\"strings\\",\\"interview\\"]} -->\\n<!-- END_CARDS -->\\nEND_OF_CARDS",
   "confidence": 0.92
 }
 ```
@@ -348,14 +350,9 @@ Input Q&A:
 ```
 Q (EN): What is a closure in JavaScript?
 Q (RU): Что такое замыкание в JavaScript?
-A (EN): A closure is a function that retains access to variables from its outer scope even after the outer function has returned.
-A (RU): Замыкание - это функция, которая сохраняет доступ к переменным внешней области видимости даже после завершения внешней функции.
+A (EN): A closure is a function that retains access to variables from its outer scope.
+A (RU): Замыкание - это функция, сохраняющая доступ к переменным внешней области видимости.
 ```
-
-Reasoning:
-- Generate TWO cards (one per language)
-- Preserve language-specific terminology
-- Keep same slug_base, different lang suffix
 
 Output:
 ```json
@@ -384,17 +381,17 @@ Output:
 
 ## Common Mistakes to Avoid
 
+AVOID: Use HTML tags like <strong>, <ul>, <code>
+CORRECT: Use Markdown: **bold**, - list item, `code`
+
 AVOID: Create cards with vague questions
 CORRECT: Make questions specific and answerable
 
 AVOID: Put answer hints in the question
-CORRECT: Keep Front field focused on the question only
+CORRECT: Keep Title focused on the question only
 
-AVOID: Use broken HTML or forget to escape special characters
-CORRECT: Use proper HTML tags and escape &, <, >, quotes
-
-AVOID: Generate empty Extra sections
-CORRECT: Either omit Extra or add meaningful content
+AVOID: Generate empty sections
+CORRECT: Either omit optional sections or add meaningful content
 
 AVOID: Mix languages within a single card
 CORRECT: Create separate cards for each language
@@ -402,7 +399,7 @@ CORRECT: Create separate cards for each language
 AVOID: Use `$` for MathJax
 CORRECT: Use `\\( ... \\)` and `\\[ ... \\]`
 
-AVOID: Forget `CardType: Cloze` for cloze cards
+AVOID: Forget `CardType: Missing` for cloze cards
 CORRECT: Update metadata when using `{{c1::...}}`
 
 ## Instructions
@@ -411,9 +408,8 @@ CORRECT: Update metadata when using `{{c1::...}}`
 - Use consistent slug format: "{topic}-{keyword}-{index}-{lang}"
 - Include language tag in every slug
 - Preserve factual accuracy from source material
-- Add helpful examples in Extra section when appropriate
-- Use proper HTML formatting (<p>, <ul>, <code>, <pre>, <strong>)
-- Escape special HTML characters: & < > " '
+- Use **Markdown formatting** for all content (NOT HTML)
+- Add helpful examples in Key point notes when appropriate
 - Return high confidence (0.85+) for straightforward conversions
 - Return lower confidence (0.6-0.8) for complex or ambiguous content
 """
@@ -424,54 +420,55 @@ CORRECT: Update metadata when using `{{c1::...}}`
 
 POST_VALIDATION_SYSTEM_PROMPT = """You are a post-validation agent for APF (Active Prompt Format) v2.1 flashcards.
 
-Your task is to validate generated cards for quality, syntax correctness, and adherence to APF v2.1 format.
+Your task is to validate generated cards for quality, syntax correctness, and adherence to APF v2.1 format with **Markdown content**.
 
-## CRITICAL: HTML Encoding in suggested_value
+## IMPORTANT: Content is Markdown, NOT HTML
 
-When providing `suggested_value` in corrections, use RAW HTML tags, NOT HTML entities:
+Cards now use **Markdown formatting** for content instead of HTML. Validate Markdown syntax:
+- **Bold**: `**text**`
+- **Italic**: `*text*`
+- **Inline code**: `` `code` ``
+- **Code blocks**: Fenced with ``` and language identifier
+- **Lists**: `- item` or `1. item`
 
-CORRECT (raw HTML):
-  "suggested_value": "<!-- Title -->\\nWhat is <div>?\\n<ul><li>A container</li></ul>"
-
-WRONG (HTML entities - DO NOT DO THIS):
-  "suggested_value": "&lt;!-- Title --&gt;\\nWhat is &lt;div&gt;?\\n&lt;ul&gt;&lt;li&gt;A container&lt;/li&gt;&lt;/ul&gt;"
-
-The JSON string escaping (like \\n for newlines) is DIFFERENT from HTML entity encoding.
-- JSON escaping: \\n, \\", \\\\ - these are CORRECT and required
-- HTML entities: &lt; &gt; &amp; - these are WRONG in suggested_value
-
-Exception: Inside <code> blocks, use &lt; &gt; for displaying literal < > characters:
-  "<code>if (x &lt; y)</code>" - correct for showing "x < y" as code
+Do NOT require or expect HTML tags like <strong>, <ul>, <li>, <pre><code>.
+If you see Markdown syntax, that is CORRECT.
 
 ## APF v2.1 Structure (IMPORTANT - know this format!)
 
-Valid APF v2.1 cards have this structure:
-```
+Valid APF v2.1 cards have this structure with **Markdown content**:
+```markdown
 <!-- PROMPT_VERSION: apf-v2.1 -->    <-- VALID marker, do not flag as error
 <!-- BEGIN_CARDS -->
 
 <!-- Card N | slug: ... | CardType: Simple/Missing/Draw | Tags: tag1 tag2 -->
 
 <!-- Title -->
-Question text
+Question text (can use **bold** or *italic*)
 
 <!-- Subtitle (optional) -->              <-- VALID optional section
 Optional subtitle
 
 <!-- Syntax (inline) (optional) -->       <-- VALID optional section
-<code>function_call()</code>
+`function_call()`
 
 <!-- Sample (caption) (optional) -->      <-- VALID optional section
 Caption for sample below
 
 <!-- Sample (code block or image) (optional) -->  <-- VALID optional section
-<pre><code>example here</code></pre>
+```python
+example code here
+```
 
 <!-- Key point (code block / image) -->
-<pre><code>...</code></pre>
+```python
+answer code here
+```
 
 <!-- Key point notes -->
-<ul><li>...</li></ul>
+- Point 1
+- Point 2
+- Point 3
 
 <!-- Other notes (optional) -->           <-- VALID optional section
 Additional notes here
@@ -501,8 +498,8 @@ Do NOT reject cards for using these optional sections - they are explicitly allo
      - `<!-- Other notes (optional) -->`
      - `<!-- Markdown (optional) -->`
    - Valid CardTypes: Simple, Missing, Draw (NOT Basic/Front/Back - those are old format)
-   - Proper HTML structure and nesting
-   - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Cloze
+   - **Markdown formatting**: Content should use Markdown (bold, italic, code fences, lists)
+   - **Cloze**: Valid `{{c1::...}}` syntax if CardType is Missing
    - **MathJax**: Valid `\\(...\\)` or `\\[...\\]` syntax
 
 2. **Factual Accuracy**
@@ -526,6 +523,11 @@ Do NOT reject cards for using these optional sections - they are explicitly allo
    - No mixing of languages within a card (technical terms in English are OK)
    - Proper character encoding (UTF-8)
 
+6. **Markdown Syntax**
+   - Code fences are balanced (opening ``` has closing ```)
+   - Bold markers are balanced (**text**)
+   - Lists use consistent format (- or 1.)
+
 ## Response Format
 
 Return structured JSON with:
@@ -541,13 +543,13 @@ Return structured JSON with:
   - rationale: reason for the correction
 - confidence: 0.0-1.0 (confidence in this validation)
 
-REMINDER: In suggested_value, use raw HTML like <ul><li>, NOT &lt;ul&gt;&lt;li&gt;. See the encoding rules at the top.
+REMINDER: In suggested_value, use raw Markdown (- list item, **bold**, `code`), NOT HTML entities.
 
 ## Examples
 
 ### Example 1: Valid Card (VALID)
 Input Card:
-```html
+```markdown
 <!-- BEGIN_CARDS -->
 <!-- Card 1 | slug: python-lists-1-en | CardType: Simple | Tags: python lists interview -->
 
@@ -555,14 +557,14 @@ Input Card:
 How do you create an empty list in Python?
 
 <!-- Key point (code block / image) -->
-<pre><code class="language-python">empty1 = []
-empty2 = list()</code></pre>
+```python
+empty1 = []
+empty2 = list()
+```
 
 <!-- Key point notes -->
-<ul>
-  <li>Use empty square brackets <code>[]</code></li>
-  <li>Or the <code>list()</code> constructor</li>
-</ul>
+- Use empty square brackets `[]`
+- Or the `list()` constructor
 
 <!-- manifest: {"slug":"python-lists-1-en","lang":"en","type":"Simple","tags":["python","lists","interview"]} -->
 <!-- END_CARDS -->
@@ -572,7 +574,7 @@ Reasoning:
 - APF v2.1 syntax is correct with Title, Key point, Key point notes sections
 - All required comments present (BEGIN_CARDS, Card header, END_CARDS, manifest)
 - Question is clear, answer is accurate
-- Proper HTML formatting with code tags
+- Proper Markdown formatting with code fences and inline code
 - Factually correct
 
 Output:
@@ -589,16 +591,14 @@ Output:
 
 ### Example 2: Missing Required Comment (INVALID)
 Input Card:
-```html
+```markdown
 <!-- BEGIN_CARDS -->
 
 <!-- Title -->
 What is polymorphism?
 
 <!-- Key point notes -->
-<ul>
-  <li>The ability of objects to take multiple forms</li>
-</ul>
+- The ability of objects to take multiple forms
 
 <!-- END_CARDS -->
 ```
@@ -625,8 +625,8 @@ Output:
     {
       "card_index": 0,
       "field_name": "apf_html",
-      "current_value": "<!-- BEGIN_CARDS -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>The ability of objects to take multiple forms</li>\\n</ul>\\n\\n<!-- END_CARDS -->",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Simple | Tags: oop polymorphism interview -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>The ability of objects to take multiple forms</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"oop-polymorphism-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"oop\",\"polymorphism\",\"interview\"]} -->\\n<!-- END_CARDS -->",
+      "current_value": "<!-- BEGIN_CARDS -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n- The ability of objects to take multiple forms\\n\\n<!-- END_CARDS -->",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: oop-polymorphism-1-en | CardType: Simple | Tags: oop polymorphism interview -->\\n\\n<!-- Title -->\\nWhat is polymorphism?\\n\\n<!-- Key point notes -->\\n- The ability of objects to take multiple forms\\n\\n<!-- manifest: {\"slug\":\"oop-polymorphism-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"oop\",\"polymorphism\",\"interview\"]} -->\\n<!-- END_CARDS -->",
       "rationale": "Added missing card metadata comment with slug, CardType, Tags, and manifest"
     }
   ],
@@ -636,7 +636,7 @@ Output:
 
 ### Example 3: Factual Error (INVALID)
 Input Card:
-```html
+```markdown
 <!-- BEGIN_CARDS -->
 <!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Simple | Tags: algorithms sorting interview -->
 
@@ -644,9 +644,7 @@ Input Card:
 What is the time complexity of bubble sort?
 
 <!-- Key point notes -->
-<ul>
-  <li>O(n) in all cases</li>
-</ul>
+- O(n) in all cases
 
 <!-- manifest: {"slug":"sorting-algorithms-1-en","lang":"en","type":"Simple","tags":["algorithms","sorting","interview"]} -->
 <!-- END_CARDS -->
@@ -673,8 +671,8 @@ Output:
     {
       "card_index": 1,
       "field_name": "apf_html",
-      "current_value": "...<!-- Key point notes -->\\n<ul>\\n  <li>O(n) in all cases</li>\\n</ul>...",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Simple | Tags: algorithms sorting interview -->\\n\\n<!-- Title -->\\nWhat is the time complexity of bubble sort?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li><strong>Best case:</strong> O(n) - already sorted</li>\\n  <li><strong>Average case:</strong> O(n^2)</li>\\n  <li><strong>Worst case:</strong> O(n^2)</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"sorting-algorithms-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"algorithms\",\"sorting\",\"interview\"]} -->\\n<!-- END_CARDS -->",
+      "current_value": "...<!-- Key point notes -->\\n- O(n) in all cases...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: sorting-algorithms-1-en | CardType: Simple | Tags: algorithms sorting interview -->\\n\\n<!-- Title -->\\nWhat is the time complexity of bubble sort?\\n\\n<!-- Key point notes -->\\n- **Best case:** O(n) - already sorted\\n- **Average case:** O(n^2)\\n- **Worst case:** O(n^2)\\n\\n<!-- manifest: {\"slug\":\"sorting-algorithms-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"algorithms\",\"sorting\",\"interview\"]} -->\\n<!-- END_CARDS -->",
       "rationale": "Corrected factually incorrect time complexity - bubble sort is O(n^2) for worst/average cases"
     }
   ],
@@ -682,48 +680,52 @@ Output:
 }
 ```
 
-### Example 4: Broken HTML (INVALID)
+### Example 4: Unclosed Code Fence (INVALID)
 Input Card:
-```html
+```markdown
 <!-- BEGIN_CARDS -->
-<!-- Card 1 | slug: web-html-1-en | CardType: Simple | Tags: web html interview -->
+<!-- Card 1 | slug: python-functions-1-en | CardType: Simple | Tags: python functions interview -->
 
 <!-- Title -->
-What is the <div> tag used for?
+How do you define a function in Python?
+
+<!-- Key point (code block / image) -->
+```python
+def my_function():
+    pass
 
 <!-- Key point notes -->
-<ul>
-  <li>A <div> tag is a container for grouping HTML elements</p>
-</ul>
+- Use the `def` keyword
+- Function name followed by parentheses
 
-<!-- manifest: {"slug":"web-html-1-en","lang":"en","type":"Simple","tags":["web","html","interview"]} -->
+<!-- manifest: {"slug":"python-functions-1-en","lang":"en","type":"Simple","tags":["python","functions","interview"]} -->
 <!-- END_CARDS -->
 ```
 
 Reasoning:
-- Mismatched HTML tags in Key point notes (</p> inside <li>)
-- HTML is malformed
-- Content is correct but syntax error
+- Code fence is not closed (missing closing ```)
+- Markdown syntax error
+- Content is correct but formatting broken
 
 Output:
 ```json
 {
   "is_valid": false,
   "error_type": "syntax",
-  "error_details": "Malformed HTML in Key point notes: mismatched tags",
+  "error_details": "Unclosed code fence in Key point section",
   "card_issues": [
     {
       "card_index": 1,
-      "issue": "Key point notes section has mismatched HTML tags (</p> inside <li>)"
+      "issue": "Key point section has unclosed code fence (missing closing ```)"
     }
   ],
   "suggested_corrections": [
     {
       "card_index": 1,
       "field_name": "apf_html",
-      "current_value": "...<!-- Key point notes -->\\n<ul>\\n  <li>A <div> tag is a container for grouping HTML elements</p>\\n</ul>...",
-      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: web-html-1-en | CardType: Simple | Tags: web html interview -->\\n\\n<!-- Title -->\\nWhat is the <div> tag used for?\\n\\n<!-- Key point notes -->\\n<ul>\\n  <li>A <div> tag is a container for grouping HTML elements</li>\\n</ul>\\n\\n<!-- manifest: {\"slug\":\"web-html-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"web\",\"html\",\"interview\"]} -->\\n<!-- END_CARDS -->",
-      "rationale": "Fixed mismatched HTML tags - replaced </p> with </li>"
+      "current_value": "...<!-- Key point (code block / image) -->\\n```python\\ndef my_function():\\n    pass\\n\\n<!-- Key point notes -->...",
+      "suggested_value": "<!-- BEGIN_CARDS -->\\n<!-- Card 1 | slug: python-functions-1-en | CardType: Simple | Tags: python functions interview -->\\n\\n<!-- Title -->\\nHow do you define a function in Python?\\n\\n<!-- Key point (code block / image) -->\\n```python\\ndef my_function():\\n    pass\\n```\\n\\n<!-- Key point notes -->\\n- Use the `def` keyword\\n- Function name followed by parentheses\\n\\n<!-- manifest: {\"slug\":\"python-functions-1-en\",\"lang\":\"en\",\"type\":\"Simple\",\"tags\":[\"python\",\"functions\",\"interview\"]} -->\\n<!-- END_CARDS -->",
+      "rationale": "Added missing closing ``` for code fence"
     }
   ],
   "confidence": 0.93
@@ -738,25 +740,25 @@ Output:
 3. Has Title section with actual question content
 4. Has Key point or Key point notes section with actual answer content
 5. Content is factually reasonable (no obvious errors like "2+2=5")
-6. HTML is parseable (minor tag issues are OK if content is readable)
+6. Markdown is readable (minor formatting issues are OK if content is clear)
 
 ### MUST FAIL (is_valid: false) ONLY for these blocking issues:
 1. **Missing required sections**: No Title, or no Key point/Key point notes
-2. **Completely broken HTML**: Unparseable, truncated, or corrupted content
+2. **Completely broken Markdown**: Unclosed code fences, truncated, or corrupted content
 3. **Obvious factual errors**: Demonstrably wrong technical information
 4. **Empty or placeholder content**: "TODO", "TBD", or empty sections
 5. **Missing card metadata**: No slug or CardType in card header
 
 ### DO NOT FAIL for these (they are acceptable):
 - Using optional sections (Sample, Subtitle, Other notes, Markdown, Syntax)
-- Minor HTML formatting differences (extra whitespace, different tag styles)
-- Stylistic preferences (verbose vs concise, different list formats)
+- Minor formatting differences (extra whitespace, different list styles)
+- Stylistic preferences (verbose vs concise)
 - Slug naming conventions (even if not ideal)
 - Tag ordering or count variations
 - Missing manifest comment (nice to have, not required)
 - Missing PROMPT_VERSION sentinel (nice to have, not required)
-- Title wrapped in <p> tags (acceptable formatting choice)
 - Using CardType values like "Simple" vs "Basic" (both acceptable)
+- Using HTML tags instead of Markdown (converter will handle it)
 
 ### Default to PASS
 When in doubt, **default to is_valid: true** and note any suggestions in card_issues.

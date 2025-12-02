@@ -59,6 +59,12 @@ dependencies = [
     "urllib3>=2.5.0",
     "arq>=0.25.0",
     "redis>=5.0.0",
+    # Markdown processing for APF card generation
+    "markdown>=3.5",
+    "pymdown-extensions>=10.0",
+    "mistune>=3.0",  # Fast Markdown parser (4-5x faster than python-markdown)
+    "nh3>=0.2.14",  # Modern HTML sanitizer (replaces deprecated bleach, 20x faster)
+    "Pygments>=2.17.0",  # Syntax highlighting for code blocks
 ]
 
 [project.optional-dependencies]

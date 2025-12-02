@@ -1,9 +1,15 @@
-"""Map APF HTML to Anki note type fields."""
+"""Map APF content (HTML or Markdown) to Anki note type fields.
+
+This module handles parsing APF card content and mapping it to Anki fields.
+It supports both HTML and Markdown content, converting Markdown to HTML
+at the Anki boundary.
+"""
 
 import json
 import re
 from typing import Any, cast
 
+from obsidian_anki_sync.apf.markdown_converter import convert_apf_field_to_html
 from obsidian_anki_sync.exceptions import FieldMappingError
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -123,6 +129,27 @@ def _extract_manifest(content: str) -> dict:
         return {}
 
 
+def _convert_fields_to_html(fields: dict[str, str]) -> dict[str, str]:
+    """Convert all field values from Markdown to HTML if needed.
+
+    This is the boundary where Markdown content is converted to HTML
+    before being sent to Anki.
+
+    Args:
+        fields: Dict of field name -> field value (may be Markdown or HTML)
+
+    Returns:
+        Dict with all values converted to HTML
+    """
+    converted = {}
+    for field_name, value in fields.items():
+        if value:
+            converted[field_name] = convert_apf_field_to_html(value)
+        else:
+            converted[field_name] = value
+    return converted
+
+
 def _map_simple(parsed: dict) -> dict[str, str]:
     """Map to APF::Simple fields using APF 3.0.0 field names."""
     # Combine sample content (caption + code)
@@ -134,7 +161,7 @@ def _map_simple(parsed: dict) -> dict[str, str]:
             sample += "\n\n"
         sample += parsed["sample_code"]
 
-    return {
+    fields = {
         "Primary Title": parsed.get("title", ""),
         "Secondary Subtitle": parsed.get("subtitle", ""),
         "Secondary Syntax (inline code)": parsed.get("syntax", ""),
@@ -144,6 +171,9 @@ def _map_simple(parsed: dict) -> dict[str, str]:
         "Note Other notes": parsed.get("other_notes", ""),
         "Note Markdown": parsed.get("markdown", ""),
     }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
 
 
 def _map_missing(parsed: dict) -> dict[str, str]:
@@ -157,7 +187,7 @@ def _map_missing(parsed: dict) -> dict[str, str]:
             sample += "\n\n"
         sample += parsed["sample_code"]
 
-    return {
+    fields = {
         "Primary Title": parsed.get("title", ""),
         "Secondary Subtitle": parsed.get("subtitle", ""),
         "Secondary Syntax (inline code)": parsed.get("syntax", ""),
@@ -167,6 +197,9 @@ def _map_missing(parsed: dict) -> dict[str, str]:
         "Note Other notes": parsed.get("other_notes", ""),
         "Note Markdown": parsed.get("markdown", ""),
     }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
 
 
 def _map_draw(parsed: dict) -> dict[str, str]:
@@ -180,7 +213,7 @@ def _map_draw(parsed: dict) -> dict[str, str]:
             sample += "\n\n"
         sample += parsed["sample_code"]
 
-    return {
+    fields = {
         "Primary Title": parsed.get("title", ""),
         "Secondary Subtitle": parsed.get("subtitle", ""),
         "Secondary Syntax (inline code)": parsed.get("syntax", ""),
@@ -190,3 +223,6 @@ def _map_draw(parsed: dict) -> dict[str, str]:
         "Note Other notes": parsed.get("other_notes", ""),
         "Note Markdown": parsed.get("markdown", ""),
     }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
