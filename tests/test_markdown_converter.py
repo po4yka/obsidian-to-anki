@@ -422,3 +422,347 @@ class TestHighlightCode:
         result = highlight_code(code)
         assert "def" in result
         assert "hello" in result
+
+
+class TestCodeBlockEdgeCases:
+    """Tests for code block rendering edge cases."""
+
+    def test_code_block_without_language(self) -> None:
+        """Code blocks without language should use auto-detection."""
+        md = """```
+print("hello world")
+```"""
+        result = convert_markdown_to_html(md)
+        assert "<pre" in result or "<code" in result
+        assert "hello" in result
+
+    def test_code_block_with_unknown_language(self) -> None:
+        """Code blocks with unknown language should fallback to plain text."""
+        md = """```not_a_real_programming_language_xyz
+some code content here
+```"""
+        result = convert_markdown_to_html(md)
+        assert "some code content" in result
+        # Should still be wrapped in pre/code tags
+        assert "<pre" in result or "<code" in result
+
+    def test_code_block_with_language_and_title(self) -> None:
+        """Code blocks with language and extra info should extract language."""
+        md = """```python title="example.py"
+def hello():
+    pass
+```"""
+        result = convert_markdown_to_html(md)
+        assert "hello" in result
+        assert "<pre" in result or "<code" in result
+
+    def test_empty_code_block(self) -> None:
+        """Empty code blocks should be handled gracefully."""
+        md = """```python
+```"""
+        result = convert_markdown_to_html(md)
+        # Should not crash, may have empty content
+        assert "<pre" in result or "<code" in result or result.strip() != ""
+
+    def test_code_block_with_special_chars(self) -> None:
+        """Code blocks with special HTML chars should be escaped."""
+        md = """```html
+<div class="test">&nbsp;</div>
+```"""
+        result = convert_markdown_to_html(md)
+        # Content should be preserved (possibly escaped)
+        assert "div" in result
+        assert "test" in result
+
+
+class TestBasicMarkdownFallback:
+    """Tests for the basic markdown to HTML fallback function."""
+
+    def test_basic_fallback_bold(self) -> None:
+        """Fallback should convert bold text."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        result = _basic_markdown_to_html("**bold text**")
+        assert "<strong>bold text</strong>" in result
+
+    def test_basic_fallback_italic(self) -> None:
+        """Fallback should convert italic text."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        result = _basic_markdown_to_html("*italic text*")
+        assert "<em>italic text</em>" in result
+
+    def test_basic_fallback_inline_code(self) -> None:
+        """Fallback should convert inline code."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        result = _basic_markdown_to_html("`inline code`")
+        assert '<code class="language-text">inline code</code>' in result
+
+    def test_basic_fallback_code_block(self) -> None:
+        """Fallback should convert code blocks."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """```python
+def test():
+    pass
+```"""
+        result = _basic_markdown_to_html(md)
+        assert "<pre>" in result
+        assert "<code" in result
+        assert "language-python" in result
+
+    def test_basic_fallback_code_block_no_lang(self) -> None:
+        """Fallback should handle code blocks without language."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """```
+plain code
+```"""
+        result = _basic_markdown_to_html(md)
+        assert "<pre>" in result
+        assert "language-text" in result
+
+    def test_basic_fallback_unordered_list(self) -> None:
+        """Fallback should convert unordered lists."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """- Item 1
+- Item 2"""
+        result = _basic_markdown_to_html(md)
+        assert "<ul>" in result
+        assert "<li>Item 1</li>" in result
+        assert "<li>Item 2</li>" in result
+
+    def test_basic_fallback_paragraphs(self) -> None:
+        """Fallback should handle paragraph breaks."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """First paragraph
+
+Second paragraph"""
+        result = _basic_markdown_to_html(md)
+        assert "</p><p>" in result
+
+
+class TestGetPygmentsCss:
+    """Tests for Pygments CSS generation."""
+
+    def test_get_default_css(self) -> None:
+        """Should generate CSS for default style."""
+        from obsidian_anki_sync.apf.markdown_converter import get_pygments_css
+
+        css = get_pygments_css()
+        assert ".codehilite" in css
+        # Should contain color definitions
+        assert "color:" in css or "#" in css
+
+    def test_get_monokai_css(self) -> None:
+        """Should generate CSS for monokai style."""
+        from obsidian_anki_sync.apf.markdown_converter import get_pygments_css
+
+        css = get_pygments_css("monokai")
+        assert ".codehilite" in css
+        assert len(css) > 100  # Should have substantial CSS
+
+    def test_get_different_styles_produce_different_css(self) -> None:
+        """Different styles should produce different CSS."""
+        from obsidian_anki_sync.apf.markdown_converter import get_pygments_css
+
+        default_css = get_pygments_css("default")
+        monokai_css = get_pygments_css("monokai")
+        # They should be different
+        assert default_css != monokai_css
+
+
+class TestMistuneConversionFallback:
+    """Tests for mistune conversion failure fallback."""
+
+    def test_conversion_uses_fallback_on_error(self) -> None:
+        """When mistune fails, should use basic fallback."""
+        from unittest.mock import patch
+
+        from obsidian_anki_sync.apf.markdown_converter import convert_markdown_to_html
+
+        # Mock mistune to raise an exception
+        with patch(
+            "obsidian_anki_sync.apf.markdown_converter._create_mistune_converter"
+        ) as mock_converter:
+            mock_converter.return_value = lambda x: (_ for _ in ()).throw(
+                Exception("Simulated failure")
+            )
+
+            result = convert_markdown_to_html("**bold text**")
+            # Should still produce valid output via fallback
+            assert "<strong>bold text</strong>" in result
+
+    def test_fallback_handles_complex_content(self) -> None:
+        """Fallback should handle complex markdown content."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """**Bold** and *italic* with `code`.
+
+```python
+def test():
+    pass
+```
+
+- List item"""
+        result = _basic_markdown_to_html(md)
+        assert "<strong>Bold</strong>" in result
+        assert "<em>italic</em>" in result
+        assert "<code" in result
+        assert "<li>List item</li>" in result
+
+
+class TestSanitizationEdgeCases:
+    """Tests for HTML sanitization edge cases."""
+
+    def test_sanitize_fallback_on_error(self) -> None:
+        """When nh3 fails, should return original HTML."""
+        from unittest.mock import patch
+
+        html = "<p>Test content</p>"
+        with patch("obsidian_anki_sync.apf.markdown_converter.nh3.clean") as mock_clean:
+            mock_clean.side_effect = Exception("Simulated nh3 failure")
+            result = sanitize_html(html)
+            # Should return original HTML on error
+            assert result == html
+
+    def test_sanitize_preserves_allowed_tags(self) -> None:
+        """Allowed tags should be preserved."""
+        html = "<p>Text with <strong>bold</strong> and <em>italic</em></p>"
+        result = sanitize_html(html)
+        assert "<p>" in result
+        assert "<strong>" in result
+        assert "<em>" in result
+
+    def test_sanitize_removes_dangerous_attributes(self) -> None:
+        """Dangerous attributes should be removed."""
+        html = '<img src="x" onerror="alert(1)">'
+        result = sanitize_html(html)
+        assert "onerror" not in result.lower()
+
+    def test_sanitize_handles_nested_tags(self) -> None:
+        """Nested tags should be handled correctly."""
+        html = "<p><strong><em>Nested</em></strong></p>"
+        result = sanitize_html(html)
+        assert "Nested" in result
+
+    def test_sanitize_preserves_code_classes(self) -> None:
+        """Code tag classes should be preserved."""
+        html = '<code class="language-python">code</code>'
+        result = sanitize_html(html)
+        assert 'class="language-python"' in result
+
+    def test_sanitize_handles_table_tags(self) -> None:
+        """Table tags should be preserved."""
+        html = "<table><tr><td>Cell</td></tr></table>"
+        result = sanitize_html(html)
+        assert "<table>" in result
+        assert "<td>" in result
+
+    def test_sanitize_removes_iframe(self) -> None:
+        """Iframe tags should be removed."""
+        html = '<p>Text</p><iframe src="evil.com"></iframe>'
+        result = sanitize_html(html)
+        assert "<iframe" not in result
+        assert "Text" in result
+
+    def test_sanitize_preserves_links(self) -> None:
+        """Link tags should be preserved with safe attributes."""
+        html = '<a href="https://example.com" title="Link">Click</a>'
+        result = sanitize_html(html)
+        assert "<a" in result
+        assert "href=" in result
+        assert "Click" in result
+
+    def test_sanitize_adds_rel_to_links(self) -> None:
+        """Links should get rel=noopener noreferrer added."""
+        html = '<a href="https://example.com">Link</a>'
+        result = sanitize_html(html)
+        # nh3 adds rel attribute
+        assert "noopener" in result or "rel=" in result
+
+
+class TestRendererMethods:
+    """Direct tests for AnkiHighlightRenderer methods."""
+
+    def test_renderer_codespan(self) -> None:
+        """Codespan method should wrap in code tags."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        result = renderer.codespan("test code")
+        assert '<code class="language-text">' in result
+        assert "test code" in result
+
+    def test_renderer_paragraph(self) -> None:
+        """Paragraph method should wrap in p tags."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        result = renderer.paragraph("some text")
+        assert "<p>" in result
+        assert "some text" in result
+
+    def test_renderer_paragraph_preserves_cloze(self) -> None:
+        """Paragraph method should preserve cloze syntax."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        result = renderer.paragraph("Answer is {{c1::42}}")
+        assert "{{c1::42}}" in result
+
+    def test_renderer_block_code_no_language(self) -> None:
+        """Block code with no language should auto-detect."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        result = renderer.block_code("print('hello')", info=None)
+        assert "hello" in result
+
+    def test_renderer_block_code_unknown_language(self) -> None:
+        """Block code with unknown language should fallback."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        result = renderer.block_code("some content", info="unknownlang12345")
+        assert "some content" in result
+        assert "language-unknownlang12345" in result
+
+
+class TestAttributeBuilding:
+    """Tests for attribute building helper."""
+
+    def test_all_tags_have_global_attrs(self) -> None:
+        """All allowed tags should have global attributes."""
+        from obsidian_anki_sync.apf.markdown_converter import (
+            _GLOBAL_ATTRIBUTES,
+            ALLOWED_ATTRIBUTES,
+            ALLOWED_TAGS,
+        )
+
+        for tag in ALLOWED_TAGS:
+            assert tag in ALLOWED_ATTRIBUTES
+            for attr in _GLOBAL_ATTRIBUTES:
+                assert attr in ALLOWED_ATTRIBUTES[tag]
+
+    def test_anchor_has_link_attrs(self) -> None:
+        """Anchor tag should have link-specific attributes."""
+        from obsidian_anki_sync.apf.markdown_converter import ALLOWED_ATTRIBUTES
+
+        assert "a" in ALLOWED_ATTRIBUTES
+        assert "href" in ALLOWED_ATTRIBUTES["a"]
+        assert "title" in ALLOWED_ATTRIBUTES["a"]
+        assert "target" in ALLOWED_ATTRIBUTES["a"]
+
+    def test_img_has_image_attrs(self) -> None:
+        """Image tag should have image-specific attributes."""
+        from obsidian_anki_sync.apf.markdown_converter import ALLOWED_ATTRIBUTES
+
+        assert "img" in ALLOWED_ATTRIBUTES
+        assert "src" in ALLOWED_ATTRIBUTES["img"]
+        assert "alt" in ALLOWED_ATTRIBUTES["img"]
+        assert "width" in ALLOWED_ATTRIBUTES["img"]
+        assert "height" in ALLOWED_ATTRIBUTES["img"]
