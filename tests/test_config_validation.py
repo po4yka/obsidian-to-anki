@@ -644,7 +644,7 @@ class TestConfigurationDefaults:
         assert config.llm_provider == "ollama"
         assert config.llm_temperature == 0.2
         assert config.llm_top_p == 0.3
-        assert config.llm_timeout == 1200.0
+        assert config.llm_timeout == 3600.0
         assert config.llm_max_tokens == 8192
 
     def test_default_model_preset(self, temp_dir):

@@ -127,14 +127,19 @@ Provide your enrichment assessment."""
                     content_hash=card.content_hash,
                 )
 
-                # Create additions list
+                # Create additions list (only if content is non-empty)
                 for enrich_type in output.enrichment_type:
+                    # Use enriched_extra or enriched_answer as content
+                    content_source = output.enriched_extra or output.enriched_answer
+                    if not content_source:
+                        # Skip if no content to add
+                        continue
                     addition = EnrichmentAddition(
                         enrichment_type=enrich_type,
                         content=(
-                            output.enriched_extra[:200] + "..."
-                            if len(output.enriched_extra) > 200
-                            else output.enriched_extra
+                            content_source[:200] + "..."
+                            if len(content_source) > 200
+                            else content_source
                         ),
                         rationale=output.rationale,
                     )
