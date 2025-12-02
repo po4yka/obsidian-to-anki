@@ -1,6 +1,7 @@
 """AnkiConnect HTTP API client."""
 
 import contextlib
+import random
 import time
 from types import TracebackType
 from typing import Any, Literal, cast
@@ -31,6 +32,9 @@ class AnkiClient(IAnkiClient):
         timeout: float = 180.0,
         enable_health_checks: bool = True,
         async_runner: AsyncioRunner | None = None,
+        max_keepalive_connections: int = 10,
+        max_connections: int = 20,
+        keepalive_expiry: float = 60.0,
     ):
         """
         Initialize client.
@@ -39,6 +43,10 @@ class AnkiClient(IAnkiClient):
             url: AnkiConnect URL
             timeout: Request timeout in seconds
             enable_health_checks: Whether to perform periodic health checks
+            async_runner: Optional async runner for sync/async bridging
+            max_keepalive_connections: Max idle connections to keep alive
+            max_connections: Max total connections in pool
+            keepalive_expiry: Seconds before idle connections expire
 
         Note:
             Uses synchronous httpx.Client. This is intentional for compatibility
@@ -48,31 +56,59 @@ class AnkiClient(IAnkiClient):
         self.url = url
         self.enable_health_checks = enable_health_checks
         self._last_health_check = 0.0
-        self._health_check_interval = 60.0  # Check health every 60 seconds
+        self._health_check_interval = 60.0  # Check health every 60 seconds when healthy
+        self._health_check_recovery_interval = 5.0  # Fast retry when unhealthy
+        self._max_health_backoff = 300.0  # Max 5 minutes between checks
+        self._consecutive_health_failures = 0
         self._is_healthy = True
         self._async_runner = async_runner or AsyncioRunner.get_global()
 
+        # Metadata cache for deck/model names (reduces redundant API calls)
+        self._metadata_cache: dict[str, Any] = {}
+        self._metadata_cache_time: dict[str, float] = {}
+        self._metadata_cache_ttl = 300.0  # 5 minutes TTL
+
         # Configure connection pooling for better performance
+        pool_limits = httpx.Limits(
+            max_keepalive_connections=max_keepalive_connections,
+            max_connections=max_connections,
+            keepalive_expiry=keepalive_expiry,
+        )
+
         # Using sync client for compatibility with existing sync code paths
-        self.session = httpx.Client(
-            timeout=timeout,
-            limits=httpx.Limits(
-                max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
-            ),
-        )
-        self._async_client = httpx.AsyncClient(
-            timeout=timeout,
-            limits=httpx.Limits(
-                max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
-            ),
-        )
+        self.session = httpx.Client(timeout=timeout, limits=pool_limits)
+        self._async_client = httpx.AsyncClient(timeout=timeout, limits=pool_limits)
         logger.info(
-            "anki_client_initialized", url=url, health_checks=enable_health_checks
+            "anki_client_initialized",
+            url=url,
+            health_checks=enable_health_checks,
+            max_connections=max_connections,
+            max_keepalive=max_keepalive_connections,
         )
+
+    def _get_health_check_interval(self) -> float:
+        """Calculate health check interval with exponential backoff and jitter."""
+        if self._is_healthy:
+            # Use normal interval when healthy
+            base_interval = self._health_check_interval
+        else:
+            # Use shorter recovery interval with exponential backoff
+            backoff_multiplier = 2 ** min(self._consecutive_health_failures, 6)
+            base_interval = min(
+                self._health_check_recovery_interval * backoff_multiplier,
+                self._max_health_backoff,
+            )
+
+        # Add jitter (0.8x to 1.2x) to prevent thundering herd
+        jitter = random.uniform(0.8, 1.2)
+        return base_interval * jitter
 
     def _check_health(self) -> bool:
         """
         Check if AnkiConnect is healthy and responding.
+
+        Uses exponential backoff with jitter when unhealthy to balance
+        quick recovery with avoiding overwhelming a struggling service.
 
         Returns:
             True if healthy, False otherwise
@@ -81,7 +117,8 @@ class AnkiClient(IAnkiClient):
             return True
 
         current_time = time.time()
-        if current_time - self._last_health_check < self._health_check_interval:
+        check_interval = self._get_health_check_interval()
+        if current_time - self._last_health_check < check_interval:
             return self._is_healthy
 
         try:
@@ -94,12 +131,63 @@ class AnkiClient(IAnkiClient):
                 msg = f"AnkiConnect error: {result['error']}"
                 raise AnkiConnectError(msg)
             self._is_healthy = True
-        except Exception:
+            self._consecutive_health_failures = 0  # Reset on success
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as e:
             self._is_healthy = False
-            logger.warning("anki_health_check_failed", url=self.url)
+            self._consecutive_health_failures += 1
+            logger.warning(
+                "anki_health_check_network_error",
+                url=self.url,
+                error=str(e),
+                error_type=type(e).__name__,
+                consecutive_failures=self._consecutive_health_failures,
+            )
+        except (httpx.HTTPStatusError, AnkiConnectError) as e:
+            self._is_healthy = False
+            self._consecutive_health_failures += 1
+            logger.warning(
+                "anki_health_check_api_error",
+                url=self.url,
+                error=str(e),
+                error_type=type(e).__name__,
+                consecutive_failures=self._consecutive_health_failures,
+            )
+        except (ValueError, TypeError) as e:
+            # Invalid JSON response
+            self._is_healthy = False
+            self._consecutive_health_failures += 1
+            logger.warning(
+                "anki_health_check_parse_error",
+                url=self.url,
+                error=str(e),
+                consecutive_failures=self._consecutive_health_failures,
+            )
 
         self._last_health_check = current_time
         return self._is_healthy
+
+    def _get_cached(self, key: str) -> Any | None:
+        """Get cached value if still valid."""
+        if key not in self._metadata_cache:
+            return None
+        cache_time = self._metadata_cache_time.get(key, 0)
+        if time.time() - cache_time > self._metadata_cache_ttl:
+            # Cache expired
+            del self._metadata_cache[key]
+            del self._metadata_cache_time[key]
+            return None
+        return self._metadata_cache[key]
+
+    def _set_cached(self, key: str, value: Any) -> None:
+        """Set cached value with current timestamp."""
+        self._metadata_cache[key] = value
+        self._metadata_cache_time[key] = time.time()
+
+    def invalidate_metadata_cache(self) -> None:
+        """Invalidate all cached metadata (deck/model names)."""
+        self._metadata_cache.clear()
+        self._metadata_cache_time.clear()
+        logger.debug("metadata_cache_invalidated")
 
     @retry(
         max_attempts=3,
@@ -155,8 +243,20 @@ class AnkiClient(IAnkiClient):
             msg = f"Invalid JSON response: {e}"
             raise AnkiConnectError(msg)
 
-        if result.get("error"):
-            msg = f"AnkiConnect error: {result['error']}"
+        # Validate response structure
+        if not isinstance(result, dict):
+            msg = f"Invalid response type: expected dict, got {type(result).__name__}"
+            raise AnkiConnectError(msg)
+
+        if "error" not in result and "result" not in result:
+            msg = f"Malformed response: missing error/result fields in {result}"
+            raise AnkiConnectError(msg)
+
+        if result.get("error") is not None:
+            error_msg = result["error"]
+            if not isinstance(error_msg, str):
+                error_msg = str(error_msg)
+            msg = f"AnkiConnect error: {error_msg}"
             raise AnkiConnectError(msg)
 
         return result.get("result")
@@ -172,6 +272,12 @@ class AnkiClient(IAnkiClient):
             List of note IDs
         """
         return cast("list[int]", self.invoke("findNotes", {"query": query}))
+
+    async def find_notes_async(self, query: str) -> list[int]:
+        """Find notes matching query (async)."""
+        return cast(
+            "list[int]", await self.invoke_async("findNotes", {"query": query})
+        )
 
     def _build_note_payload(
         self,
@@ -448,8 +554,36 @@ class AnkiClient(IAnkiClient):
                 "list[dict[str, Any]]",
                 await self.invoke_async("multi", {"actions": actions}),
             )
-            return [result.get("error") is None for result in results]
-        except Exception:
+
+            # Extract success status and log failures
+            success_list = []
+            for i, result in enumerate(results):
+                if result.get("error") is None:
+                    success_list.append(True)
+                else:
+                    logger.warning(
+                        "batch_update_async_failed",
+                        note_id=updates[i].get("id"),
+                        error=result.get("error"),
+                    )
+                    success_list.append(False)
+
+            successful = sum(1 for r in success_list if r)
+            logger.info(
+                "notes_updated_batch_async",
+                total=len(updates),
+                successful=successful,
+                failed=len(updates) - successful,
+            )
+            return success_list
+
+        except Exception as e:
+            logger.error(
+                "batch_update_async_multi_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                total=len(updates),
+            )
             return [False] * len(updates)
 
     def update_note_tags(self, note_id: int, tags: list[str]) -> None:
@@ -521,6 +655,9 @@ class AnkiClient(IAnkiClient):
         """
         Update tags for multiple notes in a batch operation.
 
+        Optimizes by grouping notes with identical tag sets into single
+        replaceTags calls, reducing the number of API actions.
+
         Args:
             note_tag_pairs: List of (note_id, tags) tuples
 
@@ -530,27 +667,50 @@ class AnkiClient(IAnkiClient):
         if not note_tag_pairs:
             return []
 
-        # Group by operation type (add/remove) for efficiency
-        # For now, use multi action to batch tag updates
-        actions = []
+        # Group notes by their desired tag set to reduce API calls
+        # Key: frozenset of tags, Value: list of note_ids
+        tag_groups: dict[frozenset[str], list[int]] = {}
+        note_to_tagset: dict[int, frozenset[str]] = {}
+        empty_tag_notes: list[int] = []
+
         for note_id, tags in note_tag_pairs:
-            # Get current tags first (we'll need to fetch them)
-            # For simplicity, use replaceTags action if available
-            # Otherwise, use addTags/removeTags combination
-            desired_tags = sorted({tag for tag in tags if tag})
+            desired_tags = frozenset(tag for tag in tags if tag)
+            note_to_tagset[note_id] = desired_tags
             if desired_tags:
-                actions.append(
-                    {
-                        "action": "replaceTags",
-                        "params": {
-                            "notes": [note_id],
-                            "tags": " ".join(desired_tags),
-                        },
-                    }
-                )
+                if desired_tags not in tag_groups:
+                    tag_groups[desired_tags] = []
+                tag_groups[desired_tags].append(note_id)
+            else:
+                empty_tag_notes.append(note_id)
+
+        # Build actions - one per unique tag set (much more efficient)
+        actions = []
+        tagset_to_action_idx: dict[frozenset[str], int] = {}
+
+        for tagset, note_ids in tag_groups.items():
+            tagset_to_action_idx[tagset] = len(actions)
+            actions.append(
+                {
+                    "action": "replaceTags",
+                    "params": {
+                        "notes": note_ids,
+                        "tags": " ".join(sorted(tagset)),
+                    },
+                }
+            )
 
         if not actions:
+            # All notes had empty tags
             return [True] * len(note_tag_pairs)
+
+        logger.debug(
+            "batch_tags_optimized",
+            original_count=len(note_tag_pairs),
+            grouped_count=len(actions),
+            reduction_pct=round(
+                (1 - len(actions) / len(note_tag_pairs)) * 100, 1
+            ),
+        )
 
         try:
             results = cast(
@@ -558,9 +718,16 @@ class AnkiClient(IAnkiClient):
                 self.invoke("multi", {"actions": actions}),
             )
 
-            success_list = []
-            for result in results:
-                success_list.append(result.get("error") is None)
+            # Map results back to original note order
+            success_list: list[bool] = []
+            for note_id, tags in note_tag_pairs:
+                tagset = note_to_tagset[note_id]
+                if not tagset:
+                    # Empty tags always succeed (no action taken)
+                    success_list.append(True)
+                else:
+                    action_idx = tagset_to_action_idx[tagset]
+                    success_list.append(results[action_idx].get("error") is None)
 
             successful = sum(1 for r in success_list if r)
             logger.info(
@@ -568,6 +735,7 @@ class AnkiClient(IAnkiClient):
                 total=len(note_tag_pairs),
                 successful=successful,
                 failed=len(note_tag_pairs) - successful,
+                actions_executed=len(actions),
             )
 
             return success_list
@@ -592,19 +760,37 @@ class AnkiClient(IAnkiClient):
     async def update_notes_tags_async(
         self, note_tag_pairs: list[tuple[int, list[str]]]
     ) -> list[bool]:
+        """Update tags for multiple notes (async, optimized by grouping)."""
         if not note_tag_pairs:
             return []
 
-        actions = []
+        # Group notes by their desired tag set to reduce API calls
+        tag_groups: dict[frozenset[str], list[int]] = {}
+        note_to_tagset: dict[int, frozenset[str]] = {}
+
         for note_id, tags in note_tag_pairs:
-            desired_tags = sorted({tag for tag in tags if tag})
+            desired_tags = frozenset(tag for tag in tags if tag)
+            note_to_tagset[note_id] = desired_tags
             if desired_tags:
-                actions.append(
-                    {
-                        "action": "replaceTags",
-                        "params": {"notes": [note_id], "tags": " ".join(desired_tags)},
-                    }
-                )
+                if desired_tags not in tag_groups:
+                    tag_groups[desired_tags] = []
+                tag_groups[desired_tags].append(note_id)
+
+        # Build actions - one per unique tag set
+        actions = []
+        tagset_to_action_idx: dict[frozenset[str], int] = {}
+
+        for tagset, note_ids in tag_groups.items():
+            tagset_to_action_idx[tagset] = len(actions)
+            actions.append(
+                {
+                    "action": "replaceTags",
+                    "params": {
+                        "notes": note_ids,
+                        "tags": " ".join(sorted(tagset)),
+                    },
+                }
+            )
 
         if not actions:
             return [True] * len(note_tag_pairs)
@@ -614,8 +800,42 @@ class AnkiClient(IAnkiClient):
                 "list[dict[str, Any]]",
                 await self.invoke_async("multi", {"actions": actions}),
             )
-            return [result.get("error") is None for result in results]
-        except Exception:
+
+            # Map results back to original note order
+            success_list: list[bool] = []
+            for note_id, tags in note_tag_pairs:
+                tagset = note_to_tagset[note_id]
+                if not tagset:
+                    success_list.append(True)
+                else:
+                    action_idx = tagset_to_action_idx[tagset]
+                    if results[action_idx].get("error") is not None:
+                        logger.warning(
+                            "batch_tags_async_failed",
+                            note_id=note_id,
+                            error=results[action_idx].get("error"),
+                        )
+                        success_list.append(False)
+                    else:
+                        success_list.append(True)
+
+            successful = sum(1 for r in success_list if r)
+            logger.info(
+                "notes_tags_updated_batch_async",
+                total=len(note_tag_pairs),
+                successful=successful,
+                failed=len(note_tag_pairs) - successful,
+                actions_executed=len(actions),
+            )
+            return success_list
+
+        except Exception as e:
+            logger.error(
+                "batch_tags_async_multi_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                total=len(note_tag_pairs),
+            )
             return [False] * len(note_tag_pairs)
 
     def delete_notes(self, note_ids: list[int]) -> None:
@@ -636,27 +856,54 @@ class AnkiClient(IAnkiClient):
             return
         await self.invoke_async("deleteNotes", {"notes": note_ids})
 
-    def get_deck_names(self) -> list[str]:
-        """Get all deck names."""
-        return cast("list[str]", self.invoke("deckNames"))
+    def get_deck_names(self, use_cache: bool = True) -> list[str]:
+        """Get all deck names (cached for 5 minutes by default)."""
+        cache_key = "deck_names"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
 
-    def get_model_names(self) -> list[str]:
-        """Get all note type (model) names."""
-        return cast("list[str]", self.invoke("modelNames"))
+        result = cast("list[str]", self.invoke("deckNames"))
+        self._set_cached(cache_key, result)
+        return result
 
-    def get_model_field_names(self, model_name: str) -> list[str]:
+    def get_model_names(self, use_cache: bool = True) -> list[str]:
+        """Get all note type (model) names (cached for 5 minutes by default)."""
+        cache_key = "model_names"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
+
+        result = cast("list[str]", self.invoke("modelNames"))
+        self._set_cached(cache_key, result)
+        return result
+
+    def get_model_field_names(
+        self, model_name: str, use_cache: bool = True
+    ) -> list[str]:
         """
-        Get field names for a note type.
+        Get field names for a note type (cached for 5 minutes by default).
 
         Args:
             model_name: Note type name
+            use_cache: Whether to use cached value if available
 
         Returns:
             List of field names
         """
-        return cast(
+        cache_key = f"model_field_names:{model_name}"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
+
+        result = cast(
             "list[str]", self.invoke("modelFieldNames", {"modelName": model_name})
         )
+        self._set_cached(cache_key, result)
+        return result
 
     def can_add_notes(self, notes: list[dict[str, Any]]) -> list[bool]:
         """
@@ -761,6 +1008,93 @@ class AnkiClient(IAnkiClient):
         self.invoke("sync")
         logger.info("anki_sync_triggered")
 
+    # Async counterparts for methods without them
+
+    async def get_deck_names_async(self, use_cache: bool = True) -> list[str]:
+        """Get all deck names (async, cached for 5 minutes by default)."""
+        cache_key = "deck_names"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
+
+        result = cast("list[str]", await self.invoke_async("deckNames"))
+        self._set_cached(cache_key, result)
+        return result
+
+    async def get_model_names_async(self, use_cache: bool = True) -> list[str]:
+        """Get all note type (model) names (async, cached for 5 minutes by default)."""
+        cache_key = "model_names"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
+
+        result = cast("list[str]", await self.invoke_async("modelNames"))
+        self._set_cached(cache_key, result)
+        return result
+
+    async def get_model_field_names_async(
+        self, model_name: str, use_cache: bool = True
+    ) -> list[str]:
+        """Get field names for a note type (async, cached for 5 minutes by default)."""
+        cache_key = f"model_field_names:{model_name}"
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cast("list[str]", cached)
+
+        result = cast(
+            "list[str]",
+            await self.invoke_async("modelFieldNames", {"modelName": model_name}),
+        )
+        self._set_cached(cache_key, result)
+        return result
+
+    async def can_add_notes_async(self, notes: list[dict[str, Any]]) -> list[bool]:
+        """Check if notes can be added (async)."""
+        if not notes:
+            return []
+        return cast(
+            "list[bool]", await self.invoke_async("canAddNotes", {"notes": notes})
+        )
+
+    async def store_media_file_async(self, filename: str, data: str) -> str:
+        """Store a media file in Anki's media collection (async)."""
+        return cast(
+            "str",
+            await self.invoke_async(
+                "storeMediaFile", {"filename": filename, "data": data}
+            ),
+        )
+
+    async def suspend_cards_async(self, card_ids: list[int]) -> None:
+        """Suspend cards by ID (async)."""
+        if not card_ids:
+            return
+        await self.invoke_async("suspend", {"cards": card_ids})
+        logger.info("cards_suspended", count=len(card_ids))
+
+    async def unsuspend_cards_async(self, card_ids: list[int]) -> None:
+        """Unsuspend cards by ID (async)."""
+        if not card_ids:
+            return
+        await self.invoke_async("unsuspend", {"cards": card_ids})
+        logger.info("cards_unsuspended", count=len(card_ids))
+
+    async def sync_async(self) -> None:
+        """Trigger Anki sync (async)."""
+        await self.invoke_async("sync")
+        logger.info("anki_sync_triggered")
+
+    async def check_connection_async(self) -> bool:
+        """Check if AnkiConnect is accessible (async)."""
+        try:
+            await self.invoke_async("version")
+            return True
+        except AnkiConnectError:
+            return False
+
     # IAnkiClient interface implementation
 
     def check_connection(self) -> bool:
@@ -782,13 +1116,32 @@ class AnkiClient(IAnkiClient):
         )
 
     def close(self) -> None:
-        """Close HTTP session and cleanup resources."""
+        """Close HTTP sessions and cleanup resources."""
         if hasattr(self, "session") and self.session:
             try:
                 self.session.close()
-                logger.debug("anki_client_closed", url=self.url)
+                logger.debug("anki_sync_client_closed", url=self.url)
             except Exception as e:
-                logger.warning("anki_client_cleanup_failed", url=self.url, error=str(e))
+                logger.warning(
+                    "anki_sync_client_cleanup_failed", url=self.url, error=str(e)
+                )
+
+        if hasattr(self, "_async_client") and self._async_client:
+            try:
+                # Run async cleanup in event loop
+                self._async_runner.run(self._async_client.aclose())
+                logger.debug("anki_async_client_closed", url=self.url)
+            except Exception as e:
+                logger.warning(
+                    "anki_async_client_cleanup_failed", url=self.url, error=str(e)
+                )
+
+    async def aclose(self) -> None:
+        """Async cleanup for async contexts."""
+        if hasattr(self, "_async_client") and self._async_client:
+            await self._async_client.aclose()
+        if hasattr(self, "session") and self.session:
+            self.session.close()
 
     def __enter__(self) -> "AnkiClient":
         """Context manager entry."""
@@ -804,7 +1157,23 @@ class AnkiClient(IAnkiClient):
         self.close()
         return False
 
+    async def __aenter__(self) -> "AnkiClient":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Literal[False]:
+        """Async context manager exit with cleanup."""
+        await self.aclose()
+        return False
+
     def __del__(self) -> None:
         """Cleanup on deletion."""
         with contextlib.suppress(Exception):
-            self.close()
+            # Only close sync client in __del__ to avoid issues with event loop
+            if hasattr(self, "session") and self.session:
+                self.session.close()

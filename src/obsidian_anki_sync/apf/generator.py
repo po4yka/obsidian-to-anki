@@ -54,6 +54,29 @@ class APFGenerator:
             logger.warning("cards_prompt_not_found", path=str(prompt_path))
             self.system_prompt = "Generate APF cards following strict APF format."
 
+    def _get_generator_model(self) -> str:
+        """Resolve the generator model using config overrides with fallbacks."""
+        model_name = getattr(self.config, "generator_model", "") or ""
+        if model_name:
+            return model_name
+
+        resolve_model = getattr(self.config, "get_model_for_agent", None)
+        if callable(resolve_model):
+            resolved = resolve_model("generator")
+            if resolved:
+                return resolved
+
+        legacy = getattr(self.config, "openrouter_model", "") or ""
+        if legacy:
+            return legacy
+
+        default_model = getattr(self.config, "default_llm_model", "") or ""
+        if default_model:
+            return default_model
+
+        msg = "No generator model configured for APF generation"
+        raise ValueError(msg)
+
     @retry(
         max_attempts=3,
         initial_delay=2.0,
@@ -102,15 +125,16 @@ class APFGenerator:
         # Generation loop with validation retries
         for attempt in range(1 + self.MAX_VALIDATION_RETRIES):
             # Call LLM
+            model_name = self._get_generator_model()
             logger.debug(
                 "calling_llm",
-                model=self.config.openrouter_model,
+                model=model_name,
                 temp=self.config.llm_temperature,
                 slug=manifest.slug,
                 attempt=attempt + 1,
             )
 
-            apf_html = self._invoke_llm(messages, manifest)
+            apf_html = self._invoke_llm(messages, manifest, model_name)
 
             # Normalize Markdown code fences (if any) into HTML blocks
             default_lang = self._code_language_hint(metadata)
@@ -267,25 +291,27 @@ class APFGenerator:
         user_prompt = self._build_batch_prompt(
             qa_pairs, metadata, manifests, lang)
 
+        model_name = self._get_generator_model()
         logger.debug(
             "calling_llm_batch",
-            model=self.config.openrouter_model,
+            model=model_name,
             temp=self.config.llm_temperature,
             card_count=len(qa_pairs),
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.openrouter_model,
+            result = self.provider.generate(
+                model=model_name,
+                prompt=user_prompt,
+                system=self.system_prompt,
                 temperature=self.config.llm_temperature,
-                top_p=self.config.llm_top_p,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                stream=False,
+                reasoning_enabled=self.config.llm_reasoning_enabled,
+                reasoning_effort=self.config.get_reasoning_effort(
+                    "generation"),
             )
 
-            apf_html_batch = response.choices[0].message.content
+            apf_html_batch = result.get("response")
 
             if not apf_html_batch:
                 msg = "LLM returned empty response"
@@ -425,7 +451,7 @@ Requirements:
         return cards
 
     def _invoke_llm(
-        self, messages: list[dict[str, str]], manifest: Manifest
+        self, messages: list[dict[str, str]], manifest: Manifest, model: str
     ) -> str:
         """Call OpenRouter (streaming if enabled) and return HTML."""
         stream_enabled = self.config.llm_streaming_enabled
@@ -449,7 +475,7 @@ Requirements:
             )
 
         result = self.provider.generate(
-            model=self.config.openrouter_model,
+            model=model,
             prompt=conversation_prompt,
             system=system_prompt,
             temperature=self.config.llm_temperature,
@@ -466,7 +492,7 @@ Requirements:
             return self._consume_stream(
                 stream=stream,
                 slug=manifest.slug,
-                model=self.config.openrouter_model,
+                model=model,
             )
 
         apf_html = result.get("response")

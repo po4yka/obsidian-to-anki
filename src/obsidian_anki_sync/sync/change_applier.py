@@ -181,6 +181,9 @@ class ChangeApplier:
     def create_card(self, card: Card) -> None:
         """Create card in Anki with atomic transaction.
 
+        The transaction ensures atomicity: if verification fails after adding
+        to Anki, the note is rolled back (deleted from Anki).
+
         Args:
             card: Card to create
         """
@@ -203,7 +206,12 @@ class ChangeApplier:
                 # Register rollback action
                 txn.rollback_actions.append(("delete_anki_note", note_id))
 
-                # Step 2: Save to database
+                # Step 2: Verify card exists in Anki BEFORE committing
+                # This ensures atomicity - if verification fails, we roll back
+                if getattr(self.config, "verify_card_creation", True):
+                    self._verify_card_exists(card, note_id, fields, card.tags)
+
+                # Step 3: Save to database (only after verification succeeds)
                 self.db.insert_card_extended(
                     card=card,
                     anki_guid=note_id,
@@ -219,10 +227,6 @@ class ChangeApplier:
                     "card_created_successfully", slug=card.slug, anki_guid=note_id
                 )
 
-                # Verify card creation if enabled
-                if getattr(self.config, "verify_card_creation", True):
-                    self.verify_creation(card, note_id, fields, card.tags)
-
         except AnkiConnectError as e:
             logger.error("anki_create_failed", slug=card.slug, error=str(e))
             self.db.update_card_status(card.slug, "failed", str(e))
@@ -236,6 +240,9 @@ class ChangeApplier:
 
     def update_card(self, card: Card, anki_guid: int) -> None:
         """Update card in Anki with atomic transaction.
+
+        The transaction ensures atomicity: if verification fails after updating
+        in Anki, the note fields/tags are rolled back to their previous state.
 
         Args:
             card: Card to update
@@ -252,7 +259,7 @@ class ChangeApplier:
                 current_info = self.anki.notes_info([anki_guid])
                 old_fields = {}
                 old_tags = []
-                if current_info:
+                if current_info and current_info[0]:
                     old_fields = current_info[0].get("fields", {})
                     old_tags = current_info[0].get("tags", [])
 
@@ -261,12 +268,16 @@ class ChangeApplier:
                 self.anki.update_note_tags(anki_guid, card.tags)
 
                 # Register rollback
-                if current_info:
+                if current_info and current_info[0]:
                     txn.rollback_actions.append(
                         ("restore_anki_note", anki_guid, old_fields, old_tags)
                     )
 
-                # Step 2: Update database
+                # Step 2: Verify update was applied BEFORE committing
+                if getattr(self.config, "verify_card_creation", True):
+                    self._verify_update_applied(card, anki_guid)
+
+                # Step 3: Update database (only after verification succeeds)
                 self.db.update_card_extended(
                     card=card, fields=fields, tags=card.tags, apf_html=card.apf_html
                 )
@@ -438,16 +449,49 @@ class ChangeApplier:
                                 card.slug, "failed", "Anki batch create returned None"
                             )
 
-                    # Batch insert into database
-                    if successful_cards:
+                    # Verify cards exist in Anki BEFORE committing
+                    # This ensures atomicity - if any verification fails, we roll back all
+                    verified_cards = []
+                    if getattr(self.config, "verify_card_creation", True):
+                        for card, note_id, fields, tags, apf_html in successful_cards:
+                            try:
+                                self._verify_card_exists(card, note_id, fields, tags)
+                                verified_cards.append(
+                                    (card, note_id, fields, tags, apf_html)
+                                )
+                            except CardOperationError as verify_error:
+                                # Verification failed - remove from rollback and mark as failed
+                                logger.error(
+                                    "batch_verify_failed",
+                                    slug=card.slug,
+                                    note_id=note_id,
+                                    error=str(verify_error),
+                                )
+                                self.stats["errors"] = self.stats.get("errors", 0) + 1
+                                if self.progress:
+                                    self.progress.increment_stat("errors")
+                                self.db.update_card_status(
+                                    card.slug, "failed", str(verify_error)
+                                )
+                                # Remove from rollback actions since card doesn't exist
+                                txn.rollback_actions = [
+                                    action
+                                    for action in txn.rollback_actions
+                                    if action[1] != note_id
+                                ]
+                    else:
+                        verified_cards = successful_cards
+
+                    # Batch insert into database (only verified cards)
+                    if verified_cards:
                         self.db.insert_cards_batch(
-                            successful_cards, self.config.anki_deck_name
+                            verified_cards, self.config.anki_deck_name
                         )
 
                     txn.commit()
 
                     # Update stats
-                    created_count = len(successful_cards)
+                    created_count = len(verified_cards)
                     self.stats["created"] = self.stats.get("created", 0) + created_count
                     if self.progress:
                         for _ in range(created_count):
@@ -460,11 +504,6 @@ class ChangeApplier:
                         successful=created_count,
                         failed=len(batch_actions) - created_count,
                     )
-
-                    # Verify card creation if enabled
-                    if getattr(self.config, "verify_card_creation", True):
-                        for card, note_id, fields, tags, _ in successful_cards:
-                            self.verify_creation(card, note_id, fields, tags)
 
             except AnkiConnectError as e:
                 logger.error(
@@ -814,6 +853,148 @@ class ChangeApplier:
                             slug=slug,
                             error=str(db_error),
                         )
+
+    def _verify_card_exists(
+        self,
+        card: Card,
+        note_id: int,
+        expected_fields: dict[str, str],
+        expected_tags: list[str],
+    ) -> None:
+        """Verify card exists in Anki (for use inside transactions).
+
+        This method is used inside CardTransaction to verify the card
+        was created successfully BEFORE committing. Unlike verify_creation(),
+        this method always raises an exception on failure to trigger rollback.
+
+        Args:
+            card: Card object that was created
+            note_id: Anki note ID returned from creation
+            expected_fields: Expected field values
+            expected_tags: Expected tags
+
+        Raises:
+            CardOperationError: If card not found or verification fails
+        """
+        try:
+            notes_info = self.anki.notes_info([note_id])
+            if not notes_info or notes_info[0] is None:
+                msg = (
+                    f"Card {card.slug} (note_id={note_id}) not found in Anki "
+                    f"immediately after creation"
+                )
+                logger.error(
+                    "atomic_verification_failed_not_found",
+                    slug=card.slug,
+                    note_id=note_id,
+                )
+                raise CardOperationError(msg)
+
+            note_info = notes_info[0]
+
+            # Verify note ID matches
+            if note_info.get("noteId") != note_id:
+                msg = (
+                    f"Card {card.slug} verification failed: note ID mismatch "
+                    f"(expected {note_id}, got {note_info.get('noteId')})"
+                )
+                logger.error(
+                    "atomic_verification_failed_id_mismatch",
+                    slug=card.slug,
+                    expected_note_id=note_id,
+                    actual_note_id=note_info.get("noteId"),
+                )
+                raise CardOperationError(msg)
+
+            # Log successful verification
+            logger.debug(
+                "atomic_verification_succeeded",
+                slug=card.slug,
+                note_id=note_id,
+            )
+
+        except CardOperationError:
+            # Re-raise to trigger transaction rollback
+            raise
+        except AnkiConnectError as e:
+            # Network/API error - fail safe by raising
+            msg = f"Card {card.slug} verification failed due to Anki error: {e}"
+            logger.error(
+                "atomic_verification_failed_anki_error",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            raise CardOperationError(msg) from e
+        except Exception as e:
+            # Unexpected error - fail safe by raising
+            msg = f"Card {card.slug} verification failed unexpectedly: {e}"
+            logger.error(
+                "atomic_verification_failed_unexpected",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            raise CardOperationError(msg) from e
+
+    def _verify_update_applied(self, card: Card, note_id: int) -> None:
+        """Verify update was applied in Anki (for use inside transactions).
+
+        This method is used inside CardTransaction to verify the update
+        was applied successfully BEFORE committing. Raises an exception
+        on failure to trigger rollback.
+
+        Args:
+            card: Card object that was updated
+            note_id: Anki note ID
+
+        Raises:
+            CardOperationError: If note not found or verification fails
+        """
+        try:
+            notes_info = self.anki.notes_info([note_id])
+            if not notes_info or notes_info[0] is None:
+                msg = (
+                    f"Card {card.slug} (note_id={note_id}) not found in Anki "
+                    f"after update"
+                )
+                logger.error(
+                    "atomic_update_verification_failed_not_found",
+                    slug=card.slug,
+                    note_id=note_id,
+                )
+                raise CardOperationError(msg)
+
+            # Log successful verification
+            logger.debug(
+                "atomic_update_verification_succeeded",
+                slug=card.slug,
+                note_id=note_id,
+            )
+
+        except CardOperationError:
+            # Re-raise to trigger transaction rollback
+            raise
+        except AnkiConnectError as e:
+            # Network/API error - fail safe by raising
+            msg = f"Card {card.slug} update verification failed due to Anki error: {e}"
+            logger.error(
+                "atomic_update_verification_failed_anki_error",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            raise CardOperationError(msg) from e
+        except Exception as e:
+            # Unexpected error - fail safe by raising
+            msg = f"Card {card.slug} update verification failed unexpectedly: {e}"
+            logger.error(
+                "atomic_update_verification_failed_unexpected",
+                slug=card.slug,
+                note_id=note_id,
+                error=str(e),
+            )
+            raise CardOperationError(msg) from e
 
     def verify_creation(
         self,

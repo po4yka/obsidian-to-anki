@@ -170,8 +170,8 @@ class CardTransaction:
                     if verify:
                         try:
                             info = self.anki.notes_info([note_id])
-                            # If we get empty result or error, deletion succeeded
-                            action.verified = not info or info[0] is None
+                            # If we get empty result or first element is None, deletion succeeded
+                            action.verified = not info or (len(info) > 0 and info[0] is None)
                             if action.verified:
                                 report.verified += 1
                             else:
