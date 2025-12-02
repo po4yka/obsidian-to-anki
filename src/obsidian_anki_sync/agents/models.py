@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,9 +17,11 @@ class CardCorrection(BaseModel):
 
     model_config = ConfigDict(frozen=False)
 
-    card_index: int = Field(ge=1, description="1-based card index (first card is 1)")
+    card_index: int = Field(
+        default=1, ge=1, description="1-based card index (first card is 1)"
+    )
     field_name: str = Field(
-        min_length=1,
+        default="apf_html",
         max_length=50,
         description="Name of the field to correct (e.g., apf_html, slug, lang)",
     )
@@ -28,6 +30,7 @@ class CardCorrection(BaseModel):
         description="Current field value (optional, for context)",
     )
     suggested_value: str = Field(
+        default="",
         description="Suggested corrected value (use raw HTML, not entities)"
     )
     rationale: str = Field(
@@ -35,6 +38,34 @@ class CardCorrection(BaseModel):
         max_length=300,
         description="Reason for the correction (max 300 chars)",
     )
+
+    @field_validator("card_index", mode="before")
+    @classmethod
+    def _fix_card_index(cls, value: Any) -> int:
+        """Ensure card_index is at least 1."""
+        if value is None:
+            return 1
+        try:
+            idx = int(value)
+            return max(1, idx)
+        except (ValueError, TypeError):
+            return 1
+
+    @field_validator("field_name", mode="before")
+    @classmethod
+    def _fix_field_name(cls, value: Any) -> str:
+        """Ensure field_name is non-empty."""
+        if not value or (isinstance(value, str) and not value.strip()):
+            return "apf_html"
+        return str(value)[:50]
+
+    @field_validator("suggested_value", mode="before")
+    @classmethod
+    def _fix_suggested_value(cls, value: Any) -> str:
+        """Ensure suggested_value is a string."""
+        if value is None:
+            return ""
+        return str(value)
 
 
 class NoteMetadata(BaseModel):

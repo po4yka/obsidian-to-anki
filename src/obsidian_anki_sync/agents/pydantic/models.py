@@ -26,12 +26,32 @@ from obsidian_anki_sync.models import NoteMetadata, QAPair
 class CardIssue(BaseModel):
     """Issue found in a specific card during validation."""
 
-    card_index: int = Field(ge=1, description="1-based card index (first card is 1)")
+    card_index: int = Field(default=1, ge=1, description="1-based card index (first card is 1)")
     issue_description: str = Field(
-        min_length=1,
+        default="Unspecified issue",
         max_length=500,
         description="Description of the issue (max 500 chars)",
     )
+
+    @field_validator("card_index", mode="before")
+    @classmethod
+    def _fix_card_index(cls, value: Any) -> int:
+        """Ensure card_index is at least 1."""
+        if value is None:
+            return 1
+        try:
+            idx = int(value)
+            return max(1, idx)
+        except (ValueError, TypeError):
+            return 1
+
+    @field_validator("issue_description", mode="before")
+    @classmethod
+    def _fix_issue_description(cls, value: Any) -> str:
+        """Ensure issue_description is non-empty."""
+        if not value or (isinstance(value, str) and not value.strip()):
+            return "Unspecified issue"
+        return str(value)[:500]
 
 
 # =============================================================================
@@ -79,8 +99,9 @@ class CardGenerationOutput(BaseModel):
 class PostValidationOutput(BaseModel):
     """Structured output from post-validation agent."""
 
-    is_valid: bool = Field(description="Whether all cards pass validation")
+    is_valid: bool = Field(default=True, description="Whether all cards pass validation")
     error_type: str = Field(
+        default="none",
         description="Type of error: syntax, factual, semantic, template, or none"
     )
     error_details: str = Field(default="", description="Detailed validation errors")
@@ -94,6 +115,67 @@ class PostValidationOutput(BaseModel):
     confidence: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Confidence in validation result"
     )
+
+    @field_validator("is_valid", mode="before")
+    @classmethod
+    def _fix_is_valid(cls, value: Any) -> bool:
+        """Coerce is_valid to bool."""
+        if value is None:
+            return True
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "yes", "1", "valid", "pass", "passed")
+        return bool(value)
+
+    @field_validator("error_type", mode="before")
+    @classmethod
+    def _fix_error_type(cls, value: Any) -> str:
+        """Ensure error_type is a valid string."""
+        if not value or value is None:
+            return "none"
+        value_str = str(value).lower().strip()
+        # Map common variations to valid types
+        valid_types = {"syntax", "factual", "semantic", "template", "none"}
+        if value_str in valid_types:
+            return value_str
+        # Map common aliases
+        if value_str in ("no_error", "no error", "valid", "ok", "pass", "passed", ""):
+            return "none"
+        if value_str in ("format", "formatting", "html"):
+            return "syntax"
+        if value_str in ("accuracy", "incorrect", "wrong"):
+            return "factual"
+        if value_str in ("meaning", "logic", "understanding"):
+            return "semantic"
+        if value_str in ("structure", "apf", "layout"):
+            return "template"
+        # Default to none if unrecognized
+        return "none"
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _fix_confidence(cls, value: Any) -> float:
+        """Ensure confidence is a valid float between 0 and 1."""
+        if value is None:
+            return 0.5
+        try:
+            conf = float(value)
+            return max(0.0, min(1.0, conf))
+        except (ValueError, TypeError):
+            return 0.5
+
+    @model_validator(mode="after")
+    def _ensure_consistency(self) -> "PostValidationOutput":
+        """Ensure is_valid and error_type are consistent."""
+        if self.is_valid and self.error_type != "none":
+            # If valid, error_type should be none
+            object.__setattr__(self, "error_type", "none")
+        elif not self.is_valid and self.error_type == "none":
+            # If invalid but error_type is none, infer from issues
+            if self.card_issues or self.suggested_corrections:
+                object.__setattr__(self, "error_type", "template")
+        return self
 
 
 class MemorizationIssue(BaseModel):

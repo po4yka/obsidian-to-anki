@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 if TYPE_CHECKING:
     from .state_db import StateDB
@@ -80,6 +80,20 @@ class SyncProgress(BaseModel):
     errors: int = Field(default=0, ge=0)
     completed_at: datetime | None = None
     note_progress: dict[str, NoteProgress] = Field(default_factory=dict)
+
+    @field_validator("phase", mode="before")
+    @classmethod
+    def _ensure_phase_is_enum(cls, value: Any) -> SyncPhase:
+        """Ensure phase is converted to SyncPhase enum."""
+        if isinstance(value, SyncPhase):
+            return value
+        if isinstance(value, str):
+            try:
+                return SyncPhase(value)
+            except ValueError:
+                # Default to INITIALIZING for unknown values
+                return SyncPhase.INITIALIZING
+        return SyncPhase.INITIALIZING
 
     @computed_field  # type: ignore[prop-decorator]
     @property
