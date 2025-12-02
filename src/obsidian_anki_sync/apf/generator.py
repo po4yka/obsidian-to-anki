@@ -1,20 +1,29 @@
 """APF card generation via OpenRouter LLM."""
 
+import hashlib
 import html
 import json
 import re
+import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
-from openai import OpenAI
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import APFValidationError
 from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
+from obsidian_anki_sync.providers.openrouter import OpenRouterProvider
 from obsidian_anki_sync.utils.code_detection import detect_code_language_from_metadata
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.llm_logging import log_llm_stream_chunk
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.retry import retry
+
+if TYPE_CHECKING:
+    from obsidian_anki_sync.providers.openrouter.provider import (
+        OpenRouterStreamResult,
+    )
 
 logger = get_logger(__name__)
 
@@ -27,10 +36,15 @@ class APFGenerator:
     def __init__(self, config: Config):
         """Initialize the generator."""
         self.config = config
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
+        self.provider = OpenRouterProvider(
             api_key=config.openrouter_api_key,
+            base_url=config.openrouter_base_url,
+            site_url=config.openrouter_site_url,
+            site_name=config.openrouter_site_name,
+            timeout=config.llm_timeout,
+            max_tokens=config.llm_max_tokens,
         )
+        self._prompt_fingerprints: dict[str, int] = {}
 
         # Load CARDS_PROMPT template
         prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
@@ -76,7 +90,7 @@ class APFGenerator:
             question, answer, qa_pair, metadata, manifest, lang
         )
 
-        # Initial messages for conversation
+        # Conversation transcript (system + user, with optional feedback turns)
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": user_prompt},
@@ -96,27 +110,7 @@ class APFGenerator:
                 attempt=attempt + 1,
             )
 
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.config.openrouter_model,
-                    temperature=self.config.llm_temperature,
-                    top_p=self.config.llm_top_p,
-                    messages=messages,
-                )
-
-                apf_html = response.choices[0].message.content
-
-                if not apf_html:
-                    msg = "LLM returned empty response"
-                    raise ValueError(msg)
-
-                logger.debug(
-                    "llm_response_received", slug=manifest.slug, length=len(apf_html)
-                )
-
-            except Exception as e:
-                logger.error("llm_call_failed", slug=manifest.slug, error=str(e))
-                raise
+            apf_html = self._invoke_llm(messages, manifest)
 
             # Normalize Markdown code fences (if any) into HTML blocks
             default_lang = self._code_language_hint(metadata)
@@ -249,7 +243,8 @@ class APFGenerator:
             cards = []
             for qa_pair, manifest in zip(qa_pairs, manifests):
                 try:
-                    card = self.generate_card(qa_pair, metadata, manifest, lang)
+                    card = self.generate_card(
+                        qa_pair, metadata, manifest, lang)
                     cards.append(card)
                 except Exception as card_error:
                     logger.error(
@@ -269,7 +264,8 @@ class APFGenerator:
     ) -> list[Card]:
         """Generate multiple cards in a single LLM call."""
         # Build batch prompt
-        user_prompt = self._build_batch_prompt(qa_pairs, metadata, manifests, lang)
+        user_prompt = self._build_batch_prompt(
+            qa_pairs, metadata, manifests, lang)
 
         logger.debug(
             "calling_llm_batch",
@@ -381,7 +377,8 @@ Requirements:
                 card_html = card_html.strip()
 
                 # Normalize code blocks
-                card_html = self._normalize_code_blocks(card_html, default_lang)
+                card_html = self._normalize_code_blocks(
+                    card_html, default_lang)
 
                 # Compute content hash
                 content_hash = compute_content_hash(qa_pair, metadata, lang)
@@ -393,7 +390,8 @@ Requirements:
                 tags = self._extract_tags(metadata, lang)
 
                 # Ensure manifest is correct
-                card_html = self._ensure_manifest(card_html, manifest, tags, note_type)
+                card_html = self._ensure_manifest(
+                    card_html, manifest, tags, note_type)
 
                 cards.append(
                     Card(
@@ -425,6 +423,100 @@ Requirements:
             raise ValueError(msg)
 
         return cards
+
+    def _invoke_llm(
+        self, messages: list[dict[str, str]], manifest: Manifest
+    ) -> str:
+        """Call OpenRouter (streaming if enabled) and return HTML."""
+        stream_enabled = self.config.llm_streaming_enabled
+        system_prompt = (
+            messages[0]["content"]
+            if messages and messages[0]["role"] == "system"
+            else self.system_prompt
+        )
+        conversation_prompt = self._serialize_messages_for_prompt(messages[1:])
+        reasoning_effort = self.config.get_reasoning_effort("generation")
+
+        fingerprint, fingerprint_count = self._record_prompt_signature(
+            conversation_prompt
+        )
+        if fingerprint_count > 1:
+            logger.info(
+                "apf_prompt_cache_hit",
+                slug=manifest.slug,
+                fingerprint=fingerprint[:12],
+                seen=fingerprint_count,
+            )
+
+        result = self.provider.generate(
+            model=self.config.openrouter_model,
+            prompt=conversation_prompt,
+            system=system_prompt,
+            temperature=self.config.llm_temperature,
+            stream=stream_enabled,
+            reasoning_enabled=self.config.llm_reasoning_enabled,
+            reasoning_effort=reasoning_effort,
+        )
+
+        if stream_enabled:
+            stream = result.get("stream")
+            if stream is None:
+                msg = "Streaming was requested but provider returned no stream handle"
+                raise RuntimeError(msg)
+            return self._consume_stream(
+                stream=stream,
+                slug=manifest.slug,
+                model=self.config.openrouter_model,
+            )
+
+        apf_html = result.get("response")
+        if not apf_html:
+            msg = "OpenRouter returned empty response"
+            raise ValueError(msg)
+        return apf_html
+
+    def _consume_stream(
+        self,
+        stream: "OpenRouterStreamResult",
+        slug: str,
+        model: str,
+    ) -> str:
+        """Iterate over streaming chunks while logging telemetry."""
+        start_time = time.time()
+        for chunk_index, chunk in enumerate(stream, start=1):
+            elapsed = time.time() - start_time
+            chunk_text = chunk if isinstance(chunk, str) else str(chunk)
+            log_llm_stream_chunk(
+                model=model,
+                operation="apf_card_generation",
+                chunk_index=chunk_index,
+                elapsed_seconds=elapsed,
+                chunk_chars=len(chunk_text),
+                chunk_preview=chunk_text,
+                slug=slug,
+            )
+        return stream.collect()
+
+    @staticmethod
+    def _serialize_messages_for_prompt(
+        messages: list[dict[str, str]]
+    ) -> str:
+        """Flatten a chat transcript into a single string prompt."""
+        if not messages:
+            return ""
+        parts = []
+        for message in messages:
+            role = message.get("role", "user").upper()
+            content = message.get("content", "")
+            parts.append(f"{role}:\n{content}")
+        return "\n\n".join(parts)
+
+    def _record_prompt_signature(self, prompt: str) -> tuple[str, int]:
+        """Record prompt fingerprint to estimate cache hit potential."""
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        count = self._prompt_fingerprints.get(digest, 0) + 1
+        self._prompt_fingerprints[digest] = count
+        return digest, count
 
     def _build_user_prompt(
         self,
@@ -652,7 +744,7 @@ QUALITY RULES:
                 normalized_parts.append(apf_html[cursor:])
                 break
 
-            fence_content = apf_html[start + 3 : end]
+            fence_content = apf_html[start + 3: end]
             if "\n" in fence_content:
                 lang_spec, code_body = fence_content.split("\n", 1)
             else:

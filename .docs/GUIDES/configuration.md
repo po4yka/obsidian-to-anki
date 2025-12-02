@@ -7,10 +7,10 @@ vault_path: "~/Documents/ObsidianVault"
 source_dir: "Notes"
 anki_deck_name: "My Deck"
 
-llm_provider: "openrouter"  # or "ollama", "openai", "anthropic"
+llm_provider: "openrouter" # or "ollama", "openai", "anthropic"
 openrouter_api_key: "${OPENROUTER_API_KEY}"
 
-model_preset: "balanced"  # cost_effective|balanced|high_quality|fast
+model_preset: "balanced" # cost_effective|balanced|high_quality|fast
 use_langgraph: true
 use_pydantic_ai: true
 ```
@@ -26,16 +26,17 @@ export OLLAMA_BASE_URL="http://localhost:11434"
 
 ## Model Presets
 
-| Preset | Pre-validator | Generator | Post-validator | Best For |
-|--------|---------------|-----------|----------------|----------|
-| `cost_effective` | gpt-4o-mini | claude-3-5-sonnet | gpt-4o-mini | Budget, high volume |
-| `balanced` | gpt-4o-mini | claude-3-5-sonnet | gpt-4o | Quality + cost |
-| `high_quality` | gpt-4o | claude-3-5-sonnet | o1-preview | Maximum quality |
-| `fast` | gpt-4o-mini | gpt-4o-mini | gpt-4o-mini | Testing |
+| Preset           | Pre-validator | Generator         | Post-validator | Best For            |
+| ---------------- | ------------- | ----------------- | -------------- | ------------------- |
+| `cost_effective` | gpt-4o-mini   | claude-3-5-sonnet | gpt-4o-mini    | Budget, high volume |
+| `balanced`       | gpt-4o-mini   | claude-3-5-sonnet | gpt-4o         | Quality + cost      |
+| `high_quality`   | gpt-4o        | claude-3-5-sonnet | o1-preview     | Maximum quality     |
+| `fast`           | gpt-4o-mini   | gpt-4o-mini       | gpt-4o-mini    | Testing             |
 
 ## Provider Examples
 
 ### Ollama (Local)
+
 ```yaml
 llm_provider: "ollama"
 ollama_base_url: "http://localhost:11434"
@@ -43,13 +44,39 @@ generator_model: "qwen3:32b"
 ```
 
 ### OpenRouter (Cloud)
+
 ```yaml
 llm_provider: "openrouter"
 openrouter_api_key: "${OPENROUTER_API_KEY}"
 generator_model: "anthropic/claude-3-5-sonnet-20241022"
+openrouter_site_url: "https://yourapp.example.com" # Optional attribution
+openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 ```
 
+#### Notes (Current State)
+
+-   **API headers** – When `openrouter_site_url` / `openrouter_site_name` are set, the
+    provider automatically sends `HTTP-Referer` and `X-Title` so your app shows up in
+    OpenRouter rankings.
+-   **Structured outputs** – JSON Schema enforcement is attempted first. If a model returns
+    an empty completion, we transparently retry without `response_format` before surfacing an
+    error.
+-   **Streaming** – Enable SSE streaming by setting `llm_streaming_enabled: true`. The APF
+    generator and LangGraph agents log chunk progress via `log_llm_stream_chunk` while still
+    returning the final HTML/JSON output.
+-   **Reasoning effort** – Use `llm_reasoning_effort` (`auto|minimal|low|medium|high|none`)
+    to control OpenRouter’s `reasoning.effort` parameter. For per-agent tuning, set
+    `reasoning_effort_overrides` (e.g., `generation: "high"`).
+-   **Prompt caching telemetry** – Look for `apf_prompt_cache_hit` log entries to understand
+    when prompts repeat and could benefit from OpenRouter’s cache.
+-   **Reasoning controls** – Only Grok models toggle reasoning automatically today. New
+    provider/config knobs are being added to expose OpenRouter’s `reasoning.effort`
+    capability.
+-   **Preflight checks** – `obsidian-anki-sync check` currently validates `/models`. Credit
+    telemetry (`/key`) and prompt-cache reporting are part of the ongoing upgrade.
+
 ### OpenAI
+
 ```yaml
 llm_provider: "openai"
 openai_api_key: "${OPENAI_API_KEY}"
@@ -78,7 +105,7 @@ agent_config:
 ## Sync Settings
 
 ```yaml
-sync_mode: "incremental"  # incremental|full
+sync_mode: "incremental" # incremental|full
 dry_run: false
 max_concurrent_requests: 5
 batch_size: 50
@@ -110,7 +137,7 @@ performance:
 
 ```yaml
 logging:
-    level: "INFO"  # DEBUG|INFO|WARNING|ERROR
+    level: "INFO" # DEBUG|INFO|WARNING|ERROR
     file: "logs/sync.log"
 ```
 

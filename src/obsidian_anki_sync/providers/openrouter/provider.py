@@ -39,6 +39,137 @@ from .token_calculator import (
 logger = get_logger(__name__)
 
 
+class OpenRouterStreamResult:
+    """Iterator that streams OpenRouter completions as they arrive."""
+
+    def __init__(
+        self,
+        client: httpx.Client,
+        url: str,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+        model: str,
+        request_start_time: float,
+        operation: str,
+        had_json_schema: bool,
+    ):
+        self._client = client
+        self._url = url
+        self._payload = payload
+        self._headers = headers
+        self.model = model
+        self._request_start_time = request_start_time
+        self._operation = operation
+        self._had_json_schema = had_json_schema
+        self._consumed = False
+        self._response_parts: list[str] = []
+        self.response_text: str = ""
+        self.finish_reason: str = "stop"
+        self.usage: dict[str, Any] = {}
+        self._context_window = MODEL_CONTEXT_WINDOWS.get(
+            model, DEFAULT_CONTEXT_WINDOW)
+
+    def __iter__(self):
+        if self._consumed:
+            msg = "Streaming result already consumed"
+            raise RuntimeError(msg)
+
+        self._consumed = True
+        try:
+            with self._client.stream(
+                "POST",
+                self._url,
+                json=self._payload,
+                headers=self._headers,
+            ) as response:
+                response.raise_for_status()
+
+                for raw_line in response.iter_lines():
+                    if not raw_line:
+                        continue
+
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+
+                    data_str = line[5:].strip()
+                    if not data_str:
+                        continue
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        chunk = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        logger.debug(
+                            "openrouter_stream_chunk_parse_failed",
+                            model=self.model,
+                            data_preview=data_str[:200],
+                        )
+                        continue
+
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+
+                    delta = choices[0].get("delta") or {}
+                    piece = delta.get("content") or ""
+                    if piece:
+                        self._response_parts.append(piece)
+                        yield piece
+
+                    finish_reason = choices[0].get("finish_reason")
+                    if finish_reason:
+                        self.finish_reason = finish_reason
+
+                    usage_data = chunk.get("usage")
+                    if usage_data:
+                        self.usage = usage_data
+
+        except Exception as exc:
+            log_llm_error(
+                model=self.model,
+                operation=self._operation,
+                start_time=self._request_start_time,
+                error=exc,
+                retryable=False,
+            )
+            raise
+        finally:
+            self.response_text = "".join(self._response_parts)
+
+            prompt_tokens = self.usage.get("prompt_tokens", 0)
+            completion_tokens = self.usage.get(
+                "completion_tokens", max(len(self.response_text) // 4, 0)
+            )
+            total_tokens = self.usage.get(
+                "total_tokens", prompt_tokens + completion_tokens
+            )
+
+            log_llm_success(
+                model=self.model,
+                operation=self._operation,
+                start_time=self._request_start_time,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                response_length=len(self.response_text),
+                finish_reason=self.finish_reason,
+                context_window=self._context_window,
+                estimate_cost_flag=True,
+                had_json_schema=self._had_json_schema,
+            )
+
+    def collect(self) -> str:
+        """Consume the stream (if needed) and return the final response."""
+        if not self._consumed:
+            for _ in self:
+                pass
+        return self.response_text
+
+
 class OpenRouterProvider(BaseLLMProvider):
     """OpenRouter LLM provider using OpenAI-compatible API.
 
@@ -134,7 +265,8 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -162,7 +294,8 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=5, max_connections=10),
                 headers=self._headers,
             )
         return self._async_client
@@ -263,11 +396,23 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success", model_count=len(models))
+            logger.info("openrouter_list_models_success",
+                        model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
             return []
+
+    def fetch_key_status(self) -> dict[str, Any] | None:
+        """Fetch account metadata (credits/rate limits) from OpenRouter."""
+        try:
+            response = self.client.get(
+                f"{self.base_url}/key", headers=self._headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception as exc:  # noqa: BLE001 - diagnostics only
+            logger.debug("openrouter_key_probe_failed", error=str(exc))
+            return None
 
     def generate(
         self,
@@ -279,6 +424,7 @@ class OpenRouterProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate completion from OpenRouter.
 
@@ -291,6 +437,7 @@ class OpenRouterProvider(BaseLLMProvider):
             json_schema: JSON schema for structured output
             stream: Enable streaming (not implemented)
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort (auto|minimal|low|medium|high|none)
 
         Returns:
             Response dictionary
@@ -299,15 +446,12 @@ class OpenRouterProvider(BaseLLMProvider):
             NotImplementedError: If streaming is requested
             httpx.HTTPError: If request fails after retries
         """
-        if stream:
-            msg = "Streaming is not yet supported"
-            raise NotImplementedError(msg)
-
         # Build messages
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -342,6 +486,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 json_schema=None,  # Skip response_format
                 format=format,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
+                stream=stream,
             )
         else:
             payload = build_payload(
@@ -352,6 +498,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 json_schema=json_schema,
                 format=format,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
+                stream=stream,
             )
 
         # Start request timing
@@ -367,6 +515,25 @@ class OpenRouterProvider(BaseLLMProvider):
             format=format,
             schema_name=json_schema.get("name") if json_schema else None,
         )
+
+        if stream:
+            stream_result = OpenRouterStreamResult(
+                client=self.client,
+                url=f"{self.base_url}/chat/completions",
+                payload=payload,
+                headers=self._headers,
+                model=model,
+                request_start_time=request_start_time,
+                operation="openrouter_generate_stream",
+                had_json_schema=bool(json_schema),
+            )
+            return {
+                "response": "",
+                "model": model,
+                "finish_reason": None,
+                "usage": {},
+                "stream": stream_result,
+            }
 
         # Retry logic for HTTP errors
         response = self._execute_with_retry(
@@ -389,6 +556,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     json_schema=json_schema,
                     stream=stream,
                     reasoning_enabled=reasoning_enabled,
+                    reasoning_effort=reasoning_effort,
                     request_start_time=request_start_time,
                     effective_max_tokens=effective_max_tokens,
                     payload=payload,
@@ -586,6 +754,7 @@ class OpenRouterProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None,
         stream: bool,
         reasoning_enabled: bool,
+        reasoning_effort: str | None,
         request_start_time: float,
         effective_max_tokens: int,
         payload: dict[str, Any],
@@ -602,7 +771,8 @@ class OpenRouterProvider(BaseLLMProvider):
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
-            completion = self._extract_completion(message, model, result, json_schema)
+            completion = self._extract_completion(
+                message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -616,7 +786,8 @@ class OpenRouterProvider(BaseLLMProvider):
             finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(
+                model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -665,6 +836,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 json_schema=json_schema,
                 stream=stream,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
                 request_start_time=request_start_time,
             )
             if fallback_result is not None:
@@ -712,7 +884,8 @@ class OpenRouterProvider(BaseLLMProvider):
             elif message.get("refusal"):
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get("finish_reason", "unknown")
+                finish_reason = result["choices"][0].get(
+                    "finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -811,6 +984,7 @@ class OpenRouterProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None,
         stream: bool,
         reasoning_enabled: bool,
+        reasoning_effort: str | None,
         request_start_time: float,
     ) -> dict[str, Any] | None:
         """Handle HTTP errors with fallback logic."""
@@ -855,6 +1029,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     json_schema=json_schema,
                     stream=stream,
                     reasoning_enabled=True,  # Enable reasoning for fallback
+                    reasoning_effort=reasoning_effort,
                 )
                 return result
             except Exception as retry_error:
@@ -884,6 +1059,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     json_schema=None,
                     stream=stream,
                     reasoning_enabled=reasoning_enabled,
+                    reasoning_effort=reasoning_effort,
                 )
                 return fallback_result
             except Exception:
@@ -900,6 +1076,7 @@ class OpenRouterProvider(BaseLLMProvider):
         temperature: float = 0.7,
         json_schema: dict[str, Any] | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from OpenRouter.
 
@@ -927,6 +1104,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 format="json" if not json_schema else "",
                 json_schema=json_schema,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
             )
         except ValueError as e:
             # Enhanced fallback for Grok models: try with reasoning enabled first
@@ -950,6 +1128,7 @@ class OpenRouterProvider(BaseLLMProvider):
                         format="",  # Use schema-based format
                         json_schema=json_schema,
                         reasoning_enabled=True,  # Enable reasoning for fallback
+                        reasoning_effort=reasoning_effort,
                     )
                     # Check if reasoning fallback also returned empty
                     response_text = result.get("response", "")
@@ -979,6 +1158,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     format="json",  # Use json_object format instead
                     json_schema=None,  # No schema
                     reasoning_enabled=reasoning_enabled,
+                    reasoning_effort=reasoning_effort,
                 )
                 # Check if fallback also returned empty
                 response_text = result.get("response", "")
@@ -1023,6 +1203,7 @@ class OpenRouterProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a completion asynchronously.
 
@@ -1046,7 +1227,8 @@ class OpenRouterProvider(BaseLLMProvider):
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
+            prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -1066,6 +1248,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 json_schema=None,
                 format=format,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
+                stream=stream,
             )
         else:
             payload = build_payload(
@@ -1076,6 +1260,8 @@ class OpenRouterProvider(BaseLLMProvider):
                 json_schema=json_schema,
                 format=format,
                 reasoning_enabled=reasoning_enabled,
+                reasoning_effort=reasoning_effort,
+                stream=stream,
             )
 
         request_start_time = log_llm_request(

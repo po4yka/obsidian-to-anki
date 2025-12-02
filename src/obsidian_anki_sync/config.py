@@ -13,6 +13,7 @@ from .utils.path_validator import (
     validate_source_dir,
     validate_vault_path,
 )
+from .utils.reasoning import normalize_reasoning_effort
 
 # =============================================================================
 # Nested Configuration Models
@@ -69,7 +70,8 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path(), description="Source directory within vault"
     )
@@ -131,7 +133,8 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -148,7 +151,8 @@ class Config(BaseSettings):
     )
 
     # Runtime settings
-    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -258,8 +262,39 @@ class Config(BaseSettings):
     llm_timeout: float = 3600.0  # 60 minutes default for large models
     # Reasonable default - models have output token limits separate from context window
     llm_max_tokens: int = 8192
+    llm_streaming_enabled: bool = Field(
+        default=False,
+        description="Enable SSE streaming for providers that support it",
+    )
     # Enable reasoning mode for models that support it (e.g., DeepSeek)
     llm_reasoning_enabled: bool = False
+    llm_reasoning_effort: str = Field(
+        default="auto",
+        description=(
+            "Reasoning effort for providers that support it "
+            "(auto|minimal|low|medium|high|none)"
+        ),
+    )
+    reasoning_effort_overrides: dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-agent reasoning effort overrides (e.g., {'generation': 'high'})",
+    )
+
+    @field_validator("llm_reasoning_effort", mode="before")
+    @classmethod
+    def _normalize_llm_reasoning_effort(cls, value: str | None) -> str:
+        return normalize_reasoning_effort(value)
+
+    @field_validator("reasoning_effort_overrides", mode="before")
+    @classmethod
+    def _normalize_reasoning_effort_overrides(
+        cls, value: dict[str, str] | None
+    ) -> dict[str, str]:
+        if not value:
+            return {}
+        return {
+            k.lower(): normalize_reasoning_effort(v) for k, v in value.items()
+        }
 
     # Ollama provider settings (local or cloud)
     ollama_base_url: str = "http://localhost:11434"
@@ -926,7 +961,8 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
+        config = get_model_config(
+            model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -940,7 +976,52 @@ class Config(BaseSettings):
             "max_tokens": config.max_tokens or self.llm_max_tokens,
             "top_p": config.top_p or self.llm_top_p,
             "reasoning_enabled": config.reasoning_enabled or self.llm_reasoning_enabled,
+            "reasoning_effort": self._resolve_reasoning_effort(
+                task, config.reasoning_effort
+            ),
         }
+
+    def _resolve_reasoning_effort(
+        self, task: str | None, model_effort: str | None = None
+    ) -> str:
+        """Resolve reasoning effort precedence: overrides -> model config -> global."""
+        if task:
+            key = task.lower()
+            if key in self.reasoning_effort_overrides:
+                return self.reasoning_effort_overrides[key]
+
+        if model_effort:
+            return normalize_reasoning_effort(model_effort)
+
+        return self.llm_reasoning_effort
+
+    def get_reasoning_effort(self, agent_type: str | None = None) -> str:
+        """Get reasoning effort for an agent or task."""
+        if not agent_type:
+            return self.llm_reasoning_effort
+
+        key = agent_type.lower()
+        if key in self.reasoning_effort_overrides:
+            return self.reasoning_effort_overrides[key]
+
+        agent_to_task = {
+            "pre_validator": "pre_validation",
+            "post_validator": "post_validation",
+            "qa_extractor": "qa_extraction",
+            "context_enrichment": "context_enrichment",
+            "memorization_quality": "memorization_quality",
+            "card_splitting": "card_splitting",
+            "split_validator": "card_splitting",
+            "duplicate_detection": "duplicate_detection",
+            "parser_repair": "parser_repair",
+            "note_correction": "parser_repair",
+            "highlight": "pre_validation",
+            "reasoning": "generation",
+            "reflection": "post_validation",
+        }
+
+        task_key = agent_to_task.get(key, key)
+        return self.reasoning_effort_overrides.get(task_key, self.llm_reasoning_effort)
 
     @model_validator(mode="after")
     def validate_config(self) -> "Config":
@@ -957,7 +1038,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -1198,7 +1280,8 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_searching", source="environment_variable", path=env_path
             )
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
         logger.debug(
             "config_searching",
@@ -1210,7 +1293,8 @@ def load_config(config_path: Path | None = None) -> Config:
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
-            logger.info("config_file_found", config_path=str(resolved_config_path))
+            logger.info("config_file_found",
+                        config_path=str(resolved_config_path))
             break
 
     if not resolved_config_path:
@@ -1313,7 +1397,8 @@ def load_config(config_path: Path | None = None) -> Config:
             config = Config(**config_kwargs)
             logger.info(
                 "config_loaded",
-                vault_path=str(config.vault_path) if config.vault_path else None,
+                vault_path=str(
+                    config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
                 use_agents=getattr(config, "use_agents", False),
                 use_langgraph=getattr(config, "use_langgraph", False),
@@ -1323,7 +1408,8 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_validation_error",
                 error=str(e),
                 error_type=type(e).__name__,
-                config_path=str(resolved_config_path) if resolved_config_path else None,
+                config_path=str(
+                    resolved_config_path) if resolved_config_path else None,
             )
             raise
 

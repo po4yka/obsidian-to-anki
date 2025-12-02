@@ -6,26 +6,27 @@ The sync system manages changes between Obsidian notes and Anki cards, balancing
 
 ## Change Types & Actions
 
-| Change Type      | Risk   | Auto-Approve | Action               |
-| ---------------- | ------ | ------------ | -------------------- |
-| Typo fix         | Low    | Yes          | Apply                |
-| Clarification    | Low    | Yes          | Apply                |
-| Rephrasing       | Medium | No           | Review               |
-| Content addition | Medium | No           | Review               |
-| Meaning change   | High   | No           | Manual review        |
-| Complete rewrite | High   | No           | Manual or new card   |
-| Conflict         | High   | No           | Resolution strategy  |
+| Change Type      | Risk   | Auto-Approve | Action              |
+| ---------------- | ------ | ------------ | ------------------- |
+| Typo fix         | Low    | Yes          | Apply               |
+| Clarification    | Low    | Yes          | Apply               |
+| Rephrasing       | Medium | No           | Review              |
+| Content addition | Medium | No           | Review              |
+| Meaning change   | High   | No           | Manual review       |
+| Complete rewrite | High   | No           | Manual or new card  |
+| Conflict         | High   | No           | Resolution strategy |
 
 ## Conflict Resolution
 
 **Detection**: Card modified in both Obsidian and Anki since last sync.
 
 **Strategies**:
-- `obsidian_wins` - Obsidian is source of truth
-- `anki_wins` - Preserve manual Anki edits
-- `manual` - User decides (default)
-- `merge` - LLM-assisted merge
-- `newest_wins` - Most recent version
+
+-   `obsidian_wins` - Obsidian is source of truth
+-   `anki_wins` - Preserve manual Anki edits
+-   `manual` - User decides (default)
+-   `merge` - LLM-assisted merge
+-   `newest_wins` - Most recent version
 
 ## Configuration
 
@@ -56,6 +57,7 @@ ARCHIVER_FD_POLL_INTERVAL=0.05  # Backoff interval (sec)
 ```
 
 For constrained environments (~128 descriptors):
+
 ```bash
 ARCHIVER_BATCH_SIZE=16
 ARCHIVER_MIN_FD_HEADROOM=8
@@ -77,6 +79,15 @@ obsidian-anki-sync history --note-id 123
 obsidian-anki-sync rollback --note-id 123
 obsidian-anki-sync rollback --all --since "1 hour ago"
 ```
+
+## Progress Visibility
+
+-   `obsidian-anki-sync sync` now shows a live Rich panel with the current phase,
+    session ID, processed/total items, card deltas, and elapsed time. It reflects
+    incremental/queue/LangGraph modes so you can see which features are active.
+-   Use `obsidian-anki-sync progress` for a historical view of recent sessions or
+    to resume incomplete runs. The progress reporter writes the same session IDs
+    shown in the live UI, making it easy to correlate with database checkpoints.
 
 ## Best Practices
 

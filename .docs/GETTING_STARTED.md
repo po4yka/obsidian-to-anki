@@ -128,7 +128,8 @@ obsidian-anki-sync sync --dry-run
 
 -   **Update configuration**: Edit `config.yaml` and re-run sync
 -   **Add new notes**: Just add Q&A notes to your Obsidian vault
--   **Monitor sync progress**: Check the logs in `.logs/sync.log`
+-   **Monitor sync progress**: Watch the live Rich panel during `obsidian-anki-sync sync`
+    or run `obsidian-anki-sync progress` to inspect recent sessions
 -   **Backup Anki**: Regular backups before major syncs
 
 ## Having Issues?

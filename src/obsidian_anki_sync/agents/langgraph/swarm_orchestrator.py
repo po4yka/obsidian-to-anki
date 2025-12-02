@@ -107,25 +107,33 @@ class LangGraphSwarmOrchestrator:
                 console=console,
                 transient=True,
             ) as progress:
-                task = progress.add_task("Initializing agent models...", total=5)
+                task = progress.add_task(
+                    "Initializing agent models...", total=5)
 
                 # Create models with reduced logging verbosity
                 pre_val_model = PydanticAIModelFactory.create_from_config(
                     self.config,
-                    model_name=self.config.get_model_for_agent("pre_validator"),
+                    model_name=self.config.get_model_for_agent(
+                        "pre_validator"),
+                    agent_type="pre_validator",
                 )
                 progress.update(
                     task, advance=1, description="Pre-validator model ready"
                 )
 
                 gen_model = PydanticAIModelFactory.create_from_config(
-                    self.config, model_name=self.config.get_model_for_agent("generator")
+                    self.config,
+                    model_name=self.config.get_model_for_agent("generator"),
+                    agent_type="generator",
                 )
-                progress.update(task, advance=1, description="Generator model ready")
+                progress.update(task, advance=1,
+                                description="Generator model ready")
 
                 post_val_model = PydanticAIModelFactory.create_from_config(
                     self.config,
-                    model_name=self.config.get_model_for_agent("post_validator"),
+                    model_name=self.config.get_model_for_agent(
+                        "post_validator"),
+                    agent_type="post_validator",
                 )
                 progress.update(
                     task, advance=1, description="Post-validator model ready"
@@ -133,7 +141,9 @@ class LangGraphSwarmOrchestrator:
 
                 context_model = PydanticAIModelFactory.create_from_config(
                     self.config,
-                    model_name=self.config.get_model_for_agent("context_enrichment"),
+                    model_name=self.config.get_model_for_agent(
+                        "context_enrichment"),
+                    agent_type="context_enrichment",
                 )
                 progress.update(
                     task, advance=1, description="Context enrichment model ready"
@@ -141,7 +151,9 @@ class LangGraphSwarmOrchestrator:
 
                 quality_model = PydanticAIModelFactory.create_from_config(
                     self.config,
-                    model_name=self.config.get_model_for_agent("memorization_quality"),
+                    model_name=self.config.get_model_for_agent(
+                        "memorization_quality"),
+                    agent_type="memorization_quality",
                 )
                 progress.update(
                     task, advance=1, description="Quality assessment model ready"
@@ -154,35 +166,40 @@ class LangGraphSwarmOrchestrator:
         return {
             "pre_validator": AgentExpertise(
                 name="pre_validator",
-                expertise=["structure validation", "format checking", "note parsing"],
+                expertise=["structure validation",
+                           "format checking", "note parsing"],
                 handoff_agents=["generator"],
                 model=pre_val_model,
                 description="Validates note structure and format before processing",
             ),
             "generator": AgentExpertise(
                 name="generator",
-                expertise=["card generation", "APF format", "content creation"],
+                expertise=["card generation",
+                           "APF format", "content creation"],
                 handoff_agents=["post_validator", "context_enrichment"],
                 model=gen_model,
                 description="Creates Anki cards from note content",
             ),
             "post_validator": AgentExpertise(
                 name="post_validator",
-                expertise=["quality validation", "error detection", "correction"],
+                expertise=["quality validation",
+                           "error detection", "correction"],
                 handoff_agents=["generator", "context_enrichment"],
                 model=post_val_model,
                 description="Validates card quality and suggests improvements",
             ),
             "context_enrichment": AgentExpertise(
                 name="context_enrichment",
-                expertise=["examples", "mnemonics", "explanations", "enhancement"],
+                expertise=["examples", "mnemonics",
+                           "explanations", "enhancement"],
                 handoff_agents=["memorization_quality"],
                 model=context_model,
                 description="Enhances cards with examples and learning aids",
             ),
             "memorization_quality": AgentExpertise(
                 name="memorization_quality",
-                expertise=["SRS effectiveness", "learning theory", "cognitive load"],
+                expertise=["SRS effectiveness",
+                           "learning theory", "cognitive load"],
                 handoff_agents=[],  # Terminal agent
                 model=quality_model,
                 description="Evaluates cards for spaced repetition effectiveness",

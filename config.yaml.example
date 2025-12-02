@@ -136,6 +136,11 @@ llm_temperature: 0.2  # Creativity level (0.0-1.0)
 llm_top_p: 0.3  # Nucleus sampling
 llm_timeout: 900.0  # Request timeout (seconds)
 llm_max_tokens: 2048  # Maximum response length
+llm_streaming_enabled: false  # Enable SSE streaming for providers that support it
+llm_reasoning_enabled: false
+llm_reasoning_effort: "auto"  # auto|minimal|low|medium|high|none
+# reasoning_effort_overrides:
+#     generation: "high"
 
 # =============================================================================
 # Legacy Agent System (deprecated - use LangGraph instead)

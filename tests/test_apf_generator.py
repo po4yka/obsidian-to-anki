@@ -11,14 +11,19 @@ from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
 
 
 @pytest.fixture(autouse=True)
-def _patch_openai(monkeypatch):
-    """Prevent real OpenAI client instantiation."""
+def _patch_openrouter_provider(monkeypatch):
+    """Prevent real OpenRouterProvider instantiation."""
 
-    class DummyClient:
-        pass
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def generate(self, *args, **kwargs):
+            return {"response": "<div>mock</div>"}
 
     monkeypatch.setattr(
-        "obsidian_anki_sync.apf.generator.OpenAI", lambda *args, **kwargs: DummyClient()
+        "obsidian_anki_sync.apf.generator.OpenRouterProvider",
+        lambda *args, **kwargs: DummyProvider(),
     )
 
 

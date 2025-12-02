@@ -86,12 +86,14 @@ class OpenAIProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 
@@ -151,6 +153,7 @@ class OpenAIProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate completion from OpenAI.
 

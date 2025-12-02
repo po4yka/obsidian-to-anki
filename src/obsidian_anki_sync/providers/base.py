@@ -18,15 +18,18 @@ class LLMResponse(BaseModel):
     """
 
     response: str = Field(description="The generated text response")
-    tokens_used: int | None = Field(default=None, description="Total tokens consumed")
-    prompt_tokens: int | None = Field(default=None, description="Tokens in the prompt")
+    tokens_used: int | None = Field(
+        default=None, description="Total tokens consumed")
+    prompt_tokens: int | None = Field(
+        default=None, description="Tokens in the prompt")
     completion_tokens: int | None = Field(
         default=None, description="Tokens in the completion"
     )
     finish_reason: str | None = Field(
         default=None, description="Reason for completion (stop, length, etc.)"
     )
-    model: str | None = Field(default=None, description="Model used for generation")
+    model: str | None = Field(
+        default=None, description="Model used for generation")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LLMResponse":
@@ -90,6 +93,7 @@ class BaseLLMProvider(ABC):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a completion from the LLM.
 
@@ -102,6 +106,7 @@ class BaseLLMProvider(ABC):
             json_schema: JSON schema for structured output (OpenRouter, OpenAI)
             stream: Enable streaming (if supported by provider)
             reasoning_enabled: Enable reasoning mode for models that support it (e.g., DeepSeek)
+            reasoning_effort: Desired reasoning effort (auto|minimal|low|medium|high|none)
 
         Returns:
             Response dictionary with at least a 'response' key containing the text.
@@ -122,6 +127,7 @@ class BaseLLMProvider(ABC):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a completion from the LLM asynchronously.
 
@@ -137,6 +143,7 @@ class BaseLLMProvider(ABC):
             json_schema: JSON schema for structured output
             stream: Enable streaming (if supported by provider)
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort
 
         Returns:
             Response dictionary with at least a 'response' key containing the text.
@@ -157,6 +164,7 @@ class BaseLLMProvider(ABC):
             json_schema=json_schema,
             stream=stream,
             reasoning_enabled=reasoning_enabled,
+            reasoning_effort=reasoning_effort,
         )
 
     async def generate_json_async(
@@ -167,6 +175,7 @@ class BaseLLMProvider(ABC):
         temperature: float = 0.7,
         json_schema: dict[str, Any] | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM asynchronously.
 
@@ -180,6 +189,7 @@ class BaseLLMProvider(ABC):
             temperature: Sampling temperature
             json_schema: JSON schema
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort
 
         Returns:
             Parsed JSON response as a dictionary
@@ -194,6 +204,7 @@ class BaseLLMProvider(ABC):
             temperature=temperature,
             json_schema=json_schema,
             reasoning_enabled=reasoning_enabled,
+            reasoning_effort=reasoning_effort,
         )
 
     def generate_json(
@@ -204,6 +215,7 @@ class BaseLLMProvider(ABC):
         temperature: float = 0.7,
         json_schema: dict[str, Any] | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM.
 
@@ -218,6 +230,7 @@ class BaseLLMProvider(ABC):
             temperature: Sampling temperature
             json_schema: JSON schema for structured output (recommended for reliability)
             reasoning_enabled: Enable reasoning mode for models that support it
+            reasoning_effort: Desired reasoning effort
 
         Returns:
             Parsed JSON response as a dictionary
@@ -233,6 +246,7 @@ class BaseLLMProvider(ABC):
             format="json",
             json_schema=json_schema,
             reasoning_enabled=reasoning_enabled,
+            reasoning_effort=reasoning_effort,
         )
 
         response_text = result.get("response", "{}")

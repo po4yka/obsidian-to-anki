@@ -22,6 +22,7 @@ class IGenerator(ABC):
         json_schema: dict[str, Any | None] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a completion from the LLM.
 
@@ -34,6 +35,7 @@ class IGenerator(ABC):
             json_schema: JSON schema for structured output
             stream: Enable streaming (if supported)
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort level
 
         Returns:
             Response with 'response' key containing generated text
@@ -48,6 +50,7 @@ class IGenerator(ABC):
         temperature: float = 0.7,
         json_schema: dict[str, Any | None] | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a JSON response from the LLM.
 
@@ -58,6 +61,7 @@ class IGenerator(ABC):
             temperature: Sampling temperature
             json_schema: JSON schema for structured output
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort level
 
         Returns:
             Parsed JSON response as dictionary
@@ -74,6 +78,7 @@ class IGenerator(ABC):
         json_schema: dict[str, Any | None] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate a completion asynchronously.
 
@@ -86,6 +91,7 @@ class IGenerator(ABC):
             json_schema: JSON schema for structured output
             stream: Enable streaming
             reasoning_enabled: Enable reasoning mode
+            reasoning_effort: Desired reasoning effort level
 
         Returns:
             Response with 'response' key containing generated text

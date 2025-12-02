@@ -36,7 +36,8 @@ _session_metrics: dict[str, dict[str, Any]] = defaultdict(
 )
 
 # Track the current session in a context-friendly way for thread safety
-_session_id_var: ContextVar[str | None] = ContextVar("llm_session_id", default=None)
+_session_id_var: ContextVar[str | None] = ContextVar(
+    "llm_session_id", default=None)
 
 # OpenRouter pricing (per 1M tokens) - update as needed
 # Source: https://openrouter.ai/models (approximate pricing)
@@ -117,8 +118,10 @@ def calculate_context_window_usage(
         Dictionary with usage statistics
     """
     total_used = prompt_tokens + completion_tokens
-    usage_percent = (total_used / context_window * 100) if context_window > 0 else 0
-    prompt_percent = (prompt_tokens / context_window * 100) if context_window > 0 else 0
+    usage_percent = (total_used / context_window *
+                     100) if context_window > 0 else 0
+    prompt_percent = (prompt_tokens / context_window *
+                      100) if context_window > 0 else 0
     remaining = context_window - total_used
 
     return {
@@ -244,7 +247,8 @@ def log_llm_success(
         **extra_context: Additional context to log
     """
     duration = time.time() - start_time
-    tokens_per_second = calculate_tokens_per_second(completion_tokens, duration)
+    tokens_per_second = calculate_tokens_per_second(
+        completion_tokens, duration)
 
     # Track slow requests (>120 seconds)
     is_slow = duration > 120.0
@@ -356,6 +360,40 @@ def log_llm_retry(
         reason=reason,
         error=str(error) if error else None,
         error_type=type(error).__name__ if error else None,
+        **extra_context,
+    )
+
+
+def log_llm_stream_chunk(
+    model: str,
+    operation: str,
+    chunk_index: int,
+    elapsed_seconds: float,
+    chunk_chars: int,
+    chunk_preview: str,
+    **extra_context: Any,
+) -> None:
+    """Log incremental progress for streamed LLM responses.
+
+    Args:
+        model: Model identifier
+        operation: Descriptive operation name (e.g., "apf_streaming")
+        chunk_index: 1-based chunk index
+        elapsed_seconds: Seconds elapsed since request start
+        chunk_chars: Number of characters emitted in this chunk
+        chunk_preview: Short preview of the chunk content
+        **extra_context: Additional metadata to log
+    """
+    tokens_estimate = max(chunk_chars // 4, 1)
+    logger.info(
+        "llm_stream_chunk",
+        model=model,
+        operation=operation,
+        chunk_index=chunk_index,
+        elapsed_seconds=round(elapsed_seconds, 3),
+        chunk_chars=chunk_chars,
+        chunk_tokens_est=tokens_estimate,
+        chunk_preview=chunk_preview[:80],
         **extra_context,
     )
 

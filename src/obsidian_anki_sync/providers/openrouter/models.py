@@ -16,6 +16,17 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "qwen/qwen3-30b-a3b",  # Smaller model, may have structured output quirks
 }
 
+# Models that support OpenRouter's reasoning-effort contract and their default auto effort
+MODELS_WITH_REASONING_SUPPORT: dict[str, str] = {
+    "x-ai/grok-4.1-fast": "medium",
+    "x-ai/grok-4.1": "medium",
+    "x-ai/grok-3": "medium",
+    "deepseek/deepseek-chat-v3.1": "medium",
+    "deepseek/deepseek-r1": "high",
+    "openai/o3-mini": "medium",
+    "openai/o3-mini-high": "high",
+}
+
 # Model context window sizes (in tokens)
 # Default: 131072 (128k) for most modern models
 MODEL_CONTEXT_WINDOWS: dict[str, int] = {

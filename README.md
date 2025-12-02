@@ -25,7 +25,6 @@ Sync Obsidian Q&A notes to Anki flashcards using LLM generation with multi-agent
 -   **Validation Suite**: Note validation and repair tools
 -   **Task Queue**: Redis-backed queue for resilient parallel processing
 
-
 ## Table of Contents
 
 -   [Features](#features)
@@ -214,6 +213,21 @@ sequenceDiagram
     generator_model: "qwen2.5:14b"
     post_validator_model: "qwen2.5:7b"
     ```
+
+    **Using OpenRouter?** Configure attribution headers so your app shows up in
+    OpenRouter analytics:
+
+    ```yaml
+    llm_provider: "openrouter"
+    openrouter_api_key: "${OPENROUTER_API_KEY}"
+    openrouter_site_url: "https://yourapp.example.com"  # Sends HTTP-Referer
+    openrouter_site_name: "Obsidian → Anki Sync"         # Sends X-Title
+    llm_streaming_enabled: true                          # Stream SSE chunks to logs
+    llm_reasoning_effort: "auto"                         # auto|minimal|low|medium|high|none
+    ```
+
+    Structured outputs are requested by default; if OpenRouter returns an empty completion
+    the provider automatically retries without `response_format` before failing.
 
 5. **Run your first sync**
 
@@ -494,3 +508,4 @@ uv run pre-commit run --all-files
 -   **[Agent System](.docs/ARCHITECTURE/agents.md)** - Multi-agent architecture
 -   **[LLM Providers](.docs/ARCHITECTURE/providers.md)** - Provider integration
 -   **[Security](#security)** - Security guidelines
+````

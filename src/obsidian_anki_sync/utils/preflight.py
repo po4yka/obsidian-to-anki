@@ -2,6 +2,7 @@
 
 import shutil
 from pathlib import Path
+from typing import Any
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,8 +21,10 @@ class CheckResult(BaseModel):
     name: str = Field(min_length=1, description="Check name")
     passed: bool = Field(description="Whether the check passed")
     message: str = Field(min_length=1, description="Result message")
-    severity: str = Field(description="Severity level: 'error', 'warning', 'info'")
-    fixable: bool = Field(default=False, description="Whether the issue is fixable")
+    severity: str = Field(
+        description="Severity level: 'error', 'warning', 'info'")
+    fixable: bool = Field(
+        default=False, description="Whether the issue is fixable")
     fix_suggestion: str | None = Field(
         default=None, description="Suggestion for fixing the issue"
     )
@@ -84,7 +87,8 @@ class PreflightChecker:
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
+        warnings = [
+            r for r in self.results if not r.passed and r.severity == "warning"]
 
         all_passed = len(errors) == 0
 
@@ -341,6 +345,59 @@ class PreflightChecker:
                             severity="info",
                         )
                     )
+
+                    status_payload = getattr(
+                        provider, "fetch_key_status", lambda: None)()
+                    if status_payload:
+                        credits, rpm = self._parse_openrouter_limits(
+                            status_payload)
+                        if credits is not None:
+                            severity = "warning" if credits < 5 else "info"
+                            self.results.append(
+                                CheckResult(
+                                    name="OpenRouter Credits",
+                                    passed=credits > 0,
+                                    message=f"Remaining credits: {credits:.2f}",
+                                    severity=severity,
+                                    fixable=severity == "warning",
+                                    fix_suggestion="Purchase additional OpenRouter credits"
+                                    if severity == "warning"
+                                    else None,
+                                )
+                            )
+                        if rpm is not None:
+                            self.results.append(
+                                CheckResult(
+                                    name="OpenRouter Rate Limit",
+                                    passed=True,
+                                    message=f"Requests per minute: {rpm}",
+                                    severity="info",
+                                )
+                            )
+                            max_concurrent = getattr(
+                                self.config, "max_concurrent_generations", 0
+                            )
+                            if (
+                                max_concurrent
+                                and rpm is not None
+                                and max_concurrent > rpm
+                            ):
+                                self.results.append(
+                                    CheckResult(
+                                        name="OpenRouter Concurrency",
+                                        passed=False,
+                                        message=(
+                                            "Configured max_concurrent_generations "
+                                            f"({max_concurrent}) exceeds RPM limit ({rpm})."
+                                        ),
+                                        severity="warning",
+                                        fixable=True,
+                                        fix_suggestion=(
+                                            "Lower max_concurrent_generations in config.yaml "
+                                            "or request a higher rate limit from OpenRouter."
+                                        ),
+                                    )
+                                )
                 else:
                     self.results.append(
                         CheckResult(
@@ -696,7 +753,8 @@ class PreflightChecker:
                         )
                     )
             except Exception as e:
-                logger.warning("disk_space_check_failed", path=str(path), error=str(e))
+                logger.warning("disk_space_check_failed",
+                               path=str(path), error=str(e))
 
     def _check_memory(self) -> None:
         """Check system memory."""
@@ -765,6 +823,46 @@ class PreflightChecker:
                     )
             except Exception:
                 pass  # Already handled by connectivity check
+
+    @staticmethod
+    def _parse_openrouter_limits(
+        status_payload: dict[str, Any]
+    ) -> tuple[float | None, float | None]:
+        """Extract remaining credits and RPM from OpenRouter `/key` payload."""
+        data = status_payload.get("data") or status_payload
+        credits = (
+            data.get("balance")
+            or data.get("credit_balance")
+            or data.get("remaining_credits")
+        )
+        if isinstance(credits, str):
+            try:
+                credits = float(credits)
+            except ValueError:
+                credits = None
+        elif isinstance(credits, (int, float)):
+            credits = float(credits)
+        else:
+            credits = None
+
+        rate_limit = data.get("rate_limit") or {}
+        requests = rate_limit.get("requests") or {}
+        rpm = (
+            requests.get("minute")
+            or rate_limit.get("requests_per_minute")
+            or rate_limit.get("rpm")
+        )
+        if isinstance(rpm, str):
+            try:
+                rpm = float(rpm)
+            except ValueError:
+                rpm = None
+        elif isinstance(rpm, (int, float)):
+            rpm = float(rpm)
+        else:
+            rpm = None
+
+        return credits, rpm
 
 
 def run_preflight_checks(

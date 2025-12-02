@@ -2,7 +2,12 @@
 
 from typing import Any
 
-from .models import MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS
+from obsidian_anki_sync.utils.reasoning import normalize_reasoning_effort
+
+from .models import (
+    MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS,
+    MODELS_WITH_REASONING_SUPPORT,
+)
 
 
 def build_messages(prompt: str, system: str) -> list[dict[str, str]]:
@@ -82,7 +87,8 @@ def _should_use_reasoning_with_schema(json_schema: dict[str, Any]) -> bool:
         if items and isinstance(items, dict) and items.get("type"):
             if items.get("type") == "object" and items.get("properties"):
                 complexity += 2
-            complexity += _count_nested_complexity(items, depth + 1, max_depth, visited)
+            complexity += _count_nested_complexity(
+                items, depth + 1, max_depth, visited)
 
         # Check for nested objects in properties
         if props and isinstance(props, dict):
@@ -186,6 +192,8 @@ def build_payload(
     json_schema: dict[str, Any] | None = None,
     format: str = "",
     reasoning_enabled: bool = False,
+    reasoning_effort: str | None = None,
+    stream: bool = False,
 ) -> dict[str, Any]:
     """Build request payload for OpenRouter API.
 
@@ -212,17 +220,17 @@ def build_payload(
         "messages": messages,
         "temperature": effective_temperature,
         "max_tokens": effective_max_tokens,
-        "stream": False,
+        "stream": stream,
     }
 
-    # For Grok models: enable reasoning for complex tasks, disable for simple deterministic tasks
-    if "grok" in model.lower():
-        # Grok 4.1 Fast excels at reasoning even with structured outputs
-        # Enable reasoning for complex reasoning tasks or when explicitly requested
-        should_enable_reasoning = reasoning_enabled or (  # Explicitly requested
-            json_schema and _should_use_reasoning_with_schema(json_schema)
-        )  # Complex schema tasks
-        payload["reasoning"] = {"enabled": bool(should_enable_reasoning)}
+    effort_value = _resolve_reasoning_effort(
+        model=model,
+        requested_effort=reasoning_effort,
+        reasoning_enabled=reasoning_enabled,
+        json_schema=json_schema,
+    )
+    if effort_value:
+        payload["reasoning"] = {"effort": effort_value}
     elif reasoning_enabled and not json_schema:
         payload["reasoning_enabled"] = True
 
@@ -254,3 +262,37 @@ def build_payload(
         payload["response_format"] = {"type": "json_object"}
 
     return payload
+
+
+def _resolve_reasoning_effort(
+    model: str,
+    requested_effort: str | None,
+    reasoning_enabled: bool,
+    json_schema: dict[str, Any] | None,
+) -> str | None:
+    """Determine reasoning effort for the current request."""
+    normalized = (
+        normalize_reasoning_effort(requested_effort)
+        if requested_effort is not None
+        else "auto"
+    )
+
+    supports_reasoning = model in MODELS_WITH_REASONING_SUPPORT
+
+    if normalized == "none":
+        return None
+
+    if normalized == "auto":
+        if not supports_reasoning:
+            return None
+        should_enable = reasoning_enabled or (
+            json_schema and _should_use_reasoning_with_schema(json_schema)
+        )
+        if should_enable:
+            return MODELS_WITH_REASONING_SUPPORT[model]
+        return None
+
+    if supports_reasoning:
+        return normalized
+
+    return None

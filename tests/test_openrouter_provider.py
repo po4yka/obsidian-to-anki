@@ -14,7 +14,7 @@ from obsidian_anki_sync.providers.openrouter import OpenRouterProvider
 BASE_URL = "https://mock.openrouter.ai/api/v1"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openrouter_provider() -> OpenRouterProvider:
     """Provide an OpenRouterProvider instance configured for tests."""
     return OpenRouterProvider(
@@ -116,7 +116,8 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
     """Provider surfaces an error if both structured and fallback calls return empty content."""
     route = respx.post(f"{BASE_URL}/chat/completions")
     route.mock(
-        return_value=httpx.Response(200, json=_build_openrouter_response(content=""))
+        return_value=httpx.Response(
+            200, json=_build_openrouter_response(content=""))
     )
 
     schema = get_qa_extraction_schema()
@@ -276,8 +277,8 @@ def test_grok_reasoning_enabled_for_complex_schema(
     assert route.call_count == 1
 
     payload = json.loads(route.calls[0].request.content.decode())
-    # Should be enabled for complex schema
-    assert payload["reasoning"]["enabled"] is True
+    # Should be enabled for complex schema with effort mapping
+    assert payload["reasoning"]["effort"] == "medium"
 
 
 @respx.mock
@@ -322,7 +323,7 @@ def test_grok_reasoning_disabled_for_simple_schema(
 
     payload = json.loads(route.calls[0].request.content.decode())
     # Should be disabled for simple schema
-    assert payload["reasoning"]["enabled"] is False
+    assert "reasoning" not in payload
 
 
 @respx.mock
@@ -351,4 +352,65 @@ def test_grok_explicit_reasoning_enabled_parameter(
 
     payload = json.loads(route.calls[0].request.content.decode())
     # Should respect explicit parameter
-    assert payload["reasoning"]["enabled"] is True
+    assert payload["reasoning"]["effort"] == "medium"
+
+
+@respx.mock
+def test_reasoning_effort_explicit_value(
+    openrouter_provider: OpenRouterProvider,
+) -> None:
+    """Explicit reasoning_effort is forwarded to the payload."""
+    route = respx.post(f"{BASE_URL}/chat/completions")
+    route.respond(
+        200,
+        json=_build_openrouter_response(content=json.dumps({"result": "ok"})),
+    )
+
+    result = openrouter_provider.generate(
+        model="x-ai/grok-4.1-fast",
+        prompt="Test explicit effort",
+        system="system",
+        temperature=0.0,
+        reasoning_enabled=False,
+        reasoning_effort="high",
+    )
+
+    assert result["response"] == '{"result": "ok"}'
+    payload = json.loads(route.calls[0].request.content.decode())
+    assert payload["reasoning"]["effort"] == "high"
+
+
+@respx.mock
+def test_generate_streaming_returns_chunk_iterator(
+    openrouter_provider: OpenRouterProvider,
+) -> None:
+    """Streaming mode returns an iterator that yields chunks in order."""
+
+    def _stream_content():
+        yield b'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
+        yield b'data: {"choices":[{"delta":{"content":" world","finish_reason":"stop"}}]}\n\n'
+        yield b"data: [DONE]\n\n"
+
+    route = respx.post(f"{BASE_URL}/chat/completions")
+    route.mock(
+        return_value=httpx.Response(
+            200,
+            stream=_stream_content(),
+        )
+    )
+
+    result = openrouter_provider.generate(
+        model="x-ai/grok-4.1-fast",
+        prompt="Say hello",
+        system="You are concise",
+        stream=True,
+    )
+
+    stream = result.get("stream")
+    assert stream is not None
+
+    chunks = list(stream)
+    assert "".join(chunks) == "Hello world"
+    assert stream.collect() == "Hello world"
+    assert stream.finish_reason == "stop"
+    assert route.called

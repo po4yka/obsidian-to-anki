@@ -8,13 +8,14 @@ from typing import Any
 
 import httpx
 from pydantic import Field
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.providers.openrouter.retry_handler import RetryTransport
 from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.reasoning import effort_for_openai
 
 logger = get_logger(__name__)
 
@@ -61,6 +62,7 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
         site_name: str | None = None,
         max_tokens: int | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
         **kwargs: Any,
     ):
         """Initialize enhanced OpenRouter model.
@@ -73,6 +75,7 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             site_name: Site name for rankings
             max_tokens: Maximum tokens per request (stored for reference)
             reasoning_enabled: Enable reasoning for this model (stored for reference)
+            reasoning_effort: Preferred reasoning effort for compatible models
             **kwargs: Additional OpenAIChatModel arguments
         """
         # Build HTTP headers for OpenRouter
@@ -106,15 +109,24 @@ class EnhancedOpenRouterModel(OpenAIChatModel):
             api_key=api_key or "",
             http_client=http_client,
         )
+        openai_effort = effort_for_openai(reasoning_effort)
+        settings = (
+            OpenAIChatModelSettings(openai_reasoning_effort=openai_effort)
+            if openai_effort
+            else None
+        )
+
         super().__init__(
             model_name,
             provider=provider,
+            settings=settings,
             **kwargs,
         )
 
         # Store configuration for reference (not used in request override)
         self.reasoning_enabled = reasoning_enabled
         self._max_tokens = max_tokens
+        self.reasoning_effort = reasoning_effort
 
         logger.info(
             "enhanced_openrouter_model_created",
@@ -149,6 +161,7 @@ class PydanticAIModelFactory:
         site_name: str | None = None,
         max_tokens: int | None = None,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
         **kwargs: Any,
     ) -> EnhancedOpenRouterModel:
         """Create an enhanced OpenRouter model with reasoning support.
@@ -177,6 +190,7 @@ class PydanticAIModelFactory:
             site_name=site_name,
             max_tokens=max_tokens,
             reasoning_enabled=reasoning_enabled,
+            reasoning_effort=reasoning_effort,
             **kwargs,
         )
 
@@ -187,6 +201,7 @@ class PydanticAIModelFactory:
         base_url: str = "https://openrouter.ai/api/v1",
         site_url: str | None = None,
         site_name: str | None = None,
+        reasoning_effort: str | None = None,
         **kwargs: Any,
     ) -> OpenAIChatModel:
         """Create a PydanticAI model using OpenRouter.
@@ -252,9 +267,16 @@ class PydanticAIModelFactory:
             api_key=api_key,
             http_client=http_client,
         )
+        openai_effort = effort_for_openai(reasoning_effort)
+        settings = (
+            OpenAIChatModelSettings(openai_reasoning_effort=openai_effort)
+            if openai_effort
+            else None
+        )
         model = OpenAIChatModel(
             model_name,
             provider=openai_provider,
+            settings=settings,
             **kwargs,
         )
 
@@ -274,6 +296,8 @@ class PydanticAIModelFactory:
         provider: str | None = None,
         reasoning_enabled: bool | None = None,
         max_tokens: int | None = None,
+        agent_type: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> OpenAIChatModel:
         """Create a PydanticAI model from service configuration.
 
@@ -293,6 +317,9 @@ class PydanticAIModelFactory:
         provider = provider or config.llm_provider
         model_name = model_name or config.generator_model
 
+        resolved_effort = reasoning_effort or config.get_reasoning_effort(
+            agent_type)
+
         if provider.lower() == "openrouter":
             # Use enhanced OpenRouter model for reasoning support
             return PydanticAIModelFactory.create_enhanced_openrouter_model(
@@ -303,6 +330,7 @@ class PydanticAIModelFactory:
                 site_name=config.openrouter_site_name,
                 max_tokens=max_tokens,
                 reasoning_enabled=reasoning_enabled or False,
+                reasoning_effort=resolved_effort,
             )
         elif provider.lower() in ("ollama", "lm_studio", "lmstudio"):
             # For now, Ollama and LM Studio can use OpenAI-compatible interface

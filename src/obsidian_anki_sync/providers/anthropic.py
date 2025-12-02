@@ -89,12 +89,14 @@ class AnthropicProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 
@@ -177,6 +179,7 @@ class AnthropicProvider(BaseLLMProvider):
         json_schema: dict[str, Any] | None = None,
         stream: bool = False,
         reasoning_enabled: bool = False,
+        reasoning_effort: str | None = None,
     ) -> dict[str, Any]:
         """Generate completion from Claude.
 
@@ -347,7 +350,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)
@@ -527,7 +531,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)

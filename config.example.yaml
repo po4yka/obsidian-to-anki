@@ -39,7 +39,6 @@ enable_queue: false
 redis_url: "redis://localhost:6379"
 queue_max_retries: 3
 
-
 # Indexing LLM usage (disable to improve indexing speed and cost)
 index_use_llm_extraction: false
 
@@ -93,6 +92,11 @@ llm_temperature: 0.2
 llm_top_p: 0.3
 llm_timeout: 600.0 # Increased for large models (qwen3:32b, qwen3:14b)
 llm_max_tokens: 2048
+llm_streaming_enabled: false # Enable SSE streaming for long generations
+llm_reasoning_enabled: false
+llm_reasoning_effort: "auto" # auto|minimal|low|medium|high|none
+# reasoning_effort_overrides:
+#     generation: "high"
 
 # =============================================================================
 # PROVIDER-SPECIFIC SETTINGS

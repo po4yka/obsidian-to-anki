@@ -60,6 +60,8 @@ class ModelFactory:
             model_name=model_name,
             reasoning_enabled=model_config.get("reasoning_enabled", False),
             max_tokens=model_config.get("max_tokens"),
+            agent_type=agent_type,
+            reasoning_effort=model_config.get("reasoning_effort"),
         )
 
     def clear_cache(self):

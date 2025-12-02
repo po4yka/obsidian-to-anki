@@ -218,7 +218,8 @@ class ProgressTracker:
                 processed=progress.notes_processed,
                 total=progress.total_notes,
             )
-            raise ResumeValidationError(msg, session_id, "inconsistent_progress")
+            raise ResumeValidationError(
+                msg, session_id, "inconsistent_progress")
 
         # Check for stale note_progress (files that no longer exist)
         missing_files = []
@@ -443,6 +444,11 @@ class ProgressTracker:
                 "skipped": self.progress.cards_skipped,
                 "errors": self.progress.errors,
             }
+
+    def get_snapshot(self) -> SyncProgress:
+        """Return a deep copy of the current progress state."""
+        with self._progress_lock:
+            return self.progress.model_copy(deep=True)
 
     def get_pending_notes(self) -> list[NoteProgress]:
         """Get list of notes that haven't been processed yet."""
