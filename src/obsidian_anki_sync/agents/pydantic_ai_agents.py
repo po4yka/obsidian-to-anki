@@ -11,6 +11,7 @@ Streaming is enabled for all agents to prevent connection timeouts.
 
 import asyncio
 import contextlib
+import html
 import re
 import time
 from pathlib import Path
@@ -89,6 +90,37 @@ def _truncate_for_log(text: str, max_length: int = 200) -> str:
     if len(text) <= max_length:
         return text
     return text[:max_length] + "..."
+
+
+def _decode_html_encoded_apf(apf_html: str) -> str:
+    """Decode HTML entities in APF content if the LLM returned encoded HTML.
+
+    Some LLMs (like Grok) sometimes return HTML-encoded content in JSON responses,
+    e.g., '&lt;!-- BEGIN_CARDS --&gt;' instead of '<!-- BEGIN_CARDS -->'.
+
+    This function detects and decodes such content while preserving intentional
+    HTML entities inside <code> blocks (like &lt; for displaying < in code).
+
+    Args:
+        apf_html: APF HTML content that may be HTML-encoded
+
+    Returns:
+        Decoded APF HTML with proper HTML tags
+    """
+    # Check if content appears to be HTML-encoded (common patterns)
+    if "&lt;!--" in apf_html or "&lt;pre&gt;" in apf_html or "&lt;ul&gt;" in apf_html:
+        # The entire content is HTML-encoded - decode it
+        decoded = html.unescape(apf_html)
+        logger.debug(
+            "apf_html_decoded",
+            original_length=len(apf_html),
+            decoded_length=len(decoded),
+            was_encoded=True,
+        )
+        return decoded
+
+    # Content looks normal, return as-is
+    return apf_html
 
 
 # ============================================================================
@@ -629,11 +661,16 @@ Q&A Pairs ({len(qa_pairs)}):
                     if qa_pair is not None:
                         content_hash = compute_content_hash(qa_pair, metadata, lang)
 
+                    # Decode HTML entities if the LLM returned encoded content
+                    # (some models like Grok sometimes HTML-encode the output)
+                    raw_apf_html = card_dict["apf_html"]
+                    decoded_apf_html = _decode_html_encoded_apf(raw_apf_html)
+
                     generated_card = GeneratedCard(
                         card_index=card_index,
                         slug=card_dict["slug"],
                         lang=lang,
-                        apf_html=card_dict["apf_html"],
+                        apf_html=decoded_apf_html,
                         confidence=card_dict.get("confidence", output.confidence),
                         content_hash=content_hash,
                     )
