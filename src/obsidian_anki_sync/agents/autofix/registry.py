@@ -17,6 +17,7 @@ from obsidian_anki_sync.agents.autofix.handlers import (
     SectionOrderHandler,
     TitleFormatHandler,
     TrailingWhitespaceHandler,
+    UnbalancedCodeFenceHandler,
 )
 from obsidian_anki_sync.agents.models import AutoFixIssue, AutoFixResult
 from obsidian_anki_sync.utils.logging import get_logger
@@ -66,6 +67,7 @@ class AutoFixRegistry:
             "broken_related_entry": BrokenRelatedEntryHandler(
                 note_index=self.note_index
             ),
+            "unbalanced_code_fence": UnbalancedCodeFenceHandler(),
         }
 
         # Filter to enabled handlers

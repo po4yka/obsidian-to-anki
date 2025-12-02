@@ -265,8 +265,8 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5,
-                                max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=100,
+                                max_connections=200),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -295,7 +295,7 @@ class OpenRouterProvider(BaseLLMProvider):
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
                 limits=httpx.Limits(
-                    max_keepalive_connections=5, max_connections=10),
+                    max_keepalive_connections=100, max_connections=200),
                 headers=self._headers,
             )
         return self._async_client

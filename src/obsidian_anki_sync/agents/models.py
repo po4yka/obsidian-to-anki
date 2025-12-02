@@ -631,6 +631,7 @@ class AutoFixIssue(BaseModel):
         "broken_related_entry",
         "missing_concept_links",
         "related_count",
+        "unbalanced_code_fence",
         "unknown_error",
     ] = Field(description="Type of issue detected")
     severity: Literal["info", "warning", "error"] = Field(

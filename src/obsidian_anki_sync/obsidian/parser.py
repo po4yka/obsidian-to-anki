@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import frontmatter
 from ruamel.yaml import YAML
 
+from obsidian_anki_sync.agents.autofix.handlers import UnbalancedCodeFenceHandler
 from obsidian_anki_sync.exceptions import ParserError
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
@@ -343,6 +344,9 @@ def parse_note(
             msg = f"Unexpected error reading {resolved_path}: {e}"
             raise ParserError(msg)
 
+    # Auto-fix unbalanced code fences before parsing
+    content = _autofix_unbalanced_code_fences(content, file_path)
+
     # Parse frontmatter
     metadata = parse_frontmatter(content, file_path)
 
@@ -616,6 +620,41 @@ def _parse_inline_array(array_content: str) -> list[str]:
         items.append(item)
 
     return items
+
+
+def _autofix_unbalanced_code_fences(content: str, file_path: Path) -> str:
+    """Auto-fix unbalanced code fences in content.
+
+    Detects unclosed ``` code blocks and adds missing closing fences.
+    This prevents parsing errors from notes with formatting issues.
+
+    Args:
+        content: Note content that may have unbalanced code fences
+        file_path: Path to the file (for logging)
+
+    Returns:
+        Fixed content with balanced code fences
+    """
+    handler = UnbalancedCodeFenceHandler()
+    issues = handler.detect(content, metadata=None)
+
+    if not issues:
+        return content
+
+    # Apply fixes
+    fixed_content, updated_issues = handler.fix(content, issues, metadata=None)
+
+    # Log what was fixed
+    fixed_count = sum(1 for issue in updated_issues if issue.auto_fixed)
+    if fixed_count > 0:
+        logger.info(
+            "autofix_unbalanced_code_fences",
+            file=str(file_path),
+            issues_found=len(issues),
+            issues_fixed=fixed_count,
+        )
+
+    return fixed_content
 
 
 def _detect_content_corruption(content: str, file_path: Path) -> None:

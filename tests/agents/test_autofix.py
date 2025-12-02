@@ -563,6 +563,123 @@ related: [valid-note, broken-entry, c-arrays]
         assert all(issue.auto_fixed for issue in updated_issues)
 
 
+class TestUnbalancedCodeFenceHandler:
+    """Tests for UnbalancedCodeFenceHandler."""
+
+    def test_detect_unbalanced_code_fence(self):
+        from obsidian_anki_sync.agents.autofix.handlers import (
+            UnbalancedCodeFenceHandler,
+        )
+
+        handler = UnbalancedCodeFenceHandler()
+        content = """# Test Note
+
+```python
+def hello():
+    print("Hello")
+
+Some text after unclosed fence.
+"""
+        issues = handler.detect(content, metadata=None)
+
+        assert len(issues) == 1
+        assert issues[0].issue_type == "unbalanced_code_fence"
+        assert "line 3" in issues[0].description
+
+    def test_detect_no_issues_with_balanced_fences(self):
+        from obsidian_anki_sync.agents.autofix.handlers import (
+            UnbalancedCodeFenceHandler,
+        )
+
+        handler = UnbalancedCodeFenceHandler()
+        content = """# Test Note
+
+```python
+def hello():
+    print("Hello")
+```
+
+Some text after properly closed fence.
+"""
+        issues = handler.detect(content, metadata=None)
+
+        assert len(issues) == 0
+
+    def test_detect_multiple_unbalanced_fences(self):
+        from obsidian_anki_sync.agents.autofix.handlers import (
+            UnbalancedCodeFenceHandler,
+        )
+
+        handler = UnbalancedCodeFenceHandler()
+        # Use tilde fences nested inside backtick fences to create multiple unbalanced
+        content = """# Test Note
+
+```python
+def hello():
+    print("Hello")
+```
+
+Some text.
+
+~~~bash
+echo "test"
+
+More text without closing.
+"""
+        issues = handler.detect(content, metadata=None)
+
+        # Only one unbalanced (the ~~~bash block)
+        assert len(issues) == 1
+        assert "line 10" in issues[0].description
+
+    def test_fix_unbalanced_code_fence(self):
+        from obsidian_anki_sync.agents.autofix.handlers import (
+            UnbalancedCodeFenceHandler,
+        )
+
+        handler = UnbalancedCodeFenceHandler()
+        content = """# Test Note
+
+```python
+def hello():
+    print("Hello")
+
+Some text after unclosed fence.
+"""
+        issues = handler.detect(content, metadata=None)
+        fixed_content, updated_issues = handler.fix(content, issues, metadata=None)
+
+        # Check that the fix was applied
+        assert fixed_content.count("```") == 2  # One open, one close
+        assert updated_issues[0].auto_fixed is True
+
+    def test_fix_preserves_content_before_fence(self):
+        from obsidian_anki_sync.agents.autofix.handlers import (
+            UnbalancedCodeFenceHandler,
+        )
+
+        handler = UnbalancedCodeFenceHandler()
+        content = """---
+id: test-note
+title: Test
+---
+
+# Question (EN)
+
+```python
+def example():
+    pass
+"""
+        issues = handler.detect(content, metadata=None)
+        fixed_content, _ = handler.fix(content, issues, metadata=None)
+
+        # Check frontmatter is preserved
+        assert "---\nid: test-note" in fixed_content
+        assert "# Question (EN)" in fixed_content
+        # Check fence is closed
+        assert fixed_content.count("```") == 2
+
+
 class TestAutoFixRegistry:
     """Tests for AutoFixRegistry."""
 
@@ -571,9 +688,10 @@ class TestAutoFixRegistry:
 
         handlers = registry.list_handlers()
 
-        assert len(handlers) == 8
+        assert len(handlers) == 9
         assert any(h["type"] == "trailing_whitespace" for h in handlers)
         assert any(h["type"] == "empty_references" for h in handlers)
+        assert any(h["type"] == "unbalanced_code_fence" for h in handlers)
 
     def test_registry_with_enabled_handlers(self):
         registry = AutoFixRegistry(

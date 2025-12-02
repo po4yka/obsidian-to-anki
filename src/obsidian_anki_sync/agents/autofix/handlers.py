@@ -660,6 +660,152 @@ class BrokenRelatedEntryHandler(AutoFixHandler):
         return fixed_content, issues
 
 
+class UnbalancedCodeFenceHandler(AutoFixHandler):
+    """Fix unbalanced code fences (``` blocks without matching closer).
+
+    Detects code fence blocks that don't have a matching closing fence
+    and adds the missing closer at the end of the block.
+    """
+
+    issue_type = "unbalanced_code_fence"
+    description = "Fix unbalanced code fence blocks (missing closing ```)"
+
+    def detect(self, content: str, metadata: dict | None = None) -> list[AutoFixIssue]:
+        issues = []
+        lines = content.split("\n")
+
+        # Track code fence state
+        fence_stack: list[tuple[int, str]] = []  # (line_number, fence_pattern)
+        unbalanced_fences: list[tuple[int, str]] = []
+
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+
+            # Check for code fence (``` or ~~~, with optional language)
+            fence_match = re.match(r"^(`{3,}|~{3,})(\w*)?$", stripped)
+
+            if fence_match:
+                fence_chars = fence_match.group(1)
+                fence_type = fence_chars[0]  # ` or ~
+                fence_len = len(fence_chars)
+
+                if fence_stack:
+                    # Check if this closes the current fence
+                    _open_line, open_pattern = fence_stack[-1]
+                    open_type = open_pattern[0]
+                    open_len = len(open_pattern)
+
+                    # Closing fence must use same char and be at least as long
+                    if fence_type == open_type and fence_len >= open_len:
+                        fence_stack.pop()
+                    else:
+                        # This is a new opening fence (nested or different type)
+                        fence_stack.append((i, fence_chars))
+                else:
+                    # New opening fence
+                    fence_stack.append((i, fence_chars))
+
+        # Any remaining fences in stack are unbalanced
+        unbalanced_fences = fence_stack
+
+        if unbalanced_fences:
+            for line_num, fence_pattern in unbalanced_fences:
+                issues.append(
+                    AutoFixIssue(
+                        issue_type="unbalanced_code_fence",
+                        severity="error",
+                        description=(
+                            f"Unbalanced code fence at line {line_num} "
+                            f"('{fence_pattern}') has no matching closer"
+                        ),
+                        location=f"line {line_num}",
+                    )
+                )
+
+        return issues
+
+    def fix(
+        self, content: str, issues: list[AutoFixIssue], metadata: dict | None = None
+    ) -> tuple[str, list[AutoFixIssue]]:
+        if not issues:
+            return content, issues
+
+        lines = content.split("\n")
+        fixed_lines = lines.copy()
+        insertions: list[tuple[int, str]] = []  # (after_line_index, fence_to_insert)
+
+        # Track code fence state to find where to insert closers
+        fence_stack: list[tuple[int, str, int]] = []  # (line_num, pattern, line_idx)
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            fence_match = re.match(r"^(`{3,}|~{3,})(\w*)?$", stripped)
+
+            if fence_match:
+                fence_chars = fence_match.group(1)
+                fence_type = fence_chars[0]
+                fence_len = len(fence_chars)
+
+                if fence_stack:
+                    _open_line, open_pattern, _open_idx = fence_stack[-1]
+                    open_type = open_pattern[0]
+                    open_len = len(open_pattern)
+
+                    if fence_type == open_type and fence_len >= open_len:
+                        fence_stack.pop()
+                    else:
+                        fence_stack.append((i + 1, fence_chars, i))
+                else:
+                    fence_stack.append((i + 1, fence_chars, i))
+
+        # For each unbalanced fence, find where to insert the closer
+        # We'll insert at the end of what looks like the code block
+        for line_num, fence_pattern, start_idx in reversed(fence_stack):
+            # Find a good place to insert the closer
+            # Look for: next heading, empty line followed by non-indented text,
+            # or end of file
+            insert_idx = len(lines) - 1  # Default to end of file
+
+            for j in range(start_idx + 1, len(lines)):
+                line = lines[j]
+                stripped = line.strip()
+
+                # Stop at headings (likely end of code block section)
+                if stripped.startswith("#"):
+                    insert_idx = j - 1
+                    break
+
+                # Stop at YAML frontmatter markers
+                if stripped == "---" and j > 0:
+                    insert_idx = j - 1
+                    break
+
+            # Calculate indentation to match the opening fence
+            opening_line = lines[start_idx]
+            indent = len(opening_line) - len(opening_line.lstrip())
+            closing_fence = " " * indent + fence_pattern[:3]  # Use base fence chars
+
+            insertions.append((insert_idx, closing_fence))
+
+        # Apply insertions in reverse order to maintain line indices
+        insertions.sort(key=lambda x: x[0], reverse=True)
+        for insert_idx, closing_fence in insertions:
+            fixed_lines.insert(insert_idx + 1, closing_fence)
+
+        fixed_content = "\n".join(fixed_lines)
+
+        for issue in issues:
+            issue.auto_fixed = True
+            issue.fix_description = "Added missing closing code fence"
+
+        logger.info(
+            "unbalanced_code_fence_fixed",
+            fences_fixed=len(issues),
+        )
+
+        return fixed_content, issues
+
+
 class UnknownErrorHandler(AutoFixHandler):
     """Handler for logging unknown errors for future analysis.
 
