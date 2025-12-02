@@ -83,12 +83,121 @@ class AgentMemoryStore:
         self._embedding_function: Any = None
         self._initialized = False
 
+    def _get_directory_size_mb(self) -> float:
+        """Get the size of the storage directory in MB."""
+        import contextlib
+
+        total_size = 0
+        if self.storage_path.exists():
+            for file_path in self.storage_path.rglob("*"):
+                if file_path.is_file():
+                    with contextlib.suppress(OSError):
+                        total_size += file_path.stat().st_size
+        return total_size / (1024 * 1024)
+
+    def _enforce_size_limit(self) -> None:
+        """Check directory size and clear if over limit."""
+        if self.config is None:
+            return
+
+        max_size_mb = getattr(self.config, "max_agent_memory_size_mb", 500)
+        if max_size_mb <= 0:
+            return  # Unlimited
+
+        current_size_mb = self._get_directory_size_mb()
+        if current_size_mb > max_size_mb:
+            logger.warning(
+                "agent_memory_size_exceeded",
+                current_size_mb=round(current_size_mb, 2),
+                max_size_mb=max_size_mb,
+                action="clearing_memory",
+            )
+            # Clear the entire directory and let it be recreated
+            import shutil
+
+            try:
+                shutil.rmtree(self.storage_path)
+                self.storage_path.mkdir(parents=True, exist_ok=True)
+                logger.info(
+                    "agent_memory_cleared",
+                    freed_mb=round(current_size_mb, 2),
+                )
+            except Exception as e:
+                logger.error(
+                    "agent_memory_clear_failed",
+                    error=str(e),
+                )
+
+    def _auto_cleanup(self) -> None:
+        """Run automatic cleanup based on retention days and max memories."""
+        if self.config is None:
+            return
+
+        retention_days = getattr(self.config, "memory_retention_days", 90)
+        max_memories = getattr(self.config, "max_memories_per_type", 10000)
+
+        try:
+            # Clean up old memories
+            deleted = self.cleanup_old_memories(retention_days)
+            if deleted > 0:
+                logger.info(
+                    "agent_memory_auto_cleanup",
+                    deleted_count=deleted,
+                    retention_days=retention_days,
+                )
+
+            # Enforce max memories per collection
+            for memory_type, collection in (self._collections or {}).items():
+                try:
+                    count = collection.count()
+                    if count > max_memories:
+                        # Get oldest memories to delete
+                        excess = count - max_memories
+                        all_data = collection.get(
+                            include=["metadatas"],
+                            limit=count,
+                        )
+                        if all_data["ids"] and all_data.get("metadatas"):
+                            # Sort by timestamp and get oldest
+                            items = list(
+                                zip(
+                                    all_data["ids"],
+                                    all_data["metadatas"] or [],
+                                    strict=False,
+                                )
+                            )
+                            items.sort(
+                                key=lambda x: float(
+                                    x[1].get("timestamp", "0") if x[1] else "0"
+                                )
+                            )
+                            ids_to_delete = [item[0] for item in items[:excess]]
+                            if ids_to_delete:
+                                collection.delete(ids=ids_to_delete)
+                                logger.info(
+                                    "agent_memory_max_enforced",
+                                    memory_type=memory_type,
+                                    deleted=len(ids_to_delete),
+                                    max_memories=max_memories,
+                                )
+                except Exception as e:
+                    logger.debug(
+                        "agent_memory_max_enforcement_failed",
+                        memory_type=memory_type,
+                        error=str(e),
+                    )
+        except Exception as e:
+            logger.debug("agent_memory_auto_cleanup_failed", error=str(e))
+
     def _ensure_initialized(self) -> None:
         """Lazily initialize ChromaDB and collections when first needed."""
         if self._initialized:
             return
 
         self.storage_path.mkdir(parents=True, exist_ok=True)
+
+        # Check and enforce size limit before initializing
+        self._enforce_size_limit()
 
         # Initialize ChromaDB client
         self._client = chromadb.PersistentClient(
@@ -132,6 +241,9 @@ class AgentMemoryStore:
         # Initialize collections
         self._initialize_collections()
         self._initialized = True
+
+        # Run automatic cleanup based on retention days
+        self._auto_cleanup()
 
     @property
     def client(self) -> chromadb.api.client.ClientAPI:

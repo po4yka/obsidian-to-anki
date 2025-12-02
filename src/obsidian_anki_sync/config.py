@@ -455,6 +455,12 @@ class Config(BaseSettings):
         default=10000, description="Maximum number of memories per type"
     )
 
+    # Maximum agent memory size in MB (0 = unlimited)
+    max_agent_memory_size_mb: int = Field(
+        default=500,
+        description="Maximum size of agent memory directory in MB (0 = unlimited)",
+    )
+
     # ============================================================================
     # RAG (Retrieval-Augmented Generation) Configuration
     # ============================================================================

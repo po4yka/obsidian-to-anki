@@ -487,18 +487,17 @@ def configure_logging(
     root_logger.addHandler(console_handler)
     _handlers.append(console_handler)
 
-    # File handler - JSON format with rotation
-    from logging.handlers import TimedRotatingFileHandler
+    # File handler - JSON format with size-based rotation
+    from logging.handlers import RotatingFileHandler
 
-    file_handler = TimedRotatingFileHandler(
+    # Use size-based rotation: 50MB max per file, keep 5 backups (250MB total max)
+    file_handler = RotatingFileHandler(
         filename=str(log_path),
-        when="midnight",
-        interval=1,
-        backupCount=30,
+        maxBytes=50 * 1024 * 1024,  # 50MB
+        backupCount=5,
         encoding="utf-8",
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.suffix = "%Y-%m-%d"
 
     # File processors (no console noise filter, but include formatted extra)
     file_pre_chain: list[structlog.typing.Processor] = [
@@ -519,20 +518,19 @@ def configure_logging(
     root_logger.addHandler(file_handler)
     _handlers.append(file_handler)
 
-    # Project-level log file handler
+    # Project-level log file handler (skip if same as log_path to avoid duplicate logging)
     project_log_path = project_log_dir / "obsidian-anki-sync.log"
-    project_handler = TimedRotatingFileHandler(
-        filename=str(project_log_path),
-        when="midnight",
-        interval=1,
-        backupCount=30,
-        encoding="utf-8",
-    )
-    project_handler.setLevel(logging.DEBUG)
-    project_handler.suffix = "%Y-%m-%d"
-    project_handler.setFormatter(file_formatter)
-    root_logger.addHandler(project_handler)
-    _handlers.append(project_handler)
+    if project_log_path != log_path:
+        project_handler = RotatingFileHandler(
+            filename=str(project_log_path),
+            maxBytes=50 * 1024 * 1024,  # 50MB
+            backupCount=5,
+            encoding="utf-8",
+        )
+        project_handler.setLevel(logging.DEBUG)
+        project_handler.setFormatter(file_formatter)
+        root_logger.addHandler(project_handler)
+        _handlers.append(project_handler)
 
     # Error-specific log file handler (ERROR and above only)
     error_log_path = project_log_dir / "errors.log"
@@ -543,15 +541,13 @@ def configure_logging(
         def filter(self, record: logging.LogRecord) -> bool:
             return record.levelno >= logging.ERROR
 
-    error_handler = TimedRotatingFileHandler(
+    error_handler = RotatingFileHandler(
         filename=str(error_log_path),
-        when="midnight",
-        interval=1,
-        backupCount=error_log_retention_days,
+        maxBytes=10 * 1024 * 1024,  # 10MB for errors
+        backupCount=10,  # Keep more error history
         encoding="utf-8",
     )
     error_handler.setLevel(logging.ERROR)
-    error_handler.suffix = "%Y-%m-%d"
     error_handler.addFilter(ErrorFilter())
     error_handler.setFormatter(file_formatter)
     root_logger.addHandler(error_handler)
@@ -578,15 +574,13 @@ def configure_logging(
                     "llm" in logger_name or "prompt" in message or "response" in message
                 )
 
-        verbose_handler = TimedRotatingFileHandler(
+        verbose_handler = RotatingFileHandler(
             filename=str(verbose_log_path),
-            when="midnight",
-            interval=1,
-            backupCount=7,
+            maxBytes=100 * 1024 * 1024,  # 100MB for verbose LLM logs
+            backupCount=3,
             encoding="utf-8",
         )
         verbose_handler.setLevel(logging.DEBUG)
-        verbose_handler.suffix = "%Y-%m-%d"
         verbose_handler.addFilter(VerboseFilter())
         verbose_handler.setFormatter(file_formatter)
         root_logger.addHandler(verbose_handler)
