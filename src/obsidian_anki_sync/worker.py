@@ -235,7 +235,7 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
-    max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "5"))
+    max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "100"))
 
 
 def _detect_stage_sla(
