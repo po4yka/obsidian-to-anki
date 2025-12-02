@@ -730,16 +730,48 @@ Output:
 }
 ```
 
+## CRITICAL: Pass/Fail Decision Rules
+
+### MUST PASS (is_valid: true) if ALL of these are true:
+1. Has required sentinels (BEGIN_CARDS, END_CARDS, or equivalent markers)
+2. Has Card metadata comment with slug and CardType
+3. Has Title section with actual question content
+4. Has Key point or Key point notes section with actual answer content
+5. Content is factually reasonable (no obvious errors like "2+2=5")
+6. HTML is parseable (minor tag issues are OK if content is readable)
+
+### MUST FAIL (is_valid: false) ONLY for these blocking issues:
+1. **Missing required sections**: No Title, or no Key point/Key point notes
+2. **Completely broken HTML**: Unparseable, truncated, or corrupted content
+3. **Obvious factual errors**: Demonstrably wrong technical information
+4. **Empty or placeholder content**: "TODO", "TBD", or empty sections
+5. **Missing card metadata**: No slug or CardType in card header
+
+### DO NOT FAIL for these (they are acceptable):
+- Using optional sections (Sample, Subtitle, Other notes, Markdown, Syntax)
+- Minor HTML formatting differences (extra whitespace, different tag styles)
+- Stylistic preferences (verbose vs concise, different list formats)
+- Slug naming conventions (even if not ideal)
+- Tag ordering or count variations
+- Missing manifest comment (nice to have, not required)
+- Missing PROMPT_VERSION sentinel (nice to have, not required)
+- Title wrapped in <p> tags (acceptable formatting choice)
+- Using CardType values like "Simple" vs "Basic" (both acceptable)
+
+### Default to PASS
+When in doubt, **default to is_valid: true** and note any suggestions in card_issues.
+The goal is to let good-enough cards through while catching genuinely broken ones.
+A card with minor imperfections is better than no card at all.
+
 ## Instructions
 
 - Validate ALL cards provided
-- Check both format AND content
-- Be strict about APF v2.1 compliance
-- Identify all issues, not just the first one
-- Provide specific corrections when possible
-- Use high confidence (0.9+) for obvious errors
-- Use medium confidence (0.7-0.85) for subjective quality issues
-- Always explain what's wrong and why
+- Focus on blocking issues only - be lenient on style
+- Default to PASS unless there's a clear blocking issue
+- Provide corrections as suggestions, not as reasons to fail
+- Use high confidence (0.9+) when passing clearly valid cards
+- Only use is_valid: false for genuine blocking issues listed above
+- Remember: optional sections are VALID, don't penalize their use
 """
 
 
