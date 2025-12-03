@@ -130,7 +130,9 @@ class AgentMemoryStore:
 
     def _auto_cleanup(self) -> None:
         """Run automatic cleanup based on retention days and max memories."""
+        logger.debug("agent_memory_auto_cleanup_starting")
         if self.config is None:
+            logger.debug("agent_memory_auto_cleanup_skipped", reason="no_config")
             return
 
         retention_days = getattr(self.config, "memory_retention_days", 90)
@@ -138,6 +140,10 @@ class AgentMemoryStore:
 
         try:
             # Clean up old memories
+            logger.debug(
+                "agent_memory_cleanup_old_memories",
+                retention_days=retention_days,
+            )
             deleted = self.cleanup_old_memories(retention_days)
             if deleted > 0:
                 logger.info(
@@ -188,12 +194,16 @@ class AgentMemoryStore:
                     )
         except Exception as e:
             logger.debug("agent_memory_auto_cleanup_failed", error=str(e))
+        logger.debug("agent_memory_auto_cleanup_finished")
 
     def _ensure_initialized(self) -> None:
         """Lazily initialize ChromaDB and collections when first needed."""
         if self._initialized:
             return
 
+        import time as time_module
+
+        init_start = time_module.time()
         logger.info(
             "agent_memory_initializing",
             storage_path=str(self.storage_path),
@@ -207,12 +217,17 @@ class AgentMemoryStore:
         self._enforce_size_limit()
 
         # Initialize ChromaDB client
+        chromadb_start = time_module.time()
         logger.info("agent_memory_chromadb_starting", path=str(self.storage_path))
         self._client = chromadb.PersistentClient(
             path=str(self.storage_path),
             settings=Settings(anonymized_telemetry=False),
         )
-        logger.info("agent_memory_chromadb_initialized")
+        chromadb_duration = time_module.time() - chromadb_start
+        logger.info(
+            "agent_memory_chromadb_initialized",
+            duration_seconds=round(chromadb_duration, 3),
+        )
 
         # Initialize embeddings using RAG embedding provider
         if self._enable_semantic_search and self.config is not None:
@@ -249,15 +264,30 @@ class AgentMemoryStore:
             logger.debug("agent_memory_using_dummy_embeddings")
 
         # Initialize collections
+        collections_start = time_module.time()
         logger.info("agent_memory_initializing_collections")
         self._initialize_collections()
-        logger.info("agent_memory_collections_initialized")
+        collections_duration = time_module.time() - collections_start
+        logger.info(
+            "agent_memory_collections_initialized",
+            duration_seconds=round(collections_duration, 3),
+        )
         self._initialized = True
 
         # Run automatic cleanup based on retention days
+        cleanup_start = time_module.time()
         logger.debug("agent_memory_starting_auto_cleanup")
         self._auto_cleanup()
-        logger.info("agent_memory_initialization_complete")
+        cleanup_duration = time_module.time() - cleanup_start
+
+        total_duration = time_module.time() - init_start
+        logger.info(
+            "agent_memory_initialization_complete",
+            total_duration_seconds=round(total_duration, 3),
+            chromadb_seconds=round(chromadb_duration, 3),
+            collections_seconds=round(collections_duration, 3),
+            cleanup_seconds=round(cleanup_duration, 3),
+        )
 
     @property
     def client(self) -> chromadb.api.client.ClientAPI:
@@ -295,6 +325,10 @@ class AgentMemoryStore:
 
         for memory_type in memory_types:
             try:
+                logger.debug(
+                    "agent_memory_creating_collection",
+                    collection=memory_type,
+                )
                 if self._client:
                     collection = self._client.get_or_create_collection(
                         name=memory_type,
@@ -302,6 +336,10 @@ class AgentMemoryStore:
                         embedding_function=self._embedding_function,
                     )
                     self._collections[memory_type] = collection
+                    logger.debug(
+                        "agent_memory_collection_created",
+                        collection=memory_type,
+                    )
             except Exception as e:
                 logger.error(
                     "failed_to_create_collection",
