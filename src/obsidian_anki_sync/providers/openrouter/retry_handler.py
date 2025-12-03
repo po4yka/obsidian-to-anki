@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import suppress
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
@@ -191,47 +192,50 @@ class RetryTransport(httpx.AsyncHTTPTransport):
                 if response.status_code == 200:
                     try:
                         await response.aread()
-                        if is_malformed_chat_completion(response.content):
-                            if retries >= self.max_retries:
-                                # Exhausted retries, return the malformed response
-                                # Let PydanticAI handle the error
-                                logger.error(
-                                    "openrouter_malformed_response_exhausted",
-                                    attempt=retries + 1,
-                                    max_retries=self.max_retries,
-                                    url=str(request.url),
-                                    body_preview=response.text[:500],
-                                )
-                                return response
+                    except Exception as exc:
+                        logger.debug(
+                            "openrouter_response_check_failed",
+                            error=str(exc),
+                            url=str(request.url),
+                        )
+                        with suppress(Exception):
+                            await response.aclose()
+                        raise
 
-                            logger.warning(
-                                "openrouter_malformed_response_retry",
-                                status_code=200,
+                    if is_malformed_chat_completion(response.content):
+                        if retries >= self.max_retries:
+                            # Exhausted retries, return the malformed response
+                            # Let PydanticAI handle the error
+                            logger.error(
+                                "openrouter_malformed_response_exhausted",
                                 attempt=retries + 1,
                                 max_retries=self.max_retries,
-                                wait_time=round(delay, 2),
                                 url=str(request.url),
                                 body_preview=response.text[:500],
                             )
+                            return response
 
-                            # Wait before retry
-                            await asyncio.sleep(delay)
-
-                            # Prepare for next attempt
-                            retries += 1
-                            delay *= self.backoff_factor
-
-                            # Close the previous response
-                            await response.aclose()
-
-                            continue
-                    except Exception as e:
-                        # If we can't read/check the response, log and return it
-                        logger.debug(
-                            "openrouter_response_check_failed",
-                            error=str(e),
+                        logger.warning(
+                            "openrouter_malformed_response_retry",
+                            status_code=200,
+                            attempt=retries + 1,
+                            max_retries=self.max_retries,
+                            wait_time=round(delay, 2),
                             url=str(request.url),
+                            body_preview=response.text[:500],
                         )
+
+                        # Wait before retry
+                        await asyncio.sleep(delay)
+
+                        # Prepare for next attempt
+                        retries += 1
+                        delay *= self.backoff_factor
+
+                        # Close the previous response
+                        await response.aclose()
+
+                        continue
 
                 # For other status codes, return immediately
                 return response

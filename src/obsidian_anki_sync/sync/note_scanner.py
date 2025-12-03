@@ -945,10 +945,10 @@ class NoteScanner:
                 )
 
             try:
-                # Sanitize job ID to avoid issues with slashes
+                # Sanitize job ID to avoid issues with slashes and scope by session
                 sanitized_path = relative_path.replace(
                     "/", "_").replace("\\", "_")
-                job_id = f"note-{sanitized_path}"
+                job_id = f"{session_id}:note-{sanitized_path}"
 
                 # Enqueue with retry logic
                 job = await self._enqueue_with_retry(
@@ -981,7 +981,8 @@ class NoteScanner:
                     job_map[job_id] = (file_path, relative_path)
                     job_submit_times[job_id] = submit_time
                     logger.warning(
-                        "job_already_exists_reusing", file=relative_path, job_id=job_id
+                        "job_already_exists_reusing", file=relative_path,
+                        job_id=job_id, session_id=session_id
                     )
 
                 # Reset circuit breaker on success

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 
 import httpx
 import pytest
@@ -10,6 +11,7 @@ import respx
 
 from obsidian_anki_sync.agents.json_schemas import get_qa_extraction_schema
 from obsidian_anki_sync.providers.openrouter import OpenRouterProvider
+from obsidian_anki_sync.providers.openrouter.retry_handler import RetryTransport
 
 BASE_URL = "https://mock.openrouter.ai/api/v1"
 
@@ -116,7 +118,8 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
     """Provider surfaces an error if both structured and fallback calls return empty content."""
     route = respx.post(f"{BASE_URL}/chat/completions")
     route.mock(
-        return_value=httpx.Response(200, json=_build_openrouter_response(content=""))
+        return_value=httpx.Response(
+            200, json=_build_openrouter_response(content=""))
     )
 
     schema = get_qa_extraction_schema()
@@ -413,3 +416,52 @@ def test_generate_streaming_returns_chunk_iterator(
     assert stream.collect() == "Hello world"
     assert stream.finish_reason == "stop"
     assert route.called
+
+
+class _BrokenStream(httpx.AsyncByteStream):
+    """Async stream that raises a protocol error mid-read."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield b"partial"
+        error_message = "peer closed connection without body"
+        raise httpx.RemoteProtocolError(error_message)
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_retry_transport_reraises_remote_protocol_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retry transport closes the stream and surfaces read failures for retries."""
+
+    request = httpx.Request(
+        "POST", "https://mock.openrouter.ai/api/v1/chat/completions"
+    )
+    streams: list[_BrokenStream] = []
+
+    async def fake_super_handle(
+        self: httpx.AsyncHTTPTransport, req: httpx.Request
+    ) -> httpx.Response:
+        assert req is request
+        stream = _BrokenStream()
+        streams.append(stream)
+        return httpx.Response(200, request=req, stream=stream)
+
+    monkeypatch.setattr(
+        httpx.AsyncHTTPTransport,
+        "handle_async_request",
+        fake_super_handle,
+    )
+
+    transport = RetryTransport(max_retries=0, initial_delay=0.01)
+
+    with pytest.raises(httpx.RemoteProtocolError):
+        await transport.handle_async_request(request)
+
+    assert streams
+    assert all(stream.closed for stream in streams)
