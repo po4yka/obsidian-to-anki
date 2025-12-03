@@ -6,7 +6,7 @@ used in the LangGraph workflow.
 
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -49,6 +49,12 @@ class NoteCorrectionResultSchema(BaseModel):
     error: str | None = None
 
 
+# Type adapters for validation
+NoteMetadataAdapter = TypeAdapter(NoteMetadataSchema)
+QAPairListAdapter = TypeAdapter(list[QAPairSchema])
+AutoFixResultAdapter = TypeAdapter(AutoFixResultSchema)
+
+
 def validate_metadata_dict(data: dict[str, Any] | None) -> bool:
     """Validate metadata_dict structure.
 
@@ -61,7 +67,7 @@ def validate_metadata_dict(data: dict[str, Any] | None) -> bool:
     if data is None:
         return True
     try:
-        NoteMetadataSchema.model_validate(data)
+        NoteMetadataAdapter.validate_python(data)
         return True
     except ValidationError as e:
         logger.warning("invalid_metadata_dict", errors=str(e))
@@ -80,8 +86,7 @@ def validate_qa_pairs_dicts(data: list[dict[str, Any]] | None) -> bool:
     if data is None:
         return True
     try:
-        for qa in data:
-            QAPairSchema.model_validate(qa)
+        QAPairListAdapter.validate_python(data)
         return True
     except ValidationError as e:
         logger.warning("invalid_qa_pairs_dicts", errors=str(e))
@@ -100,7 +105,7 @@ def validate_autofix_dict(data: dict[str, Any] | None) -> bool:
     if data is None:
         return True
     try:
-        AutoFixResultSchema.model_validate(data)
+        AutoFixResultAdapter.validate_python(data)
         return True
     except ValidationError as e:
         logger.warning("invalid_autofix_dict", errors=str(e))
