@@ -66,8 +66,7 @@ class OpenRouterStreamResult:
         self.response_text: str = ""
         self.finish_reason: str = "stop"
         self.usage: dict[str, Any] = {}
-        self._context_window = MODEL_CONTEXT_WINDOWS.get(
-            model, DEFAULT_CONTEXT_WINDOW)
+        self._context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
 
     def __iter__(self):
         if self._consumed:
@@ -265,8 +264,7 @@ class OpenRouterProvider(BaseLLMProvider):
         )
         self.client = httpx.Client(
             timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=100,
-                                max_connections=200),
+            limits=httpx.Limits(max_keepalive_connections=100, max_connections=200),
             headers=headers,
         )
         # Async client for async operations (lazy initialization)
@@ -294,8 +292,7 @@ class OpenRouterProvider(BaseLLMProvider):
             )
             self._async_client = httpx.AsyncClient(
                 timeout=timeout_config,
-                limits=httpx.Limits(
-                    max_keepalive_connections=100, max_connections=200),
+                limits=httpx.Limits(max_keepalive_connections=100, max_connections=200),
                 headers=self._headers,
             )
         return self._async_client
@@ -396,8 +393,7 @@ class OpenRouterProvider(BaseLLMProvider):
             data = response.json()
 
             models = [model["id"] for model in data.get("data", [])]
-            logger.info("openrouter_list_models_success",
-                        model_count=len(models))
+            logger.info("openrouter_list_models_success", model_count=len(models))
             return models
         except Exception as e:
             logger.error("openrouter_list_models_failed", error=str(e))
@@ -406,11 +402,10 @@ class OpenRouterProvider(BaseLLMProvider):
     def fetch_key_status(self) -> dict[str, Any] | None:
         """Fetch account metadata (credits/rate limits) from OpenRouter."""
         try:
-            response = self.client.get(
-                f"{self.base_url}/key", headers=self._headers)
+            response = self.client.get(f"{self.base_url}/key", headers=self._headers)
             response.raise_for_status()
             return response.json()
-        except Exception as exc:  # noqa: BLE001 - diagnostics only
+        except Exception as exc:
             logger.debug("openrouter_key_probe_failed", error=str(exc))
             return None
 
@@ -450,8 +445,7 @@ class OpenRouterProvider(BaseLLMProvider):
         messages = build_messages(prompt, system)
 
         # Calculate tokens
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
-            prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,
@@ -771,8 +765,7 @@ class OpenRouterProvider(BaseLLMProvider):
 
             first_choice = choices[0]
             message = first_choice.get("message", {})
-            completion = self._extract_completion(
-                message, model, result, json_schema)
+            completion = self._extract_completion(message, model, result, json_schema)
 
             # Clean JSON if needed
             if json_schema or format == "json":
@@ -786,8 +779,7 @@ class OpenRouterProvider(BaseLLMProvider):
             finish_reason = first_choice.get("finish_reason", "stop")
 
             # Log success
-            context_window = MODEL_CONTEXT_WINDOWS.get(
-                model, DEFAULT_CONTEXT_WINDOW)
+            context_window = MODEL_CONTEXT_WINDOWS.get(model, DEFAULT_CONTEXT_WINDOW)
             log_llm_success(
                 model=model,
                 operation="openrouter_generate",
@@ -884,8 +876,7 @@ class OpenRouterProvider(BaseLLMProvider):
             elif message.get("refusal"):
                 completion = message["refusal"]
             else:
-                finish_reason = result["choices"][0].get(
-                    "finish_reason", "unknown")
+                finish_reason = result["choices"][0].get("finish_reason", "unknown")
                 logger.warning(
                     "empty_completion_from_openrouter",
                     model=model,
@@ -1227,8 +1218,7 @@ class OpenRouterProvider(BaseLLMProvider):
         async_client = self._get_async_client()
         messages = build_messages(prompt, system)
 
-        prompt_tokens_estimate = calculate_prompt_tokens_estimate(
-            prompt, system)
+        prompt_tokens_estimate = calculate_prompt_tokens_estimate(prompt, system)
         schema_overhead = calculate_schema_overhead(json_schema)
         effective_max_tokens = calculate_effective_max_tokens(
             model=model,

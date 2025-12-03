@@ -15,13 +15,13 @@ from obsidian_anki_sync.agents.pydantic.split_validator import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_model():
     """Create a mock PydanticAI model."""
     return MagicMock()
 
 
-@pytest.fixture()
+@pytest.fixture
 def split_validator(mock_model):
     """Create a split validator agent with mock model."""
     with patch(
@@ -34,7 +34,7 @@ def split_validator(mock_model):
         yield agent
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validate_valid_split(split_validator):
     """Test validation of a valid split plan."""
     # Mock agent run result
@@ -86,7 +86,7 @@ async def test_validate_valid_split(split_validator):
     split_validator.agent.run.assert_called_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validate_invalid_split(split_validator):
     """Test validation of an invalid split plan."""
     # Mock agent run result
@@ -129,7 +129,7 @@ async def test_validate_invalid_split(split_validator):
     assert "Over-fragmentation" in result.feedback
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_validate_fallback_on_error(split_validator):
     """Test fallback behavior when validation fails."""
     # Mock agent run to raise exception

@@ -16,13 +16,13 @@ from obsidian_anki_sync.obsidian.parser import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def temp_dir(tmp_path):
     """Alias for pytest's tmp_path fixture."""
     return tmp_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note_content():
     """Sample note content with all expected fields for parser tests."""
     return """---
@@ -76,7 +76,7 @@ Unit testing is testing individual components.
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note_metadata():
     """Sample note metadata for parser tests."""
     return NoteMetadata(

@@ -232,8 +232,7 @@ class ProgressTracker:
                 processed=progress.notes_processed,
                 total=progress.total_notes,
             )
-            raise ResumeValidationError(
-                msg, session_id, "inconsistent_progress")
+            raise ResumeValidationError(msg, session_id, "inconsistent_progress")
 
         # Check for stale note_progress (files that no longer exist)
         missing_files = []

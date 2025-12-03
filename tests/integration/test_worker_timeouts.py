@@ -70,7 +70,7 @@ def _build_pipeline_result(
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_worker_flags_generation_sla(tmp_path: Path) -> None:
     """Generation overruns should be surfaced as actionable errors."""
     note_path = tmp_path / "note.md"
@@ -112,7 +112,7 @@ async def test_worker_flags_generation_sla(tmp_path: Path) -> None:
     assert "generation" in response["error"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_worker_flags_validation_sla(tmp_path: Path) -> None:
     """Post-validation overruns should be reported with stage metadata."""
     note_path = tmp_path / "note.md"

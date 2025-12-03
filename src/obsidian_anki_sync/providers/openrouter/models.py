@@ -18,7 +18,7 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
 
 # Models that support OpenRouter's reasoning-effort contract and their default auto effort
 MODELS_WITH_REASONING_SUPPORT: dict[str, str] = {
-    "x-ai/grok-4.1-fast": "medium",
+    "x-ai/grok-4.1-fast:free": "medium",
     "x-ai/grok-4.1": "medium",
     "x-ai/grok-3": "medium",
     "deepseek/deepseek-chat-v3.1": "medium",
@@ -44,7 +44,7 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "qwen/qwen3-32b": 131072,  # 128K context (standard)
     "qwen/qwen3-30b-a3b": 131072,  # 128K context (standard)
     # xAI Grok Series
-    "x-ai/grok-4.1-fast": 2000000,  # 2M context window
+    "x-ai/grok-4.1-fast:free": 2000000,  # 2M context window
 }
 DEFAULT_CONTEXT_WINDOW = 131072  # 128k tokens
 CONTEXT_SAFETY_MARGIN = 1000  # Reserve tokens for safety
@@ -67,7 +67,7 @@ MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
     "qwen/qwen3-32b": 8192,
     "qwen/qwen3-30b-a3b": 8192,
     # xAI Grok Series - supports larger outputs due to 2M context window
-    "x-ai/grok-4.1-fast": 32768,  # Conservative limit for 2M context model
+    "x-ai/grok-4.1-fast:free": 32768,  # Conservative limit for 2M context model
 }
 DEFAULT_MAX_OUTPUT_TOKENS = 8192  # Safe default for most models
 
@@ -85,7 +85,7 @@ MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
     "qwen/qwen3-max",
     # xAI Grok 4.1 Fast - excellent structured output support
     # Best practices: temperature=0 for deterministic output, disable reasoning for JSON
-    "x-ai/grok-4.1-fast",
+    "x-ai/grok-4.1-fast:free",
 }
 
 # HTTP status codes that should be retried

@@ -224,8 +224,7 @@ def cleanup_runtime_resources(runtime_key: str) -> None:
 
     Should be called when the pipeline finishes to prevent memory leaks.
     """
-    if runtime_key in _RUNTIME_RESOURCES:
-        del _RUNTIME_RESOURCES[runtime_key]
+    _RUNTIME_RESOURCES.pop(runtime_key, None)
 
 
 def _get_resource(state: PipelineState, name: str) -> Any:

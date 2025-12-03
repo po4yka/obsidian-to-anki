@@ -7,7 +7,7 @@ from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.utils.preflight import PreflightChecker
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_config():
     config = Mock(spec=Config)
     config.vault_path = Path("/tmp/vault")
@@ -22,7 +22,7 @@ def mock_config():
     return config
 
 
-@pytest.fixture()
+@pytest.fixture
 def checker(mock_config):
     return PreflightChecker(mock_config)
 

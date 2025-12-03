@@ -3,10 +3,7 @@
 import pytest
 
 from obsidian_anki_sync.agents.models import CardCorrection
-from obsidian_anki_sync.agents.pydantic.models import (
-    CardIssue,
-    PostValidationOutput,
-)
+from obsidian_anki_sync.agents.pydantic.models import CardIssue, PostValidationOutput
 
 
 class TestCardIssueValidators:
@@ -34,9 +31,7 @@ class TestCardIssueValidators:
 
     def test_zero_card_index_corrected(self):
         """Zero card_index should be corrected to 1."""
-        issue = CardIssue.model_validate(
-            {"card_index": 0, "issue_description": "test"}
-        )
+        issue = CardIssue.model_validate({"card_index": 0, "issue_description": "test"})
         assert issue.card_index == 1
 
     def test_negative_card_index_corrected(self):
@@ -66,9 +61,7 @@ class TestCardCorrectionValidators:
 
     def test_empty_field_name_gets_default(self):
         """Empty field_name should get default value."""
-        correction = CardCorrection(
-            card_index=1, field_name="", suggested_value="test"
-        )
+        correction = CardCorrection(card_index=1, field_name="", suggested_value="test")
         assert correction.field_name == "apf_html"
 
     def test_none_suggested_value_becomes_empty_string(self):

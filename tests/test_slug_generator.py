@@ -8,7 +8,7 @@ from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_metadata():
     """Sample note metadata for slug generator tests."""
     return NoteMetadata(

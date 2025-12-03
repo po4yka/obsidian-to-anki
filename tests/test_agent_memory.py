@@ -12,13 +12,13 @@ from obsidian_anki_sync.agents.specialized import ProblemDomain
 class TestAgentMemoryStore:
     """Test agent memory store."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_storage(self):
         """Create temporary storage directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
-    @pytest.fixture()
+    @pytest.fixture
     def memory_store(self, temp_storage):
         """Create memory store instance."""
         # Disable semantic search for testing (avoids OpenAI API calls)
@@ -153,7 +153,7 @@ class TestAgentMemoryStore:
 class TestMemoryIntegration:
     """Test memory integration with other components."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_storage(self):
         """Create temporary storage directory."""
         with tempfile.TemporaryDirectory() as tmpdir:

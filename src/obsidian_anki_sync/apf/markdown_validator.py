@@ -103,8 +103,7 @@ def _validate_formatting_markers(content: str) -> list[str]:
     bold_marker_count = len(re.findall(r"\*\*", content_without_code))
     if bold_marker_count % 2 != 0:
         errors.append(
-            "Unbalanced bold markers (**). "
-            "Each ** needs a matching closing **."
+            "Unbalanced bold markers (**). Each ** needs a matching closing **."
         )
 
     return errors

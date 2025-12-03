@@ -855,25 +855,27 @@ class StateDB(IStateRepository):
             params_list = []
             for item in cards_data:
                 card = item["card"]
-                params_list.append((
-                    card.slug,
-                    card.manifest.slug_base,
-                    card.lang,
-                    card.manifest.source_path,
-                    card.manifest.source_anchor,
-                    card.manifest.card_index,
-                    item.get("anki_guid"),
-                    card.content_hash,
-                    card.manifest.note_id,
-                    card.manifest.note_title,
-                    card.note_type,
-                    card.guid,
-                    item["apf_html"],
-                    json.dumps(item["fields"]),
-                    json.dumps(item["tags"]),
-                    item["deck_name"],
-                    item.get("creation_status", "success"),
-                ))
+                params_list.append(
+                    (
+                        card.slug,
+                        card.manifest.slug_base,
+                        card.lang,
+                        card.manifest.source_path,
+                        card.manifest.source_anchor,
+                        card.manifest.card_index,
+                        item.get("anki_guid"),
+                        card.content_hash,
+                        card.manifest.note_id,
+                        card.manifest.note_title,
+                        card.note_type,
+                        card.guid,
+                        item["apf_html"],
+                        json.dumps(item["fields"]),
+                        json.dumps(item["tags"]),
+                        item["deck_name"],
+                        item.get("creation_status", "success"),
+                    )
+                )
 
             cursor.executemany(
                 """
@@ -924,9 +926,7 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM cards WHERE creation_status = 'pending'"
-        )
+        cursor.execute("SELECT * FROM cards WHERE creation_status = 'pending'")
         return [dict(row) for row in cursor.fetchall()]
 
     def insert_cards_batch(

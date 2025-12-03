@@ -170,7 +170,7 @@ class PydanticAIModelFactory:
         configuration and other enhancements not available in standard OpenAIModel.
 
         Args:
-            model_name: Model identifier (e.g., "x-ai/grok-4.1-fast")
+            model_name: Model identifier (e.g., "x-ai/grok-4.1-fast:free")
             api_key: OpenRouter API key
             base_url: OpenRouter API base URL
             site_url: Site URL for rankings
@@ -317,8 +317,7 @@ class PydanticAIModelFactory:
         provider = provider or config.llm_provider
         model_name = model_name or config.generator_model
 
-        resolved_effort = reasoning_effort or config.get_reasoning_effort(
-            agent_type)
+        resolved_effort = reasoning_effort or config.get_reasoning_effort(agent_type)
 
         if provider.lower() == "openrouter":
             # Use enhanced OpenRouter model for reasoning support

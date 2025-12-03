@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import diskcache
+
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -163,11 +164,7 @@ class RAGService:
         """
         # Check cache
         cache_key = self._get_cache_key(
-            "related",
-            content=content,
-            k=k,
-            topic=topic_filter,
-            language=language
+            "related", content=content, k=k, topic=topic_filter, language=language
         )
 
         if cache_key in self._cache:
@@ -337,10 +334,7 @@ class RAGService:
         """
         # Check cache
         cache_key = self._get_cache_key(
-            "few_shot",
-            topic=topic,
-            difficulty=difficulty,
-            k=k
+            "few_shot", topic=topic, difficulty=difficulty, k=k
         )
 
         if cache_key in self._cache:

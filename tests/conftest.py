@@ -25,43 +25,43 @@ from tests.fixtures import (  # noqa: E402
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_anki_client():
     """Provide a mock Anki client for testing."""
     return MockAnkiClient()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_llm_provider():
     """Provide a mock LLM provider for testing."""
     return MockLLMProvider()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_ollama_provider():
     """Provide a mock Ollama provider for testing (alias for mock_llm_provider)."""
     return MockLLMProvider()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_state_repository():
     """Provide a mock state repository for testing."""
     return MockStateRepository()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_card_generator():
     """Provide a mock card generator for testing."""
     return MockCardGenerator()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_note_parser():
     """Provide a mock note parser for testing."""
     return MockNoteParser()
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note_metadata():
     """Provide sample note metadata for testing."""
     from datetime import datetime
@@ -81,7 +81,7 @@ def sample_note_metadata():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note_content():
     """Provide sample note content with Q&A pairs."""
     return """---
@@ -119,7 +119,7 @@ Unit testing is testing individual components in isolation.
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_qa_pair():
     """Provide a sample Q&A pair for testing."""
     return QAPair(
@@ -133,7 +133,7 @@ def sample_qa_pair():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note(sample_note_metadata, tmp_path):
     """Provide a sample note entity for testing."""
     file_path = tmp_path / "sample_note.md"
@@ -150,7 +150,7 @@ def sample_note(sample_note_metadata, tmp_path):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_card(sample_note):
     """Provide a sample card entity for testing."""
     manifest = CardManifest(
@@ -174,7 +174,7 @@ def sample_card(sample_note):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def temp_vault_dir(tmp_path):
     """Provide a temporary directory structure mimicking an Obsidian vault."""
     vault_dir = tmp_path / "vault"
@@ -224,7 +224,7 @@ Development is writing code.
     return vault_dir
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_config(temp_vault_dir):
     """Provide a mock Config instance with valid paths."""
     from unittest.mock import MagicMock

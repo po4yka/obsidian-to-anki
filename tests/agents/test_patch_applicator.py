@@ -9,7 +9,7 @@ from obsidian_anki_sync.agents.patch_applicator import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_cards() -> list[GeneratedCard]:
     """Create sample cards for testing.
 
@@ -351,7 +351,7 @@ class TestHtmlEntityDecoding:
             )
         ]
 
-        corrected, changes = apply_corrections(sample_cards, corrections)
+        _corrected, changes = apply_corrections(sample_cards, corrections)
 
         # No changes should be applied
         assert changes == []

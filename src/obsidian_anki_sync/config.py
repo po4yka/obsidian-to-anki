@@ -70,8 +70,7 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(
-        default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path(), description="Source directory within vault"
     )
@@ -133,8 +132,7 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(
-        default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -151,8 +149,7 @@ class Config(BaseSettings):
     )
 
     # Runtime settings
-    run_mode: str = Field(
-        default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -296,9 +293,7 @@ class Config(BaseSettings):
     ) -> dict[str, str]:
         if not value:
             return {}
-        return {
-            k.lower(): normalize_reasoning_effort(v) for k, v in value.items()
-        }
+        return {k.lower(): normalize_reasoning_effort(v) for k, v in value.items()}
 
     # Ollama provider settings (local or cloud)
     ollama_base_url: str = "http://localhost:11434"
@@ -971,8 +966,7 @@ class Config(BaseSettings):
                 overrides["max_tokens"] = self.parser_repair_max_tokens
 
         # Get model config from preset
-        config = get_model_config(
-            model_task, preset, overrides if overrides else None)
+        config = get_model_config(model_task, preset, overrides if overrides else None)
 
         # Override model name if explicitly set
         explicit_model = self.get_model_for_agent(task)
@@ -1048,8 +1042,7 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(
-            self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -1290,8 +1283,7 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_searching", source="environment_variable", path=env_path
             )
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(
-            __file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
         logger.debug(
             "config_searching",
@@ -1303,8 +1295,7 @@ def load_config(config_path: Path | None = None) -> Config:
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
-            logger.info("config_file_found",
-                        config_path=str(resolved_config_path))
+            logger.info("config_file_found", config_path=str(resolved_config_path))
             break
 
     if not resolved_config_path:
@@ -1407,8 +1398,7 @@ def load_config(config_path: Path | None = None) -> Config:
             config = Config(**config_kwargs)
             logger.info(
                 "config_loaded",
-                vault_path=str(
-                    config.vault_path) if config.vault_path else None,
+                vault_path=str(config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
                 use_agents=getattr(config, "use_agents", False),
                 use_langgraph=getattr(config, "use_langgraph", False),
@@ -1418,8 +1408,7 @@ def load_config(config_path: Path | None = None) -> Config:
                 "config_validation_error",
                 error=str(e),
                 error_type=type(e).__name__,
-                config_path=str(
-                    resolved_config_path) if resolved_config_path else None,
+                config_path=str(resolved_config_path) if resolved_config_path else None,
             )
             raise
 

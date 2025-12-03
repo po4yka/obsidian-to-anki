@@ -26,7 +26,6 @@ import asyncio
 import yaml  # type: ignore
 from arq import create_pool
 from arq.connections import RedisSettings
-from arq.jobs import Job
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import (
@@ -371,31 +370,37 @@ class NoteScanner:
                 for (qa_pair, lang), (card, _, _) in zip(tasks, results):
                     if card:
                         try:
-                            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
-                            pending_cards_data.append({
-                                "card": card,
-                                "anki_guid": None,
-                                "fields": fields,
-                                "tags": card.tags,
-                                "deck_name": self.config.anki_deck_name,
-                                "apf_html": card.apf_html,
-                                "creation_status": "pending"
-                            })
+                            fields = map_apf_to_anki_fields(
+                                card.apf_html, card.note_type
+                            )
+                            pending_cards_data.append(
+                                {
+                                    "card": card,
+                                    "anki_guid": None,
+                                    "fields": fields,
+                                    "tags": card.tags,
+                                    "deck_name": self.config.anki_deck_name,
+                                    "apf_html": card.apf_html,
+                                    "creation_status": "pending",
+                                }
+                            )
                         except Exception as e:
                             logger.warning(
                                 "failed_to_prepare_pending_card_for_batch",
                                 slug=card.slug,
-                                error=str(e)
+                                error=str(e),
                             )
 
                 if pending_cards_data:
                     try:
                         self.db.upsert_batch_extended(pending_cards_data)
-                        logger.debug("persisted_pending_cards_batch", count=len(pending_cards_data))
+                        logger.debug(
+                            "persisted_pending_cards_batch",
+                            count=len(pending_cards_data),
+                        )
                     except Exception as e:
                         logger.warning(
-                            "failed_to_persist_pending_cards_batch",
-                            error=str(e)
+                            "failed_to_persist_pending_cards_batch", error=str(e)
                         )
 
                 failures_this_note = 0
@@ -418,7 +423,8 @@ class NoteScanner:
                 # Atomic processing callback
                 if on_batch_complete:
                     cards_generated = [
-                        card for (qa_pair, lang), (card, _, _) in zip(tasks, results)
+                        card
+                        for (qa_pair, lang), (card, _, _) in zip(tasks, results)
                         if card
                     ]
                     if cards_generated:
@@ -831,7 +837,9 @@ class NoteScanner:
 
         # Use hardened Redis settings
         redis_settings = RedisSettings.from_dsn(self.config.redis_url)
-        redis_settings.conn_timeout = getattr(self.config, "redis_socket_connect_timeout", 5.0)
+        redis_settings.conn_timeout = getattr(
+            self.config, "redis_socket_connect_timeout", 5.0
+        )
 
         pool = await create_pool(redis_settings)
 
@@ -846,6 +854,7 @@ class NoteScanner:
 
         # Generate unique session ID for this batch
         import uuid
+
         session_id = str(uuid.uuid4())
         result_queue_name = f"obsidian_anki_sync:results:{session_id}"
 
@@ -858,7 +867,9 @@ class NoteScanner:
             self.config, "queue_circuit_breaker_threshold", 3
         )
 
-        logger.info("submitting_jobs", total_files=len(note_files), session_id=session_id)
+        logger.info(
+            "submitting_jobs", total_files=len(note_files), session_id=session_id
+        )
 
         # Submit all jobs with retry logic
         for file_path, relative_path in note_files:
@@ -975,11 +986,14 @@ class NoteScanner:
                 try:
                     # BLPOP returns (key, value) tuple or None on timeout
                     # We use a small timeout to allow the loop to check overall constraints
-                    result_data = await pool.blpop(result_queue_name, timeout=blpop_timeout)
+                    result_data = await pool.blpop(
+                        result_queue_name, timeout=blpop_timeout
+                    )
 
                     if result_data:
                         _, payload = result_data
                         import json
+
                         result = json.loads(payload)
 
                         # We don't have job_id in the result payload by default unless we add it.
@@ -1028,9 +1042,7 @@ class NoteScanner:
                         else:
                             error_msg = result.get("error", "Unknown error")
                             # We don't know the file path here easily without job_id
-                            logger.warning(
-                                "job_failed_result", error=error_msg
-                            )
+                            logger.warning("job_failed_result", error=error_msg)
                             self.stats["errors"] = self.stats.get("errors", 0) + 1
                             error_by_type["queue_error"] += 1
                             if len(error_samples["queue_error"]) < 3:
@@ -1039,7 +1051,9 @@ class NoteScanner:
                                 )
 
                         logger.info(
-                            "queue_progress", completed=completed_jobs, total=len(job_map)
+                            "queue_progress",
+                            completed=completed_jobs,
+                            total=len(job_map),
                         )
 
                 except Exception as e:
@@ -1052,7 +1066,11 @@ class NoteScanner:
             try:
                 await pool.delete(result_queue_name)
             except Exception as e:
-                logger.warning("failed_to_cleanup_result_queue", queue=result_queue_name, error=str(e))
+                logger.warning(
+                    "failed_to_cleanup_result_queue",
+                    queue=result_queue_name,
+                    error=str(e),
+                )
 
             await pool.close()
 
@@ -1303,30 +1321,35 @@ class NoteScanner:
                 for card in cards.values():
                     try:
                         fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
-                        pending_cards_data.append({
-                            "card": card,
-                            "anki_guid": None,
-                            "fields": fields,
-                            "tags": card.tags,
-                            "deck_name": self.config.anki_deck_name,
-                            "apf_html": card.apf_html,
-                            "creation_status": "pending"
-                        })
+                        pending_cards_data.append(
+                            {
+                                "card": card,
+                                "anki_guid": None,
+                                "fields": fields,
+                                "tags": card.tags,
+                                "deck_name": self.config.anki_deck_name,
+                                "apf_html": card.apf_html,
+                                "creation_status": "pending",
+                            }
+                        )
                     except Exception as e:
                         logger.warning(
                             "failed_to_prepare_pending_card_for_batch_parallel",
                             slug=card.slug,
-                            error=str(e)
+                            error=str(e),
                         )
 
                 if pending_cards_data:
                     try:
                         self.db.upsert_batch_extended(pending_cards_data)
-                        logger.debug("persisted_pending_cards_batch_parallel", count=len(pending_cards_data))
+                        logger.debug(
+                            "persisted_pending_cards_batch_parallel",
+                            count=len(pending_cards_data),
+                        )
                     except Exception as e:
                         logger.warning(
                             "failed_to_persist_pending_cards_batch_parallel",
-                            error=str(e)
+                            error=str(e),
                         )
 
             result_info["success"] = True

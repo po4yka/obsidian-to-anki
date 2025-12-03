@@ -635,13 +635,15 @@ class SyncEngine:
                     batch_obsidian_cards,
                     anki_cards,
                     batch_changes,
-                    db_cards_override=db_cards
+                    db_cards_override=db_cards,
                 )
 
                 # Update stats
                 for change in batch_changes:
                     change_type = change.type
-                    changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                    changes_by_type[change_type] = (
+                        changes_by_type.get(change_type, 0) + 1
+                    )
                     self.changes.append(change)
 
                 # Apply changes immediately if not dry run
@@ -673,7 +675,7 @@ class SyncEngine:
                 incremental=incremental,
                 qa_extractor=self.qa_extractor,
                 existing_cards_for_duplicate_detection=existing_cards,
-                on_batch_complete=on_batch_complete
+                on_batch_complete=on_batch_complete,
             )
 
             scan_duration = time.time() - scan_start_time
@@ -764,7 +766,9 @@ class SyncEngine:
             if deletion_changes:
                 for change in deletion_changes:
                     change_type = change.type
-                    changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                    changes_by_type[change_type] = (
+                        changes_by_type.get(change_type, 0) + 1
+                    )
                     self.changes.append(change)
 
                 if not dry_run:
@@ -787,8 +791,8 @@ class SyncEngine:
                     changes_previewed=len(self.changes),
                 )
             else:
-                 # Changes already applied incrementally
-                 pass
+                # Changes already applied incrementally
+                pass
 
             # Mark as completed
             if self.progress:

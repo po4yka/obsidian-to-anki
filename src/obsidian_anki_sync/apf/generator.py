@@ -21,9 +21,7 @@ from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.retry import retry
 
 if TYPE_CHECKING:
-    from obsidian_anki_sync.providers.openrouter.provider import (
-        OpenRouterStreamResult,
-    )
+    from obsidian_anki_sync.providers.openrouter.provider import OpenRouterStreamResult
 
 logger = get_logger(__name__)
 
@@ -267,8 +265,7 @@ class APFGenerator:
             cards = []
             for qa_pair, manifest in zip(qa_pairs, manifests):
                 try:
-                    card = self.generate_card(
-                        qa_pair, metadata, manifest, lang)
+                    card = self.generate_card(qa_pair, metadata, manifest, lang)
                     cards.append(card)
                 except Exception as card_error:
                     logger.error(
@@ -288,8 +285,7 @@ class APFGenerator:
     ) -> list[Card]:
         """Generate multiple cards in a single LLM call."""
         # Build batch prompt
-        user_prompt = self._build_batch_prompt(
-            qa_pairs, metadata, manifests, lang)
+        user_prompt = self._build_batch_prompt(qa_pairs, metadata, manifests, lang)
 
         model_name = self._get_generator_model()
         logger.debug(
@@ -307,8 +303,7 @@ class APFGenerator:
                 temperature=self.config.llm_temperature,
                 stream=False,
                 reasoning_enabled=self.config.llm_reasoning_enabled,
-                reasoning_effort=self.config.get_reasoning_effort(
-                    "generation"),
+                reasoning_effort=self.config.get_reasoning_effort("generation"),
             )
 
             apf_html_batch = result.get("response")
@@ -403,8 +398,7 @@ Requirements:
                 card_html = card_html.strip()
 
                 # Normalize code blocks
-                card_html = self._normalize_code_blocks(
-                    card_html, default_lang)
+                card_html = self._normalize_code_blocks(card_html, default_lang)
 
                 # Compute content hash
                 content_hash = compute_content_hash(qa_pair, metadata, lang)
@@ -416,8 +410,7 @@ Requirements:
                 tags = self._extract_tags(metadata, lang)
 
                 # Ensure manifest is correct
-                card_html = self._ensure_manifest(
-                    card_html, manifest, tags, note_type)
+                card_html = self._ensure_manifest(card_html, manifest, tags, note_type)
 
                 cards.append(
                     Card(
@@ -524,9 +517,7 @@ Requirements:
         return stream.collect()
 
     @staticmethod
-    def _serialize_messages_for_prompt(
-        messages: list[dict[str, str]]
-    ) -> str:
+    def _serialize_messages_for_prompt(messages: list[dict[str, str]]) -> str:
         """Flatten a chat transcript into a single string prompt."""
         if not messages:
             return ""
@@ -770,7 +761,7 @@ QUALITY RULES:
                 normalized_parts.append(apf_html[cursor:])
                 break
 
-            fence_content = apf_html[start + 3: end]
+            fence_content = apf_html[start + 3 : end]
             if "\n" in fence_content:
                 lang_spec, code_body = fence_content.split("\n", 1)
             else:

@@ -26,7 +26,9 @@ from obsidian_anki_sync.models import NoteMetadata, QAPair
 class CardIssue(BaseModel):
     """Issue found in a specific card during validation."""
 
-    card_index: int = Field(default=1, ge=1, description="1-based card index (first card is 1)")
+    card_index: int = Field(
+        default=1, ge=1, description="1-based card index (first card is 1)"
+    )
     issue_description: str = Field(
         default="Unspecified issue",
         max_length=500,
@@ -99,10 +101,12 @@ class CardGenerationOutput(BaseModel):
 class PostValidationOutput(BaseModel):
     """Structured output from post-validation agent."""
 
-    is_valid: bool = Field(default=True, description="Whether all cards pass validation")
+    is_valid: bool = Field(
+        default=True, description="Whether all cards pass validation"
+    )
     error_type: str = Field(
         default="none",
-        description="Type of error: syntax, factual, semantic, template, or none"
+        description="Type of error: syntax, factual, semantic, template, or none",
     )
     error_details: str = Field(default="", description="Detailed validation errors")
     card_issues: list[CardIssue] = Field(

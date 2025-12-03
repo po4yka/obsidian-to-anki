@@ -1,9 +1,11 @@
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
+
+from obsidian_anki_sync.models import Card, Manifest, SyncAction
 from obsidian_anki_sync.sync.engine import SyncEngine
-from obsidian_anki_sync.models import Card, SyncAction, Manifest
+
 
 @pytest.fixture
 def mock_components():
@@ -25,16 +27,22 @@ def mock_components():
 
     return config, state_db, note_scanner, anki_state_manager, change_applier
 
+
 def test_atomic_sync_callback(mock_components):
-    config, state_db, note_scanner, anki_state_manager, change_applier = mock_components
+    config, state_db, _note_scanner, _anki_state_manager, _change_applier = (
+        mock_components
+    )
 
     # Patch the classes that SyncEngine instantiates internally
-    with patch("obsidian_anki_sync.sync.engine.NoteScanner") as MockNoteScanner, \
-         patch("obsidian_anki_sync.sync.engine.AnkiStateManager") as MockAnkiStateManager, \
-         patch("obsidian_anki_sync.sync.engine.ChangeApplier") as MockChangeApplier, \
-         patch("obsidian_anki_sync.sync.engine.CardGenerator") as MockCardGenerator, \
-         patch("obsidian_anki_sync.sync.engine.APFGenerator") as MockAPFGenerator:
-
+    with (
+        patch("obsidian_anki_sync.sync.engine.NoteScanner") as MockNoteScanner,
+        patch(
+            "obsidian_anki_sync.sync.engine.AnkiStateManager"
+        ) as MockAnkiStateManager,
+        patch("obsidian_anki_sync.sync.engine.ChangeApplier") as MockChangeApplier,
+        patch("obsidian_anki_sync.sync.engine.CardGenerator") as MockCardGenerator,
+        patch("obsidian_anki_sync.sync.engine.APFGenerator") as MockAPFGenerator,
+    ):
         # Setup mock instances
         note_scanner_instance = MockNoteScanner.return_value
         anki_state_manager_instance = MockAnkiStateManager.return_value
@@ -62,12 +70,12 @@ def test_atomic_sync_callback(mock_components):
                     note_id="note-id",
                     note_title="Test Note",
                     card_index=0,
-                    guid="guid"
+                    guid="guid",
                 ),
                 content_hash="hash",
                 note_type="APF::Simple",
                 tags=[],
-                guid="guid"
+                guid="guid",
             )
 
             # Invoke callback
@@ -78,11 +86,15 @@ def test_atomic_sync_callback(mock_components):
         note_scanner_instance.scan_notes.side_effect = mock_scan_notes
 
         # Mock determine_actions to generate a create action
-        def mock_determine_actions(obs_cards, anki_cards, changes, db_cards_override=None):
+        def mock_determine_actions(
+            obs_cards, anki_cards, changes, db_cards_override=None
+        ):
             for card in obs_cards.values():
                 changes.append(SyncAction(type="create", card=card, reason="Test"))
 
-        anki_state_manager_instance.determine_actions.side_effect = mock_determine_actions
+        anki_state_manager_instance.determine_actions.side_effect = (
+            mock_determine_actions
+        )
 
         # Initialize engine
         engine = SyncEngine(

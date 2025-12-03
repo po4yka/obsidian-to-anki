@@ -21,10 +21,8 @@ class CheckResult(BaseModel):
     name: str = Field(min_length=1, description="Check name")
     passed: bool = Field(description="Whether the check passed")
     message: str = Field(min_length=1, description="Result message")
-    severity: str = Field(
-        description="Severity level: 'error', 'warning', 'info'")
-    fixable: bool = Field(
-        default=False, description="Whether the issue is fixable")
+    severity: str = Field(description="Severity level: 'error', 'warning', 'info'")
+    fixable: bool = Field(default=False, description="Whether the issue is fixable")
     fix_suggestion: str | None = Field(
         default=None, description="Suggestion for fixing the issue"
     )
@@ -87,8 +85,7 @@ class PreflightChecker:
 
         # Count errors
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [
-            r for r in self.results if not r.passed and r.severity == "warning"]
+        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
 
         all_passed = len(errors) == 0
 
@@ -347,10 +344,10 @@ class PreflightChecker:
                     )
 
                     status_payload = getattr(
-                        provider, "fetch_key_status", lambda: None)()
+                        provider, "fetch_key_status", lambda: None
+                    )()
                     if status_payload:
-                        credits, rpm = self._parse_openrouter_limits(
-                            status_payload)
+                        credits, rpm = self._parse_openrouter_limits(status_payload)
                         if credits is not None:
                             severity = "warning" if credits < 5 else "info"
                             self.results.append(
@@ -753,8 +750,7 @@ class PreflightChecker:
                         )
                     )
             except Exception as e:
-                logger.warning("disk_space_check_failed",
-                               path=str(path), error=str(e))
+                logger.warning("disk_space_check_failed", path=str(path), error=str(e))
 
     def _check_memory(self) -> None:
         """Check system memory."""
@@ -826,7 +822,7 @@ class PreflightChecker:
 
     @staticmethod
     def _parse_openrouter_limits(
-        status_payload: dict[str, Any]
+        status_payload: dict[str, Any],
     ) -> tuple[float | None, float | None]:
         """Extract remaining credits and RPM from OpenRouter `/key` payload."""
         data = status_payload.get("data") or status_payload

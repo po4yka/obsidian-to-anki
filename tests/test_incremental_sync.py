@@ -12,7 +12,7 @@ from obsidian_anki_sync.sync.state_db import StateDB
 class TestIncrementalSync:
     """Test incremental sync mode."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -205,7 +205,7 @@ class TestIncrementalSync:
 class TestIncrementalSyncStatistics:
     """Test statistics tracking for incremental sync."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:

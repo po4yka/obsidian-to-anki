@@ -275,9 +275,7 @@ class AnkiClient(IAnkiClient):
 
     async def find_notes_async(self, query: str) -> list[int]:
         """Find notes matching query (async)."""
-        return cast(
-            "list[int]", await self.invoke_async("findNotes", {"query": query})
-        )
+        return cast("list[int]", await self.invoke_async("findNotes", {"query": query}))
 
     def _build_note_payload(
         self,
@@ -707,9 +705,7 @@ class AnkiClient(IAnkiClient):
             "batch_tags_optimized",
             original_count=len(note_tag_pairs),
             grouped_count=len(actions),
-            reduction_pct=round(
-                (1 - len(actions) / len(note_tag_pairs)) * 100, 1
-            ),
+            reduction_pct=round((1 - len(actions) / len(note_tag_pairs)) * 100, 1),
         )
 
         try:

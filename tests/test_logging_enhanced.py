@@ -14,7 +14,7 @@ from obsidian_anki_sync.utils.logging import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def temp_dir(tmp_path):
     """Alias for pytest's tmp_path fixture."""
     return tmp_path

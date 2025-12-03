@@ -295,7 +295,9 @@ Notes here
 <!-- END_CARDS -->"""
         result = validate_apf_markdown(apf)
         # Should detect the unclosed fence
-        assert any("code fence" in e.lower() for e in result.errors) or not result.is_valid
+        assert (
+            any("code fence" in e.lower() for e in result.errors) or not result.is_valid
+        )
 
     def test_multiple_cards(self) -> None:
         """Multiple cards in document should all be validated."""

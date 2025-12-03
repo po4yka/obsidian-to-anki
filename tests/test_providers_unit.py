@@ -21,7 +21,7 @@ from obsidian_anki_sync.providers.factory import ProviderFactory
 from obsidian_anki_sync.providers.ollama import OllamaProvider
 
 
-@pytest.fixture()
+@pytest.fixture
 def temp_dir(tmp_path):
     """Alias for pytest's tmp_path fixture."""
     return tmp_path
@@ -245,7 +245,7 @@ def test_base_provider_generate_json_invalid_json_raises_error():
 # Test Ollama Provider
 
 
-@pytest.fixture()
+@pytest.fixture
 def ollama_provider():
     """Provide an OllamaProvider instance for tests."""
     return OllamaProvider(

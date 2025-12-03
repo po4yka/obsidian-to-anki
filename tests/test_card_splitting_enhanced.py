@@ -9,7 +9,7 @@ from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_metadata():
     """Create sample note metadata."""
     return NoteMetadata(
@@ -23,7 +23,7 @@ def sample_metadata():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_qa_pairs():
     """Create sample Q&A pairs."""
     return [
@@ -41,7 +41,7 @@ def sample_qa_pairs():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def card_splitting_agent():
     """Create a CardSplittingAgentAI instance with mocked PydanticAI Agent."""
     mock_model = MagicMock()

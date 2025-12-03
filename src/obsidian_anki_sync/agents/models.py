@@ -30,8 +30,7 @@ class CardCorrection(BaseModel):
         description="Current field value (optional, for context)",
     )
     suggested_value: str = Field(
-        default="",
-        description="Suggested corrected value (use raw HTML, not entities)"
+        default="", description="Suggested corrected value (use raw HTML, not entities)"
     )
     rationale: str = Field(
         default="",

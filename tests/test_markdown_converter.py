@@ -253,7 +253,10 @@ END_OF_CARDS"""
         # Structure should be preserved
         assert "<!-- PROMPT_VERSION: apf-v2.1 -->" in result
         assert "<!-- BEGIN_CARDS -->" in result
-        assert "<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test -->" in result
+        assert (
+            "<!-- Card 1 | slug: test-card | CardType: Simple | Tags: test -->"
+            in result
+        )
         assert "<!-- Title -->" in result
         assert "<!-- Key point -->" in result
         assert "<!-- Key point notes -->" in result

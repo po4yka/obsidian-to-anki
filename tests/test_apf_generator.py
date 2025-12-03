@@ -27,7 +27,7 @@ def _patch_openrouter_provider(monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def dummy_config(tmp_path):
     """Create a minimal config for APFGenerator."""
     # Create source directory in vault
@@ -51,7 +51,7 @@ def dummy_config(tmp_path):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_metadata_for_code():
     return NoteMetadata(
         id="test",
@@ -64,7 +64,7 @@ def sample_metadata_for_code():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def plain_metadata():
     return NoteMetadata(
         id="plain",
@@ -77,7 +77,7 @@ def plain_metadata():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_manifest():
     return Manifest(
         slug="sample-slug-en",
@@ -92,7 +92,7 @@ def sample_manifest():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_qa_pair_for_prompt():
     return QAPair(
         card_index=1,

@@ -8,7 +8,7 @@ from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_qa_pair():
     """Sample QAPair for content hash tests."""
     return QAPair(
@@ -24,7 +24,7 @@ def sample_qa_pair():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_metadata():
     """Sample NoteMetadata for content hash tests."""
     return NoteMetadata(

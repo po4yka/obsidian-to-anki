@@ -245,6 +245,8 @@ ignore = [
     "S108",      # insecure temp file usage (acceptable in test paths)
     "PTH118",    # os.path.join vs Path (acceptable in utility scripts)
     "RUF012",    # mutable class attributes should be annotated with ClassVar
+    "UP046",     # Generic class uses Generic subclass (style preference, Generic[T] is readable)
+    "UP047",     # Generic function should use type parameters (style preference)
 ]
 
 # Allow autofix for safe rules
@@ -304,7 +306,7 @@ exclude = [
     "TCH002",    # move import to type-checking block
     "TCH003",    # move import to type-checking block
 ]
-"src/obsidian_anki_sync/cli.py" = ["T201"]  # print statements in CLI
+"src/obsidian_anki_sync/cli.py" = ["T201", "PT028"]  # print statements in CLI, CLI commands are not pytest tests
 "scripts/**" = ["T201", "S603", "S607"]  # scripts may use print and subprocess
 "docs/**" = ["T201"]  # documentation scripts
 "conftest.py" = ["F401"]  # conftest.py often has unused imports

@@ -9,7 +9,7 @@ from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
 from obsidian_anki_sync.obsidian.parser import parse_frontmatter
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_note_content():
     """Sample note content for validator tests."""
     return """---
@@ -45,7 +45,7 @@ Unit testing is testing individual components.
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def sample_metadata():
     """Sample metadata for validator tests."""
     return NoteMetadata(

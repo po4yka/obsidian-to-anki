@@ -12,7 +12,7 @@ from obsidian_anki_sync.agents.models import GeneratedCard, PostValidationResult
 from obsidian_anki_sync.models import NoteMetadata
 
 
-@pytest.fixture()
+@pytest.fixture
 def post_validation_state() -> Callable[[], dict]:
     """Factory that produces a minimal PipelineState for post-validation tests."""
 
@@ -73,7 +73,7 @@ class _DummyValidator:
         return response
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_post_validation_node_retries_and_records_stage_time(
     post_validation_state: Callable[[], dict],
     monkeypatch: pytest.MonkeyPatch,

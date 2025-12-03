@@ -13,7 +13,7 @@ from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.worker import process_note_job
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_config():
     config = Config()
     config.enable_queue = True
@@ -21,7 +21,7 @@ def mock_config():
     return config
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_pool():
     pool = AsyncMock(spec=ArqRedis)
     # Add ping method for health check
@@ -51,6 +51,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     # Mock BLPOP return value
     # BLPOP returns (key, value)
     import json
+
     result_payload = {
         "success": True,
         "cards": [
@@ -84,7 +85,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     # We have 1 job, so 1 result should clear it.
     mock_pool.blpop.side_effect = [
         (b"queue", json.dumps(result_payload).encode("utf-8")),
-        None
+        None,
     ]
 
     # create_pool is async, so we need to return a coroutine that returns the mock_pool
@@ -132,17 +133,13 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
         assert "obsidian_anki_sync:results:" in call_kwargs["result_queue_name"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_process_note_job():
     """Test worker job processing pushes to Redis."""
 
     # Mock Redis in context
     mock_redis = AsyncMock()
-    ctx = {
-        "config": Config(),
-        "orchestrator": AsyncMock(),
-        "redis": mock_redis
-    }
+    ctx = {"config": Config(), "orchestrator": AsyncMock(), "redis": mock_redis}
 
     # Mock orchestrator result
     mock_result = MagicMock()
@@ -192,7 +189,7 @@ async def test_process_note_job():
             "test.md",
             metadata_dict,
             qa_pairs_dicts,
-            result_queue_name=result_queue
+            result_queue_name=result_queue,
         )
 
         assert result["success"] is True
@@ -203,6 +200,7 @@ async def test_process_note_job():
         assert mock_redis.rpush.called
         assert mock_redis.rpush.call_args[0][0] == result_queue
         import json
+
         payload = json.loads(mock_redis.rpush.call_args[0][1])
         assert payload["success"] is True
         assert payload["cards"][0]["slug"] == "test-card"

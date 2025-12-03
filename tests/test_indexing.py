@@ -12,7 +12,7 @@ from obsidian_anki_sync.sync.state_db import StateDB
 class TestNoteIndex:
     """Test note index functionality."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -170,7 +170,7 @@ class TestNoteIndex:
 class TestCardIndex:
     """Test card index functionality."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -278,7 +278,7 @@ class TestCardIndex:
 class TestIndexStatistics:
     """Test index statistics functionality."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -449,7 +449,7 @@ class TestIndexStatistics:
 class TestIndexIntegration:
     """Test integration between note and card indexes."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:

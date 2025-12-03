@@ -18,18 +18,15 @@ class LLMResponse(BaseModel):
     """
 
     response: str = Field(description="The generated text response")
-    tokens_used: int | None = Field(
-        default=None, description="Total tokens consumed")
-    prompt_tokens: int | None = Field(
-        default=None, description="Tokens in the prompt")
+    tokens_used: int | None = Field(default=None, description="Total tokens consumed")
+    prompt_tokens: int | None = Field(default=None, description="Tokens in the prompt")
     completion_tokens: int | None = Field(
         default=None, description="Tokens in the completion"
     )
     finish_reason: str | None = Field(
         default=None, description="Reason for completion (stop, length, etc.)"
     )
-    model: str | None = Field(
-        default=None, description="Model used for generation")
+    model: str | None = Field(default=None, description="Model used for generation")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LLMResponse":

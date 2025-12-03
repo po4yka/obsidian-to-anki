@@ -55,7 +55,7 @@ def anyio_backend():
 # =============================================================================
 
 
-@pytest.fixture()
+@pytest.fixture
 def base_reasoning_output():
     """Create a base reasoning output for testing."""
     return ReasoningTraceOutput(
@@ -68,7 +68,7 @@ def base_reasoning_output():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_pipeline_state():
     """Create a minimal pipeline state for testing."""
     from datetime import datetime
@@ -110,7 +110,7 @@ def mock_pipeline_state():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_config():
     """Create a mock config for testing."""
     config = MagicMock(spec=Config)

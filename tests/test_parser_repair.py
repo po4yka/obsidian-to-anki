@@ -8,13 +8,13 @@ from obsidian_anki_sync.obsidian.parser import parse_note_with_repair
 from tests.fixtures.mock_llm_provider import MockLLMProvider
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_ollama_provider():
     """Create a mock Ollama provider for testing."""
     return MockLLMProvider()
 
 
-@pytest.fixture()
+@pytest.fixture
 def parser_repair_agent(mock_ollama_provider):
     """Create a ParserRepairAgent instance for testing."""
     return ParserRepairAgent(
@@ -22,7 +22,7 @@ def parser_repair_agent(mock_ollama_provider):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def malformed_note_empty_language_tags():
     """Create a malformed note with empty language_tags."""
     content = """---
@@ -49,7 +49,7 @@ Testing is verification.
     return content
 
 
-@pytest.fixture()
+@pytest.fixture
 def repaired_note_content():
     """Create repaired note content."""
     content = """---

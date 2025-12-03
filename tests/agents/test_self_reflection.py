@@ -56,7 +56,7 @@ def anyio_backend():
 # =============================================================================
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_pipeline_state():
     """Create a mock pipeline state for self-reflection tests."""
     from unittest.mock import MagicMock

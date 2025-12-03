@@ -1,14 +1,16 @@
 """Tests for performance tracker agent."""
 
-import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 from obsidian_anki_sync.agents.performance_tracker import PerformanceTracker
-from obsidian_anki_sync.models import Card, Manifest
+from obsidian_anki_sync.models import Card
 
 
-class TestPerformanceTracker(unittest.TestCase):
-    def setUp(self):
+class TestPerformanceTracker:
+    @pytest.fixture(autouse=True)
+    def setup(self):
         self.mock_anki_client = MagicMock()
         self.tracker = PerformanceTracker(self.mock_anki_client)
 
@@ -37,12 +39,12 @@ class TestPerformanceTracker(unittest.TestCase):
 
         metrics = self.tracker.get_card_performance([123])
 
-        self.assertIn(123, metrics)
+        assert 123 in metrics
         card_metrics = metrics[123]
-        self.assertEqual(card_metrics["total_reviews"], 10)
-        self.assertEqual(card_metrics["lapses"], 1)
-        self.assertEqual(card_metrics["lapse_rate"], 0.1)
-        self.assertEqual(card_metrics["difficulty_indicator"], "medium")
+        assert card_metrics["total_reviews"] == 10
+        assert card_metrics["lapses"] == 1
+        assert card_metrics["lapse_rate"] == 0.1
+        assert card_metrics["difficulty_indicator"] == "medium"
 
     def test_get_review_statistics_success(self):
         """Test fetching overall review statistics."""
@@ -51,8 +53,8 @@ class TestPerformanceTracker(unittest.TestCase):
 
         stats = self.tracker.get_review_statistics()
 
-        self.assertEqual(stats["reviews_today"], 50.0)
-        self.assertEqual(stats["collection_stats_html"], "<html>Stats</html>")
+        assert stats["reviews_today"] == 50.0
+        assert stats["collection_stats_html"] == "<html>Stats</html>"
 
     def test_analyze_card_patterns_with_guids(self):
         """Test card pattern analysis using GUIDs."""
@@ -111,12 +113,12 @@ class TestPerformanceTracker(unittest.TestCase):
         issues = self.tracker.analyze_card_patterns(cards)
 
         # Check that issues were identified correctly
-        self.assertIn("slug1", issues.get("persistent_failures", []))
-        self.assertIn("slug1", issues.get("very_difficult", []))
-        self.assertIn("slug1", issues.get("potential_leeches", []))
+        assert "slug1" in issues.get("persistent_failures", [])
+        assert "slug1" in issues.get("very_difficult", [])
+        assert "slug1" in issues.get("potential_leeches", [])
 
-        self.assertNotIn("slug2", issues.get("persistent_failures", []))
-        self.assertNotIn("slug2", issues.get("very_difficult", []))
+        assert "slug2" not in issues.get("persistent_failures", [])
+        assert "slug2" not in issues.get("very_difficult", [])
 
     def test_analyze_card_patterns_no_guids(self):
         """Test pattern analysis with cards missing GUIDs."""
@@ -127,9 +129,5 @@ class TestPerformanceTracker(unittest.TestCase):
         issues = self.tracker.analyze_card_patterns([card1])
 
         # Should find no issues and call no Anki methods
-        self.assertEqual(len(issues), 0)
+        assert len(issues) == 0
         self.mock_anki_client.find_notes.assert_not_called()
-
-
-if __name__ == "__main__":
-    unittest.main()

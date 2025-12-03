@@ -155,12 +155,18 @@ async def process_note_job(
             error_details = []
             if not pipeline_result.success:
                 error_details.append("Pipeline marked as failed")
-            if pipeline_result.pre_validation and not pipeline_result.pre_validation.is_valid:
+            if (
+                pipeline_result.pre_validation
+                and not pipeline_result.pre_validation.is_valid
+            ):
                 error_details.append(
                     f"Pre-validation failed ({pipeline_result.pre_validation.error_type}): "
                     f"{pipeline_result.pre_validation.error_details}"
                 )
-            if pipeline_result.post_validation and not pipeline_result.post_validation.is_valid:
+            if (
+                pipeline_result.post_validation
+                and not pipeline_result.post_validation.is_valid
+            ):
                 error_details.append(
                     f"Post-validation failed ({pipeline_result.post_validation.error_type}): "
                     f"{pipeline_result.post_validation.error_details}"
@@ -222,7 +228,11 @@ async def process_note_job(
             **pipeline_context,
         )
 
-        result = {"success": True, "cards": cards_dicts, "slugs": [c.slug for c in cards]}
+        result = {
+            "success": True,
+            "cards": cards_dicts,
+            "slugs": [c.slug for c in cards],
+        }
         if result_queue_name:
             await _push_result(ctx, result_queue_name, result)
         return result
@@ -235,10 +245,13 @@ async def process_note_job(
         return result
 
 
-async def _push_result(ctx: dict[str, Any], queue_name: str, result: dict[str, Any]) -> None:
+async def _push_result(
+    ctx: dict[str, Any], queue_name: str, result: dict[str, Any]
+) -> None:
     """Push job result to Redis list."""
     try:
         import json
+
         # Use arq's redis connection from context if available, otherwise create new
         redis = ctx.get("redis")
         if not redis:
@@ -273,7 +286,9 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
-    redis_settings.conn_timeout = float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5.0"))
+    redis_settings.conn_timeout = float(
+        os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5.0")
+    )
     max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "50"))
 
 

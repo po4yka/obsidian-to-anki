@@ -56,7 +56,7 @@ class TestSyncProgress:
 class TestProgressTracker:
     """Test ProgressTracker class."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -244,7 +244,7 @@ class TestNoteProgress:
 class TestProgressPersistence:
     """Test progress persistence to database."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def temp_db(self) -> None:
         """Create temporary database."""
         with tempfile.TemporaryDirectory() as tmpdir:

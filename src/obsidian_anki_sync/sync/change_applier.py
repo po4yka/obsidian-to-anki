@@ -220,7 +220,7 @@ class ChangeApplier:
                     tags=card.tags,
                     deck_name=self.config.anki_deck_name,
                     apf_html=card.apf_html,
-                    creation_status="success"
+                    creation_status="success",
                 )
 
                 txn.commit()

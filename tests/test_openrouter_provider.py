@@ -116,8 +116,7 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
     """Provider surfaces an error if both structured and fallback calls return empty content."""
     route = respx.post(f"{BASE_URL}/chat/completions")
     route.mock(
-        return_value=httpx.Response(
-            200, json=_build_openrouter_response(content=""))
+        return_value=httpx.Response(200, json=_build_openrouter_response(content=""))
     )
 
     schema = get_qa_extraction_schema()
@@ -265,7 +264,7 @@ def test_grok_reasoning_enabled_for_complex_schema(
     }
 
     result = openrouter_provider.generate_json(
-        model="x-ai/grok-4.1-fast",
+        model="x-ai/grok-4.1-fast:free",
         prompt="Extract complex QAs from this text",
         system="You are an expert at QA extraction",
         temperature=0.0,
@@ -310,7 +309,7 @@ def test_grok_reasoning_disabled_for_simple_schema(
     }
 
     result = openrouter_provider.generate_json(
-        model="x-ai/grok-4.1-fast",
+        model="x-ai/grok-4.1-fast:free",
         prompt="What is the capital of France?",
         system="Answer questions directly",
         temperature=0.0,
@@ -340,7 +339,7 @@ def test_grok_explicit_reasoning_enabled_parameter(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast",
+        model="x-ai/grok-4.1-fast:free",
         prompt="Analyze this text",
         system="Be analytical",
         temperature=0.0,
@@ -367,7 +366,7 @@ def test_reasoning_effort_explicit_value(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast",
+        model="x-ai/grok-4.1-fast:free",
         prompt="Test explicit effort",
         system="system",
         temperature=0.0,
@@ -400,7 +399,7 @@ def test_generate_streaming_returns_chunk_iterator(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast",
+        model="x-ai/grok-4.1-fast:free",
         prompt="Say hello",
         system="You are concise",
         stream=True,

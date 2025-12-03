@@ -117,12 +117,14 @@ def _build_status_table(summary: dict[str, Any], meta: ProgressMeta) -> Table:
         mode_description += " · LangGraph"
 
     updated_at = summary["updated_at"]
-    updated_text = updated_at.strftime(
-        "%H:%M:%S") if isinstance(updated_at, datetime) else "–"
+    updated_text = (
+        updated_at.strftime("%H:%M:%S") if isinstance(updated_at, datetime) else "–"
+    )
 
     table.add_row("Session", summary["session_id_short"])
     table.add_row(
-        "Phase", f"{summary['phase_label']} ({summary['percent_complete']:.1f}%)")
+        "Phase", f"{summary['phase_label']} ({summary['percent_complete']:.1f}%)"
+    )
     table.add_row("Mode", mode_description)
     table.add_row("Vault", meta.vault_label)
     table.add_row("Elapsed", _format_duration(summary["elapsed_seconds"]))
