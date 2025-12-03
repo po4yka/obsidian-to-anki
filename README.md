@@ -394,6 +394,10 @@ obsidian-anki-sync analyze-logs      # Analyze logs
 obsidian-anki-sync list-problematic-notes # List issues
 ```
 
+> ℹ️  Chunk IDs now include the source path to avoid collisions across directories.
+> If you upgraded from an earlier version, run `obsidian-anki-sync rag index --force`
+> to rebuild the vector store with the new identifiers.
+
 ```
 
 ### Makefile shortcuts

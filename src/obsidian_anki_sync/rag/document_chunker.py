@@ -423,9 +423,11 @@ class DocumentChunker:
         Returns:
             Unique chunk ID
         """
-        # Use file name + section for readable ID
-        file_name = Path(source_file).stem
-        return f"{file_name}_{section}"
+        # Use file name + section for readability, plus a path hash to avoid collisions
+        file_path = Path(source_file)
+        path_hash = hashlib.sha256(file_path.as_posix().encode()).hexdigest()[:8]
+        file_name = file_path.stem
+        return f"{file_name}_{section}_{path_hash}"
 
     def _truncate_content(self, content: str) -> str:
         """Truncate content to chunk size if needed.
