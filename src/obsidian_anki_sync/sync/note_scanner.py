@@ -7,7 +7,7 @@ import errno
 import random
 import time
 from collections import defaultdict
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -133,6 +133,7 @@ class NoteScanner:
         incremental: bool = False,
         qa_extractor: Any = None,
         existing_cards_for_duplicate_detection: list | None = None,
+        on_batch_complete: Callable[[list[Card]], None] | None = None,
     ) -> dict[str, Card]:
         """Scan Obsidian vault and generate cards.
 
@@ -141,6 +142,7 @@ class NoteScanner:
             incremental: If True, only process new notes not yet in database
             qa_extractor: Optional QA extractor for LLM-based extraction
             existing_cards_for_duplicate_detection: Existing cards from Anki for duplicate detection
+            on_batch_complete: Optional callback for atomic batch processing
 
         Returns:
             Dict of slug -> Card
@@ -210,6 +212,7 @@ class NoteScanner:
                     error_by_type,
                     error_samples,
                     qa_extractor,
+                    on_batch_complete,
                 )
             return self.scan_notes_parallel(
                 note_files,
@@ -218,6 +221,7 @@ class NoteScanner:
                 error_by_type,
                 error_samples,
                 qa_extractor,
+                on_batch_complete,
             )
 
         # Sequential processing
@@ -365,6 +369,15 @@ class NoteScanner:
                         self.stats["errors"] = self.stats.get("errors", 0) + 1
                         failures_this_note += 1
 
+                # Atomic processing callback
+                if on_batch_complete:
+                    cards_generated = [
+                        card for (qa_pair, lang), (card, _, _) in zip(tasks, results)
+                        if card
+                    ]
+                    if cards_generated:
+                        on_batch_complete(cards_generated)
+
                 consecutive_errors += failures_this_note
 
                 self.stats["processed"] = self.stats.get("processed", 0) + 1
@@ -474,6 +487,7 @@ class NoteScanner:
         error_by_type: defaultdict[str, int],
         error_samples: defaultdict[str, list[str]],
         qa_extractor: Any = None,
+        on_batch_complete: Callable[[list[Card]], None] | None = None,
     ) -> dict[str, Card]:
         """Scan Obsidian notes using parallel processing.
 
@@ -484,6 +498,7 @@ class NoteScanner:
             error_by_type: Dict to aggregate errors by type
             error_samples: Dict to store sample errors
             qa_extractor: Optional QA extractor
+            on_batch_complete: Optional callback for atomic batch processing
 
         Returns:
             Dict of slug -> Card
@@ -553,6 +568,14 @@ class NoteScanner:
                         obsidian_cards.update(cards)
                         shared_slugs.update(new_slugs)
                         existing_slugs.update(new_slugs)
+
+                    # Atomic processing callback
+                    if on_batch_complete and cards:
+                        on_batch_complete(list(cards.values()))
+
+                    # Atomic processing callback
+                    if on_batch_complete and cards:
+                        on_batch_complete(list(cards.values()))
 
                     with stats_lock:
                         notes_processed += 1
@@ -631,6 +654,7 @@ class NoteScanner:
         error_by_type: defaultdict[str, int],
         error_samples: defaultdict[str, list[str]],
         qa_extractor: Any = None,
+        on_batch_complete: Callable[[list[Card]], None] | None = None,
     ) -> dict[str, Card]:
         """Scan Obsidian notes using Redis queue for distribution.
 
@@ -641,27 +665,24 @@ class NoteScanner:
             error_by_type: Dict to aggregate errors by type
             error_samples: Dict to store sample errors
             qa_extractor: Optional QA extractor
+            on_batch_complete: Optional callback for atomic batch processing
 
         Returns:
             Dict of slug -> Card
         """
         import asyncio
 
-        # We need to run the async queue logic from a sync context
-        # This helper function handles the async loop
-        def _run_queue_scan():
-            return asyncio.run(
-                self._scan_notes_with_queue_async(
-                    note_files,
-                    obsidian_cards,
-                    existing_slugs,
-                    error_by_type,
-                    error_samples,
-                    qa_extractor,
-                )
+        return asyncio.run(
+            self._scan_notes_with_queue_async(
+                note_files,
+                obsidian_cards,
+                existing_slugs,
+                error_by_type,
+                error_samples,
+                qa_extractor,
+                on_batch_complete,
             )
-
-        return _run_queue_scan()
+        )
 
     async def _validate_redis_connection(self, pool) -> bool:
         """Validate Redis connection is healthy before submitting jobs.
@@ -745,6 +766,7 @@ class NoteScanner:
         error_by_type: defaultdict[str, int],
         error_samples: defaultdict[str, list[str]],
         qa_extractor: Any = None,
+        on_batch_complete: Callable[[list[Card]], None] | None = None,
     ) -> dict[str, Card]:
         """Async implementation of queue scanning with stability improvements.
 
@@ -810,7 +832,8 @@ class NoteScanner:
 
             try:
                 # Sanitize job ID to avoid issues with slashes
-                job_id = f"note-{relative_path.replace('/', '_').replace('\\', '_')}"
+                sanitized_path = relative_path.replace("/", "_").replace("\\", "_")
+                job_id = f"note-{sanitized_path}"
 
                 # Enqueue with retry logic
                 job = await self._enqueue_with_retry(
@@ -952,6 +975,10 @@ class NoteScanner:
                                 card = Card(**card_dict)
                                 obsidian_cards[card.slug] = card
                                 existing_slugs.add(card.slug)
+
+                                # Atomic processing callback
+                                if on_batch_complete:
+                                    on_batch_complete([card])
                             except Exception as e:
                                 logger.error(
                                     "card_rehydration_failed",

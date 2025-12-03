@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -106,8 +106,8 @@ def parse_retry_after_header(response: httpx.Response) -> float | None:
         try:
             retry_datetime = parsedate_to_datetime(retry_after)
             if retry_datetime.tzinfo is None:
-                retry_datetime = retry_datetime.replace(tzinfo=UTC)
-            now = datetime.now(UTC)
+                retry_datetime = retry_datetime.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
             delta = (retry_datetime - now).total_seconds()
             if delta > 0:
                 return float(delta)

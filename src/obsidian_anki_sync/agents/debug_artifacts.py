@@ -1,7 +1,7 @@
 """Debug artifact saving for LLM operations."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -64,14 +64,14 @@ class DebugArtifactSaver:
 
         try:
             # Create timestamp-based filename
-            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
             safe_operation = operation.replace("/", "_").replace(" ", "_")
             filename = f"{timestamp}_{safe_operation}_{model.replace(':', '_')}.json"
             filepath = self.artifacts_dir / filename
 
             # Build artifact data
             artifact = {
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "operation": operation,
                 "model": model,
                 "error": {
@@ -127,7 +127,7 @@ class DebugArtifactSaver:
             return 0
 
         deleted = 0
-        cutoff_timestamp = datetime.now(UTC).timestamp() - (max_age_days * 86400)
+        cutoff_timestamp = datetime.now(timezone.utc).timestamp() - (max_age_days * 86400)
 
         try:
             for filepath in self.artifacts_dir.glob("*.json"):

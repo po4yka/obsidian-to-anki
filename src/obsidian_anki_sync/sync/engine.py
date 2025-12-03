@@ -32,7 +32,7 @@ except ImportError:
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.models import ManifestData, SyncAction
+from obsidian_anki_sync.models import Card, ManifestData, SyncAction
 from obsidian_anki_sync.providers.factory import ProviderFactory
 from obsidian_anki_sync.sync.anki_state_manager import AnkiStateManager
 from obsidian_anki_sync.sync.card_generator import CardGenerator
@@ -40,6 +40,7 @@ from obsidian_anki_sync.sync.change_applier import ChangeApplier
 from obsidian_anki_sync.sync.indexer import build_full_index
 from obsidian_anki_sync.sync.note_scanner import NoteScanner
 from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.guid import deterministic_guid
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
@@ -597,7 +598,67 @@ class SyncEngine:
                     existing_cards
                 )
 
-            # Step 2: Scan Obsidian notes and generate cards
+            # Step 2: Fetch Anki state early for atomic processing
+            if self.progress:
+                from .progress import SyncPhase
+
+                self.progress.set_phase(SyncPhase.DETERMINING_ACTIONS)
+
+            logger.info("sync_phase_started", phase="fetching_anki_state")
+            fetch_start_time = time.time()
+            anki_cards = self.anki_state_manager.fetch_state()
+            fetch_duration = time.time() - fetch_start_time
+            logger.info(
+                "sync_phase_completed",
+                phase="fetching_anki_state",
+                duration=round(fetch_duration, 2),
+                cards_found=len(anki_cards),
+            )
+
+            # Get database state early
+            db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
+
+            # Define callback for atomic processing
+            self.changes = []
+            changes_by_type = {}
+
+            def on_batch_complete(batch_cards: list[Card]) -> None:
+                """Process a batch of generated cards immediately."""
+                if not batch_cards:
+                    return
+
+                batch_changes: list[SyncAction] = []
+                batch_obsidian_cards = {c.slug: c for c in batch_cards}
+
+                # Determine actions for this batch
+                self.anki_state_manager.determine_actions(
+                    batch_obsidian_cards,
+                    anki_cards,
+                    batch_changes,
+                    db_cards_override=db_cards
+                )
+
+                # Update stats
+                for change in batch_changes:
+                    change_type = change.type
+                    changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                    self.changes.append(change)
+
+                # Apply changes immediately if not dry run
+                if not dry_run:
+                    self.change_applier.apply_changes(batch_changes)
+
+                    # Update in-memory state to reflect changes
+                    for change in batch_changes:
+                        if change.type == "create" and change.card:
+                            # We don't have the new note ID yet without refetching or return from apply_changes
+                            # But we can mark it as present to avoid duplicate creates if processed again
+                            # For now, just updating db_cards is enough for content hash checks
+                            pass
+                        elif change.type == "update" and change.card:
+                            pass
+
+            # Step 3: Scan Obsidian notes and generate cards (with atomic processing)
             if self.progress:
                 from .progress import SyncPhase
 
@@ -605,12 +666,16 @@ class SyncEngine:
 
             logger.info("sync_phase_started", phase="scanning")
             scan_start_time = time.time()
+
+            # Pass callback to scanner
             obsidian_cards = self.note_scanner.scan_notes(
                 sample_size=sample_size,
                 incremental=incremental,
                 qa_extractor=self.qa_extractor,
                 existing_cards_for_duplicate_detection=existing_cards,
+                on_batch_complete=on_batch_complete
             )
+
             scan_duration = time.time() - scan_start_time
             logger.info(
                 "sync_phase_completed",
@@ -623,39 +688,96 @@ class SyncEngine:
             if self.progress and self.progress.is_interrupted():
                 return cast("dict[Any, Any]", self.progress.get_stats())
 
-            # Step 2: Fetch Anki state
-            if self.progress:
-                from .progress import SyncPhase
+            # Step 4: Handle deletions (cards in DB/Anki but not in Obsidian)
+            # This must be done after all notes are scanned
+            logger.info("sync_phase_started", phase="determining_deletions")
 
-                self.progress.set_phase(SyncPhase.DETERMINING_ACTIONS)
+            deletion_changes: list[SyncAction] = []
 
-            logger.info("sync_phase_started", phase="determining_actions")
-            action_start_time = time.time()
-            anki_cards = self.anki_state_manager.fetch_state()
+            # Check for deletions in Obsidian
+            for slug, db_card in db_cards.items():
+                if slug not in obsidian_cards and slug in anki_cards:
+                    # Card deleted in Obsidian but still in Anki
+                    from obsidian_anki_sync.models import Card as CardModel
+                    from obsidian_anki_sync.models import Manifest
 
-            # Step 3: Determine sync actions
-            self.changes = []
-            self.anki_state_manager.determine_actions(
-                obsidian_cards, anki_cards, self.changes
-            )
-            action_duration = time.time() - action_start_time
-            changes_by_type = {}
-            for change in self.changes:
-                change_type = change.type
-                changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                    # Reconstruct minimal card for deletion
+                    card = CardModel(
+                        slug=slug,
+                        lang=db_card["lang"],
+                        apf_html="",
+                        manifest=Manifest(
+                            slug=slug,
+                            slug_base=db_card["slug_base"],
+                            lang=db_card["lang"],
+                            source_path=db_card["source_path"],
+                            source_anchor=db_card["source_anchor"],
+                            note_id=db_card["note_id"],
+                            note_title=db_card["note_title"],
+                            card_index=db_card["card_index"],
+                            guid=db_card.get("card_guid")
+                            or deterministic_guid(
+                                [
+                                    db_card.get("note_id", ""),
+                                    db_card["source_path"],
+                                    str(db_card["card_index"]),
+                                    db_card["lang"],
+                                ]
+                            ),
+                        ),
+                        content_hash=db_card["content_hash"],
+                        note_type=db_card.get("note_type", "APF::Simple"),
+                        tags=[],
+                        guid=db_card.get("card_guid")
+                        or deterministic_guid(
+                            [
+                                db_card.get("note_id", ""),
+                                db_card["source_path"],
+                                str(db_card["card_index"]),
+                                db_card["lang"],
+                            ]
+                        ),
+                    )
+
+                    deletion_changes.append(
+                        SyncAction(
+                            type="delete",
+                            card=card,
+                            anki_guid=db_card["anki_guid"],
+                            reason="Card removed from Obsidian",
+                        )
+                    )
+
+            # Check for deletions in Anki (restore)
+            for slug in db_cards:
+                if slug not in anki_cards and slug in obsidian_cards:
+                    # Card deleted in Anki but still in Obsidian - restore
+                    deletion_changes.append(
+                        SyncAction(
+                            type="restore",
+                            card=obsidian_cards[slug],
+                            reason="Card deleted in Anki, restoring from Obsidian",
+                        )
+                    )
+
+            # Apply deletion/restore changes
+            if deletion_changes:
+                for change in deletion_changes:
+                    change_type = change.type
+                    changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
+                    self.changes.append(change)
+
+                if not dry_run:
+                    self.change_applier.apply_changes(deletion_changes)
+
             logger.info(
                 "sync_phase_completed",
-                phase="determining_actions",
-                duration=round(action_duration, 2),
+                phase="determining_deletions",
                 total_changes=len(self.changes),
                 changes_by_type=changes_by_type,
             )
 
-            # Check for interruption
-            if self.progress and self.progress.is_interrupted():
-                return cast("dict[Any, Any]", self.progress.get_stats())
-
-            # Step 4: Apply or preview
+            # Step 5: Finalize
             if dry_run:
                 logger.info("sync_phase_started", phase="preview")
                 self._print_plan()
@@ -665,21 +787,8 @@ class SyncEngine:
                     changes_previewed=len(self.changes),
                 )
             else:
-                if self.progress:
-                    from .progress import SyncPhase
-
-                    self.progress.set_phase(SyncPhase.APPLYING_CHANGES)
-
-                logger.info("sync_phase_started", phase="applying_changes")
-                apply_start_time = time.time()
-                self.change_applier.apply_changes(self.changes)
-                apply_duration = time.time() - apply_start_time
-                logger.info(
-                    "sync_phase_completed",
-                    phase="applying_changes",
-                    duration=round(apply_duration, 2),
-                    changes_applied=len(self.changes),
-                )
+                 # Changes already applied incrementally
+                 pass
 
             # Mark as completed
             if self.progress:
