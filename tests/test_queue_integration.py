@@ -139,7 +139,8 @@ async def test_process_note_job():
 
     # Mock Redis in context
     mock_redis = AsyncMock()
-    ctx = {"config": Config(), "orchestrator": AsyncMock(), "redis": mock_redis}
+    ctx = {"config": Config(), "orchestrator": AsyncMock(),
+           "redis": mock_redis}
 
     # Mock orchestrator result
     mock_result = MagicMock()
@@ -204,3 +205,72 @@ async def test_process_note_job():
         payload = json.loads(mock_redis.rpush.call_args[0][1])
         assert payload["success"] is True
         assert payload["cards"][0]["slug"] == "test-card"
+
+
+@pytest.mark.asyncio
+async def test_process_note_job_fallbacks_when_redis_missing():
+    """Worker should create a temporary Redis connection when ctx lacks one."""
+
+    # Configure orchestrator stub
+    ctx = {"config": Config(), "orchestrator": AsyncMock()}
+
+    mock_result = MagicMock()
+    mock_result.success = True
+    mock_result.generation.cards = [MagicMock()]
+    mock_result.generation.total_cards = 1
+    mock_result.stage_times = {"generation": 1.0, "validation": 0.5}
+    mock_result.retry_count = 0
+    mock_result.total_time = 1.5
+    mock_result.last_error = None
+    ctx["orchestrator"].process_note.return_value = mock_result
+
+    mock_card = MagicMock()
+    mock_card.slug = "test-card"
+    mock_card.model_dump.return_value = {"slug": "test-card"}
+    ctx["orchestrator"].convert_to_cards = MagicMock(return_value=[mock_card])
+
+    metadata_dict = {
+        "id": "fallback-test",
+        "title": "Test",
+        "topic": "Testing",
+        "created": "2025-12-03T00:00:00Z",
+        "updated": "2025-12-03T00:00:00Z",
+    }
+    qa_pairs_dicts = [
+        {
+            "question_en": "Q",
+            "question_ru": "Q",
+            "answer_en": "A",
+            "answer_ru": "A",
+            "card_index": 1,
+        }
+    ]
+
+    fallback_redis = AsyncMock()
+    fallback_redis.close = AsyncMock()
+
+    with (
+        patch(
+            "obsidian_anki_sync.worker.create_pool",
+            new_callable=AsyncMock,
+            create=True,
+        ) as create_pool_mock,
+        patch("pathlib.Path.exists", return_value=True),
+        patch("pathlib.Path.read_text", return_value="content"),
+    ):
+        create_pool_mock.return_value = fallback_redis
+
+        result = await process_note_job(
+            ctx,
+            "/tmp/test.md",
+            "test.md",
+            metadata_dict=metadata_dict,
+            qa_pairs_dicts=qa_pairs_dicts,
+            result_queue_name="test-queue",
+        )
+
+    assert result["success"] is True
+    create_pool_mock.assert_awaited_once()
+    fallback_redis.rpush.assert_awaited_once()
+    fallback_redis.expire.assert_awaited_once_with("test-queue", 3600)
+    fallback_redis.close.assert_awaited_once_with(close_connection_pool=True)

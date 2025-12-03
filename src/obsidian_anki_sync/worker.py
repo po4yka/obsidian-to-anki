@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from arq.connections import RedisSettings
+from arq.connections import RedisSettings, create_pool
 
 from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 from obsidian_anki_sync.config import load_config
@@ -78,10 +78,18 @@ async def process_note_job(
         if hasattr(orchestrator, "setup_async"):
             await orchestrator.setup_async()
 
-    logger.info("worker_processing_job", file=relative_path)
+    logger.info(
+        "worker_processing_job",
+        file=relative_path,
+        result_queue=result_queue_name,
+        has_metadata=metadata_dict is not None,
+        has_qa_pairs=qa_pairs_dicts is not None,
+    )
 
-    generation_sla = getattr(config, "worker_generation_timeout_seconds", 900.0)
-    validation_sla = getattr(config, "worker_validation_timeout_seconds", 900.0)
+    generation_sla = getattr(
+        config, "worker_generation_timeout_seconds", 900.0)
+    validation_sla = getattr(
+        config, "worker_validation_timeout_seconds", 900.0)
 
     try:
         path_obj = Path(file_path)
@@ -104,6 +112,29 @@ async def process_note_job(
             qa_pairs = [QAPair(**qa) for qa in qa_pairs_dicts]
         else:
             metadata, qa_pairs = parse_note(path_obj, content=note_content)
+
+        logger.info(
+            "worker_parsed_note",
+            file=relative_path,
+            qa_pairs_count=len(qa_pairs),
+            title=metadata.title if metadata else None,
+        )
+
+        # Check if we have QA pairs to process
+        if not qa_pairs:
+            logger.warning(
+                "worker_no_qa_pairs",
+                file=relative_path,
+                title=metadata.title if metadata else None,
+            )
+            result = {
+                "success": False,
+                "error": f"No QA pairs found in note: {relative_path}",
+                "cards": [],
+            }
+            if result_queue_name:
+                await _push_result(ctx, result_queue_name, result)
+            return result
 
         # Reconstruct existing cards if provided
         existing_cards = None
@@ -186,7 +217,8 @@ async def process_note_job(
                 )
 
             error_msg = (
-                "; ".join(error_details) if error_details else "Unknown pipeline error"
+                "; ".join(
+                    error_details) if error_details else "Unknown pipeline error"
             )
             logger.warning(
                 "pipeline_generation_failed",
@@ -254,9 +286,17 @@ async def _push_result(
 
         # Use arq's redis connection from context if available, otherwise create new
         redis = ctx.get("redis")
+        fallback_redis = None
         if not redis:
-            # Fallback if ctx doesn't have redis (shouldn't happen in arq worker)
-            return
+            logger.warning(
+                "redis_not_in_context",
+                available_keys=list(ctx.keys()),
+                queue=queue_name,
+                action="creating_fallback_connection",
+            )
+            redis_settings = _build_redis_settings(ctx.get("config"))
+            redis = await create_pool(redis_settings)
+            fallback_redis = redis
 
         # Serialize result
         # We need to handle potential non-serializable objects if any remain
@@ -265,8 +305,36 @@ async def _push_result(
         await redis.rpush(queue_name, payload)
         # Set expiry on result queue to prevent memory leaks (e.g., 1 hour)
         await redis.expire(queue_name, 3600)
+        logger.debug(
+            "result_pushed_to_queue",
+            queue=queue_name,
+            success=result.get("success"),
+            cards_count=len(result.get("cards", [])),
+        )
     except Exception as e:
         logger.error("failed_to_push_result", queue=queue_name, error=str(e))
+    finally:
+        if fallback_redis:
+            await fallback_redis.close(close_connection_pool=True)
+
+
+def _build_redis_settings(config: Any | None) -> RedisSettings:
+    """Construct Redis settings using config or environment defaults."""
+    redis_url = (
+        getattr(config, "redis_url", None)
+        if config is not None
+        else None
+    ) or os.getenv("REDIS_URL", "redis://localhost:6379")
+    settings = RedisSettings.from_dsn(redis_url)
+    timeout = (
+        getattr(config, "redis_socket_connect_timeout", None)
+        if config is not None
+        else None
+    )
+    if timeout is None:
+        timeout = float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5.0"))
+    settings.conn_timeout = float(timeout)
+    return settings
 
 
 class WorkerSettings:
@@ -280,7 +348,8 @@ class WorkerSettings:
     # Validation includes: post-validation with retries, context enrichment
     _gen_budget = float(os.getenv("WORKER_GENERATION_TIMEOUT_SECONDS", "2700"))
     _val_budget = float(os.getenv("WORKER_VALIDATION_TIMEOUT_SECONDS", "2700"))
-    job_timeout = int(_gen_budget + _val_budget + 180)  # 5580s = 93 minutes total
+    # 5580s = 93 minutes total
+    job_timeout = int(_gen_budget + _val_budget + 180)
 
     # Use environment variables with defaults
     redis_settings = RedisSettings.from_dsn(
