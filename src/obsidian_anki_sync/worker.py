@@ -287,6 +287,7 @@ async def _push_result(
         # Use arq's redis connection from context if available, otherwise create new
         redis = ctx.get("redis")
         fallback_redis = None
+        fallback_settings = None
         if not redis:
             logger.warning(
                 "redis_not_in_context",
@@ -297,6 +298,18 @@ async def _push_result(
             redis_settings = _build_redis_settings(ctx.get("config"))
             redis = await create_pool(redis_settings)
             fallback_redis = redis
+            fallback_settings = redis_settings
+            logger.info(
+                "redis_fallback_pool_created",
+                queue=queue_name,
+                **_describe_redis_settings(redis_settings),
+            )
+        else:
+            logger.debug(
+                "redis_context_pool_used",
+                queue=queue_name,
+                context_keys=list(ctx.keys()),
+            )
 
         # Serialize result
         # We need to handle potential non-serializable objects if any remain
@@ -315,7 +328,23 @@ async def _push_result(
         logger.error("failed_to_push_result", queue=queue_name, error=str(e))
     finally:
         if fallback_redis:
-            await fallback_redis.close(close_connection_pool=True)
+            try:
+                await fallback_redis.close(close_connection_pool=True)
+                logger.debug(
+                    "redis_fallback_pool_closed",
+                    queue=queue_name,
+                    **(
+                        _describe_redis_settings(fallback_settings)
+                        if fallback_settings
+                        else {}
+                    ),
+                )
+            except Exception as close_error:
+                logger.warning(
+                    "redis_fallback_pool_close_failed",
+                    queue=queue_name,
+                    error=str(close_error),
+                )
 
 
 def _build_redis_settings(config: Any | None) -> RedisSettings:
@@ -335,6 +364,18 @@ def _build_redis_settings(config: Any | None) -> RedisSettings:
         timeout = float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5.0"))
     settings.conn_timeout = float(timeout)
     return settings
+
+
+def _describe_redis_settings(settings: RedisSettings | None) -> dict[str, Any]:
+    """Return non-sensitive Redis connection attributes for logging."""
+    if not settings:
+        return {}
+    return {
+        "host": settings.host,
+        "port": settings.port,
+        "db": getattr(settings, "database", None),
+        "ssl": bool(getattr(settings, "ssl", None)),
+    }
 
 
 class WorkerSettings:
