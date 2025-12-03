@@ -116,7 +116,8 @@ def _check_sentinels(lines: list[str], result: ValidationResult) -> None:
 
     # Check PROMPT_VERSION
     if not re.search(REQUIRED_SENTINELS[0], content, re.MULTILINE):
-        result.errors.append("Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
+        result.errors.append(
+            "Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
 
     # Check BEGIN_CARDS
     if not re.search(REQUIRED_SENTINELS[1], content, re.MULTILINE):
@@ -239,7 +240,8 @@ def _validate_header_format_strict(
         return
 
     if "cardtype:" in header_line.lower() and "CardType:" not in header_line:
-        result.errors.append(f"Card {card_num}: Use 'CardType:' with capital C and T")
+        result.errors.append(
+            f"Card {card_num}: Use 'CardType:' with capital C and T")
         return
 
     # Check spacing around pipes
@@ -264,21 +266,31 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
             f"Card {card_num}: Must have {MIN_TAGS}-{MAX_TAGS} tags, found {len(tags)}"
         )
 
-    # Check snake_case format
+    # Check snake_case format (allow hyphens and convert to underscores)
+    normalized_tags = []
     for tag in tags:
-        if not re.match(r"^[a-z0-9_]+$", tag):
+        # Convert hyphens to underscores for validation
+        normalized_tag = tag.replace("-", "_")
+        normalized_tags.append(normalized_tag)
+        if not re.match(r"^[a-z0-9_]+$", normalized_tag):
             result.errors.append(
-                f"Card {card_num}: Tag '{tag}' not in snake_case format"
+                f"Card {card_num}: Tag '{tag}' not in valid format (use snake_case or kebab-case)"
             )
 
-    # Check first tag is a language
-    if tags and tags[0] not in ALLOWED_LANGUAGES:
+    # Check first tag is a language, tool, or common platform
+    ALLOWED_FIRST_TAGS = ALLOWED_LANGUAGES | {
+        "android", "ios", "web", "mobile", "backend", "frontend", "fullstack",
+        "devops", "cloud", "database", "security", "testing", "architecture",
+        "design", "ux", "ui", "api", "microservices", "serverless"
+    }
+
+    if tags and tags[0] not in ALLOWED_FIRST_TAGS:
         result.warnings.append(
-            f"Card {card_num}: First tag should be a language/tool, got '{tags[0]}'"
+            f"Card {card_num}: First tag should be a language/tool/platform, got '{tags[0]}'"
         )
 
     # Check for at least one non-language tag
-    non_lang_tags = [t for t in tags if t not in ALLOWED_LANGUAGES]
+    non_lang_tags = [t for t in normalized_tags if t not in ALLOWED_LANGUAGES]
     if not non_lang_tags:
         result.errors.append(
             f"Card {card_num}: Must have at least one non-language tag"
@@ -304,7 +316,8 @@ def _validate_manifest(
     required_fields = ["slug", "lang", "type", "tags"]
     missing = [f for f in required_fields if f not in manifest]
     if missing:
-        result.errors.append(f"Card {card_num}: Manifest missing fields: {missing}")
+        result.errors.append(
+            f"Card {card_num}: Manifest missing fields: {missing}")
 
     # Check slug matches
     if manifest.get("slug") != expected_slug:
@@ -333,7 +346,8 @@ def _validate_cloze_density(
     cloze_matches = re.findall(r"\{\{c(\d+)::", block)
 
     if not cloze_matches:
-        result.warnings.append(f"Card {card_num}: Missing card has no cloze deletions")
+        result.warnings.append(
+            f"Card {card_num}: Missing card has no cloze deletions")
         return
 
     indices = sorted({int(m) for m in cloze_matches})

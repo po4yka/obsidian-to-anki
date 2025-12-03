@@ -140,12 +140,12 @@ class TestTagValidation:
         assert any("Must have 3-6 tags" in e for e in result.errors)
 
     def test_invalid_tag_format(self) -> None:
-        """Test error on non-snake_case tags."""
+        """Test error on invalid tag formats."""
         apf_html = self._make_card_html("python TestCase camelCase")
         result = validate_apf(apf_html)
 
         assert not result.is_valid
-        assert any("not in snake_case" in e for e in result.errors)
+        assert any("not in valid format" in e for e in result.errors)
 
     def test_missing_non_language_tag(self) -> None:
         """Test error when all tags are languages."""
@@ -154,6 +154,23 @@ class TestTagValidation:
 
         assert not result.is_valid
         assert any("at least one non-language tag" in e for e in result.errors)
+
+    def test_android_first_tag_valid(self) -> None:
+        """Test that 'android' is accepted as a valid first tag."""
+        apf_html = self._make_card_html("android jetpack app_startup")
+        result = validate_apf(apf_html)
+
+        assert result.is_valid
+        # Should not have warnings about first tag
+        assert not any("first tag" in w.lower() for w in result.warnings)
+
+    def test_kebab_case_tags_valid(self) -> None:
+        """Test that kebab-case tags are accepted."""
+        apf_html = self._make_card_html(
+            "python app-startup dependency-injection")
+        result = validate_apf(apf_html)
+
+        assert result.is_valid
 
     def _make_card_html(self, tags: str) -> str:
         """Helper to create card HTML with specific tags."""

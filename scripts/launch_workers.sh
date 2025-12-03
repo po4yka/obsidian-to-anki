@@ -5,14 +5,14 @@
 #   ./scripts/launch_workers.sh [NUM_WORKERS] [MAX_JOBS_PER_WORKER]
 #
 # Examples:
-#   ./scripts/launch_workers.sh           # 5 workers, 100 jobs each (default)
-#   ./scripts/launch_workers.sh 10        # 10 workers, 100 jobs each
-#   ./scripts/launch_workers.sh 3 50      # 3 workers, 50 jobs each
+#   ./scripts/launch_workers.sh           # 8 workers, 30 jobs each (default)
+#   ./scripts/launch_workers.sh 10        # 10 workers, 30 jobs each
+#   ./scripts/launch_workers.sh 14 50     # 14 workers, 50 jobs each (aggressive)
 
 set -e
 
-NUM_WORKERS=${1:-5}
-MAX_JOBS=${2:-50}
+NUM_WORKERS=${1:-8}
+MAX_JOBS=${2:-30}
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 
 echo "Starting $NUM_WORKERS workers with $MAX_JOBS concurrent jobs each..."
