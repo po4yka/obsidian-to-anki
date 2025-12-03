@@ -6,6 +6,7 @@ the LangGraph state machine workflow.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -875,7 +876,86 @@ class LangGraphOrchestrator:
             final_state=final_state,
         )
 
-        # NEW: Record observability metrics
+        # Post-pipeline tasks with timeout to prevent blocking result return
+        # These are non-critical tasks (observability, memory learning) that
+        # should not prevent the pipeline result from being returned to the worker
+        post_pipeline_timeout = getattr(
+            self.config, "post_pipeline_timeout_seconds", 30.0
+        )
+        logger.debug(
+            "post_pipeline_tasks_starting",
+            pipeline_id=pipeline_id,
+            note_id=metadata.id,
+            timeout=post_pipeline_timeout,
+        )
+
+        try:
+            await asyncio.wait_for(
+                self._run_post_pipeline_tasks(
+                    pipeline_id=pipeline_id,
+                    metadata=metadata,
+                    note_content=note_content,
+                    qa_pairs=qa_pairs,
+                    success=success,
+                    total_time=total_time,
+                    final_state=final_state,
+                    generation=generation,
+                    memorization_quality=memorization_quality,
+                    context_enrichment=context_enrichment,
+                    start_time=start_time,
+                ),
+                timeout=post_pipeline_timeout,
+            )
+            logger.debug(
+                "post_pipeline_tasks_completed",
+                pipeline_id=pipeline_id,
+                note_id=metadata.id,
+            )
+        except TimeoutError:
+            logger.warning(
+                "post_pipeline_tasks_timeout",
+                pipeline_id=pipeline_id,
+                note_id=metadata.id,
+                timeout=post_pipeline_timeout,
+                message="Post-pipeline tasks timed out, returning result anyway",
+            )
+        except Exception as e:
+            logger.warning(
+                "post_pipeline_tasks_failed",
+                pipeline_id=pipeline_id,
+                note_id=metadata.id,
+                error=str(e),
+                message="Post-pipeline tasks failed, returning result anyway",
+            )
+
+        logger.debug(
+            "pipeline_returning_result",
+            pipeline_id=pipeline_id,
+            note_id=metadata.id,
+            success=success,
+            cards_count=len(generation.cards) if generation and generation.cards else 0,
+        )
+        return result
+
+    async def _run_post_pipeline_tasks(
+        self,
+        pipeline_id: str,
+        metadata: NoteMetadata,
+        note_content: str,
+        qa_pairs: list[QAPair],
+        success: bool,
+        total_time: float,
+        final_state: dict,
+        generation: GenerationResult | None,
+        memorization_quality: MemorizationQualityResult | None,
+        context_enrichment: ContextEnrichmentResult | None,
+        start_time: float,
+    ) -> None:
+        """Run non-critical post-pipeline tasks (observability, memory learning).
+
+        These tasks are wrapped in a timeout to prevent blocking result return.
+        """
+        # Record observability metrics
         if self.observability:
             try:
                 from obsidian_anki_sync.agents.enhanced_observability import (
@@ -900,13 +980,20 @@ class LangGraphOrchestrator:
                     timestamp=start_time,
                 )
                 self.observability.record_metrics(metrics)
-                logger.info("observability_metrics_recorded")
+                logger.debug("observability_metrics_recorded", pipeline_id=pipeline_id)
             except Exception as e:
-                logger.warning("observability_metrics_recording_failed", error=str(e))
+                logger.warning(
+                    "observability_metrics_recording_failed",
+                    pipeline_id=pipeline_id,
+                    error=str(e),
+                )
 
-        # NEW: Learn from execution if advanced memory is enabled
+        # Learn from execution if advanced memory is enabled
         if self.advanced_memory_store and self.advanced_memory_store.connected:
             try:
+                logger.debug(
+                    "advanced_memory_learning_starting", pipeline_id=pipeline_id
+                )
                 await self.advanced_memory_store.learn_from_pipeline_result(
                     agent_name="langgraph_orchestrator",
                     task_type="note_processing",
@@ -948,11 +1035,15 @@ class LangGraphOrchestrator:
                         metadata, generation, memorization_quality
                     )
 
-                logger.info("advanced_memory_learning_completed")
+                logger.debug(
+                    "advanced_memory_learning_completed", pipeline_id=pipeline_id
+                )
             except Exception as e:
-                logger.warning("advanced_memory_learning_failed", error=str(e))
-
-        return result
+                logger.warning(
+                    "advanced_memory_learning_failed",
+                    pipeline_id=pipeline_id,
+                    error=str(e),
+                )
 
     async def _learn_user_preferences(
         self,

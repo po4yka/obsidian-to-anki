@@ -144,12 +144,29 @@ async def process_note_job(
             existing_cards = [GeneratedCard(**c) for c in existing_cards_dicts]
 
         # Process note
+        logger.debug(
+            "worker_calling_pipeline",
+            file=relative_path,
+            result_queue=result_queue_name,
+        )
         pipeline_result = await orchestrator.process_note(
             note_content=note_content,
             metadata=metadata,
             qa_pairs=qa_pairs,
             file_path=path_obj,
             existing_cards=existing_cards,
+        )
+        logger.debug(
+            "worker_pipeline_returned",
+            file=relative_path,
+            success=pipeline_result.success,
+            has_generation=pipeline_result.generation is not None,
+            cards_count=(
+                len(pipeline_result.generation.cards)
+                if pipeline_result.generation and pipeline_result.generation.cards
+                else 0
+            ),
+            result_queue=result_queue_name,
         )
 
         pipeline_context = {
@@ -266,14 +283,44 @@ async def process_note_job(
             "slugs": [c.slug for c in cards],
         }
         if result_queue_name:
+            logger.debug(
+                "worker_pushing_success_result",
+                file=relative_path,
+                queue=result_queue_name,
+                cards_count=len(cards_dicts),
+            )
             await _push_result(ctx, result_queue_name, result)
+            logger.debug(
+                "worker_result_pushed",
+                file=relative_path,
+                queue=result_queue_name,
+                success=True,
+            )
+        else:
+            logger.warning(
+                "worker_no_result_queue",
+                file=relative_path,
+                message="No result queue provided, result not pushed",
+            )
         return result
 
     except Exception as e:
         logger.exception("worker_job_failed", file=relative_path, error=str(e))
         result = {"success": False, "error": str(e), "cards": []}
         if result_queue_name:
+            logger.debug(
+                "worker_pushing_error_result",
+                file=relative_path,
+                queue=result_queue_name,
+                error=str(e)[:200],
+            )
             await _push_result(ctx, result_queue_name, result)
+            logger.debug(
+                "worker_result_pushed",
+                file=relative_path,
+                queue=result_queue_name,
+                success=False,
+            )
         return result
 
 
@@ -315,17 +362,30 @@ async def _push_result(
         # We need to handle potential non-serializable objects if any remain
         # But cards_dicts should be pure python dicts/lists/etc.
         payload = json.dumps(result)
+        payload_size = len(payload)
+        logger.debug(
+            "redis_pushing_result",
+            queue=queue_name,
+            payload_size=payload_size,
+        )
         await redis.rpush(queue_name, payload)
         # Set expiry on result queue to prevent memory leaks (e.g., 1 hour)
         await redis.expire(queue_name, 3600)
-        logger.debug(
+        # Log at INFO level - this is critical for debugging queue issues
+        logger.info(
             "result_pushed_to_queue",
             queue=queue_name,
             success=result.get("success"),
             cards_count=len(result.get("cards", [])),
+            payload_size=payload_size,
         )
     except Exception as e:
-        logger.error("failed_to_push_result", queue=queue_name, error=str(e))
+        logger.error(
+            "failed_to_push_result",
+            queue=queue_name,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
     finally:
         if fallback_redis:
             try:
