@@ -1,10 +1,12 @@
 """Sync command implementation logic."""
 
+import uuid
 from contextlib import nullcontext
 from typing import Any
 
 import typer
 from rich.table import Table
+from structlog import contextvars as structlog_contextvars
 
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.config import Config
@@ -44,6 +46,9 @@ def run_sync(
     Raises:
         typer.Exit: On sync failure
     """
+    sync_run_id = str(uuid.uuid4())
+    structlog_contextvars.bind_contextvars(sync_run_id=sync_run_id)
+
     logger.info(
         "sync_started",
         dry_run=dry_run,
@@ -155,10 +160,12 @@ def run_sync(
                         incremental=incremental,
                         build_index=not no_index,
                         sample_size=sample_size,
+                        sync_run_id=sync_run_id,
                     )
                 finally:
                     progress_reporter.stop()
 
+                structlog_contextvars.bind_contextvars(sync_run_id=sync_run_id)
                 _display_sync_results(stats, no_index)
                 logger.info(
                     "sync_completed",
@@ -169,6 +176,7 @@ def run_sync(
                 )
 
     except Exception as e:
+        structlog_contextvars.bind_contextvars(sync_run_id=sync_run_id)
         logger.error(
             "sync_failed",
             error=str(e),
@@ -180,6 +188,8 @@ def run_sync(
         )
         console.print(f"\n[bold red]Error:[/bold red] {e}")
         raise typer.Exit(code=1)
+    finally:
+        structlog_contextvars.unbind_contextvars("sync_run_id")
 
 
 def _handle_progress_tracking(

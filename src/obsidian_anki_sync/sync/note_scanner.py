@@ -3,6 +3,7 @@
 Handles discovery, parsing, and processing of Obsidian notes.
 """
 
+import contextvars
 import errno
 import random
 import time
@@ -26,6 +27,7 @@ import asyncio
 import yaml  # type: ignore
 from arq import create_pool
 from arq.connections import RedisSettings
+from structlog import contextvars as structlog_contextvars
 
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import (
@@ -137,6 +139,7 @@ class NoteScanner:
         self._archiver_fd_poll_interval = max(
             0.01, getattr(self.config, "archiver_fd_poll_interval", 0.05)
         )
+        self.sync_run_id: str | None = None
 
     def scan_notes(
         self,
@@ -158,6 +161,8 @@ class NoteScanner:
         Returns:
             Dict of slug -> Card
         """
+        self._bind_sync_context()
+
         logger.info(
             "scanning_obsidian",
             path=str(self.config.vault_path),
@@ -282,8 +287,7 @@ class NoteScanner:
                 )
                 note_content = note_content or ""
 
-                logger.debug("processing_note",
-                             file=relative_path, pairs=len(qa_pairs))
+                logger.debug("processing_note", file=relative_path, pairs=len(qa_pairs))
 
                 tasks = [
                     (qa_pair, lang)
@@ -374,8 +378,7 @@ class NoteScanner:
 
                 # Execute card generation sequentially to avoid nested thread pools
                 # The outer loop (scan_notes_parallel) already handles concurrency at the note level
-                results = [_generate_single(qa_pair, lang)
-                           for qa_pair, lang in tasks]
+                results = [_generate_single(qa_pair, lang) for qa_pair, lang in tasks]
 
                 # Batch upsert pending cards
                 pending_cards_data = []
@@ -545,6 +548,17 @@ class NoteScanner:
 
         return obsidian_cards
 
+    def set_sync_run_id(self, sync_run_id: str | None) -> None:
+        """Set the sync run identifier for propagation to worker threads."""
+
+        self.sync_run_id = sync_run_id
+
+    def _bind_sync_context(self) -> None:
+        """Bind the current sync_run_id to the logging context if available."""
+
+        if getattr(self, "sync_run_id", None):
+            structlog_contextvars.bind_contextvars(sync_run_id=self.sync_run_id)
+
     def scan_notes_parallel(
         self,
         note_files: list[tuple[Any, str]],
@@ -578,8 +592,7 @@ class NoteScanner:
                 len(note_files),
             )
         else:
-            max_workers = min(
-                self.config.max_concurrent_generations, len(note_files))
+            max_workers = min(self.config.max_concurrent_generations, len(note_files))
 
         logger.info(
             "parallel_scan_started",
@@ -608,8 +621,10 @@ class NoteScanner:
         batch_start_time = time.time()
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            base_context = contextvars.copy_context()
             future_to_note = {
                 executor.submit(
+                    base_context.run,
                     self.process_note_with_retry,
                     file_path,
                     relative_path,
@@ -647,11 +662,9 @@ class NoteScanner:
                     with stats_lock:
                         notes_processed += 1
                         if result_info["success"]:
-                            self.stats["processed"] = self.stats.get(
-                                "processed", 0) + 1
+                            self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             if result_info["error_type"]:
                                 error_by_type[result_info["error_type"]] += 1
                                 if len(error_samples[result_info["error_type"]]) < 3:
@@ -697,8 +710,7 @@ class NoteScanner:
                         percent=percent,
                         elapsed_seconds=round(elapsed_time, 1),
                         avg_seconds_per_note=round(avg_time_per_note, 2),
-                        estimated_remaining_seconds=round(
-                            estimated_remaining, 1),
+                        estimated_remaining_seconds=round(estimated_remaining, 1),
                         cards_generated=len(obsidian_cards),
                         active_workers=max_workers,
                     )
@@ -946,8 +958,7 @@ class NoteScanner:
 
             try:
                 # Sanitize job ID to avoid issues with slashes and scope by session
-                sanitized_path = relative_path.replace(
-                    "/", "_").replace("\\", "_")
+                sanitized_path = relative_path.replace("/", "_").replace("\\", "_")
                 job_id = f"{session_id}:note-{sanitized_path}"
 
                 # Enqueue with retry logic
@@ -965,8 +976,7 @@ class NoteScanner:
                 if job:
                     job_map[job.job_id] = (file_path, relative_path)
                     job_submit_times[job.job_id] = submit_time
-                    logger.debug("job_enqueued", job_id=job.job_id,
-                                 file=relative_path)
+                    logger.debug("job_enqueued", job_id=job.job_id, file=relative_path)
                 else:
                     # Job with this ID already exists in Redis
                     # In the new model, we still need to wait for its result.
@@ -981,8 +991,10 @@ class NoteScanner:
                     job_map[job_id] = (file_path, relative_path)
                     job_submit_times[job_id] = submit_time
                     logger.warning(
-                        "job_already_exists_reusing", file=relative_path,
-                        job_id=job_id, session_id=session_id
+                        "job_already_exists_reusing",
+                        file=relative_path,
+                        job_id=job_id,
+                        session_id=session_id,
                     )
 
                 # Reset circuit breaker on success
@@ -1010,8 +1022,7 @@ class NoteScanner:
         completed_jobs = 0
 
         # Timeout configuration
-        max_wait_time = getattr(
-            self.config, "queue_max_wait_time_seconds", 18000)
+        max_wait_time = getattr(self.config, "queue_max_wait_time_seconds", 18000)
         start_time = time.time()
 
         # We use a shorter timeout for BLPOP to allow checking overall timeout
@@ -1103,15 +1114,12 @@ class NoteScanner:
                                         slug=card_dict.get("slug"),
                                         error=str(e),
                                     )
-                            self.stats["processed"] = self.stats.get(
-                                "processed", 0) + 1
+                            self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
                             error_msg = result.get("error", "Unknown error")
                             # We don't know the file path here easily without job_id
-                            logger.warning("job_failed_result",
-                                           error=error_msg)
-                            self.stats["errors"] = self.stats.get(
-                                "errors", 0) + 1
+                            logger.warning("job_failed_result", error=error_msg)
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
                             error_by_type["queue_error"] += 1
                             if len(error_samples["queue_error"]) < 3:
                                 error_samples["queue_error"].append(
@@ -1296,8 +1304,7 @@ class NoteScanner:
                 file_path, qa_extractor=qa_extractor, content=note_content or None
             )
 
-            slug_view: Collection[str] = _ThreadSafeSlugView(
-                existing_slugs, slug_lock)
+            slug_view: Collection[str] = _ThreadSafeSlugView(existing_slugs, slug_lock)
 
             tasks = [
                 (qa_pair, lang)
@@ -1326,8 +1333,7 @@ class NoteScanner:
                 slug_view: Collection[str] = slug_view,
             ):
                 if self.progress:
-                    self.progress.start_note(
-                        relative_path, qa_pair.card_index, lang)
+                    self.progress.start_note(relative_path, qa_pair.card_index, lang)
                 try:
                     card = self.card_generator.generate_card(
                         qa_pair=qa_pair,
@@ -1405,8 +1411,7 @@ class NoteScanner:
 
                 for card in cards.values():
                     try:
-                        fields = map_apf_to_anki_fields(
-                            card.apf_html, card.note_type)
+                        fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
                         pending_cards_data.append(
                             {
                                 "card": card,
@@ -1667,7 +1672,7 @@ class NoteScanner:
             self._wait_for_fd_headroom()
 
             batch = archives_to_process[
-                batch_start: batch_start + self._archiver_batch_size
+                batch_start : batch_start + self._archiver_batch_size
             ]
 
             for archive_request in batch:
@@ -1721,8 +1726,7 @@ class NoteScanner:
 
         while True:
             time.sleep(self._archiver_fd_poll_interval)
-            has_headroom, snapshot = has_fd_headroom(
-                self._archiver_fd_headroom)
+            has_headroom, snapshot = has_fd_headroom(self._archiver_fd_headroom)
             if has_headroom:
                 logger.debug(
                     "archiver_fd_headroom_restored",

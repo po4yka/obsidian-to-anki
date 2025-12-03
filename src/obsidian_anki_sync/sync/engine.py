@@ -2,10 +2,12 @@
 
 import contextlib
 import json
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import diskcache
+import structlog
 from pydantic import ValidationError
 
 try:
@@ -301,6 +303,8 @@ class SyncEngine:
             stats=self.stats,
         )
 
+        self.sync_run_id: str | None = None
+
     def set_progress_display(self, progress_display: "ProgressDisplay | None") -> None:
         """Set progress display for real-time updates.
 
@@ -524,6 +528,7 @@ class SyncEngine:
         sample_size: int | None = None,
         incremental: bool = False,
         build_index: bool = True,
+        sync_run_id: str | None = None,
     ) -> dict:
         """
         Perform synchronization.
@@ -537,6 +542,13 @@ class SyncEngine:
         Returns:
             Statistics dict
         """
+        if sync_run_id is None:
+            sync_run_id = str(uuid.uuid4())
+
+        self.sync_run_id = sync_run_id
+        structlog.contextvars.bind_contextvars(sync_run_id=sync_run_id)
+        self.note_scanner.set_sync_run_id(sync_run_id)
+
         logger.info(
             "sync_started",
             dry_run=dry_run,
@@ -885,6 +897,8 @@ class SyncEngine:
         finally:
             # Close caches to ensure data is flushed to disk
             self._close_caches()
+
+            structlog.contextvars.unbind_contextvars("sync_run_id")
 
     def _cleanup_memory(self) -> None:
         """Aggressively clean up memory after processing large objects."""
