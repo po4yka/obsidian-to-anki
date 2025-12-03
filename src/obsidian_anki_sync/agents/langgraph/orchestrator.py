@@ -882,11 +882,16 @@ class LangGraphOrchestrator:
         post_pipeline_timeout = getattr(
             self.config, "post_pipeline_timeout_seconds", 30.0
         )
-        logger.debug(
+        logger.info(
             "post_pipeline_tasks_starting",
             pipeline_id=pipeline_id,
             note_id=metadata.id,
             timeout=post_pipeline_timeout,
+            has_observability=self.observability is not None,
+            has_advanced_memory=self.advanced_memory_store is not None,
+            advanced_memory_connected=self.advanced_memory_store.connected
+            if self.advanced_memory_store
+            else False,
         )
 
         try:
@@ -906,7 +911,7 @@ class LangGraphOrchestrator:
                 ),
                 timeout=post_pipeline_timeout,
             )
-            logger.debug(
+            logger.info(
                 "post_pipeline_tasks_completed",
                 pipeline_id=pipeline_id,
                 note_id=metadata.id,
@@ -928,7 +933,7 @@ class LangGraphOrchestrator:
                 message="Post-pipeline tasks failed, returning result anyway",
             )
 
-        logger.debug(
+        logger.info(
             "pipeline_returning_result",
             pipeline_id=pipeline_id,
             note_id=metadata.id,
@@ -955,6 +960,12 @@ class LangGraphOrchestrator:
 
         These tasks are wrapped in a timeout to prevent blocking result return.
         """
+        logger.info(
+            "post_pipeline_tasks_executing",
+            pipeline_id=pipeline_id,
+            note_id=metadata.id,
+        )
+
         # Record observability metrics
         if self.observability:
             try:
@@ -980,7 +991,7 @@ class LangGraphOrchestrator:
                     timestamp=start_time,
                 )
                 self.observability.record_metrics(metrics)
-                logger.debug("observability_metrics_recorded", pipeline_id=pipeline_id)
+                logger.info("observability_metrics_recorded", pipeline_id=pipeline_id)
             except Exception as e:
                 logger.warning(
                     "observability_metrics_recording_failed",
@@ -989,9 +1000,17 @@ class LangGraphOrchestrator:
                 )
 
         # Learn from execution if advanced memory is enabled
+        logger.info(
+            "advanced_memory_check",
+            pipeline_id=pipeline_id,
+            has_store=self.advanced_memory_store is not None,
+            connected=self.advanced_memory_store.connected
+            if self.advanced_memory_store
+            else False,
+        )
         if self.advanced_memory_store and self.advanced_memory_store.connected:
             try:
-                logger.debug(
+                logger.info(
                     "advanced_memory_learning_starting", pipeline_id=pipeline_id
                 )
                 await self.advanced_memory_store.learn_from_pipeline_result(
@@ -1035,7 +1054,7 @@ class LangGraphOrchestrator:
                         metadata, generation, memorization_quality
                     )
 
-                logger.debug(
+                logger.info(
                     "advanced_memory_learning_completed", pipeline_id=pipeline_id
                 )
             except Exception as e:

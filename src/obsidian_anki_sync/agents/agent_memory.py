@@ -194,16 +194,25 @@ class AgentMemoryStore:
         if self._initialized:
             return
 
+        logger.info(
+            "agent_memory_initializing",
+            storage_path=str(self.storage_path),
+            enable_semantic_search=self._enable_semantic_search,
+        )
+
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         # Check and enforce size limit before initializing
+        logger.debug("agent_memory_enforcing_size_limit")
         self._enforce_size_limit()
 
         # Initialize ChromaDB client
+        logger.info("agent_memory_chromadb_starting", path=str(self.storage_path))
         self._client = chromadb.PersistentClient(
             path=str(self.storage_path),
             settings=Settings(anonymized_telemetry=False),
         )
+        logger.info("agent_memory_chromadb_initialized")
 
         # Initialize embeddings using RAG embedding provider
         if self._enable_semantic_search and self.config is not None:
@@ -237,13 +246,18 @@ class AgentMemoryStore:
         if not self._embedding_function:
             # Prevent ChromaDB from downloading default embedding models during tests
             self._embedding_function = DummyEmbeddingFunction()
+            logger.debug("agent_memory_using_dummy_embeddings")
 
         # Initialize collections
+        logger.info("agent_memory_initializing_collections")
         self._initialize_collections()
+        logger.info("agent_memory_collections_initialized")
         self._initialized = True
 
         # Run automatic cleanup based on retention days
+        logger.debug("agent_memory_starting_auto_cleanup")
         self._auto_cleanup()
+        logger.info("agent_memory_initialization_complete")
 
     @property
     def client(self) -> chromadb.api.client.ClientAPI:
