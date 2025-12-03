@@ -641,7 +641,7 @@ class SyncEngine:
             action_duration = time.time() - action_start_time
             changes_by_type = {}
             for change in self.changes:
-                change_type = change.type.value
+                change_type = change.type
                 changes_by_type[change_type] = changes_by_type.get(change_type, 0) + 1
             logger.info(
                 "sync_phase_completed",
