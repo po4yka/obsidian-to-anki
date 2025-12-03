@@ -19,6 +19,7 @@ from obsidian_anki_sync.utils.code_detection import (
     detect_code_language_from_metadata,
 )
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
+from obsidian_anki_sync.utils.llm_logging import log_slow_llm_request
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .debug_artifacts import save_failed_llm_call
@@ -55,6 +56,7 @@ class GeneratorAgent:
         ollama_client: BaseLLMProvider,
         model: str = "qwen3:32b",
         temperature: float = 0.3,
+        slow_request_threshold: float = 60.0,
     ):
         """Initialize generator agent.
 
@@ -66,6 +68,7 @@ class GeneratorAgent:
         self.ollama_client = ollama_client
         self.model = model
         self.temperature = temperature
+        self.slow_request_threshold = slow_request_threshold
 
         # Load system prompt from CARDS_PROMPT.md
         prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
@@ -356,6 +359,13 @@ class GeneratorAgent:
                     temperature=self.temperature,
                 )
                 llm_duration = time.time() - llm_start_time
+
+                log_slow_llm_request(
+                    duration_seconds=llm_duration,
+                    threshold_seconds=self.slow_request_threshold,
+                    model=self.model,
+                    operation="card_generation",
+                )
 
                 apf_html = result.get("response", "")
 
@@ -888,6 +898,12 @@ Now generate the card following this structure:
                 )
 
                 llm_duration = time.time() - llm_start_time
+                log_slow_llm_request(
+                    duration_seconds=llm_duration,
+                    threshold_seconds=self.slow_request_threshold,
+                    model=self.model,
+                    operation="card_translation",
+                )
                 translated_html = result.get("response", "")
 
                 if not translated_html or not translated_html.strip():

@@ -15,6 +15,33 @@ from .logging import get_logger
 
 logger = get_logger(__name__)
 
+
+def log_slow_llm_request(
+    *,
+    duration_seconds: float,
+    threshold_seconds: float,
+    model: str | None,
+    operation: str,
+) -> None:
+    """Log a standardized slow LLM request warning.
+
+    Args:
+        duration_seconds: Measured request duration
+        threshold_seconds: Threshold for warning
+        model: Model name used for the request
+        operation: Operation identifier (e.g., "embedding", "card_generation")
+    """
+
+    if duration_seconds > threshold_seconds:
+        logger.warning(
+            "llm_request_slow",
+            model=model or "unknown",
+            operation=operation,
+            duration_seconds=round(duration_seconds, 3),
+            threshold_seconds=threshold_seconds,
+        )
+
+
 # Global session tracking for cumulative metrics
 _session_metrics: dict[str, dict[str, Any]] = defaultdict(
     lambda: {

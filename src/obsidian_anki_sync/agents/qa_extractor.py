@@ -9,6 +9,7 @@ from pathlib import Path
 
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.llm_logging import log_slow_llm_request
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .json_schemas import get_qa_extraction_schema
@@ -32,6 +33,7 @@ class QAExtractorAgent:
         reasoning_enabled: bool = False,
         enable_content_generation: bool = True,
         repair_missing_sections: bool = True,
+        slow_request_threshold: float = 60.0,
     ):
         """Initialize Q&A extractor agent.
 
@@ -49,6 +51,7 @@ class QAExtractorAgent:
         self.reasoning_enabled = reasoning_enabled
         self.enable_content_generation = enable_content_generation
         self.repair_missing_sections = repair_missing_sections
+        self.slow_request_threshold = slow_request_threshold
         logger.info(
             "qa_extractor_agent_initialized",
             model=model,
@@ -400,6 +403,7 @@ You are an expert Q&A extraction system specializing in educational note analysi
 
                 for attempt in range(max_retries):
                     try:
+                        start_time = time.perf_counter()
                         result = self.llm_provider.generate_json(
                             model=self.model,
                             prompt=prompt,
@@ -407,6 +411,13 @@ You are an expert Q&A extraction system specializing in educational note analysi
                             temperature=self.temperature,
                             json_schema=json_schema,
                             reasoning_enabled=self.reasoning_enabled,
+                        )
+                        duration = time.perf_counter() - start_time
+                        log_slow_llm_request(
+                            duration_seconds=duration,
+                            threshold_seconds=self.slow_request_threshold,
+                            model=self.model,
+                            operation="qa_extraction",
                         )
                         break
                     except json.JSONDecodeError as e:

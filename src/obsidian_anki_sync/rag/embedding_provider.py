@@ -9,6 +9,7 @@ Uses LangChain embeddings for compatibility with vector stores.
 """
 
 import hashlib
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.utils.llm_logging import log_slow_llm_request
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -67,6 +69,7 @@ class EmbeddingProvider:
         self.cache_dir = cache_dir
         self._embeddings: Embeddings | None = None
         self._cache: dict[str, list[float]] = {}
+        self._slow_request_threshold = config.llm_slow_request_threshold
 
         logger.info(
             "embedding_provider_initialized",
@@ -159,7 +162,16 @@ class EmbeddingProvider:
                 return self._cache[cache_key]
 
         try:
+            start_time = time.perf_counter()
             embedding = self.embeddings.embed_query(text)
+            duration = time.perf_counter() - start_time
+
+            log_slow_llm_request(
+                duration_seconds=duration,
+                threshold_seconds=self._slow_request_threshold,
+                model=self.model_name,
+                operation="embedding_query",
+            )
 
             if use_cache:
                 self._cache[cache_key] = embedding
@@ -231,7 +243,16 @@ class EmbeddingProvider:
                 batch_end = min(batch_start + batch_size, len(uncached_texts))
                 batch = uncached_texts[batch_start:batch_end]
 
+                start_time = time.perf_counter()
                 batch_embeddings = self.embeddings.embed_documents(batch)
+                duration = time.perf_counter() - start_time
+
+                log_slow_llm_request(
+                    duration_seconds=duration,
+                    threshold_seconds=self._slow_request_threshold,
+                    model=self.model_name,
+                    operation="embedding_batch",
+                )
 
                 # Store results and cache
                 for j, embedding in enumerate(batch_embeddings):
