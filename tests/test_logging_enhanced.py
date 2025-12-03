@@ -1,7 +1,10 @@
 """Tests for enhanced logging configuration."""
 
+import gzip
 import json
 import logging
+import os
+import time
 
 import pytest
 import structlog
@@ -115,6 +118,61 @@ class TestEnhancedLogging:
         # Verify error log was created
         error_logs = list(project_log_dir.glob("errors*.log"))
         assert len(error_logs) >= 1
+
+    def test_error_log_retention_cleanup(self, temp_dir):
+        """Ensure rotated error logs beyond retention are pruned."""
+
+        project_log_dir = temp_dir / "logs"
+        project_log_dir.mkdir(parents=True, exist_ok=True)
+
+        expired_log = project_log_dir / "errors.log.1"
+        expired_log.write_text("old errors", encoding="utf-8")
+        old_time = time.time() - (3 * 24 * 60 * 60)
+        os.utime(expired_log, (old_time, old_time))
+
+        recent_log = project_log_dir / "errors.log.2"
+        recent_log.write_text("recent errors", encoding="utf-8")
+
+        configure_logging(
+            log_level="INFO",
+            project_log_dir=project_log_dir,
+            error_log_retention_days=1,
+            compress_old_error_logs=False,
+        )
+
+        import logging
+
+        logging.shutdown()
+
+        assert not expired_log.exists()
+        assert recent_log.exists()
+
+    def test_error_log_compression(self, temp_dir):
+        """Verify rotated error logs are compressed when requested."""
+
+        project_log_dir = temp_dir / "logs"
+        project_log_dir.mkdir(parents=True, exist_ok=True)
+
+        rotate_candidate = project_log_dir / "errors.log.3"
+        rotate_candidate.write_text("compress me", encoding="utf-8")
+
+        configure_logging(
+            log_level="INFO",
+            project_log_dir=project_log_dir,
+            error_log_retention_days=7,
+            compress_old_error_logs=True,
+        )
+
+        import logging
+
+        logging.shutdown()
+
+        compressed_path = project_log_dir / "errors.log.3.gz"
+        assert compressed_path.exists()
+        assert not rotate_candidate.exists()
+
+        with gzip.open(compressed_path, "rt", encoding="utf-8") as handle:
+            assert "compress me" in handle.read()
 
     def test_json_structure_in_file_logs(self, temp_dir):
         """Test that file logs contain valid JSON structure."""

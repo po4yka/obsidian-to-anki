@@ -176,6 +176,10 @@ class Config(BaseSettings):
     error_log_retention_days: int = Field(
         default=90, description="Days to retain error logs"
     )
+    compress_error_logs: bool = Field(
+        default=True,
+        description="Compress rotated error logs within retention window",
+    )
     archiver_batch_size: int = Field(
         default=64,
         ge=1,

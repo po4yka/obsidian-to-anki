@@ -1,6 +1,9 @@
 """Logging configuration using structlog for structured JSON logging."""
 
+import contextlib
+import gzip
 import logging
+import shutil
 import sys
 import threading
 import time
@@ -395,6 +398,46 @@ def _setup_stdlib_logging(
     )
 
 
+def _cleanup_error_logs(
+    project_log_dir: Path,
+    retention_days: int,
+    compress_old_error_logs: bool,
+) -> None:
+    """Remove or archive rotated error logs past retention window."""
+
+    cutoff_seconds = max(retention_days, 0) * 24 * 60 * 60
+    now = time.time()
+    error_log_path = project_log_dir / "errors.log"
+
+    for log_file in project_log_dir.glob("errors.log*"):
+        if log_file == error_log_path:
+            continue
+
+        try:
+            stat = log_file.stat()
+        except FileNotFoundError:
+            continue
+
+        age_seconds = now - stat.st_mtime
+        if age_seconds > cutoff_seconds:
+            with contextlib.suppress(OSError):
+                log_file.unlink()
+            continue
+
+        if compress_old_error_logs and not log_file.name.endswith(".gz"):
+            compressed_path = log_file.with_name(f"{log_file.name}.gz")
+            try:
+                with (
+                    log_file.open("rb") as src,
+                    gzip.open(compressed_path, "wb") as dst,
+                ):
+                    shutil.copyfileobj(src, dst)
+                log_file.unlink()
+            except OSError:
+                with contextlib.suppress(OSError):
+                    compressed_path.unlink(missing_ok=True)
+
+
 def configure_logging(
     log_level: str = "INFO",
     log_dir: Path | None = None,
@@ -403,6 +446,7 @@ def configure_logging(
     verbose: bool = False,
     project_log_dir: Path | None = None,
     error_log_retention_days: int = 90,
+    compress_old_error_logs: bool = True,
     enable_console_noise_filter: bool = True,
 ) -> None:
     """Configure structlog logging with dual output.
@@ -415,6 +459,7 @@ def configure_logging(
         verbose: If True, show all log messages on terminal (for debugging)
         project_log_dir: Directory for project-level logs (default: ./logs)
         error_log_retention_days: Days to retain error logs (default: 90)
+        compress_old_error_logs: Compress rotated error logs within retention window
         enable_console_noise_filter: Toggle console-side noise suppression
     """
     global _configured, _handlers  # noqa: PLW0602
@@ -447,8 +492,6 @@ def configure_logging(
     project_log_dir.mkdir(exist_ok=True, parents=True)
 
     # Console handler - human-readable with colors
-    import contextlib
-
     class ResilientStreamHandler(logging.StreamHandler):
         """StreamHandler that silently ignores I/O errors."""
 
@@ -579,6 +622,12 @@ def configure_logging(
     error_handler.setFormatter(file_formatter)
     root_logger.addHandler(error_handler)
     _handlers.append(error_handler)
+
+    _cleanup_error_logs(
+        project_log_dir=project_log_dir,
+        retention_days=error_log_retention_days,
+        compress_old_error_logs=compress_old_error_logs,
+    )
 
     # Verbose LLM logging handler (if enabled)
     if very_verbose:

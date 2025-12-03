@@ -60,6 +60,7 @@ def get_config_and_logger(
             verbose=verbose,
             project_log_dir=_config.get_log_dir(),
             error_log_retention_days=_config.error_log_retention_days,
+            compress_old_error_logs=_config.compress_error_logs,
         )
         _logger = get_logger("cli")
 
