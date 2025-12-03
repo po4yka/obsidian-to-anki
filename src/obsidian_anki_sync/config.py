@@ -321,7 +321,7 @@ class Config(BaseSettings):
     openrouter_site_name: str | None = None
 
     # Legacy OpenRouter settings (for backward compatibility)
-    openrouter_model: str = "x-ai/grok-4.1-fast"
+    openrouter_model: str = "x-ai/grok-4.1-fast:free"
 
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
@@ -537,7 +537,7 @@ class Config(BaseSettings):
 
     # Default model used by ALL agents unless specifically overridden
     # Only used if model_preset is not set or for backward compatibility
-    default_llm_model: str = "x-ai/grok-4.1-fast"
+    default_llm_model: str = "x-ai/grok-4.1-fast:free"
 
     # Per-agent model overrides (optional - overrides preset defaults)
     # Set model to empty string ("") to use preset default

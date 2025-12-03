@@ -17,7 +17,7 @@ Input Note -> Pre-Validator -> Generator -> Post-Validator -> Output Cards
 | Agent | Purpose | Models | Output |
 |-------|---------|--------|--------|
 | Pre-Validator | Early input validation | gpt-4o-mini, qwen3:8b | `PreValidationResult` |
-| Highlight | Analyze failed notes, suggest fixes | grok-4.1-fast | `HighlightResult` |
+| Highlight | Analyze failed notes, suggest fixes | grok-4.1-fast:free | `HighlightResult` |
 | Generator | Card generation | claude-3-5-sonnet, gpt-4o | `CardGenerationResult` |
 | Post-Validator | Quality assurance | gpt-4o, claude-3-haiku | `PostValidationResult` |
 
