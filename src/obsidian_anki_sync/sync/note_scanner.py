@@ -310,6 +310,12 @@ class NoteScanner:
                             relative_path, qa_pair.card_index, lang
                         )
                     try:
+                        # Check for existing pending card first
+                        # We need to construct the slug to check
+                        # This is a bit tricky because slug generation might depend on counters
+                        # But for recovery, we can check if we have a pending card with the same content hash
+
+                        # Generate the card
                         card = self.card_generator.generate_card(
                             qa_pair=qa_pair,
                             metadata=metadata,
@@ -319,6 +325,32 @@ class NoteScanner:
                             note_content=note_content,
                             all_qa_pairs=qa_pairs,
                         )
+
+                        # Persist immediately as pending
+                        # This ensures that if the process crashes before sync, we have the card
+                        try:
+                            # Map fields for storage
+                            from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
+                            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+                            self.db.upsert_card_extended(
+                                card=card,
+                                anki_guid=None,  # Not yet in Anki
+                                fields=fields,
+                                tags=card.tags,
+                                deck_name=self.config.anki_deck_name,
+                                apf_html=card.apf_html,
+                                creation_status="pending"
+                            )
+                            logger.debug("persisted_pending_card", slug=card.slug)
+                        except Exception as e:
+                            logger.warning(
+                                "failed_to_persist_pending_card",
+                                slug=card.slug,
+                                error=str(e)
+                            )
+                            # Continue anyway, as this is just a safety measure
+
                         if self.progress:
                             self.progress.complete_note(
                                 relative_path, qa_pair.card_index, lang, 1

@@ -750,6 +750,97 @@ class StateDB(IStateRepository):
             )
             raise
 
+    def upsert_card_extended(
+        self,
+        card: ModelCard,
+        anki_guid: int | None,
+        fields: dict[str, str],
+        tags: list[str],
+        deck_name: str,
+        apf_html: str,
+        creation_status: str = "success",
+    ) -> None:
+        """Insert or update card with full content.
+
+        Args:
+            card: Card object
+            anki_guid: Anki note ID (can be None for pending cards)
+            fields: Mapped fields dict
+            tags: List of tags
+            deck_name: Target deck name
+            apf_html: Full APF HTML content
+            creation_status: Status of creation (success, pending, failed)
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO cards (
+                    slug, slug_base, lang, source_path, source_anchor,
+                    card_index, anki_guid, content_hash, note_id, note_title,
+                    note_type, card_guid, apf_html, fields_json, tags_json,
+                    deck_name, creation_status, synced_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(slug) DO UPDATE SET
+                    anki_guid = excluded.anki_guid,
+                    content_hash = excluded.content_hash,
+                    note_title = excluded.note_title,
+                    note_type = excluded.note_type,
+                    card_guid = excluded.card_guid,
+                    apf_html = excluded.apf_html,
+                    fields_json = excluded.fields_json,
+                    tags_json = excluded.tags_json,
+                    deck_name = excluded.deck_name,
+                    creation_status = excluded.creation_status,
+                    synced_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    card.slug,
+                    card.manifest.slug_base,
+                    card.lang,
+                    card.manifest.source_path,
+                    card.manifest.source_anchor,
+                    card.manifest.card_index,
+                    anki_guid,
+                    card.content_hash,
+                    card.manifest.note_id,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    apf_html,
+                    json.dumps(fields),
+                    json.dumps(tags),
+                    deck_name,
+                    creation_status,
+                ),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="upsert_card_extended",
+                slug=card.slug,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
+
+    def get_pending_cards(self) -> list[dict[str, Any]]:
+        """Get all cards with 'pending' creation status.
+
+        Returns:
+            List of pending card records
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM cards WHERE creation_status = 'pending'"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
     def insert_cards_batch(
         self,
         cards_data: list[tuple[ModelCard, int, dict[str, str], list[str], str]],
@@ -797,8 +888,21 @@ class StateDB(IStateRepository):
                     slug, slug_base, lang, source_path, source_anchor,
                     card_index, anki_guid, content_hash, note_id, note_title,
                     note_type, card_guid, apf_html, fields_json, tags_json,
-                    deck_name, creation_status, synced_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    deck_name, creation_status, synced_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(slug) DO UPDATE SET
+                    anki_guid = excluded.anki_guid,
+                    content_hash = excluded.content_hash,
+                    note_title = excluded.note_title,
+                    note_type = excluded.note_type,
+                    card_guid = excluded.card_guid,
+                    apf_html = excluded.apf_html,
+                    fields_json = excluded.fields_json,
+                    tags_json = excluded.tags_json,
+                    deck_name = excluded.deck_name,
+                    creation_status = excluded.creation_status,
+                    synced_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
                 """,
                 insert_data,
             )

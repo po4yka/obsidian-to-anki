@@ -212,13 +212,15 @@ class ChangeApplier:
                     self._verify_card_exists(card, note_id, fields, card.tags)
 
                 # Step 3: Save to database (only after verification succeeds)
-                self.db.insert_card_extended(
+                # Use upsert to handle cases where card was already inserted as "pending"
+                self.db.upsert_card_extended(
                     card=card,
                     anki_guid=note_id,
                     fields=fields,
                     tags=card.tags,
                     deck_name=self.config.anki_deck_name,
                     apf_html=card.apf_html,
+                    creation_status="success"
                 )
 
                 txn.commit()
@@ -484,6 +486,7 @@ class ChangeApplier:
 
                     # Batch insert into database (only verified cards)
                     if verified_cards:
+                        # insert_cards_batch now handles upserts internally
                         self.db.insert_cards_batch(
                             verified_cards, self.config.anki_deck_name
                         )
