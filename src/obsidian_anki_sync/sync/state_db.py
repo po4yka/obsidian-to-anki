@@ -828,6 +828,94 @@ class StateDB(IStateRepository):
             )
             raise
 
+    def upsert_batch_extended(
+        self,
+        cards_data: list[dict[str, Any]],
+    ) -> None:
+        """Insert or update multiple cards in a single transaction.
+
+        Args:
+            cards_data: List of dicts containing:
+                - card: ModelCard
+                - anki_guid: int | None
+                - fields: dict[str, str]
+                - tags: list[str]
+                - deck_name: str
+                - apf_html: str
+                - creation_status: str (optional, default="success")
+        """
+        if not cards_data:
+            return
+
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+
+            # Prepare data for executemany
+            params_list = []
+            for item in cards_data:
+                card = item["card"]
+                params_list.append((
+                    card.slug,
+                    card.manifest.slug_base,
+                    card.lang,
+                    card.manifest.source_path,
+                    card.manifest.source_anchor,
+                    card.manifest.card_index,
+                    item.get("anki_guid"),
+                    card.content_hash,
+                    card.manifest.note_id,
+                    card.manifest.note_title,
+                    card.note_type,
+                    card.guid,
+                    item["apf_html"],
+                    json.dumps(item["fields"]),
+                    json.dumps(item["tags"]),
+                    item["deck_name"],
+                    item.get("creation_status", "success"),
+                ))
+
+            cursor.executemany(
+                """
+                INSERT INTO cards (
+                    slug, slug_base, lang, source_path, source_anchor,
+                    card_index, anki_guid, content_hash, note_id, note_title,
+                    note_type, card_guid, apf_html, fields_json, tags_json,
+                    deck_name, creation_status, synced_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(slug) DO UPDATE SET
+                    anki_guid = excluded.anki_guid,
+                    content_hash = excluded.content_hash,
+                    note_title = excluded.note_title,
+                    note_type = excluded.note_type,
+                    card_guid = excluded.card_guid,
+                    apf_html = excluded.apf_html,
+                    fields_json = excluded.fields_json,
+                    tags_json = excluded.tags_json,
+                    deck_name = excluded.deck_name,
+                    creation_status = excluded.creation_status,
+                    synced_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                params_list,
+            )
+            conn.commit()
+            logger.debug(
+                "db_batch_committed",
+                operation="upsert_batch_extended",
+                count=len(cards_data),
+            )
+        except sqlite3.Error as e:
+            conn.rollback()
+            logger.error(
+                "db_transaction_error",
+                operation="upsert_batch_extended",
+                count=len(cards_data),
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
+
     def get_pending_cards(self) -> list[dict[str, Any]]:
         """Get all cards with 'pending' creation status.
 

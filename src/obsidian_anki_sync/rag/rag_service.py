@@ -7,9 +7,11 @@ Provides unified interface for:
 - Related concept discovery
 """
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
+import diskcache
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -76,7 +78,15 @@ class RAGService:
         self._vector_store = vector_store
         self._initialized = False
 
-        logger.info("rag_service_created")
+        # Initialize cache
+        cache_dir = config.db_path.parent / ".cache" / "rag_service"
+        self._cache = diskcache.Cache(
+            directory=str(cache_dir),
+            size_limit=500 * 1024 * 1024,  # 500MB limit
+            eviction_policy="least-recently-used",
+        )
+
+        logger.info("rag_service_created", cache_dir=str(cache_dir))
 
     @property
     def vector_store(self) -> VaultVectorStore:
@@ -121,6 +131,18 @@ class RAGService:
             "stats": self.vector_store.get_stats(),
         }
 
+    def _get_cache_key(self, prefix: str, **kwargs) -> str:
+        """Generate a deterministic cache key."""
+        # Convert kwargs to string representation for hashing
+        # We sort keys to ensure deterministic order
+        content_parts = []
+        for k, v in sorted(kwargs.items()):
+            content_parts.append(f"{k}:{v}")
+
+        content = "|".join(content_parts)
+        hash_val = hashlib.md5(content.encode()).hexdigest()
+        return f"{prefix}:{hash_val}"
+
     async def get_related_concepts(
         self,
         content: str,
@@ -139,6 +161,19 @@ class RAGService:
         Returns:
             List of related concepts
         """
+        # Check cache
+        cache_key = self._get_cache_key(
+            "related",
+            content=content,
+            k=k,
+            topic=topic_filter,
+            language=language
+        )
+
+        if cache_key in self._cache:
+            logger.debug("rag_cache_hit", operation="get_related_concepts")
+            return self._cache[cache_key]
+
         # Build filters
         filters: dict[str, Any] = {}
         if topic_filter:
@@ -213,6 +248,8 @@ class RAGService:
             topic_filter=topic_filter,
         )
 
+        # Cache result
+        self._cache[cache_key] = concepts
         return concepts
 
     async def check_duplicate(
@@ -298,6 +335,18 @@ class RAGService:
         Returns:
             List of few-shot examples
         """
+        # Check cache
+        cache_key = self._get_cache_key(
+            "few_shot",
+            topic=topic,
+            difficulty=difficulty,
+            k=k
+        )
+
+        if cache_key in self._cache:
+            logger.debug("rag_cache_hit", operation="get_few_shot_examples")
+            return self._cache[cache_key]
+
         # Build query from topic
         query = f"Example cards for topic: {topic}"
         if difficulty:
@@ -360,6 +409,8 @@ class RAGService:
             examples=len(examples),
         )
 
+        # Cache result
+        self._cache[cache_key] = examples
         return examples
 
     async def enrich_context(

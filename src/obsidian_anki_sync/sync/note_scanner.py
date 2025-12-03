@@ -328,28 +328,8 @@ class NoteScanner:
 
                         # Persist immediately as pending
                         # This ensures that if the process crashes before sync, we have the card
-                        try:
-                            # Map fields for storage
-                            from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
-                            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
-
-                            self.db.upsert_card_extended(
-                                card=card,
-                                anki_guid=None,  # Not yet in Anki
-                                fields=fields,
-                                tags=card.tags,
-                                deck_name=self.config.anki_deck_name,
-                                apf_html=card.apf_html,
-                                creation_status="pending"
-                            )
-                            logger.debug("persisted_pending_card", slug=card.slug)
-                        except Exception as e:
-                            logger.warning(
-                                "failed_to_persist_pending_card",
-                                slug=card.slug,
-                                error=str(e)
-                            )
-                            # Continue anyway, as this is just a safety measure
+                        # OPTIMIZATION: We now batch these upserts after the loop to reduce DB transactions
+                        # The risk is slightly higher (if crash happens during loop), but performance is much better
 
                         if self.progress:
                             self.progress.complete_note(
@@ -383,6 +363,40 @@ class NoteScanner:
                 # Execute card generation sequentially to avoid nested thread pools
                 # The outer loop (scan_notes_parallel) already handles concurrency at the note level
                 results = [_generate_single(qa_pair, lang) for qa_pair, lang in tasks]
+
+                # Batch upsert pending cards
+                pending_cards_data = []
+                from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
+
+                for (qa_pair, lang), (card, _, _) in zip(tasks, results):
+                    if card:
+                        try:
+                            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+                            pending_cards_data.append({
+                                "card": card,
+                                "anki_guid": None,
+                                "fields": fields,
+                                "tags": card.tags,
+                                "deck_name": self.config.anki_deck_name,
+                                "apf_html": card.apf_html,
+                                "creation_status": "pending"
+                            })
+                        except Exception as e:
+                            logger.warning(
+                                "failed_to_prepare_pending_card_for_batch",
+                                slug=card.slug,
+                                error=str(e)
+                            )
+
+                if pending_cards_data:
+                    try:
+                        self.db.upsert_batch_extended(pending_cards_data)
+                        logger.debug("persisted_pending_cards_batch", count=len(pending_cards_data))
+                    except Exception as e:
+                        logger.warning(
+                            "failed_to_persist_pending_cards_batch",
+                            error=str(e)
+                        )
 
                 failures_this_note = 0
                 for (qa_pair, lang), (card, error_message, error_type) in zip(
@@ -1301,9 +1315,42 @@ class NoteScanner:
                             if card:
                                 cards[card.slug] = card
                                 new_slugs.add(card.slug)
-                            elif error_message:
                                 result_info["error"] = error_message
                                 result_info["error_type"] = error_type_name
+
+            # Batch upsert pending cards
+            if cards:
+                pending_cards_data = []
+                from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
+
+                for card in cards.values():
+                    try:
+                        fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+                        pending_cards_data.append({
+                            "card": card,
+                            "anki_guid": None,
+                            "fields": fields,
+                            "tags": card.tags,
+                            "deck_name": self.config.anki_deck_name,
+                            "apf_html": card.apf_html,
+                            "creation_status": "pending"
+                        })
+                    except Exception as e:
+                        logger.warning(
+                            "failed_to_prepare_pending_card_for_batch_parallel",
+                            slug=card.slug,
+                            error=str(e)
+                        )
+
+                if pending_cards_data:
+                    try:
+                        self.db.upsert_batch_extended(pending_cards_data)
+                        logger.debug("persisted_pending_cards_batch_parallel", count=len(pending_cards_data))
+                    except Exception as e:
+                        logger.warning(
+                            "failed_to_persist_pending_cards_batch_parallel",
+                            error=str(e)
+                        )
 
             result_info["success"] = True
             result_info["cards_count"] = len(cards)
