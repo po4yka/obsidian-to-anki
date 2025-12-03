@@ -208,6 +208,10 @@ class Config(BaseSettings):
         default=3,
         description="Maximum retries for queued tasks",
     )
+    redis_socket_connect_timeout: float = Field(
+        default=5.0,
+        description="Redis socket connect timeout in seconds",
+    )
 
     # Queue Stability Configuration
     queue_max_wait_time_seconds: int = Field(

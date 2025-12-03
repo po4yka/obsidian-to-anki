@@ -28,50 +28,64 @@ def mock_pool():
     pool.ping = AsyncMock(return_value=True)
     # Add close method
     pool.close = AsyncMock(return_value=None)
+    # Add blpop method
+    pool.blpop = AsyncMock()
+    # Add rpush method
+    pool.rpush = AsyncMock()
+    # Add expire method
+    pool.expire = AsyncMock()
+    # Add delete method
+    pool.delete = AsyncMock()
     return pool
 
 
 def test_scan_notes_with_queue(mock_config, mock_pool):
-    """Test that scan_notes_with_queue submits jobs and collects results."""
+    """Test that scan_notes_with_queue submits jobs and collects results via BLPOP."""
 
     # Mock job returned by enqueue_job
     mock_job = MagicMock()
     mock_job.job_id = "test-job-id"
 
-    # Mock Job class instance for status checking
-    mock_job_instance = MagicMock()
-    mock_job_instance.status = AsyncMock(return_value="complete")
-    mock_job_instance.result = AsyncMock(
-        return_value={
-            "success": True,
-            "cards": [
-                {
-                    "slug": "test-card",
-                    "lang": "en",
-                    "apf_html": "<!-- test -->",
-                    "manifest": {
-                        "slug": "test-card",
-                        "slug_base": "test-card",
-                        "lang": "en",
-                        "source_path": "/tmp/test.md",
-                        "source_anchor": "#card-1",
-                        "note_id": "test",
-                        "note_title": "Test",
-                        "card_index": 0,
-                        "guid": "guid",
-                        "hash6": None,
-                    },
-                    "content_hash": "hash123",
-                    "note_type": "APF::Simple",
-                    "tags": ["tag"],
-                    "guid": "guid",
-                }
-            ],
-            "slugs": ["test-card"],
-        }
-    )
-
     mock_pool.enqueue_job.return_value = mock_job
+
+    # Mock BLPOP return value
+    # BLPOP returns (key, value)
+    import json
+    result_payload = {
+        "success": True,
+        "cards": [
+            {
+                "slug": "test-card",
+                "lang": "en",
+                "apf_html": "<!-- test -->",
+                "manifest": {
+                    "slug": "test-card",
+                    "slug_base": "test-card",
+                    "lang": "en",
+                    "source_path": "/tmp/test.md",
+                    "source_anchor": "#card-1",
+                    "note_id": "test",
+                    "note_title": "Test",
+                    "card_index": 0,
+                    "guid": "guid",
+                    "hash6": None,
+                },
+                "content_hash": "hash123",
+                "note_type": "APF::Simple",
+                "tags": ["tag"],
+                "guid": "guid",
+            }
+        ],
+        "slugs": ["test-card"],
+    }
+
+    # First call returns result, second call returns None (timeout) to break loop if we were looping on timeout
+    # But our loop breaks when pending_jobs is empty.
+    # We have 1 job, so 1 result should clear it.
+    mock_pool.blpop.side_effect = [
+        (b"queue", json.dumps(result_payload).encode("utf-8")),
+        None
+    ]
 
     # create_pool is async, so we need to return a coroutine that returns the mock_pool
     async def mock_create_pool(*args, **kwargs):
@@ -82,9 +96,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
             "obsidian_anki_sync.sync.note_scanner.create_pool",
             side_effect=mock_create_pool,
         ),
-        patch(
-            "obsidian_anki_sync.sync.note_scanner.Job", return_value=mock_job_instance
-        ) as mock_job_class,
+        # We don't need to patch Job class anymore as we don't use it for status checks
     ):
         from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
@@ -112,15 +124,25 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
         assert len(result) == 1
         assert "test-card" in result
         assert mock_pool.enqueue_job.called
-        # Verify Job class was instantiated with correct parameters
-        mock_job_class.assert_called_with(job_id="test-job-id", redis=mock_pool)
+        assert mock_pool.blpop.called
+
+        # Verify enqueue was called with result_queue_name
+        call_kwargs = mock_pool.enqueue_job.call_args[1]
+        assert "result_queue_name" in call_kwargs
+        assert "obsidian_anki_sync:results:" in call_kwargs["result_queue_name"]
 
 
 @pytest.mark.asyncio()
 async def test_process_note_job():
-    """Test worker job processing."""
+    """Test worker job processing pushes to Redis."""
 
-    ctx = {"config": Config(), "orchestrator": AsyncMock()}
+    # Mock Redis in context
+    mock_redis = AsyncMock()
+    ctx = {
+        "config": Config(),
+        "orchestrator": AsyncMock(),
+        "redis": mock_redis
+    }
 
     # Mock orchestrator result
     mock_result = MagicMock()
@@ -163,10 +185,24 @@ async def test_process_note_job():
             }
         ]
 
+        result_queue = "test-queue"
         result = await process_note_job(
-            ctx, "/tmp/test.md", "test.md", metadata_dict, qa_pairs_dicts
+            ctx,
+            "/tmp/test.md",
+            "test.md",
+            metadata_dict,
+            qa_pairs_dicts,
+            result_queue_name=result_queue
         )
 
         assert result["success"] is True
         assert len(result["cards"]) == 1
         assert result["cards"][0]["slug"] == "test-card"
+
+        # Verify push to Redis
+        assert mock_redis.rpush.called
+        assert mock_redis.rpush.call_args[0][0] == result_queue
+        import json
+        payload = json.loads(mock_redis.rpush.call_args[0][1])
+        assert payload["success"] is True
+        assert payload["cards"][0]["slug"] == "test-card"

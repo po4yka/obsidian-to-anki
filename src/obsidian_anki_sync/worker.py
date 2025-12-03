@@ -51,6 +51,7 @@ async def process_note_job(
     metadata_dict: dict[str, Any] | None = None,
     qa_pairs_dicts: list[dict[str, Any]] | None = None,
     existing_cards_dicts: list[dict[str, Any]] | None = None,
+    result_queue_name: str | None = None,
 ) -> dict[str, Any]:
     """Process a note generation job.
 
@@ -61,6 +62,7 @@ async def process_note_job(
         metadata_dict: Optional pre-parsed metadata
         qa_pairs_dicts: Optional pre-parsed QA pairs
         existing_cards_dicts: Optional existing cards for duplicate detection
+        result_queue_name: Optional Redis list to push results to
 
     Returns:
         Dict containing generated cards and status
@@ -84,11 +86,14 @@ async def process_note_job(
     try:
         path_obj = Path(file_path)
         if not path_obj.exists():
-            return {
+            result = {
                 "success": False,
                 "error": f"File not found: {file_path}",
                 "cards": [],
             }
+            if result_queue_name:
+                await _push_result(ctx, result_queue_name, result)
+            return result
 
         # Read content
         note_content = path_obj.read_text(encoding="utf-8")
@@ -108,7 +113,7 @@ async def process_note_job(
             existing_cards = [GeneratedCard(**c) for c in existing_cards_dicts]
 
         # Process note
-        result = await orchestrator.process_note(
+        pipeline_result = await orchestrator.process_note(
             note_content=note_content,
             metadata=metadata,
             qa_pairs=qa_pairs,
@@ -117,16 +122,16 @@ async def process_note_job(
         )
 
         pipeline_context = {
-            "total_time": round(result.total_time, 3),
-            "retry_count": result.retry_count,
-            "stage_times": result.stage_times,
-            "last_error": result.last_error,
+            "total_time": round(pipeline_result.total_time, 3),
+            "retry_count": pipeline_result.retry_count,
+            "stage_times": pipeline_result.stage_times,
+            "last_error": pipeline_result.last_error,
             "generation_sla": generation_sla,
             "validation_sla": validation_sla,
         }
 
         sla_violation = _detect_stage_sla(
-            result.stage_times, generation_sla, validation_sla
+            pipeline_result.stage_times, generation_sla, validation_sla
         )
         if sla_violation is not None:
             logger.error(
@@ -136,39 +141,42 @@ async def process_note_job(
                 elapsed=round(sla_violation["elapsed"], 2),
                 budget=sla_violation["budget"],
             )
-            return {
+            result = {
                 "success": False,
                 "error": sla_violation["message"],
                 "cards": [],
             }
+            if result_queue_name:
+                await _push_result(ctx, result_queue_name, result)
+            return result
 
-        if not result.success or not result.generation:
+        if not pipeline_result.success or not pipeline_result.generation:
             # Build detailed error message from pipeline result
             error_details = []
-            if not result.success:
+            if not pipeline_result.success:
                 error_details.append("Pipeline marked as failed")
-            if result.pre_validation and not result.pre_validation.is_valid:
+            if pipeline_result.pre_validation and not pipeline_result.pre_validation.is_valid:
                 error_details.append(
-                    f"Pre-validation failed ({result.pre_validation.error_type}): "
-                    f"{result.pre_validation.error_details}"
+                    f"Pre-validation failed ({pipeline_result.pre_validation.error_type}): "
+                    f"{pipeline_result.pre_validation.error_details}"
                 )
-            if result.post_validation and not result.post_validation.is_valid:
+            if pipeline_result.post_validation and not pipeline_result.post_validation.is_valid:
                 error_details.append(
-                    f"Post-validation failed ({result.post_validation.error_type}): "
-                    f"{result.post_validation.error_details}"
+                    f"Post-validation failed ({pipeline_result.post_validation.error_type}): "
+                    f"{pipeline_result.post_validation.error_details}"
                 )
-            if not result.generation:
+            if not pipeline_result.generation:
                 error_details.append("No cards generated")
-            elif result.generation.total_cards == 0:
+            elif pipeline_result.generation.total_cards == 0:
                 error_details.append("Generator returned zero cards")
 
-            if result.post_validation:
+            if pipeline_result.post_validation:
                 logger.warning(
                     "post_validation_payload",
                     file=relative_path,
-                    is_valid=result.post_validation.is_valid,
-                    error_type=result.post_validation.error_type,
-                    error_details=result.post_validation.error_details[:500],
+                    is_valid=pipeline_result.post_validation.is_valid,
+                    error_type=pipeline_result.post_validation.error_type,
+                    error_details=pipeline_result.post_validation.error_details[:500],
                 )
 
             error_msg = (
@@ -178,25 +186,28 @@ async def process_note_job(
                 "pipeline_generation_failed",
                 file=relative_path,
                 error=error_msg,
-                pre_valid=result.pre_validation.is_valid
-                if result.pre_validation
+                pre_valid=pipeline_result.pre_validation.is_valid
+                if pipeline_result.pre_validation
                 else None,
-                post_valid=result.post_validation.is_valid
-                if result.post_validation
+                post_valid=pipeline_result.post_validation.is_valid
+                if pipeline_result.post_validation
                 else None,
-                stage_times=result.stage_times,
-                retry_count=result.retry_count,
-                last_error=result.last_error,
+                stage_times=pipeline_result.stage_times,
+                retry_count=pipeline_result.retry_count,
+                last_error=pipeline_result.last_error,
             )
-            return {
+            result = {
                 "success": False,
                 "error": error_msg,
                 "cards": [],
             }
+            if result_queue_name:
+                await _push_result(ctx, result_queue_name, result)
+            return result
 
         # Convert to cards
         cards = orchestrator.convert_to_cards(
-            result.generation.cards, metadata, qa_pairs, path_obj
+            pipeline_result.generation.cards, metadata, qa_pairs, path_obj
         )
 
         # Serialize cards for return
@@ -211,11 +222,38 @@ async def process_note_job(
             **pipeline_context,
         )
 
-        return {"success": True, "cards": cards_dicts, "slugs": [c.slug for c in cards]}
+        result = {"success": True, "cards": cards_dicts, "slugs": [c.slug for c in cards]}
+        if result_queue_name:
+            await _push_result(ctx, result_queue_name, result)
+        return result
 
     except Exception as e:
         logger.exception("worker_job_failed", file=relative_path, error=str(e))
-        return {"success": False, "error": str(e), "cards": []}
+        result = {"success": False, "error": str(e), "cards": []}
+        if result_queue_name:
+            await _push_result(ctx, result_queue_name, result)
+        return result
+
+
+async def _push_result(ctx: dict[str, Any], queue_name: str, result: dict[str, Any]) -> None:
+    """Push job result to Redis list."""
+    try:
+        import json
+        # Use arq's redis connection from context if available, otherwise create new
+        redis = ctx.get("redis")
+        if not redis:
+            # Fallback if ctx doesn't have redis (shouldn't happen in arq worker)
+            return
+
+        # Serialize result
+        # We need to handle potential non-serializable objects if any remain
+        # But cards_dicts should be pure python dicts/lists/etc.
+        payload = json.dumps(result)
+        await redis.rpush(queue_name, payload)
+        # Set expiry on result queue to prevent memory leaks (e.g., 1 hour)
+        await redis.expire(queue_name, 3600)
+    except Exception as e:
+        logger.error("failed_to_push_result", queue=queue_name, error=str(e))
 
 
 class WorkerSettings:
@@ -235,6 +273,7 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(
         os.getenv("REDIS_URL", "redis://localhost:6379")
     )
+    redis_settings.conn_timeout = float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5.0"))
     max_jobs = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "50"))
 
 
