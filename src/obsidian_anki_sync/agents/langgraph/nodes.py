@@ -920,14 +920,22 @@ async def generation_node(state: PipelineState) -> PipelineState:
         # Validate against split plan if available
         if expected_card_count is not None:
             actual_count = gen_result.total_cards
-            if actual_count != expected_card_count:
+            
+            # Adjust expected count for bilingual notes
+            # Each concept (card in split plan) generates one card per language
+            num_languages = len(metadata.language_tags) if metadata.language_tags else 1
+            adjusted_expected_count = expected_card_count * num_languages
+            
+            if actual_count != adjusted_expected_count:
                 logger.warning(
                     "langgraph_generation_card_count_mismatch",
-                    expected=expected_card_count,
+                    expected=adjusted_expected_count,
                     actual=actual_count,
                     strategy=(
                         splitting_result.splitting_strategy if card_splitting else None
                     ),
+                    num_languages=num_languages,
+                    original_expected=expected_card_count,
                 )
                 # This is a warning, not an error - generation may produce different count
                 # based on actual Q&A pairs vs split plan expectations
