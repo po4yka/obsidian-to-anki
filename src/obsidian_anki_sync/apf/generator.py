@@ -1,4 +1,4 @@
-"""APF card generation via OpenRouter LLM."""
+"""APF card generation via OpenRouter LLM."""  # pragma: allowlist secret
 
 import hashlib
 import html
@@ -11,12 +11,15 @@ from typing import TYPE_CHECKING
 import httpx
 
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.exceptions import APFValidationError
+from obsidian_anki_sync.exceptions import APFValidationError  # pragma: allowlist secret
 from obsidian_anki_sync.models import Card, Manifest, NoteMetadata, QAPair
 from obsidian_anki_sync.providers.openrouter import OpenRouterProvider
 from obsidian_anki_sync.utils.code_detection import detect_code_language_from_metadata
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
-from obsidian_anki_sync.utils.llm_logging import log_llm_stream_chunk
+from obsidian_anki_sync.utils.llm_logging import (
+    log_llm_stream_chunk,
+    log_slow_llm_request,
+)
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.retry import retry
 
@@ -43,6 +46,7 @@ class APFGenerator:
             max_tokens=config.llm_max_tokens,
         )
         self._prompt_fingerprints: dict[str, int] = {}
+        self._slow_request_threshold = config.llm_slow_request_threshold
 
         # Load CARDS_PROMPT template
         prompt_path = Path(__file__).parents[3] / ".docs" / "CARDS_PROMPT.md"
@@ -467,6 +471,8 @@ Requirements:
                 seen=fingerprint_count,
             )
 
+        request_start = time.perf_counter()
+
         result = self.provider.generate(
             model=model,
             prompt=conversation_prompt,
@@ -482,16 +488,34 @@ Requirements:
             if stream is None:
                 msg = "Streaming was requested but provider returned no stream handle"
                 raise RuntimeError(msg)
-            return self._consume_stream(
+            apf_html = self._consume_stream(
                 stream=stream,
                 slug=manifest.slug,
                 model=model,
+                start_time=request_start,
             )
+
+            duration = time.perf_counter() - request_start
+            log_slow_llm_request(
+                duration_seconds=duration,
+                threshold_seconds=self._slow_request_threshold,
+                model=model,
+                operation="apf_card_generation_stream",
+            )
+            return apf_html
 
         apf_html = result.get("response")
         if not apf_html:
             msg = "OpenRouter returned empty response"
             raise ValueError(msg)
+
+        duration = time.perf_counter() - request_start
+        log_slow_llm_request(
+            duration_seconds=duration,
+            threshold_seconds=self._slow_request_threshold,
+            model=model,
+            operation="apf_card_generation",
+        )
         return apf_html
 
     def _consume_stream(
@@ -499,9 +523,10 @@ Requirements:
         stream: "OpenRouterStreamResult",
         slug: str,
         model: str,
+        start_time: float | None = None,
     ) -> str:
         """Iterate over streaming chunks while logging telemetry."""
-        start_time = time.time()
+        start_time = start_time or time.time()
         for chunk_index, chunk in enumerate(stream, start=1):
             elapsed = time.time() - start_time
             chunk_text = chunk if isinstance(chunk, str) else str(chunk)

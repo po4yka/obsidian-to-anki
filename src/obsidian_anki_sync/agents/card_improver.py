@@ -6,6 +6,7 @@ import time
 
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.providers.base import BaseLLMProvider
+from obsidian_anki_sync.utils.llm_logging import log_slow_llm_request
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .models import GeneratedCard, QualityReport
@@ -51,6 +52,7 @@ class CardImprover:
         llm_provider: BaseLLMProvider | None = None,
         model: str = "qwen3:14b",
         temperature: float = 0.0,
+        slow_request_threshold: float = 60.0,
     ):
         """Initialize card improver.
 
@@ -62,6 +64,7 @@ class CardImprover:
         self.llm_provider = llm_provider
         self.model = model
         self.temperature = temperature
+        self.slow_request_threshold = slow_request_threshold
 
         logger.info("card_improver_initialized", has_llm=llm_provider is not None)
 
@@ -201,10 +204,19 @@ class CardImprover:
         try:
             prompt = self._build_improvement_prompt(card, complex_issues, metadata)
 
+            start_time = time.perf_counter()
             response = self.llm_provider.generate(
                 model=self.model,
                 prompt=prompt,
                 temperature=self.temperature,
+            )
+            duration = time.perf_counter() - start_time
+
+            log_slow_llm_request(
+                duration_seconds=duration,
+                threshold_seconds=self.slow_request_threshold,
+                model=self.model,
+                operation="card_improvement",
             )
 
             # Extract response text from dict
