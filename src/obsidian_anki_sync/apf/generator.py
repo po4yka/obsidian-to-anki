@@ -613,6 +613,7 @@ Requirements:
 - Add "Ref: {ref_link}" in Other notes section
 - Follow APF v2.1 format strictly
 - Output ONLY the card HTML, no explanations
+- ALL cards MUST be wrapped with `<!-- BEGIN_CARDS -->` and `<!-- END_CARDS -->` markers.
 - End with END_OF_CARDS on its own line
 
 SPACED REPETITION PRINCIPLES (apply strictly):
