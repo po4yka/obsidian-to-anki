@@ -128,6 +128,113 @@ class AgentMemoryStore:
                     error=str(e),
                 )
 
+    def _check_database_health(self) -> bool:
+        """Check if the ChromaDB database is healthy before loading.
+
+        Returns:
+            True if database appears healthy, False if it should be rebuilt.
+        """
+        import sqlite3
+
+        sqlite_path = self.storage_path / "chroma.sqlite3"
+        if not sqlite_path.exists():
+            return True  # Fresh database, will be created
+
+        try:
+            # Check SQLite integrity
+            conn = sqlite3.connect(str(sqlite_path))
+            cursor = conn.cursor()
+
+            # Quick integrity check
+            cursor.execute("PRAGMA quick_check;")
+            result = cursor.fetchone()
+            if result[0] != "ok":
+                logger.warning(
+                    "agent_memory_sqlite_corrupted",
+                    check_result=result[0],
+                )
+                conn.close()
+                return False
+
+            # Check embedding count - if too large, it may cause issues
+            cursor.execute("SELECT COUNT(*) FROM embeddings;")
+            embedding_count = cursor.fetchone()[0]
+
+            # Get max embeddings from config (default 50000)
+            max_embeddings = 50000
+            if self.config:
+                max_embeddings = getattr(
+                    self.config, "max_agent_memory_embeddings", 50000
+                )
+
+            if embedding_count > max_embeddings:
+                logger.warning(
+                    "agent_memory_too_large",
+                    embedding_count=embedding_count,
+                    max_embeddings=max_embeddings,
+                    action="rebuilding",
+                )
+                conn.close()
+                return False
+
+            conn.close()
+            logger.debug(
+                "agent_memory_health_check_passed",
+                embedding_count=embedding_count,
+            )
+            return True
+
+        except Exception as e:
+            logger.warning(
+                "agent_memory_health_check_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return False
+
+    def _rebuild_corrupted_database(self) -> None:
+        """Rebuild a corrupted ChromaDB database by clearing and recreating it."""
+        import shutil
+
+        current_size_mb = self._get_directory_size_mb()
+        logger.warning(
+            "agent_memory_rebuilding",
+            storage_path=str(self.storage_path),
+            current_size_mb=round(current_size_mb, 2),
+        )
+
+        try:
+            # Backup path for potential recovery (optional)
+            backup_path = self.storage_path.parent / f"{self.storage_path.name}.corrupted"
+            if backup_path.exists():
+                shutil.rmtree(backup_path)
+
+            # Move corrupted data to backup instead of deleting
+            if self.storage_path.exists():
+                shutil.move(str(self.storage_path), str(backup_path))
+                logger.info(
+                    "agent_memory_corrupted_backup",
+                    backup_path=str(backup_path),
+                )
+
+            # Create fresh directory
+            self.storage_path.mkdir(parents=True, exist_ok=True)
+            logger.info("agent_memory_rebuilt")
+
+        except Exception as e:
+            logger.error(
+                "agent_memory_rebuild_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            # Last resort - try to just delete
+            try:
+                if self.storage_path.exists():
+                    shutil.rmtree(self.storage_path)
+                self.storage_path.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+
     def _auto_cleanup(self) -> None:
         """Run automatic cleanup based on retention days and max memories."""
         logger.debug("agent_memory_auto_cleanup_starting")
@@ -216,13 +323,37 @@ class AgentMemoryStore:
         logger.debug("agent_memory_enforcing_size_limit")
         self._enforce_size_limit()
 
-        # Initialize ChromaDB client
+        # Pre-check database health to avoid segfaults with corrupted/oversized DBs
+        if not self._check_database_health():
+            logger.warning(
+                "agent_memory_unhealthy_database",
+                action="rebuilding_before_load",
+            )
+            self._rebuild_corrupted_database()
+
+        # Initialize ChromaDB client with crash recovery
         chromadb_start = time_module.time()
         logger.info("agent_memory_chromadb_starting", path=str(self.storage_path))
-        self._client = chromadb.PersistentClient(
-            path=str(self.storage_path),
-            settings=Settings(anonymized_telemetry=False),
-        )
+        try:
+            self._client = chromadb.PersistentClient(
+                path=str(self.storage_path),
+                settings=Settings(anonymized_telemetry=False),
+            )
+            # Test that we can actually access collections (catches corrupted DBs)
+            _ = self._client.list_collections()
+        except Exception as e:
+            logger.warning(
+                "agent_memory_chromadb_corrupted",
+                error=str(e),
+                error_type=type(e).__name__,
+                action="rebuilding_database",
+            )
+            # Database is corrupted - clear and recreate
+            self._rebuild_corrupted_database()
+            self._client = chromadb.PersistentClient(
+                path=str(self.storage_path),
+                settings=Settings(anonymized_telemetry=False),
+            )
         chromadb_duration = time_module.time() - chromadb_start
         logger.info(
             "agent_memory_chromadb_initialized",
@@ -720,13 +851,27 @@ class AgentMemoryStore:
         Returns:
             Number of memories deleted
         """
+        logger.debug(
+            "cleanup_old_memories_starting",
+            retention_days=retention_days,
+            collections_count=len(self.collections) if self.collections else 0,
+        )
         cutoff_time = time.time() - (retention_days * 24 * 60 * 60)
         deleted_count = 0
 
         for memory_type, collection in self.collections.items():
             try:
+                logger.debug(
+                    "cleanup_collection_starting",
+                    memory_type=memory_type,
+                )
                 # Get all memories
                 all_memories = collection.get()
+                logger.debug(
+                    "cleanup_collection_fetched",
+                    memory_type=memory_type,
+                    memories_count=len(all_memories.get("ids", [])),
+                )
 
                 # Filter old memories
                 old_ids = []
@@ -770,6 +915,12 @@ class AgentMemoryStore:
                     "cleanup_failed",
                     memory_type=memory_type,
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
+
+        logger.debug(
+            "cleanup_old_memories_complete",
+            deleted_count=deleted_count,
+        )
 
         return deleted_count
