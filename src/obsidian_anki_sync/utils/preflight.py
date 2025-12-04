@@ -21,7 +21,10 @@ class CheckResult(BaseModel):
     name: str = Field(min_length=1, description="Check name")
     passed: bool = Field(description="Whether the check passed")
     message: str = Field(min_length=1, description="Result message")
-    severity: str = Field(description="Severity level: 'error', 'warning', 'info'")
+    severity: str = Field(
+        description="Severity level: 'error', 'blocking_warning', 'warning', 'info'. "
+        "'error' and 'blocking_warning' halt execution in strict mode."
+    )
     fixable: bool = Field(default=False, description="Whether the issue is fixable")
     fix_suggestion: str | None = Field(
         default=None, description="Suggestion for fixing the issue"
@@ -83,18 +86,28 @@ class PreflightChecker:
         if check_anki or check_llm:
             self._check_network_latency(check_anki, check_llm)
 
-        # Count errors
+        # Count errors and blocking warnings
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
+        blocking_warnings = [
+            r for r in self.results if not r.passed and r.severity == "blocking_warning"
+        ]
         warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
 
-        all_passed = len(errors) == 0
+        # In strict mode, blocking warnings also halt execution
+        strict_mode = getattr(self.config, "strict_mode", True)
+        if strict_mode:
+            all_passed = len(errors) == 0 and len(blocking_warnings) == 0
+        else:
+            all_passed = len(errors) == 0
 
         logger.info(
             "preflight_checks_completed",
             passed=all_passed,
             total_checks=len(self.results),
             errors=len(errors),
+            blocking_warnings=len(blocking_warnings),
             warnings=len(warnings),
+            strict_mode=strict_mode,
         )
 
         return all_passed, self.results
@@ -504,7 +517,10 @@ class PreflightChecker:
         try:
             from obsidian_anki_sync.anki.client import AnkiClient
 
-            with AnkiClient(self.config.anki_connect_url) as anki:
+            # Use verify_connectivity=False since we handle errors ourselves
+            with AnkiClient(
+                self.config.anki_connect_url, verify_connectivity=False
+            ) as anki:
                 # Try to get deck names
                 decks = anki.get_deck_names()
                 self.results.append(
@@ -562,7 +578,10 @@ class PreflightChecker:
         try:
             from obsidian_anki_sync.anki.client import AnkiClient
 
-            with AnkiClient(self.config.anki_connect_url) as anki:
+            # Use verify_connectivity=False - connectivity already verified
+            with AnkiClient(
+                self.config.anki_connect_url, verify_connectivity=False
+            ) as anki:
                 model_names = anki.get_model_names()
 
                 if note_type in model_names:
@@ -613,7 +632,10 @@ class PreflightChecker:
         try:
             from obsidian_anki_sync.anki.client import AnkiClient
 
-            with AnkiClient(self.config.anki_connect_url) as anki:
+            # Use verify_connectivity=False - connectivity already verified
+            with AnkiClient(
+                self.config.anki_connect_url, verify_connectivity=False
+            ) as anki:
                 deck_names = anki.get_deck_names()
 
                 if deck_name in deck_names:
@@ -735,9 +757,9 @@ class PreflightChecker:
                             name=f"Disk Space ({name})",
                             passed=False,
                             message=f"Low disk space: {free_mb:.1f}MB free",
-                            severity="warning",
+                            severity="blocking_warning",  # Blocks in strict mode
                             fixable=True,
-                            fix_suggestion="Free up disk space",
+                            fix_suggestion="Free up disk space before continuing",
                         )
                     )
                 else:
@@ -762,13 +784,26 @@ class PreflightChecker:
             mem = psutil.virtual_memory()
             available_gb = mem.available / (1024 * 1024 * 1024)
 
-            if available_gb < 4.0:
+            if available_gb < 2.0:
+                # Critical low memory - error
+                self.results.append(
+                    CheckResult(
+                        name="System Memory",
+                        passed=False,
+                        message=f"Critical low memory for local LLM: {available_gb:.1f}GB",
+                        severity="error",
+                        fixable=True,
+                        fix_suggestion="Close other applications or use a cloud provider",
+                    )
+                )
+            elif available_gb < 4.0:
+                # Low memory - blocking warning in strict mode
                 self.results.append(
                     CheckResult(
                         name="System Memory",
                         passed=False,
                         message=f"Low available memory for local LLM: {available_gb:.1f}GB",
-                        severity="warning",
+                        severity="blocking_warning",
                         fixable=True,
                         fix_suggestion="Close other applications or use a cloud provider",
                     )
@@ -794,7 +829,10 @@ class PreflightChecker:
                 start = time.time()
                 from obsidian_anki_sync.anki.client import AnkiClient
 
-                with AnkiClient(self.config.anki_connect_url) as anki:
+                # Use verify_connectivity=False since we're doing our own latency check
+                with AnkiClient(
+                    self.config.anki_connect_url, verify_connectivity=False
+                ) as anki:
                     anki.invoke("version")
                 latency = (time.time() - start) * 1000
 

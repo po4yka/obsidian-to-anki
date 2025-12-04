@@ -266,18 +266,32 @@ class APFGenerator:
                 falling_back_to_individual=True,
             )
             # Fall back to individual generation
+            # In strict mode, re-raise validation errors immediately
+            strict_mode = getattr(self.config, "strict_mode", True)
             cards = []
             for qa_pair, manifest in zip(qa_pairs, manifests):
                 try:
                     card = self.generate_card(qa_pair, metadata, manifest, lang)
                     cards.append(card)
+                except APFValidationError:
+                    # Always re-raise APF validation errors in strict mode
+                    if strict_mode:
+                        raise
+                    logger.error(
+                        "individual_card_generation_failed_validation",
+                        slug=manifest.slug,
+                        strict_mode=strict_mode,
+                    )
                 except Exception as card_error:
                     logger.error(
                         "individual_card_generation_failed",
                         slug=manifest.slug,
                         error=str(card_error),
+                        strict_mode=strict_mode,
                     )
-                    # Continue with other cards
+                    if strict_mode:
+                        raise  # Re-raise in strict mode
+                    # Continue with other cards only in lenient mode
             return cards
 
     def _generate_cards_batch(

@@ -116,8 +116,7 @@ def _check_sentinels(lines: list[str], result: ValidationResult) -> None:
 
     # Check PROMPT_VERSION
     if not re.search(REQUIRED_SENTINELS[0], content, re.MULTILINE):
-        result.errors.append(
-            "Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
+        result.errors.append("Missing '<!-- PROMPT_VERSION: apf-v2.1 -->' sentinel")
 
     # Check BEGIN_CARDS
     if not re.search(REQUIRED_SENTINELS[1], content, re.MULTILINE):
@@ -201,17 +200,12 @@ def _validate_card_block(
         result.errors.append(f"Card {card_num}: Missing manifest")
     else:
         _validate_manifest(
-            block, 
-            slug, 
-            card_num, 
-            result, 
-            expected_tags=tags, 
-            expected_type=card_type
+            block, slug, card_num, result, expected_tags=tags, expected_type=card_type
         )
 
     # Check field headers present
     _check_field_headers(block, card_num, result)
-    
+
     # Validate Key Point Notes content
     _validate_key_point_notes(block, card_num, result)
 
@@ -250,8 +244,7 @@ def _validate_header_format_strict(
         return
 
     if "cardtype:" in header_line.lower() and "CardType:" not in header_line:
-        result.errors.append(
-            f"Card {card_num}: Use 'CardType:' with capital C and T")
+        result.errors.append(f"Card {card_num}: Use 'CardType:' with capital C and T")
         return
 
     # Check spacing around pipes
@@ -282,10 +275,12 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
         # Convert hyphens to underscores for validation
         normalized_tag = tag.replace("-", "_")
         normalized_tags.append(normalized_tag)
-        
+
         # Check for whitespace
         if re.search(r"\s", tag):
-            result.errors.append(f"Card {card_num}: Tag '{tag}' must not contain whitespace")
+            result.errors.append(
+                f"Card {card_num}: Tag '{tag}' must not contain whitespace"
+            )
             continue
 
         # Check strictly for alphanumeric + underscore (unicode friendly)
@@ -304,9 +299,25 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
 
     # Check first tag is a language, tool, or common platform
     ALLOWED_FIRST_TAGS = ALLOWED_LANGUAGES | {
-        "android", "ios", "web", "mobile", "backend", "frontend", "fullstack",
-        "devops", "cloud", "database", "security", "testing", "architecture",
-        "design", "ux", "ui", "api", "microservices", "serverless"
+        "android",
+        "ios",
+        "web",
+        "mobile",
+        "backend",
+        "frontend",
+        "fullstack",
+        "devops",
+        "cloud",
+        "database",
+        "security",
+        "testing",
+        "architecture",
+        "design",
+        "ux",
+        "ui",
+        "api",
+        "microservices",
+        "serverless",
     }
 
     if tags and tags[0] not in ALLOWED_FIRST_TAGS:
@@ -323,12 +334,12 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
 
 
 def _validate_manifest(
-    block: str, 
-    expected_slug: str, 
-    card_num: int, 
+    block: str,
+    expected_slug: str,
+    card_num: int,
     result: ValidationResult,
     expected_tags: list[str] | None = None,
-    expected_type: str | None = None
+    expected_type: str | None = None,
 ) -> None:
     """Validate manifest JSON."""
     # Extract manifest
@@ -346,8 +357,7 @@ def _validate_manifest(
     required_fields = ["slug", "lang", "type", "tags"]
     missing = [f for f in required_fields if f not in manifest]
     if missing:
-        result.errors.append(
-            f"Card {card_num}: Manifest missing fields: {missing}")
+        result.errors.append(f"Card {card_num}: Manifest missing fields: {missing}")
 
     # Check slug matches
     if manifest.get("slug") != expected_slug:
@@ -374,7 +384,9 @@ def _validate_manifest(
             )
 
 
-def _validate_key_point_notes(block: str, card_num: int, result: ValidationResult) -> None:
+def _validate_key_point_notes(
+    block: str, card_num: int, result: ValidationResult
+) -> None:
     """Validate content of Key point notes."""
     match = re.search(r"<!-- Key point notes -->\s*(.*?)(?=<!--|\Z)", block, re.DOTALL)
     if not match:
@@ -408,14 +420,21 @@ def _validate_key_point_notes(block: str, card_num: int, result: ValidationResul
 def _check_field_headers(block: str, card_num: int, result: ValidationResult) -> None:
     """Check that field headers are present and contain content."""
     # Required headers
-    required = ["<!-- Title -->", "<!-- Key point (code block / image) -->", "<!-- Key point notes -->"]
+    required = [
+        "<!-- Title -->",
+        "<!-- Key point (code block / image) -->",
+        "<!-- Key point notes -->",
+    ]
 
     for header in required:
         if header not in block:
             # Fallback for older templates using shorter header
-            if header == "<!-- Key point (code block / image) -->" and "<!-- Key point -->" in block:
+            if (
+                header == "<!-- Key point (code block / image) -->"
+                and "<!-- Key point -->" in block
+            ):
                 continue
-            
+
             result.errors.append(
                 f"Card {card_num}: Missing required field header '{header}'"
             )
@@ -428,14 +447,12 @@ def _check_field_headers(block: str, card_num: int, result: ValidationResult) ->
         # Use DOTALL to match newlines
         pattern = rf"{escaped_header}\s*(.*?)(?=<!--|\Z)"
         match = re.search(pattern, block, re.DOTALL)
-        
+
         if match:
             content = match.group(1).strip()
             # For Title and Key point, empty content is an error
             if not content and (header == "<!-- Title -->" or "Key point" in header):
-                result.errors.append(
-                    f"Card {card_num}: Field '{header}' is empty"
-                )
+                result.errors.append(f"Card {card_num}: Field '{header}' is empty")
 
 
 def _validate_cloze_density(
@@ -446,8 +463,7 @@ def _validate_cloze_density(
     cloze_matches = re.findall(r"\{\{c(\d+)::", block)
 
     if not cloze_matches:
-        result.warnings.append(
-            f"Card {card_num}: Missing card has no cloze deletions")
+        result.warnings.append(f"Card {card_num}: Missing card has no cloze deletions")
         return
 
     indices = sorted({int(m) for m in cloze_matches})

@@ -15,6 +15,8 @@ from obsidian_anki_sync.obsidian.parser import parse_note
 
 async def test_note(note_path: str) -> None:
     """Test card generation for a single note."""
+
+
 """Test card generation for a single note to see detailed errors."""
 
 import asyncio

@@ -103,14 +103,24 @@ def parse_apf_card(apf_html: str) -> dict:
         "tags": tags_str.strip().split(),
         "title": _extract_field(card_content, "Title"),
         "subtitle": _extract_field(card_content, "Subtitle (optional)", ["Subtitle"]),
-        "syntax": _extract_field(card_content, "Syntax (inline) (optional)", ["Syntax (inline)", "Syntax"]),
-        "sample_caption": _extract_field(card_content, "Sample (caption) (optional)", ["Sample (caption)"]),
-        "sample_code": _extract_field(
-            card_content, "Sample (code block or image) (optional for Missing)", ["Sample (code block or image)", "Sample"]
+        "syntax": _extract_field(
+            card_content, "Syntax (inline) (optional)", ["Syntax (inline)", "Syntax"]
         ),
-        "key_point": _extract_field(card_content, "Key point (code block / image)", ["Key point"]),
+        "sample_caption": _extract_field(
+            card_content, "Sample (caption) (optional)", ["Sample (caption)"]
+        ),
+        "sample_code": _extract_field(
+            card_content,
+            "Sample (code block or image) (optional for Missing)",
+            ["Sample (code block or image)", "Sample"],
+        ),
+        "key_point": _extract_field(
+            card_content, "Key point (code block / image)", ["Key point"]
+        ),
         "key_point_notes": _extract_field(card_content, "Key point notes"),
-        "other_notes": _extract_field(card_content, "Other notes (optional)", ["Other notes"]),
+        "other_notes": _extract_field(
+            card_content, "Other notes (optional)", ["Other notes"]
+        ),
         "markdown": _extract_field(card_content, "Markdown (optional)", ["Markdown"]),
         "manifest": _extract_manifest(card_content),
     }
@@ -118,14 +128,17 @@ def parse_apf_card(apf_html: str) -> dict:
     return parsed
 
 
-def _extract_field(content: str, field_name: str, alternative_names: list[str] | None = None) -> str:
+def _extract_field(
+    content: str, field_name: str, alternative_names: list[str] | None = None
+) -> str:
     """Extract field content from APF HTML.
-    
+
     Args:
         content: The HTML content to search.
         field_name: The primary name of the field to extract.
         alternative_names: Optional list of alternative field names to try if primary fails.
     """
+
     # Helper to try a specific field name
     def try_extract(name: str) -> str | None:
         escaped_name = re.escape(name)
@@ -146,12 +159,18 @@ def _extract_field(content: str, field_name: str, alternative_names: list[str] |
         for alt_name in alternative_names:
             value = try_extract(alt_name)
             if value is not None:
-                logger.debug(f"Field extraction: found '{field_name}' using alternative '{alt_name}'")
+                logger.debug(
+                    f"Field extraction: found '{field_name}' using alternative '{alt_name}'"
+                )
                 if not value:
-                    logger.debug(f"Field extraction warning: '{alt_name}' found but empty")
+                    logger.debug(
+                        f"Field extraction warning: '{alt_name}' found but empty"
+                    )
                 return value
 
-    logger.debug(f"Field extraction failed: '{field_name}' not found in content snippet (len={len(content)})")
+    logger.debug(
+        f"Field extraction failed: '{field_name}' not found in content snippet (len={len(content)})"
+    )
     return ""
 
 

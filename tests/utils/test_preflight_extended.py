@@ -78,21 +78,23 @@ def test_check_disk_space_warning(checker):
         # Should have results for Database and Logs (deduplicated if paths resolve to same)
         # In our mock, resolve returns same path, so only 1 result expected
         assert len(checker.results) >= 1
-        assert any(r.severity == "warning" for r in checker.results)
+        # blocking_warning is used for low (but not critical) disk space in strict mode
+        assert any(r.severity == "blocking_warning" for r in checker.results)
         assert any("Low disk space" in r.message for r in checker.results)
 
 
 def test_check_memory_warning(checker):
     with patch("psutil.virtual_memory") as mock_memory:
-        # 2GB available (< 4GB)
-        mock_memory.return_value = Mock(available=2 * 1024 * 1024 * 1024)
+        # 3GB available (between 2GB and 4GB) - triggers blocking_warning
+        mock_memory.return_value = Mock(available=3 * 1024 * 1024 * 1024)
 
         checker._check_memory()
 
         assert len(checker.results) == 1
         assert checker.results[0].name == "System Memory"
         assert checker.results[0].passed is False
-        assert checker.results[0].severity == "warning"
+        # blocking_warning is used for low (but not critical) memory in strict mode
+        assert checker.results[0].severity == "blocking_warning"
 
 
 def test_check_network_latency_high(checker):

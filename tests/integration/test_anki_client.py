@@ -23,7 +23,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": "success", "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         result = client.invoke("testAction", {"param": "value"})
 
         assert result == "success"
@@ -37,7 +37,9 @@ class TestAnkiClient:
             )
         )
 
-        client = AnkiClient(mock_anki_url, enable_health_checks=False)
+        client = AnkiClient(
+            mock_anki_url, enable_health_checks=False, verify_connectivity=False
+        )
 
         with pytest.raises(AnkiConnectError, match="Test error"):
             client.invoke("testAction")
@@ -49,7 +51,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": [1, 2, 3], "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         notes = client.find_notes("deck:Test")
 
         assert notes == [1, 2, 3]
@@ -73,7 +75,7 @@ class TestAnkiClient:
             )
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         info = client.notes_info([1])
 
         assert len(info) == 1
@@ -87,7 +89,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": 12345, "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         note_id = client.add_note(
             deck_name="Test Deck",
             model_name="Basic",
@@ -107,7 +109,7 @@ class TestAnkiClient:
             )
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         can_add = client.can_add_notes(
             [
                 {
@@ -134,7 +136,7 @@ class TestAnkiClient:
             )
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         result = client.store_media_file("image.png", "base64data")
 
         assert result == "stored_image.png"
@@ -146,7 +148,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": None, "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         client.suspend_cards([1, 2, 3])
 
         # Verify the request was made
@@ -159,7 +161,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": None, "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         client.update_note_fields(note_id=12345, fields={"Front": "Updated Q"})
 
         # Should not raise
@@ -171,7 +173,7 @@ class TestAnkiClient:
             return_value=httpx.Response(200, json={"result": None, "error": None})
         )
 
-        client = AnkiClient(mock_anki_url)
+        client = AnkiClient(mock_anki_url, verify_connectivity=False)
         client.delete_notes([1, 2, 3])
 
         # Should not raise
@@ -181,7 +183,9 @@ class TestAnkiClient:
         """Test HTTP error handling."""
         respx.post(mock_anki_url).mock(return_value=httpx.Response(500))
 
-        client = AnkiClient(mock_anki_url, enable_health_checks=False)
+        client = AnkiClient(
+            mock_anki_url, enable_health_checks=False, verify_connectivity=False
+        )
 
         with pytest.raises(AnkiConnectError, match="HTTP 500 from AnkiConnect"):
             client.invoke("testAction")

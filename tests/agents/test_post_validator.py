@@ -110,9 +110,14 @@ async def test_post_validation_node_retries_and_records_stage_time(
     first_pass_state = await post_validation_node(state)
 
     assert first_pass_state["retry_count"] == 1
-    assert first_pass_state["current_stage"] == "post_validation"
+    # When validation fails and retry is needed, stage goes back to "generation"
+    # to trigger content regeneration before re-validation
+    assert first_pass_state["current_stage"] == "generation"
     assert "post_validation" in first_pass_state["stage_times"]
 
+    # For the second pass, we need to reset the stage to post_validation
+    # to simulate what the workflow router would do
+    first_pass_state["current_stage"] = "post_validation"
     second_pass_state = await post_validation_node(first_pass_state)
 
     assert second_pass_state["current_stage"] == "context_enrichment"

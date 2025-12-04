@@ -35,6 +35,7 @@ class AnkiClient(IAnkiClient):
         max_keepalive_connections: int = 10,
         max_connections: int = 20,
         keepalive_expiry: float = 60.0,
+        verify_connectivity: bool = True,
     ):
         """
         Initialize client.
@@ -47,6 +48,11 @@ class AnkiClient(IAnkiClient):
             max_keepalive_connections: Max idle connections to keep alive
             max_connections: Max total connections in pool
             keepalive_expiry: Seconds before idle connections expire
+            verify_connectivity: If True, verify AnkiConnect is reachable at startup.
+                Raises AnkiConnectError if connection fails (fail-fast behavior).
+
+        Raises:
+            AnkiConnectError: If verify_connectivity=True and Anki is unreachable.
 
         Note:
             Uses synchronous httpx.Client. This is intentional for compatibility
@@ -84,7 +90,62 @@ class AnkiClient(IAnkiClient):
             health_checks=enable_health_checks,
             max_connections=max_connections,
             max_keepalive=max_keepalive_connections,
+            verify_connectivity=verify_connectivity,
         )
+
+        # Verify connectivity at startup if requested (fail-fast behavior)
+        if verify_connectivity:
+            try:
+                # Use direct HTTP call to version action as a lightweight connectivity check
+                # (avoiding invoke() which triggers _check_health and async runner)
+                payload = {"action": "version", "version": 6, "params": {}}
+                response = self.session.post(self.url, json=payload)
+                response.raise_for_status()
+                result = response.json()
+                if result.get("error"):
+                    msg = f"AnkiConnect error: {result['error']}"
+                    raise AnkiConnectError(msg)
+                version = result.get("result")
+                logger.info(
+                    "anki_connectivity_verified",
+                    url=url,
+                    anki_connect_version=version,
+                )
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.NetworkError,
+            ) as e:
+                logger.error(
+                    "anki_connectivity_failed_network",
+                    url=url,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                msg = f"Cannot connect to AnkiConnect at {url}"
+                suggestion = (
+                    "Ensure Anki is running. "
+                    "Check AnkiConnect addon is installed and enabled. "
+                    f"Verify URL is correct: {url}. "
+                    "Check firewall settings allow the connection."
+                )
+                raise AnkiConnectError(msg, suggestion=suggestion) from e
+            except AnkiConnectError:
+                # Re-raise AnkiConnectError as-is
+                raise
+            except Exception as e:
+                logger.error(
+                    "anki_connectivity_failed_unexpected",
+                    url=url,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                msg = f"AnkiConnect connectivity check failed: {e}"
+                suggestion = (
+                    "Ensure Anki is running with AnkiConnect addon. "
+                    f"Check AnkiConnect is listening at {url}."
+                )
+                raise AnkiConnectError(msg, suggestion=suggestion) from e
 
     def _get_health_check_interval(self) -> float:
         """Calculate health check interval with exponential backoff and jitter."""
@@ -1138,10 +1199,18 @@ class AnkiClient(IAnkiClient):
             logger.debug("getDeckStats_not_supported_falling_back", deck=deck_name)
 
             # Using findCards which is faster than findNotes for stats
-            total_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}"'}))
-            new_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:new'}))
-            learn_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:learn'}))
-            due_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:due'}))
+            total_cards = len(
+                self.invoke("findCards", {"query": f'deck:"{deck_name}"'})
+            )
+            new_cards = len(
+                self.invoke("findCards", {"query": f'deck:"{deck_name}" is:new'})
+            )
+            learn_cards = len(
+                self.invoke("findCards", {"query": f'deck:"{deck_name}" is:learn'})
+            )
+            due_cards = len(
+                self.invoke("findCards", {"query": f'deck:"{deck_name}" is:due'})
+            )
 
             # Note: is:due includes learn cards that are due, but we separate them roughly here
             # Ideally we'd use getDeckStats if possible.
@@ -1153,7 +1222,7 @@ class AnkiClient(IAnkiClient):
                 "total_in_deck": total_cards,
                 "new_count": new_cards,
                 "learn_count": learn_cards,
-                "review_count": due_cards
+                "review_count": due_cards,
             }
 
     def close(self) -> None:

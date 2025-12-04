@@ -614,9 +614,10 @@ You are an expert Q&A extraction system specializing in educational note analysi
                         {
                             "q_en": q.question_en[:50],
                             "a_en": q.answer_en[:50],
-                            "q_ru": q.question_ru[:50]
-                        } for q in qa_pairs
-                    ]
+                            "q_ru": q.question_ru[:50],
+                        }
+                        for q in qa_pairs
+                    ],
                 )
 
             return qa_pairs

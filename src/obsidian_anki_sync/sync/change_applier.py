@@ -33,6 +33,7 @@ class ChangeApplier:
         progress_tracker: "ProgressTracker | None" = None,
         stats: dict[str, Any] | None = None,
         async_runner: AsyncioRunner | None = None,
+        fail_fast: bool | None = None,
     ):
         """Initialize change applier.
 
@@ -42,6 +43,10 @@ class ChangeApplier:
             anki_client: AnkiConnect client
             progress_tracker: Optional progress tracker
             stats: Statistics dictionary to update
+            async_runner: Optional async runner for sync/async bridging
+            fail_fast: If True, re-raise errors on first card operation failure.
+                If None, uses config.fail_on_card_error.
+                If False, continue processing remaining cards on error.
         """
         self.config = config
         self.db = state_db
@@ -49,6 +54,10 @@ class ChangeApplier:
         self.progress = progress_tracker
         self.stats = stats or {}
         self._async_runner = async_runner or AsyncioRunner.get_global()
+        # Determine fail-fast behavior from parameter or config
+        self.fail_fast = (
+            fail_fast if fail_fast is not None else config.fail_on_card_error
+        )
 
     def apply_changes(self, changes: list[SyncAction]) -> None:
         """Apply sync actions to Anki.
@@ -113,20 +122,26 @@ class ChangeApplier:
                     action=action.type,
                     slug=action.card.slug,
                     error=str(e),
+                    fail_fast=self.fail_fast,
                 )
                 self.stats["errors"] = self.stats.get("errors", 0) + 1
                 if self.progress:
                     self.progress.increment_stat("errors")
+                if self.fail_fast:
+                    raise  # Re-raise to halt sync immediately
             except AnkiConnectError as e:
                 logger.error(
                     "action_failed_anki_connect",
                     action=action.type,
                     slug=action.card.slug,
                     error=str(e),
+                    fail_fast=self.fail_fast,
                 )
                 self.stats["errors"] = self.stats.get("errors", 0) + 1
                 if self.progress:
                     self.progress.increment_stat("errors")
+                if self.fail_fast:
+                    raise  # Re-raise to halt sync immediately
             except Exception as e:
                 logger.error(
                     "action_failed_unexpected",
@@ -134,10 +149,13 @@ class ChangeApplier:
                     slug=action.card.slug,
                     error=str(e),
                     exc_info=True,
+                    fail_fast=self.fail_fast,
                 )
                 self.stats["errors"] = self.stats.get("errors", 0) + 1
                 if self.progress:
                     self.progress.increment_stat("errors")
+                if self.fail_fast:
+                    raise  # Re-raise to halt sync immediately
 
     def apply_batched(self, changes: list[SyncAction]) -> None:
         """Apply changes using batch operations for better performance.
@@ -403,7 +421,9 @@ class ChangeApplier:
                     slug=card.slug,
                     note_type=card.note_type,
                     apf_html_length=len(card.apf_html) if card.apf_html else 0,
-                    apf_html_preview=(card.apf_html[:200] if card.apf_html else "empty"),
+                    apf_html_preview=(
+                        card.apf_html[:200] if card.apf_html else "empty"
+                    ),
                 )
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
@@ -418,12 +438,17 @@ class ChangeApplier:
                     note_payload["guid"] = card.guid
 
                 # Debug: Log payload for empty note check
-                if not note_payload["fields"].get("Primary Title") or not note_payload["fields"].get("Primary Key point (code block)"):
-                     logger.warning(
-                         "sending_potentially_empty_card_to_anki",
-                         slug=card.slug,
-                         fields_preview={k: v[:50] + "..." if v else "EMPTY" for k,v in note_payload["fields"].items()}
-                     )
+                if not note_payload["fields"].get("Primary Title") or not note_payload[
+                    "fields"
+                ].get("Primary Key point (code block)"):
+                    logger.warning(
+                        "sending_potentially_empty_card_to_anki",
+                        slug=card.slug,
+                        fields_preview={
+                            k: v[:50] + "..." if v else "EMPTY"
+                            for k, v in note_payload["fields"].items()
+                        },
+                    )
 
                 note_payloads.append(note_payload)
                 card_data.append((card, fields, card.tags, card.apf_html))

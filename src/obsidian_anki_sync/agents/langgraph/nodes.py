@@ -920,12 +920,12 @@ async def generation_node(state: PipelineState) -> PipelineState:
         # Validate against split plan if available
         if expected_card_count is not None:
             actual_count = gen_result.total_cards
-            
+
             # Adjust expected count for bilingual notes
             # Each concept (card in split plan) generates one card per language
             num_languages = len(metadata.language_tags) if metadata.language_tags else 1
             adjusted_expected_count = expected_card_count * num_languages
-            
+
             if actual_count != adjusted_expected_count:
                 logger.warning(
                     "langgraph_generation_card_count_mismatch",
@@ -1251,10 +1251,10 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
         for res in state.get("linter_results", []):
             if res.get("errors"):
                 all_linter_errors.extend(res["errors"])
-        
-        error_msg = "; ".join(all_linter_errors[:3]) # First 3 errors
+
+        error_msg = "; ".join(all_linter_errors[:3])  # First 3 errors
         if len(all_linter_errors) > 3:
-            error_msg += f" (+{len(all_linter_errors)-3} more)"
+            error_msg += f" (+{len(all_linter_errors) - 3} more)"
 
         # Log the override if LLM thought it was valid
         if post_result.is_valid:
@@ -1262,9 +1262,9 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
                 "llm_validation_overridden_by_linter_failure",
                 llm_judgment="valid",
                 linter_errors=all_linter_errors,
-                reason="linter_is_authoritative"
+                reason="linter_is_authoritative",
             )
-        
+
         # Force invalid status
         post_result.is_valid = False
         post_result.error_type = "template"
@@ -1348,12 +1348,14 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     ):
         await _sleep_post_validation_backoff(state)
         state["retry_count"] = (state.get("retry_count") or 0) + 1
-        
+
         # Important: If validation failed, we must RE-GENERATE the content.
         # Setting stage to 'generation' triggers the retry loop in the router.
-        state["current_stage"] = "generation" 
-        
-        retry_reason = "timeout, retrying" if is_timeout_error else "applied fixes/retrying"
+        state["current_stage"] = "generation"
+
+        retry_reason = (
+            "timeout, retrying" if is_timeout_error else "applied fixes/retrying"
+        )
         state["messages"].append(
             f"{retry_reason}, re-generating (attempt {state['retry_count']})"
         )

@@ -205,7 +205,9 @@ class AgentMemoryStore:
 
         try:
             # Backup path for potential recovery (optional)
-            backup_path = self.storage_path.parent / f"{self.storage_path.name}.corrupted"
+            backup_path = (
+                self.storage_path.parent / f"{self.storage_path.name}.corrupted"
+            )
             if backup_path.exists():
                 shutil.rmtree(backup_path)
 

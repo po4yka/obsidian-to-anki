@@ -841,6 +841,25 @@ class Config(BaseSettings):
     # Enable aggressive memory cleanup after processing
     enable_memory_cleanup: bool = True
 
+    # ============================================================================
+    # Fail-Fast Configuration (strict by default - opt-out model)
+    # ============================================================================
+    strict_mode: bool = Field(
+        default=True,
+        description="Enable strict validation and fail-fast behavior. "
+        "When True, errors halt execution immediately. Set to False for lenient mode.",
+    )
+    fail_on_card_error: bool = Field(
+        default=True,
+        description="Stop sync on first card operation error. "
+        "Set to False to continue processing remaining cards on error.",
+    )
+    verify_connectivity_at_startup: bool = Field(
+        default=True,
+        description="Verify external services (Anki, LLM provider) connectivity at startup. "
+        "Catches configuration issues early before processing begins.",
+    )
+
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
 
@@ -1263,8 +1282,22 @@ class Config(BaseSettings):
 _config: Config | None = None
 
 
-def load_config(config_path: Path | None = None) -> Config:
-    """Load configuration from .env and config.yaml files using pydantic-settings."""
+def load_config(
+    config_path: Path | None = None, *, strict_config: bool = True
+) -> Config:
+    """Load configuration from .env and config.yaml files using pydantic-settings.
+
+    Args:
+        config_path: Optional explicit path to config file.
+        strict_config: If True (default), raise ConfigurationError on YAML parse errors.
+            If False, continue with empty config on parse errors (legacy behavior).
+
+    Returns:
+        Loaded Config object.
+
+    Raises:
+        ConfigurationError: If strict_config=True and config file cannot be parsed.
+    """
     import yaml
 
     from obsidian_anki_sync.utils.logging import get_logger
@@ -1325,6 +1358,15 @@ def load_config(config_path: Path | None = None) -> Config:
                 error=str(e),
                 error_type=type(e).__name__,
             )
+            if strict_config:
+                msg = f"Failed to parse config file: {resolved_config_path}"
+                suggestion = (
+                    "Check YAML syntax (indentation, colons, quotes). "
+                    "Validate file encoding is UTF-8. "
+                    f"Original error: {e}"
+                )
+                raise ConfigurationError(msg, suggestion=suggestion) from e
+            # In non-strict mode, continue with empty yaml_data (legacy behavior)
 
     # Convert YAML data to environment variable format for pydantic-settings
     # pydantic-settings will automatically load from .env file via model_config
@@ -1421,11 +1463,22 @@ def load_config(config_path: Path | None = None) -> Config:
         config.validate_config()
         logger.debug("config_validation_passed")
     except Exception as e:
-        logger.warning(
-            "config_validation_warning",
-            error=str(e),
-            error_type=type(e).__name__,
-        )
+        # In strict mode, re-raise validation errors
+        # Use both the function parameter and config's strict_mode setting
+        effective_strict = strict_config and config.strict_mode
+        if effective_strict:
+            logger.error(
+                "config_validation_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
+        else:
+            logger.warning(
+                "config_validation_warning",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
     return config
 

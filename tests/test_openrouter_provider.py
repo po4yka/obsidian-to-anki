@@ -118,8 +118,7 @@ def test_generate_json_raises_when_fallback_also_returns_empty(
     """Provider surfaces an error if both structured and fallback calls return empty content."""
     route = respx.post(f"{BASE_URL}/chat/completions")
     route.mock(
-        return_value=httpx.Response(
-            200, json=_build_openrouter_response(content=""))
+        return_value=httpx.Response(200, json=_build_openrouter_response(content=""))
     )
 
     schema = get_qa_extraction_schema()

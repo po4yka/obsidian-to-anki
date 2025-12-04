@@ -140,12 +140,13 @@ class TestTagValidation:
         assert any("Must have 3-6 tags" in e for e in result.errors)
 
     def test_invalid_tag_format(self) -> None:
-        """Test error on invalid tag formats."""
+        """Test warning on non-lowercase tag formats (convention)."""
         apf_html = self._make_card_html("python TestCase camelCase")
         result = validate_apf(apf_html)
 
-        assert not result.is_valid
-        assert any("not in valid format" in e for e in result.errors)
+        # Uppercase tags are now warnings, not errors (convention enforcement)
+        assert result.is_valid  # No errors, just warnings
+        assert any("should be lowercase" in w for w in result.warnings)
 
     def test_missing_non_language_tag(self) -> None:
         """Test error when all tags are languages."""
@@ -166,8 +167,7 @@ class TestTagValidation:
 
     def test_kebab_case_tags_valid(self) -> None:
         """Test that kebab-case tags are accepted."""
-        apf_html = self._make_card_html(
-            "python app-startup dependency-injection")
+        apf_html = self._make_card_html("python app-startup dependency-injection")
         result = validate_apf(apf_html)
 
         assert result.is_valid

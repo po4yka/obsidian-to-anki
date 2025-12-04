@@ -82,7 +82,7 @@ def test_factory_create_from_config_ollama(temp_dir):
         db_path=temp_dir / "test.db",
     )
 
-    provider = ProviderFactory.create_from_config(config)
+    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)
     assert provider.base_url == "http://localhost:11434"
@@ -594,6 +594,6 @@ def test_factory_create_from_config_uses_default_provider_ollama(temp_dir):
     # Verify default is ollama
     assert config.llm_provider == "ollama"
 
-    provider = ProviderFactory.create_from_config(config)
+    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)

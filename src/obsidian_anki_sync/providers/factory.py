@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+from obsidian_anki_sync.exceptions import ProviderError
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .anthropic import AnthropicProvider
@@ -118,13 +119,19 @@ class ProviderFactory:
 
     @classmethod
     def create_from_config(
-        cls, config: Any, verbose_logging: bool = False
+        cls,
+        config: Any,
+        verbose_logging: bool = False,
+        verify_connectivity: bool | None = None,
     ) -> BaseLLMProvider:
         """Create a provider instance from a Config object.
 
         Args:
             config: Configuration object with provider settings
             verbose_logging: Whether to log detailed initialization info
+            verify_connectivity: If True, verify provider connectivity after creation.
+                If None, uses config.verify_connectivity_at_startup.
+                If False, skips connectivity check.
 
         Returns:
             Initialized provider instance
@@ -132,6 +139,7 @@ class ProviderFactory:
         Raises:
             ValueError: If provider configuration is invalid
             AttributeError: If config doesn't have required attributes
+            ProviderError: If verify_connectivity=True and provider is unreachable
 
         Examples:
             >>> from obsidian_anki_sync.config import Config
@@ -216,9 +224,53 @@ class ProviderFactory:
                 config_attributes=list(kwargs.keys()),
             )
 
-        return cls.create_provider(
+        provider = cls.create_provider(
             provider_type, verbose_logging=verbose_logging, **kwargs
         )
+
+        # Determine if we should verify connectivity
+        should_verify = verify_connectivity
+        if should_verify is None:
+            # Use config setting if verify_connectivity not explicitly passed
+            should_verify = getattr(config, "verify_connectivity_at_startup", True)
+
+        if should_verify:
+            if verbose_logging:
+                logger.info(
+                    "verifying_provider_connectivity",
+                    provider_type=provider_type,
+                )
+            try:
+                if not provider.check_connection():
+                    msg = f"Provider {provider_type} connectivity check failed"
+                    suggestion = (
+                        f"Verify {provider_type} service is running. "
+                        "Check API key is valid. "
+                        "Verify network connectivity."
+                    )
+                    raise ProviderError(msg, suggestion=suggestion)
+                if verbose_logging:
+                    logger.info(
+                        "provider_connectivity_verified",
+                        provider_type=provider_type,
+                    )
+            except ProviderError:
+                raise
+            except Exception as e:
+                logger.error(
+                    "provider_connectivity_check_failed",
+                    provider_type=provider_type,
+                    error=str(e),
+                )
+                msg = f"Provider {provider_type} connectivity check failed: {e}"
+                suggestion = (
+                    f"Verify {provider_type} service is running and accessible. "
+                    "Check API key is valid and has sufficient permissions. "
+                    "Verify network connectivity to provider endpoint."
+                )
+                raise ProviderError(msg, suggestion=suggestion) from e
+
+        return provider
 
     @classmethod
     def list_supported_providers(cls) -> list[str]:

@@ -295,86 +295,86 @@ class LangGraphOrchestrator:
         """
         import hashlib
 
+        from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
         from obsidian_anki_sync.models import Card, Manifest
         from obsidian_anki_sync.utils.content_hash import compute_content_hash
-        from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
 
         cards: list[Card] = []
         qa_lookup = {qa.card_index: qa for qa in qa_pairs}
 
         for gen_card in generated_cards:
-                        # Validate that we can extract fields from the generated HTML
-                        try:
-                            # Use default note type for validation check
-                            fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
-                            
-                            # Log all extracted fields for debugging purposes
-                            logger.debug(
-                                "extracted_fields_from_generated_card",
-                                slug=gen_card.slug,
-                                apf_html_length=len(gen_card.apf_html),
-                                extracted_fields=fields,
-                            )
-            
-                            if not fields.get("Primary Title"):
-                                logger.warning(
-                                    "empty_primary_title_detected_in_generated_card",
-                                    slug=gen_card.slug,
-                                    apf_html_preview=gen_card.apf_html[:500],
-                                    hint="Card fields extraction failed (Primary Title is empty). Check APF format."
-                                )
-                                continue  # Skip this card
-            
-                        except Exception as e:
-                            logger.warning(
-                                "field_extraction_failed_during_conversion",
-                                slug=gen_card.slug,
-                                error=str(e),
-                                apf_html_preview=gen_card.apf_html[:500]
-                            )
-                            continue  # Skip this card if parsing fails entirely (e.g. missing sentinels)
-            
-                        # Create manifest
-                        # Safely extract slug_base by removing -index-lang suffix
-                        parts = gen_card.slug.rsplit("-", 2)
-                        slug_base = parts[0] if len(parts) >= 3 else gen_card.slug
-            
-                        manifest = Manifest(
-                            slug=gen_card.slug,
-                            slug_base=slug_base,
-                            lang=gen_card.lang,
-                            source_path=str(file_path) if file_path else "unknown",
-                            source_anchor=f"qa-{gen_card.card_index}",
-                            note_id=metadata.id,
-                            note_title=metadata.title,
-                            card_index=gen_card.card_index,
-                            guid=gen_card.slug,  # Use slug as GUID for now
-                            hash6=None,
-                        )
-            
-                        qa_pair = qa_lookup.get(gen_card.card_index)
-                        content_hash = gen_card.content_hash
-                        if not content_hash and qa_pair:
-                            content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
-                        elif not content_hash:
-                            content_hash = hashlib.sha256(
-                                gen_card.apf_html.encode("utf-8")
-                            ).hexdigest()
-            
-                        cards.append(
-                            Card(
-                                slug=gen_card.slug,
-                                lang=gen_card.lang,
-                                apf_html=gen_card.apf_html,
-                                manifest=manifest,
-                                content_hash=content_hash,
-                                note_type="APF::Simple",  # Default, can be detected from HTML
-                                tags=[],  # Extract from manifest in HTML
-                                guid=gen_card.slug,
-                            )
-                        )
-            
-                    return cards
+            # Validate that we can extract fields from the generated HTML
+            try:
+                # Use default note type for validation check
+                fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
+
+                # Log all extracted fields for debugging purposes
+                logger.debug(
+                    "extracted_fields_from_generated_card",
+                    slug=gen_card.slug,
+                    apf_html_length=len(gen_card.apf_html),
+                    extracted_fields=fields,
+                )
+
+                if not fields.get("Primary Title"):
+                    logger.warning(
+                        "empty_primary_title_detected_in_generated_card",
+                        slug=gen_card.slug,
+                        apf_html_preview=gen_card.apf_html[:500],
+                        hint="Card fields extraction failed (Primary Title is empty). Check APF format.",
+                    )
+                    continue  # Skip this card
+
+            except Exception as e:
+                logger.warning(
+                    "field_extraction_failed_during_conversion",
+                    slug=gen_card.slug,
+                    error=str(e),
+                    apf_html_preview=gen_card.apf_html[:500],
+                )
+                continue  # Skip this card if parsing fails entirely
+
+            # Create manifest
+            # Safely extract slug_base by removing -index-lang suffix
+            parts = gen_card.slug.rsplit("-", 2)
+            slug_base = parts[0] if len(parts) >= 3 else gen_card.slug
+
+            manifest = Manifest(
+                slug=gen_card.slug,
+                slug_base=slug_base,
+                lang=gen_card.lang,
+                source_path=str(file_path) if file_path else "unknown",
+                source_anchor=f"qa-{gen_card.card_index}",
+                note_id=metadata.id,
+                note_title=metadata.title,
+                card_index=gen_card.card_index,
+                guid=gen_card.slug,  # Use slug as GUID for now
+                hash6=None,
+            )
+
+            qa_pair = qa_lookup.get(gen_card.card_index)
+            content_hash = gen_card.content_hash
+            if not content_hash and qa_pair:
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
+            elif not content_hash:
+                content_hash = hashlib.sha256(
+                    gen_card.apf_html.encode("utf-8")
+                ).hexdigest()
+
+            cards.append(
+                Card(
+                    slug=gen_card.slug,
+                    lang=gen_card.lang,
+                    apf_html=gen_card.apf_html,
+                    manifest=manifest,
+                    content_hash=content_hash,
+                    note_type="APF::Simple",  # Default, can be detected from HTML
+                    tags=[],  # Extract from manifest in HTML
+                    guid=gen_card.slug,
+                )
+            )
+
+        return cards
 
     @property
     def provider(self):
