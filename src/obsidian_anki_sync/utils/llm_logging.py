@@ -74,6 +74,7 @@ OPENROUTER_PRICING: dict[str, dict[str, float]] = {
     "qwen/qwen-2.5-32b-instruct": {"prompt": 0.20, "completion": 0.20},
     "deepseek/deepseek-chat-v3.1": {"prompt": 0.14, "completion": 0.28},
     "deepseek/deepseek-chat": {"prompt": 0.14, "completion": 0.28},
+    "deepseek/deepseek-v3.2": {"prompt": 0.27, "completion": 0.40},
     "minimax/minimax-m2": {"prompt": 0.30, "completion": 0.30},
     "qwen/qwen3-max": {"prompt": 0.50, "completion": 0.50},
     # Qwen3 series models

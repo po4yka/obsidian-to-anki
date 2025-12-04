@@ -148,6 +148,16 @@ MODEL_CAPABILITIES: dict[str, ModelCapabilities] = {
         speed_tier=2,
         quality_tier=5,
     ),
+    "deepseek/deepseek-v3.2": ModelCapabilities(
+        supports_structured_outputs=True,  # Supports tool calling well
+        supports_reasoning=True,  # Controllable via reasoning.enabled
+        max_output_tokens=16384,
+        context_window=163840,  # 163K context
+        cost_per_1m_prompt=0.27,
+        cost_per_1m_completion=0.40,
+        speed_tier=2,
+        quality_tier=5,  # Highest tier - GPT-5 class reasoning
+    ),
     # MiniMax Series
     "minimax/minimax-m2": ModelCapabilities(
         supports_structured_outputs=True,

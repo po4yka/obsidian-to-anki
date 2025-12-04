@@ -14,6 +14,7 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "qwen/qwen3-next-80b-a3b-instruct",
     "qwen/qwen3-32b",  # Smaller model, may have structured output quirks
     "qwen/qwen3-30b-a3b",  # Smaller model, may have structured output quirks
+    # Note: deepseek/deepseek-v3.2 supports tool calling well, not listed here
 }
 
 # Models that support OpenRouter's reasoning-effort contract and their default auto effort
@@ -22,6 +23,7 @@ MODELS_WITH_REASONING_SUPPORT: dict[str, str] = {
     "x-ai/grok-4.1": "medium",
     "x-ai/grok-3": "medium",
     "deepseek/deepseek-chat-v3.1": "medium",
+    "deepseek/deepseek-v3.2": "medium",  # Supports reasoning via reasoning.enabled boolean
     "deepseek/deepseek-r1": "high",
     "openai/o3-mini": "medium",
     "openai/o3-mini-high": "high",
@@ -36,6 +38,7 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "qwen/qwen-2.5-32b-instruct": 131072,
     "deepseek/deepseek-chat-v3.1": 131072,
     "deepseek/deepseek-chat": 131072,
+    "deepseek/deepseek-v3.2": 163840,  # 163K context window
     "minimax/minimax-m2": 131072,
     # Qwen3 models support larger context windows
     "qwen/qwen3-235b-a22b-2507": 262144,  # 262K context
@@ -57,6 +60,7 @@ MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
     "qwen/qwen-2.5-32b-instruct": 8192,  # Conservative limit
     "deepseek/deepseek-chat": 8192,
     "deepseek/deepseek-chat-v3.1": 8192,
+    "deepseek/deepseek-v3.2": 16384,  # Good output capacity with 163K context
     "minimax/minimax-m2": 8192,
     "moonshotai/kimi-k2": 8192,
     "moonshotai/kimi-k2-thinking": 8192,
@@ -86,6 +90,9 @@ MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
     # xAI Grok 4.1 Fast - excellent structured output support
     # Best practices: temperature=0 for deterministic output, disable reasoning for JSON
     "x-ai/grok-4.1-fast:free",
+    # DeepSeek V3.2 - supports tool calling and structured outputs
+    # GPT-5 class reasoning, gold-medal performance on IMO/IOI 2025
+    "deepseek/deepseek-v3.2",
 }
 
 # HTTP status codes that should be retried
