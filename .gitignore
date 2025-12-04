@@ -64,4 +64,16 @@ settings.local.json
 # AI/ML data and cache directories
 .chroma_db/
 .agent_memory/
+.agent_memory.corrupted/
 .cache/
+
+# Test artifacts and temporary files
+temp_*.md
+*corrupted*/
+*MagicMock*
+<MagicMock*
+
+# Temporary test files (uncomment if needed)
+# test_*.py
+# verify_*.py
+# reproduce_*.py
