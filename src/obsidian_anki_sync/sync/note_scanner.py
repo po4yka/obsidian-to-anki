@@ -967,6 +967,7 @@ class NoteScanner:
                     "process_note_job",
                     str(file_path),
                     relative_path,
+                    job_id=job_id,
                     max_retries=getattr(self.config, "queue_max_retries", 3),
                     _job_id=job_id,
                     result_queue_name=result_queue_name,
@@ -1063,39 +1064,67 @@ class NoteScanner:
 
                         result = json.loads(payload)
 
-                        # We don't have job_id in the result payload by default unless we add it.
-                        # But we can process the result regardless.
-                        # To track pending_jobs, we need to know WHICH job finished.
-                        # We can infer it from the slug or file path if included in result.
-                        # For now, let's just count completions.
-                        # Wait, we need to remove from pending_jobs to exit the loop.
-                        # The worker result doesn't explicitly have job_id.
-                        # Let's assume we process until we have N results or timeout.
-                        # Actually, we should probably add job_id to the result in worker.
-                        # But since we can't easily change the worker signature to pass job_id through orchestrator without big changes,
-                        # let's rely on counting for now.
-                        # Ideally, we should match results to requests.
+                        job_id = result.get("job_id")
+                        if not job_id:
+                            logger.warning(
+                                "result_missing_job_id",
+                                queue=result_queue_name,
+                                pending=len(pending_jobs),
+                            )
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
+                            error_by_type["queue_error"] += 1
+                            if len(error_samples["queue_error"]) < 3:
+                                error_samples["queue_error"].append(
+                                    "Queue Error: missing job_id in result"
+                                )
+                            continue
 
-                        # Let's try to match by slug if possible, but multiple cards per note...
-                        # The result contains "slugs".
+                        if job_id not in job_map:
+                            logger.warning(
+                                "unexpected_job_id_result",
+                                job_id=job_id,
+                                queue=result_queue_name,
+                                pending=len(pending_jobs),
+                            )
+                            self.stats["errors"] = self.stats.get("errors", 0) + 1
+                            error_by_type["queue_error"] += 1
+                            if len(error_samples["queue_error"]) < 3:
+                                error_samples["queue_error"].append(
+                                    f"Queue Error: unexpected job_id {job_id}"
+                                )
+                            continue
 
-                        # A better approach: The result is one-per-job.
-                        # So we can just decrement the pending count.
-                        completed_jobs += 1
+                        file_path, relative_path = job_map[job_id]
 
-                        # We can't easily remove from pending_jobs set without ID.
-                        # But we can check if we have received enough results.
-                        if completed_jobs >= len(job_map):
-                            # We are done!
-                            pending_jobs.clear()
+                        if job_id not in pending_jobs:
+                            logger.warning(
+                                "duplicate_job_result",
+                                job_id=job_id,
+                                file=relative_path,
+                                queue=result_queue_name,
+                            )
+                            continue
+
+                        pending_jobs.remove(job_id)
+                        completed_jobs = len(job_map) - len(pending_jobs)
+
+                        job_submit_time = job_submit_times.get(job_id)
+                        job_duration = (
+                            round(time.time() - job_submit_time, 2)
+                            if job_submit_time
+                            else None
+                        )
 
                         logger.debug(
                             "queue_result_received",
                             queue=result_queue_name,
+                            job_id=job_id,
+                            file=relative_path,
                             success=result.get("success"),
                             cards=len(result.get("cards", [])),
                             completed=completed_jobs,
                             total=len(job_map),
+                            duration=job_duration,
                         )
 
                         if result.get("success"):
@@ -1117,13 +1146,17 @@ class NoteScanner:
                             self.stats["processed"] = self.stats.get("processed", 0) + 1
                         else:
                             error_msg = result.get("error", "Unknown error")
-                            # We don't know the file path here easily without job_id
-                            logger.warning("job_failed_result", error=error_msg)
+                            logger.warning(
+                                "job_failed_result",
+                                error=error_msg,
+                                job_id=job_id,
+                                file=relative_path,
+                            )
                             self.stats["errors"] = self.stats.get("errors", 0) + 1
                             error_by_type["queue_error"] += 1
                             if len(error_samples["queue_error"]) < 3:
                                 error_samples["queue_error"].append(
-                                    f"Queue Error: {error_msg}"
+                                    f"Queue Error: {relative_path}: {error_msg}"
                                 )
 
                         logger.info(

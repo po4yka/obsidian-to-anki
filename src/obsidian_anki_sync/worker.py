@@ -48,6 +48,7 @@ async def process_note_job(
     ctx: dict[str, Any],
     file_path: str,
     relative_path: str,
+    job_id: str | None = None,
     metadata_dict: dict[str, Any] | None = None,
     qa_pairs_dicts: list[dict[str, Any]] | None = None,
     existing_cards_dicts: list[dict[str, Any]] | None = None,
@@ -70,6 +71,9 @@ async def process_note_job(
     # Get or create config and orchestrator
     config = ctx.get("config")
     orchestrator = ctx.get("orchestrator")
+    job_ctx = ctx.get("job")
+    if job_id is None and job_ctx is not None:
+        job_id = getattr(job_ctx, "job_id", None) or getattr(job_ctx, "id", None)
 
     if config is None or orchestrator is None:
         # Initialize config and orchestrator for this job
@@ -86,10 +90,8 @@ async def process_note_job(
         has_qa_pairs=qa_pairs_dicts is not None,
     )
 
-    generation_sla = getattr(
-        config, "worker_generation_timeout_seconds", 900.0)
-    validation_sla = getattr(
-        config, "worker_validation_timeout_seconds", 900.0)
+    generation_sla = getattr(config, "worker_generation_timeout_seconds", 900.0)
+    validation_sla = getattr(config, "worker_validation_timeout_seconds", 900.0)
 
     try:
         path_obj = Path(file_path)
@@ -98,9 +100,10 @@ async def process_note_job(
                 "success": False,
                 "error": f"File not found: {file_path}",
                 "cards": [],
+                "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result)
+                await _push_result(ctx, result_queue_name, result, job_id=job_id)
             return result
 
         # Read content
@@ -131,9 +134,10 @@ async def process_note_job(
                 "success": False,
                 "error": f"No QA pairs found in note: {relative_path}",
                 "cards": [],
+                "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result)
+                await _push_result(ctx, result_queue_name, result, job_id=job_id)
             return result
 
         # Reconstruct existing cards if provided
@@ -193,9 +197,10 @@ async def process_note_job(
                 "success": False,
                 "error": sla_violation["message"],
                 "cards": [],
+                "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result)
+                await _push_result(ctx, result_queue_name, result, job_id=job_id)
             return result
 
         if not pipeline_result.success or not pipeline_result.generation:
@@ -234,8 +239,7 @@ async def process_note_job(
                 )
 
             error_msg = (
-                "; ".join(
-                    error_details) if error_details else "Unknown pipeline error"
+                "; ".join(error_details) if error_details else "Unknown pipeline error"
             )
             logger.warning(
                 "pipeline_generation_failed",
@@ -255,9 +259,10 @@ async def process_note_job(
                 "success": False,
                 "error": error_msg,
                 "cards": [],
+                "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result)
+                await _push_result(ctx, result_queue_name, result, job_id=job_id)
             return result
 
         # Convert to cards
@@ -281,6 +286,7 @@ async def process_note_job(
             "success": True,
             "cards": cards_dicts,
             "slugs": [c.slug for c in cards],
+            "job_id": job_id,
         }
         if result_queue_name:
             logger.debug(
@@ -289,7 +295,7 @@ async def process_note_job(
                 queue=result_queue_name,
                 cards_count=len(cards_dicts),
             )
-            await _push_result(ctx, result_queue_name, result)
+            await _push_result(ctx, result_queue_name, result, job_id=job_id)
             logger.debug(
                 "worker_result_pushed",
                 file=relative_path,
@@ -306,7 +312,7 @@ async def process_note_job(
 
     except Exception as e:
         logger.exception("worker_job_failed", file=relative_path, error=str(e))
-        result = {"success": False, "error": str(e), "cards": []}
+        result = {"success": False, "error": str(e), "cards": [], "job_id": job_id}
         if result_queue_name:
             logger.debug(
                 "worker_pushing_error_result",
@@ -314,7 +320,7 @@ async def process_note_job(
                 queue=result_queue_name,
                 error=str(e)[:200],
             )
-            await _push_result(ctx, result_queue_name, result)
+            await _push_result(ctx, result_queue_name, result, job_id=job_id)
             logger.debug(
                 "worker_result_pushed",
                 file=relative_path,
@@ -325,11 +331,18 @@ async def process_note_job(
 
 
 async def _push_result(
-    ctx: dict[str, Any], queue_name: str, result: dict[str, Any]
+    ctx: dict[str, Any],
+    queue_name: str,
+    result: dict[str, Any],
+    job_id: str | None = None,
 ) -> None:
     """Push job result to Redis list."""
     try:
         import json
+
+        payload_data = {**result}
+        if payload_data.get("job_id") is None and job_id is not None:
+            payload_data["job_id"] = job_id
 
         # Use arq's redis connection from context if available, otherwise create new
         redis = ctx.get("redis")
@@ -361,7 +374,7 @@ async def _push_result(
         # Serialize result
         # We need to handle potential non-serializable objects if any remain
         # But cards_dicts should be pure python dicts/lists/etc.
-        payload = json.dumps(result)
+        payload = json.dumps(payload_data)
         payload_size = len(payload)
         logger.debug(
             "redis_pushing_result",
@@ -410,9 +423,7 @@ async def _push_result(
 def _build_redis_settings(config: Any | None) -> RedisSettings:
     """Construct Redis settings using config or environment defaults."""
     redis_url = (
-        getattr(config, "redis_url", None)
-        if config is not None
-        else None
+        getattr(config, "redis_url", None) if config is not None else None
     ) or os.getenv("REDIS_URL", "redis://localhost:6379")
     settings = RedisSettings.from_dsn(redis_url)
     timeout = (
