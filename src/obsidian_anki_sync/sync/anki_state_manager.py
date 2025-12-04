@@ -147,6 +147,7 @@ class AnkiStateManager:
         obsidian_cards: dict[str, Card],
         anki_cards: dict[str, int],
         changes: list[SyncAction],
+        db_cards_override: dict[str, dict] | None = None,
     ) -> None:
         """Determine what actions to take.
 
@@ -154,13 +155,18 @@ class AnkiStateManager:
             obsidian_cards: Cards from Obsidian
             anki_cards: Current Anki state (slug -> note_id)
             changes: List to populate with sync actions
+            db_cards_override: Pre-fetched database cards (avoids re-fetching)
         """
         logger.info("determining_actions")
 
-        # Get database state
-        logger.debug("getting_db_cards")
-        db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
-        logger.debug("got_db_cards", count=len(db_cards))
+        # Get database state (use override if provided for efficiency)
+        if db_cards_override is not None:
+            db_cards = db_cards_override
+            logger.debug("using_db_cards_override", count=len(db_cards))
+        else:
+            logger.debug("getting_db_cards")
+            db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
+            logger.debug("got_db_cards", count=len(db_cards))
 
         # Check each Obsidian card
         for slug, obs_card in obsidian_cards.items():
