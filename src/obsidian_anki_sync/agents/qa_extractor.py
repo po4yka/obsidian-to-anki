@@ -606,6 +606,18 @@ You are an expert Q&A extraction system specializing in educational note analysi
                     file=str(file_path) if file_path else "unknown",
                     extraction_notes=extraction_notes,
                 )
+            else:
+                logger.info(
+                    "qa_extraction_summary",
+                    count=len(qa_pairs),
+                    pairs=[
+                        {
+                            "q_en": q.question_en[:50],
+                            "a_en": q.answer_en[:50],
+                            "q_ru": q.question_ru[:50]
+                        } for q in qa_pairs
+                    ]
+                )
 
             return qa_pairs
 

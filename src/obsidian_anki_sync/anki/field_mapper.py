@@ -126,9 +126,14 @@ def _extract_field(content: str, field_name: str) -> str:
 
     match = re.search(pattern, content, re.DOTALL)
     if not match:
+        logger.debug(f"Field extraction failed: '{field_name}' not found in content snippet (len={len(content)})")
         return ""
 
-    return match.group(1).strip()
+    value = match.group(1).strip()
+    if not value:
+        logger.debug(f"Field extraction warning: '{field_name}' found but empty")
+    
+    return value
 
 
 def _extract_manifest(content: str) -> dict:

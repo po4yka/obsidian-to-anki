@@ -307,19 +307,30 @@ class LangGraphOrchestrator:
             try:
                 # Use default note type for validation check
                 fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
+                
+                # Log all extracted fields for debugging purposes
+                logger.debug(
+                    "extracted_fields_from_generated_card",
+                    slug=gen_card.slug,
+                    apf_html_length=len(gen_card.apf_html),
+                    extracted_fields=fields,
+                )
+
                 if not fields.get("Primary Title"):
                     logger.warning(
-                        "empty_fields_detected_in_generated_card",
+                        "empty_primary_title_detected_in_generated_card",
                         slug=gen_card.slug,
                         apf_html_preview=gen_card.apf_html[:500],
-                        hint="Card fields extraction failed. Check APF format."
+                        hint="Card fields extraction failed (Primary Title is empty). Check APF format."
                     )
             except Exception as e:
                 logger.warning(
                     "field_extraction_failed_during_conversion",
                     slug=gen_card.slug,
-                    error=str(e)
+                    error=str(e),
+                    apf_html_preview=gen_card.apf_html[:500]
                 )
+
 
             # Create manifest
             # Safely extract slug_base by removing -index-lang suffix

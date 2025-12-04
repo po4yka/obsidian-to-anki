@@ -417,6 +417,14 @@ class ChangeApplier:
                 if card.guid:
                     note_payload["guid"] = card.guid
 
+                # Debug: Log payload for empty note check
+                if not note_payload["fields"].get("Primary Title") or not note_payload["fields"].get("Primary Key point (code block)"):
+                     logger.warning(
+                         "sending_potentially_empty_card_to_anki",
+                         slug=card.slug,
+                         fields_preview={k: v[:50] + "..." if v else "EMPTY" for k,v in note_payload["fields"].items()}
+                     )
+
                 note_payloads.append(note_payload)
                 card_data.append((card, fields, card.tags, card.apf_html))
 
