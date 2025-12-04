@@ -59,25 +59,39 @@ def parse_apf_card(apf_html: str) -> dict:
     Returns:
         Dict of parsed fields
     """
+    logger.debug("parse_apf_card_input", apf_html_length=len(apf_html))
+
     # Extract card block (between BEGIN_CARDS and END_CARDS)
     match = re.search(
         r"<!-- BEGIN_CARDS -->(.*?)<!-- END_CARDS -->", apf_html, re.DOTALL
     )
 
     if not match:
+        logger.error(
+            "parse_apf_card_no_block",
+            apf_html_preview=apf_html[:500] if apf_html else "empty",
+        )
         msg = "No card block found"
         raise ValueError(msg)
 
     card_content = match.group(1).strip()
+    logger.debug("parse_apf_card_block", card_content_length=len(card_content))
 
-    # Parse header
+    # Parse header - more lenient regex to allow more slug characters
     header_match = re.match(
-        r"<!-- Card \d+ \| slug: ([a-z0-9-]+) \| CardType: (\w+) \| Tags: (.+?) -->",
+        r"<!-- Card \d+ \| slug: ([a-zA-Z0-9_-]+) \| CardType: (\w+) \| Tags: (.+?) -->",
         card_content,
     )
 
     if not header_match:
-        msg = "Invalid card header"
+        # Log what the header actually looks like for debugging
+        header_line = card_content.split("\n")[0] if card_content else ""
+        logger.error(
+            "parse_apf_card_invalid_header",
+            header_line=header_line[:200],
+            card_content_preview=card_content[:300],
+        )
+        msg = f"Invalid card header: {header_line[:100]}"
         raise ValueError(msg)
 
     slug, card_type, tags_str = header_match.groups()

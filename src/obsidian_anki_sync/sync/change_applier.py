@@ -398,6 +398,13 @@ class ChangeApplier:
 
             for action in batch_actions:
                 card = action.card
+                logger.debug(
+                    "preparing_card_for_anki",
+                    slug=card.slug,
+                    note_type=card.note_type,
+                    apf_html_length=len(card.apf_html) if card.apf_html else 0,
+                    apf_html_preview=(card.apf_html[:200] if card.apf_html else "empty"),
+                )
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
                 note_payload = {
