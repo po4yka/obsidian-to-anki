@@ -59,9 +59,9 @@ class CardRecovery:
             "inconsistent": [],  # Different content in Anki vs DB
         }
 
-        # Get all cards from database
+        # Get all cards from database (returns Card domain objects)
         db_cards = self.db.get_all_cards()
-        db_by_guid = {c["anki_guid"]: c for c in db_cards if c.get("anki_guid")}
+        db_by_guid = {c.anki_guid: c for c in db_cards if c.anki_guid}
 
         logger.info("checking_for_orphaned_cards", db_cards=len(db_cards))
 
@@ -79,19 +79,19 @@ class CardRecovery:
 
         # Check DB cards that should be in Anki
         for card in db_cards:
-            if not card.get("anki_guid"):
+            if not card.anki_guid:
                 # Card has no Anki GUID recorded
-                results["orphaned_in_db"].append(card["slug"])
+                results["orphaned_in_db"].append(card.slug)
                 continue
 
             try:
-                anki_info = self.anki.notes_info([card["anki_guid"]])
+                anki_info = self.anki.notes_info([card.anki_guid])
                 if not anki_info:
                     # Card deleted from Anki but still in DB
-                    results["orphaned_in_db"].append(card["slug"])
+                    results["orphaned_in_db"].append(card.slug)
             except AnkiConnectError:
                 # Failed to query - assume orphaned
-                results["orphaned_in_db"].append(card["slug"])
+                results["orphaned_in_db"].append(card.slug)
 
         logger.info(
             "orphaned_cards_found",
@@ -136,7 +136,8 @@ class CardRecovery:
         Returns:
             List of card records with 'failed' status
         """
-        all_cards = self.db.get_all_cards()
+        # Use raw method to access database-specific fields like creation_status
+        all_cards = self.db.get_all_cards_raw()
         failed_cards = [c for c in all_cards if c.get("creation_status") == "failed"]
 
         logger.info("found_failed_cards", count=len(failed_cards))

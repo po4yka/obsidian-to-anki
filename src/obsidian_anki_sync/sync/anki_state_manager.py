@@ -147,7 +147,7 @@ class AnkiStateManager:
         obsidian_cards: dict[str, Card],
         anki_cards: dict[str, int],
         changes: list[SyncAction],
-        db_cards_override: dict[str, dict] | None = None,
+        db_cards_override: dict | None = None,
     ) -> None:
         """Determine what actions to take.
 
@@ -155,17 +155,18 @@ class AnkiStateManager:
             obsidian_cards: Cards from Obsidian
             anki_cards: Current Anki state (slug -> note_id)
             changes: List to populate with sync actions
-            db_cards_override: Pre-fetched database cards (avoids re-fetching)
+            db_cards_override: Pre-fetched database cards as domain Card objects
         """
         logger.info("determining_actions")
 
         # Get database state (use override if provided for efficiency)
+        # db_cards contains Card domain objects (not dicts)
         if db_cards_override is not None:
             db_cards = db_cards_override
             logger.debug("using_db_cards_override", count=len(db_cards))
         else:
             logger.debug("getting_db_cards")
-            db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
+            db_cards = {c.slug: c for c in self.db.get_all_cards()}
             logger.debug("got_db_cards", count=len(db_cards))
 
         # Check each Obsidian card
@@ -183,14 +184,14 @@ class AnkiStateManager:
                     )
                 )
 
-            elif db_card and obs_card.content_hash != db_card["content_hash"]:
+            elif db_card and obs_card.content_hash != db_card.content_hash:
                 # Updated card - update
                 changes.append(
                     SyncAction(
                         type="update",
                         card=obs_card,
-                        anki_guid=db_card["anki_guid"],
-                        reason=f"Content changed (old hash: {db_card['content_hash'][:8]}...)",
+                        anki_guid=db_card.anki_guid,
+                        reason=f"Content changed (old hash: {db_card.content_hash[:8]}...)",
                     )
                 )
 
@@ -200,7 +201,7 @@ class AnkiStateManager:
                     SyncAction(
                         type="skip",
                         card=obs_card,
-                        anki_guid=db_card.get("anki_guid") if db_card else None,
+                        anki_guid=db_card.anki_guid if db_card else None,
                         reason="No changes detected",
                     )
                 )
@@ -212,49 +213,44 @@ class AnkiStateManager:
                 from obsidian_anki_sync.models import Card as CardModel
                 from obsidian_anki_sync.models import Manifest
 
+                # db_card is a domain Card object - access manifest for nested fields
+                manifest = db_card.manifest
+                card_guid = manifest.guid or deterministic_guid(
+                    [
+                        manifest.note_id or "",
+                        manifest.source_path,
+                        str(manifest.card_index),
+                        db_card.language,
+                    ]
+                )
+
                 # Reconstruct minimal card for deletion
                 card = CardModel(
                     slug=slug,
-                    lang=db_card["lang"],
+                    lang=db_card.language,
                     apf_html="",
                     manifest=Manifest(
                         slug=slug,
-                        slug_base=db_card["slug_base"],
-                        lang=db_card["lang"],
-                        source_path=db_card["source_path"],
-                        source_anchor=db_card["source_anchor"],
-                        note_id=db_card["note_id"],
-                        note_title=db_card["note_title"],
-                        card_index=db_card["card_index"],
-                        guid=db_card.get("card_guid")
-                        or deterministic_guid(
-                            [
-                                db_card.get("note_id", ""),
-                                db_card["source_path"],
-                                str(db_card["card_index"]),
-                                db_card["lang"],
-                            ]
-                        ),
+                        slug_base=manifest.slug_base,
+                        lang=db_card.language,
+                        source_path=manifest.source_path,
+                        source_anchor=manifest.source_anchor,
+                        note_id=manifest.note_id,
+                        note_title=manifest.note_title,
+                        card_index=manifest.card_index,
+                        guid=card_guid,
                     ),
-                    content_hash=db_card["content_hash"],
-                    note_type=db_card.get("note_type", "APF::Simple"),
+                    content_hash=db_card.content_hash,
+                    note_type=db_card.note_type or "APF::Simple",
                     tags=[],
-                    guid=db_card.get("card_guid")
-                    or deterministic_guid(
-                        [
-                            db_card.get("note_id", ""),
-                            db_card["source_path"],
-                            str(db_card["card_index"]),
-                            db_card["lang"],
-                        ]
-                    ),
+                    guid=card_guid,
                 )
 
                 changes.append(
                     SyncAction(
                         type="delete",
                         card=card,
-                        anki_guid=db_card["anki_guid"],
+                        anki_guid=db_card.anki_guid,
                         reason="Card removed from Obsidian",
                     )
                 )

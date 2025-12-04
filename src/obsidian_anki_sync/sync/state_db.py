@@ -607,6 +607,21 @@ class StateDB(IStateRepository):
                 continue
         return cards
 
+    def get_all_cards_raw(self) -> list[dict]:
+        """Get all cards as raw dictionary records.
+
+        Use this for operations that need database-specific fields
+        like creation_status, retry_count, etc. that aren't part
+        of the domain Card entity.
+
+        Returns:
+            List of card records as dictionaries
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM cards")
+        return [dict(row) for row in cursor.fetchall()]
+
     def get_processed_note_paths(self) -> set[str]:
         """Get set of all note paths that have been processed.
 

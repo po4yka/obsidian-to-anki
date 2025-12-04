@@ -627,8 +627,8 @@ class SyncEngine:
                 cards_found=len(anki_cards),
             )
 
-            # Get database state early
-            db_cards = {c["slug"]: c for c in self.db.get_all_cards()}
+            # Get database state early (Card objects, not dicts)
+            db_cards = {c.slug: c for c in self.db.get_all_cards()}
 
             # Define callback for atomic processing
             self.changes = []
@@ -715,49 +715,44 @@ class SyncEngine:
                     from obsidian_anki_sync.models import Card as CardModel
                     from obsidian_anki_sync.models import Manifest
 
+                    # db_card is a domain Card object - access manifest for nested fields
+                    manifest = db_card.manifest
+                    card_guid = manifest.guid or deterministic_guid(
+                        [
+                            manifest.note_id or "",
+                            manifest.source_path,
+                            str(manifest.card_index),
+                            db_card.language,
+                        ]
+                    )
+
                     # Reconstruct minimal card for deletion
                     card = CardModel(
                         slug=slug,
-                        lang=db_card["lang"],
+                        lang=db_card.language,
                         apf_html="",
                         manifest=Manifest(
                             slug=slug,
-                            slug_base=db_card["slug_base"],
-                            lang=db_card["lang"],
-                            source_path=db_card["source_path"],
-                            source_anchor=db_card["source_anchor"],
-                            note_id=db_card["note_id"],
-                            note_title=db_card["note_title"],
-                            card_index=db_card["card_index"],
-                            guid=db_card.get("card_guid")
-                            or deterministic_guid(
-                                [
-                                    db_card.get("note_id", ""),
-                                    db_card["source_path"],
-                                    str(db_card["card_index"]),
-                                    db_card["lang"],
-                                ]
-                            ),
+                            slug_base=manifest.slug_base,
+                            lang=db_card.language,
+                            source_path=manifest.source_path,
+                            source_anchor=manifest.source_anchor,
+                            note_id=manifest.note_id,
+                            note_title=manifest.note_title,
+                            card_index=manifest.card_index,
+                            guid=card_guid,
                         ),
-                        content_hash=db_card["content_hash"],
-                        note_type=db_card.get("note_type", "APF::Simple"),
+                        content_hash=db_card.content_hash,
+                        note_type=db_card.note_type or "APF::Simple",
                         tags=[],
-                        guid=db_card.get("card_guid")
-                        or deterministic_guid(
-                            [
-                                db_card.get("note_id", ""),
-                                db_card["source_path"],
-                                str(db_card["card_index"]),
-                                db_card["lang"],
-                            ]
-                        ),
+                        guid=card_guid,
                     )
 
                     deletion_changes.append(
                         SyncAction(
                             type="delete",
                             card=card,
-                            anki_guid=db_card["anki_guid"],
+                            anki_guid=db_card.anki_guid,
                             reason="Card removed from Obsidian",
                         )
                     )

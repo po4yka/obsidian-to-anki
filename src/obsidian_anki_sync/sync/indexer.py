@@ -476,13 +476,14 @@ class SyncIndexer:
         }
 
         try:
-            # Get all cards from database
+            # Get all cards from database (returns Card domain objects)
             db_cards = self.db.get_all_cards()
             stats["total_discovered"] = len(db_cards)
 
             for db_card in db_cards:
                 try:
-                    slug = db_card["slug"]
+                    slug = db_card.slug
+                    manifest = db_card.manifest
 
                     # Update card index with database information
                     existing_card = self.db.get_card_index_by_slug(slug)
@@ -490,14 +491,14 @@ class SyncIndexer:
                     if existing_card:
                         # Update with database info
                         self.db.upsert_card_index(
-                            source_path=db_card["source_path"],
-                            card_index=db_card["card_index"],
-                            lang=db_card["lang"],
+                            source_path=manifest.source_path,
+                            card_index=manifest.card_index,
+                            lang=db_card.language,
                             slug=slug,
-                            anki_guid=db_card["anki_guid"],
-                            note_id=db_card.get("note_id"),
-                            note_title=db_card.get("note_title"),
-                            content_hash=db_card["content_hash"],
+                            anki_guid=db_card.anki_guid,
+                            note_id=manifest.note_id,
+                            note_title=manifest.note_title,
+                            content_hash=db_card.content_hash,
                             in_obsidian=existing_card.get("in_obsidian", False),
                             in_anki=existing_card.get("in_anki", False),
                             in_database=True,
@@ -505,14 +506,14 @@ class SyncIndexer:
                     else:
                         # Card in database but not indexed yet
                         self.db.upsert_card_index(
-                            source_path=db_card["source_path"],
-                            card_index=db_card["card_index"],
-                            lang=db_card["lang"],
+                            source_path=manifest.source_path,
+                            card_index=manifest.card_index,
+                            lang=db_card.language,
                             slug=slug,
-                            anki_guid=db_card["anki_guid"],
-                            note_id=db_card.get("note_id"),
-                            note_title=db_card.get("note_title"),
-                            content_hash=db_card["content_hash"],
+                            anki_guid=db_card.anki_guid,
+                            note_id=manifest.note_id,
+                            note_title=manifest.note_title,
+                            content_hash=db_card.content_hash,
                             status="synced",
                             in_obsidian=False,
                             in_anki=False,
@@ -524,7 +525,7 @@ class SyncIndexer:
                 except Exception as e:
                     logger.error(
                         "database_card_indexing_failed",
-                        slug=db_card.get("slug"),
+                        slug=getattr(db_card, "slug", "unknown"),
                         error=str(e),
                     )
                     stats["errors"] += 1
