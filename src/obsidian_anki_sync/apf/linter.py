@@ -282,9 +282,24 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
         # Convert hyphens to underscores for validation
         normalized_tag = tag.replace("-", "_")
         normalized_tags.append(normalized_tag)
-        if not re.match(r"^[a-z0-9_]+$", normalized_tag):
+        
+        # Check for whitespace
+        if re.search(r"\s", tag):
+            result.errors.append(f"Card {card_num}: Tag '{tag}' must not contain whitespace")
+            continue
+
+        # Check strictly for alphanumeric + underscore (unicode friendly)
+        # \w matches [a-zA-Z0-9_] plus unicode chars in Python 3
+        if not re.match(r"^\w+$", normalized_tag):
             result.errors.append(
-                f"Card {card_num}: Tag '{tag}' not in valid format (use snake_case or kebab-case)"
+                f"Card {card_num}: Tag '{tag}' contains invalid characters (use alphanumeric, '_', or '-')"
+            )
+            continue
+
+        # Warn on uppercase (convention)
+        if not tag.islower():
+            result.warnings.append(
+                f"Card {card_num}: Tag '{tag}' should be lowercase (convention)"
             )
 
     # Check first tag is a language, tool, or common platform

@@ -1348,10 +1348,14 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     ):
         await _sleep_post_validation_backoff(state)
         state["retry_count"] = (state.get("retry_count") or 0) + 1
-        state["current_stage"] = "post_validation"
-        retry_reason = "timeout, retrying" if is_timeout_error else "applied fixes"
+        
+        # Important: If validation failed, we must RE-GENERATE the content.
+        # Setting stage to 'generation' triggers the retry loop in the router.
+        state["current_stage"] = "generation" 
+        
+        retry_reason = "timeout, retrying" if is_timeout_error else "applied fixes/retrying"
         state["messages"].append(
-            f"{retry_reason}, re-validating (attempt {state['retry_count']})"
+            f"{retry_reason}, re-generating (attempt {state['retry_count']})"
         )
     else:
         state["current_stage"] = "failed"
