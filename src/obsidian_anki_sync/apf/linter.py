@@ -200,10 +200,20 @@ def _validate_card_block(
     if "<!-- manifest:" not in block:
         result.errors.append(f"Card {card_num}: Missing manifest")
     else:
-        _validate_manifest(block, slug, card_num, result)
+        _validate_manifest(
+            block, 
+            slug, 
+            card_num, 
+            result, 
+            expected_tags=tags, 
+            expected_type=card_type
+        )
 
     # Check field headers present
     _check_field_headers(block, card_num, result)
+    
+    # Validate Key Point Notes content
+    _validate_key_point_notes(block, card_num, result)
 
     # Validate cloze density for Missing cards
     if card_type == "Missing":
@@ -298,7 +308,12 @@ def _validate_tags(tags: list[str], card_num: int, result: ValidationResult) -> 
 
 
 def _validate_manifest(
-    block: str, expected_slug: str, card_num: int, result: ValidationResult
+    block: str, 
+    expected_slug: str, 
+    card_num: int, 
+    result: ValidationResult,
+    expected_tags: list[str] | None = None,
+    expected_type: str | None = None
 ) -> None:
     """Validate manifest JSON."""
     # Extract manifest
@@ -324,6 +339,55 @@ def _validate_manifest(
         result.errors.append(
             f"Card {card_num}: Manifest slug mismatch (header: {expected_slug}, manifest: {manifest.get('slug')})"
         )
+
+    # Check consistency with header
+    if expected_tags:
+        manifest_tags = set(manifest.get("tags", []))
+        header_tags = set(expected_tags)
+        if manifest_tags != header_tags:
+            result.warnings.append(
+                f"Card {card_num}: Manifest tags do not match header tags"
+            )
+
+    if expected_type:
+        # Manifest type might use full "APF::Simple" while header uses "Simple"
+        manifest_type = manifest.get("type", "")
+        # Check if header type is contained in manifest type (e.g. "Simple" in "APF::Simple")
+        if expected_type not in manifest_type:
+            result.warnings.append(
+                f"Card {card_num}: Manifest type '{manifest_type}' mismatch with header '{expected_type}'"
+            )
+
+
+def _validate_key_point_notes(block: str, card_num: int, result: ValidationResult) -> None:
+    """Validate content of Key point notes."""
+    match = re.search(r"<!-- Key point notes -->\s*(.*?)(?=<!--|\Z)", block, re.DOTALL)
+    if not match:
+        return  # Handled by _check_field_headers
+
+    content = match.group(1).strip()
+    if not content:
+        return  # Handled by _check_field_headers
+
+    # Check for list items (<ul>, <li> or markdown bullets if user messed up)
+    # Ideally APF requires HTML <ul><li> but sometimes we get markdown
+    # We should warn if we see neither
+    has_html_list = "<li>" in content
+    # Check for markdown bullets just in case (heuristic)
+    has_md_list = re.search(r"^\s*[-*]\s+", content, re.MULTILINE)
+
+    if not has_html_list and not has_md_list:
+        result.warnings.append(
+            f"Card {card_num}: 'Key point notes' should contain a list (bullets)"
+        )
+
+    # Count bullets (rough heuristic)
+    if has_html_list:
+        bullet_count = content.count("<li>")
+        if bullet_count < 3:
+            result.warnings.append(
+                f"Card {card_num}: 'Key point notes' has few bullets ({bullet_count}), aim for 5-7"
+            )
 
 
 def _check_field_headers(block: str, card_num: int, result: ValidationResult) -> None:
