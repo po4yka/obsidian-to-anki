@@ -489,14 +489,14 @@ You are an expert Q&A extraction system specializing in educational note analysi
                 try:
                     qa_pair = QAPair(
                         card_index=qa_data.get("card_index", len(qa_pairs) + 1),
-                        question_en=qa_data.get("question_en", "").strip(),
-                        question_ru=qa_data.get("question_ru", "").strip(),
-                        answer_en=qa_data.get("answer_en", "").strip(),
-                        answer_ru=qa_data.get("answer_ru", "").strip(),
-                        context=qa_data.get("context", "").strip(),
-                        followups=qa_data.get("followups", "").strip(),
-                        references=qa_data.get("references", "").strip(),
-                        related=qa_data.get("related", "").strip(),
+                        question_en=(qa_data.get("question_en") or "").strip(),
+                        question_ru=(qa_data.get("question_ru") or "").strip(),
+                        answer_en=(qa_data.get("answer_en") or "").strip(),
+                        answer_ru=(qa_data.get("answer_ru") or "").strip(),
+                        context=(qa_data.get("context") or "").strip(),
+                        followups=(qa_data.get("followups") or "").strip(),
+                        references=(qa_data.get("references") or "").strip(),
+                        related=(qa_data.get("related") or "").strip(),
                     )
 
                     # Validate that required language content is present
