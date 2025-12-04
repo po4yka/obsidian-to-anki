@@ -34,6 +34,7 @@ from obsidian_anki_sync.exceptions import (
     CircuitBreakerOpenError,
     ConfigurationError,
     ParserError,
+    TruncationError,
 )
 from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import discover_notes, parse_note
@@ -451,6 +452,25 @@ class NoteScanner:
 
                 self.stats["processed"] = self.stats.get("processed", 0) + 1
 
+            except TruncationError as e:
+                # Handle oversized notes that couldn't be chunked
+                logger.warning(
+                    "note_too_large_for_extraction",
+                    file=relative_path,
+                    content_tokens=e.content_tokens,
+                    required_output_tokens=e.required_output_tokens,
+                    model_limit=e.model_limit,
+                    suggestion=e.suggestion,
+                    error=str(e),
+                )
+                self.stats["errors"] = self.stats.get("errors", 0) + 1
+                consecutive_errors += 1
+                self._archive_note_safely(
+                    file_path=file_path,
+                    relative_path=relative_path,
+                    error=e,
+                    processing_stage="qa_extraction",
+                )
             except (
                 ParserError,
                 yaml.YAMLError,

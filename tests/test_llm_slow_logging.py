@@ -2,10 +2,8 @@
 
 import importlib.util
 import logging
-import types
 from pathlib import Path
 
-from obsidian_anki_sync.apf.generator import APFGenerator  # pragma: allowlist secret
 from obsidian_anki_sync.config import Config
 
 
@@ -61,29 +59,5 @@ def test_embedding_provider_logs_slow_request(caplog):
     assert any(
         "llm_request_slow" in record.getMessage()
         and provider.model_name in record.getMessage()
-        for record in caplog.records
-    )
-
-
-def test_apf_generator_logs_slow_request(caplog):
-    config = _build_test_config()
-
-    generator = APFGenerator(config)
-    generator.provider = types.SimpleNamespace(
-        generate=lambda **_: {"response": "<div class='front'>Q</div>"}
-    )
-
-    manifest = types.SimpleNamespace(slug="test-card")
-    messages = [
-        {"role": "system", "content": "system"},
-        {"role": "user", "content": "user"},
-    ]
-
-    with caplog.at_level(logging.WARNING):
-        generator._invoke_llm(messages, manifest, model="stub-model")
-
-    assert any(
-        "llm_request_slow" in record.getMessage()
-        and "stub-model" in record.getMessage()
         for record in caplog.records
     )

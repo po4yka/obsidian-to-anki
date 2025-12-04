@@ -14,7 +14,7 @@ import frontmatter
 from ruamel.yaml import YAML
 
 from obsidian_anki_sync.agents.autofix.handlers import UnbalancedCodeFenceHandler
-from obsidian_anki_sync.exceptions import ParserError
+from obsidian_anki_sync.exceptions import ParserError, TruncationError
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
 from obsidian_anki_sync.utils.logging import get_logger
@@ -880,6 +880,10 @@ def parse_qa_pairs(
                     title=metadata.title,
                     file=str(file_path) if file_path else "unknown",
                 )
+        except TruncationError:
+            # Re-raise TruncationError - caller should handle this explicitly
+            # Do not fall back to rigid parser for oversized notes
+            raise
         except Exception as e:
             logger.warning(
                 "llm_extraction_failed_falling_back",

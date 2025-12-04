@@ -432,6 +432,46 @@ class ConcurrencyTimeoutError(SyncError):
         super().__init__(message, suggestion)
 
 
+class TruncationError(ProviderError):
+    """Content exceeds model output token limits.
+
+    Raised when note content is too large to process without truncation,
+    even after chunking attempts.
+
+    Attributes:
+        content_tokens: Estimated input content tokens
+        required_output_tokens: Estimated required output tokens
+        model_limit: Model's maximum output token limit
+        note_path: Path to the note that caused truncation
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        content_tokens: int | None = None,
+        required_output_tokens: int | None = None,
+        model_limit: int | None = None,
+        note_path: str | None = None,
+        suggestion: str | None = None,
+    ):
+        """Initialize truncation error.
+
+        Args:
+            message: Human-readable error message
+            content_tokens: Estimated input content tokens
+            required_output_tokens: Estimated required output tokens
+            model_limit: Model's maximum output token limit
+            note_path: Path to the note that caused truncation
+            suggestion: Optional suggestion for resolving the error
+        """
+        self.content_tokens = content_tokens
+        self.required_output_tokens = required_output_tokens
+        self.model_limit = model_limit
+        self.note_path = note_path
+        super().__init__(message, suggestion)
+
+
 # Export helper functions for backward compatibility
 
 
@@ -453,6 +493,7 @@ def get_exception_hierarchy() -> dict[str, list[str]]:
         "ProviderError": [
             "ProviderConnectionError",
             "ProviderTimeoutError",
+            "TruncationError",
         ],
         "ValidationError": [
             "ParserError",

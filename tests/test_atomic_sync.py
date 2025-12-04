@@ -41,7 +41,6 @@ def test_atomic_sync_callback(mock_components):
         ) as MockAnkiStateManager,
         patch("obsidian_anki_sync.sync.engine.ChangeApplier") as MockChangeApplier,
         patch("obsidian_anki_sync.sync.engine.CardGenerator") as MockCardGenerator,
-        patch("obsidian_anki_sync.sync.engine.APFGenerator") as MockAPFGenerator,
     ):
         # Setup mock instances
         note_scanner_instance = MockNoteScanner.return_value
