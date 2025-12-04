@@ -44,11 +44,12 @@ from obsidian_anki_sync.agents.pydantic import (
     SplitValidatorAgentAI,
 )
 from obsidian_anki_sync.apf.linter import validate_apf
+from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.providers.pydantic_ai_models import (
     create_openrouter_model_from_env,
 )
-from obsidian_anki_sync.utils.logging import get_logger
+from obsidian_anki_sync.utils.logging import get_logger, log_state_transition
 from obsidian_anki_sync.utils.resilience import compute_jittered_backoff
 
 from .node_helpers import increment_step_count
@@ -61,6 +62,32 @@ from .state import (
 )
 
 logger = get_logger(__name__)
+
+
+def _validate_generation_inputs(state: PipelineState) -> list[str]:
+    """Validate inputs before generation to catch issues early.
+
+    Returns:
+        List of validation error messages (empty if valid)
+    """
+    errors = []
+
+    if not state.get("note_content"):
+        errors.append("note_content is empty or None")
+
+    if not state.get("qa_pairs_dicts"):
+        errors.append("qa_pairs_dicts is empty or None")
+
+    metadata = state.get("metadata_dict", {})
+    if not metadata:
+        errors.append("metadata_dict is empty or None")
+    elif not metadata.get("title"):
+        errors.append("metadata.title is missing")
+
+    if not state.get("slug_base"):
+        errors.append("slug_base is empty or None")
+
+    return errors
 
 
 def _get_reasoning_recommendations(state: PipelineState) -> list[str]:
@@ -692,6 +719,39 @@ async def generation_node(state: PipelineState) -> PipelineState:
     logger.info("langgraph_generation_start")
     start_time = time.time()
 
+    # Log state transition if enabled
+    config = get_config(state)
+    if getattr(config, "log_state_transitions", True):
+        log_state_transition(
+            logger,
+            pipeline_id=state.get("pipeline_id"),
+            from_stage=state.get("current_stage", "unknown"),
+            to_stage="generation",
+            reason="starting generation",
+        )
+
+    # Input validation - catch issues early with clear error messages
+    validation_errors = _validate_generation_inputs(state)
+    if validation_errors:
+        logger.error(
+            "generation_input_validation_failed",
+            errors=validation_errors,
+            error_code=ErrorCode.GEN_INPUT_INVALID.value,
+        )
+        gen_result = GenerationResult(
+            cards=[],
+            total_cards=0,
+            generation_time=time.time() - start_time,
+            model_used="none",
+            error_code=ErrorCode.GEN_INPUT_INVALID.value,
+        )
+        state["generation"] = gen_result.model_dump()
+        state["stage_times"]["generation"] = gen_result.generation_time
+        state["current_stage"] = "failed"
+        state["last_error"] = f"Input validation failed: {'; '.join(validation_errors)}"
+        state["messages"].append(f"Generation failed: {'; '.join(validation_errors)}")
+        return state
+
     # Get CoT reasoning recommendations if available
     reasoning_recommendations = _get_reasoning_recommendations(state)
     if reasoning_recommendations:
@@ -731,7 +791,13 @@ async def generation_node(state: PipelineState) -> PipelineState:
                         ),
                     )
             except Exception as e:
-                logger.warning("rag_context_enrichment_failed", error=str(e))
+                # Upgrade to error level - RAG failures affect generation quality
+                logger.error(
+                    "rag_context_enrichment_failed",
+                    error=str(e),
+                    error_code=ErrorCode.PRV_RAG_FAILED.value,
+                    recoverable=True,
+                )
 
         # Get few-shot examples
         if state.get("rag_few_shot_examples", True):
@@ -751,7 +817,13 @@ async def generation_node(state: PipelineState) -> PipelineState:
                             topic=topic,
                         )
             except Exception as e:
-                logger.warning("rag_few_shot_examples_failed", error=str(e))
+                # Upgrade to error level - RAG failures affect generation quality
+                logger.error(
+                    "rag_few_shot_examples_failed",
+                    error=str(e),
+                    error_code=ErrorCode.PRV_RAG_FAILED.value,
+                    recoverable=True,
+                )
 
     # Deserialize data
     metadata = NoteMetadata(**state["metadata_dict"])
@@ -853,15 +925,20 @@ async def generation_node(state: PipelineState) -> PipelineState:
             all_cards = []
             total_gen_time = 0.0
             all_warnings = []
+            failed_chunks = 0
+            total_chunks = len(chunks)
 
             for i, res in enumerate(results):
                 if isinstance(res, Exception):
+                    failed_chunks += 1
                     logger.error(
                         "langgraph_generation_chunk_failed",
                         chunk_index=i,
+                        total_chunks=total_chunks,
                         error=str(res),
+                        error_code=ErrorCode.GEN_CHUNK_FAILED.value,
                     )
-                    # We continue with partial results if some chunks fail
+                    all_warnings.append(f"Chunk {i} failed: {str(res)[:100]}")
                 # Handle different result types
                 elif hasattr(res, "data") and hasattr(res.data, "cards"):
                     # UnifiedAgentResult with GenerationResult data
@@ -872,12 +949,45 @@ async def generation_node(state: PipelineState) -> PipelineState:
                     if hasattr(res, "warnings") and res.warnings:
                         all_warnings.extend(res.warnings)
 
-            # Create merged result
+            # Fail the entire note if any chunks failed (per user preference)
+            if failed_chunks > 0:
+                logger.error(
+                    "generation_partial_failure",
+                    failed_chunks=failed_chunks,
+                    total_chunks=total_chunks,
+                    error_code=ErrorCode.GEN_PARTIAL_RESULT.value,
+                )
+                gen_result = GenerationResult(
+                    cards=[],
+                    total_cards=0,
+                    generation_time=time.time() - start_time,
+                    model_used=str(model),
+                    is_partial=True,
+                    failed_chunk_count=failed_chunks,
+                    total_chunk_count=total_chunks,
+                    error_code=ErrorCode.GEN_PARTIAL_RESULT.value,
+                    warnings=all_warnings,
+                )
+                state["generation"] = gen_result.model_dump()
+                state["stage_times"]["generation"] = gen_result.generation_time
+                state["current_stage"] = "failed"
+                state["last_error"] = (
+                    f"Partial generation failure: {failed_chunks}/{total_chunks} "
+                    "chunks failed"
+                )
+                state["messages"].append(
+                    f"Generation failed: {failed_chunks}/{total_chunks} chunks failed"
+                )
+                return state
+
+            # Create merged result (all chunks succeeded)
             gen_result = GenerationResult(
                 cards=all_cards,
                 total_cards=len(all_cards),
                 generation_time=time.time() - start_time,  # Total wall time
                 model_used=str(model),
+                total_chunk_count=total_chunks,
+                warnings=all_warnings,
             )
 
         # Sequential generation (single batch)

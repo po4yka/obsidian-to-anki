@@ -34,6 +34,7 @@ except ImportError:
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.models import Card, ManifestData, SyncAction
 from obsidian_anki_sync.providers.factory import ProviderFactory
 from obsidian_anki_sync.sync.anki_state_manager import AnkiStateManager
@@ -217,6 +218,13 @@ class SyncEngine:
             "restored": 0,
             "skipped": 0,
             "errors": 0,
+        }
+
+        # Retry statistics tracking
+        self._retry_stats: dict[str, int] = {
+            "total_retries": 0,
+            "successful_after_retry": 0,
+            "failed_after_max_retries": 0,
         }
 
         # Thread-safe slug generation
@@ -806,14 +814,24 @@ class SyncEngine:
                 self.progress.complete(success=True)
 
             total_duration = time.time() - sync_start_time
-            logger.info(
-                "sync_completed",
-                stats=self.stats,
-                total_duration=round(total_duration, 2),
-                dry_run=dry_run,
-                incremental=incremental,
-                sample_size=sample_size,
-            )
+
+            # Build sync summary log with optional retry stats
+            sync_summary_kwargs: dict[str, Any] = {
+                "stats": self.stats,
+                "total_duration": round(total_duration, 2),
+                "dry_run": dry_run,
+                "incremental": incremental,
+                "sample_size": sample_size,
+            }
+
+            # Include retry stats if configured and any retries occurred
+            if (
+                self.config.include_retry_stats_in_summary
+                and self._retry_stats["total_retries"] > 0
+            ):
+                sync_summary_kwargs["retry_stats"] = self._retry_stats
+
+            logger.info("sync_completed", **sync_summary_kwargs)
 
             # Clean up memory after sync completion
             self._cleanup_memory()
@@ -872,10 +890,23 @@ class SyncEngine:
                     avg_generation_seconds=round(avg_generation_time, 2),
                 )
 
+            # Check for orphaned cards at end of sync (if configured)
+            orphan_stats = None
+            if self.config.detect_orphans_on_sync and not dry_run:
+                logger.info("sync_phase_started", phase="orphan_detection")
+                orphan_stats = self._check_for_orphans()
+
             # Build result dict
             result = self.progress.get_stats() if self.progress else self.stats
             if index_stats:
                 result["index"] = index_stats["overall"]
+            if orphan_stats:
+                result["orphans"] = {
+                    "in_anki": len(orphan_stats.get("orphaned_in_anki", [])),
+                    "in_db": len(orphan_stats.get("orphaned_in_db", [])),
+                }
+            if self._retry_stats["total_retries"] > 0:
+                result["retry_stats"] = self._retry_stats
 
             return result
 
@@ -937,3 +968,67 @@ class SyncEngine:
     # - ChangeApplier: _apply_changes, _apply_changes_sequential, _apply_changes_batched,
     #   _create_card, _update_card, _delete_card, _create_cards_batch, _update_cards_batch,
     #   _delete_cards_batch, _verify_card_creation
+
+    def _check_for_orphans(self) -> dict[str, list[str]]:
+        """Check for orphaned cards and log findings.
+
+        Orphaned cards are cards that exist in one system but not the other:
+        - orphaned_in_anki: Cards in Anki but not tracked in the database
+        - orphaned_in_db: Cards in database but deleted from Anki
+
+        Returns:
+            Dictionary with orphan lists by category.
+        """
+        from obsidian_anki_sync.sync.recovery import CardRecovery
+
+        try:
+            recovery = CardRecovery(self.anki, self.db)
+            orphans = recovery.find_orphaned_cards()
+
+            orphaned_in_anki = orphans.get("orphaned_in_anki", [])
+            orphaned_in_db = orphans.get("orphaned_in_db", [])
+
+            if orphaned_in_anki or orphaned_in_db:
+                logger.warning(
+                    "orphaned_cards_detected",
+                    orphaned_in_anki_count=len(orphaned_in_anki),
+                    orphaned_in_db_count=len(orphaned_in_db),
+                    error_code=ErrorCode.ANK_ORPHAN_DETECTED.value,
+                )
+
+                # Log detailed info at debug level
+                if orphaned_in_anki:
+                    logger.debug(
+                        "orphaned_in_anki_details",
+                        sample=orphaned_in_anki[:10],
+                        total=len(orphaned_in_anki),
+                    )
+                if orphaned_in_db:
+                    logger.debug(
+                        "orphaned_in_db_details",
+                        sample=orphaned_in_db[:10],
+                        total=len(orphaned_in_db),
+                    )
+            else:
+                logger.info("no_orphaned_cards_detected")
+
+            return orphans
+
+        except Exception as e:
+            logger.error(
+                "orphan_detection_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return {"orphaned_in_anki": [], "orphaned_in_db": [], "inconsistent": []}
+
+    def increment_retry_stat(self, stat_name: str, count: int = 1) -> None:
+        """Increment a retry statistic.
+
+        Args:
+            stat_name: Name of the stat to increment
+                       (total_retries, successful_after_retry, failed_after_max_retries)
+            count: Amount to increment by (default 1)
+        """
+        if stat_name in self._retry_stats:
+            self._retry_stats[stat_name] += count

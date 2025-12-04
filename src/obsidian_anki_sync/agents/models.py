@@ -168,6 +168,7 @@ class GenerationResult(BaseModel):
     """Result from generator agent.
 
     Contains all cards generated from a single note.
+    Includes fields for tracking partial failures and error codes.
     """
 
     model_config = ConfigDict(frozen=False)
@@ -176,6 +177,30 @@ class GenerationResult(BaseModel):
     total_cards: int = Field(ge=0)
     generation_time: float = Field(ge=0.0)
     model_used: str
+
+    # Partial result tracking for parallel generation
+    is_partial: bool = Field(
+        default=False,
+        description="True if some chunks failed during parallel generation",
+    )
+    failed_chunk_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of chunks that failed during parallel generation",
+    )
+    total_chunk_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of chunks attempted",
+    )
+    error_code: str | None = Field(
+        default=None,
+        description="Structured error code if generation had issues (e.g., GEN-PARTIAL-001)",
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Non-fatal warnings during generation",
+    )
 
 
 class PostValidationResult(BaseModel):

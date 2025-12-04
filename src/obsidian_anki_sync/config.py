@@ -335,6 +335,33 @@ class Config(BaseSettings):
         description="Fallback model to use when primary model fails with empty completions",
     )
 
+    # =========================================================================
+    # Stability Configuration
+    # =========================================================================
+    generation_timeout_seconds: float = Field(
+        default=300.0,
+        ge=30.0,
+        description="Timeout for card generation stage in seconds. "
+        "Prevents indefinite hangs on LLM calls.",
+    )
+
+    detect_orphans_on_sync: bool = Field(
+        default=True,
+        description="Check for orphaned cards at end of each sync. "
+        "Orphans are cards in Anki without DB records or vice versa.",
+    )
+
+    log_state_transitions: bool = Field(
+        default=True,
+        description="Log pipeline state transitions for debugging. "
+        "Useful for tracing card generation failures.",
+    )
+
+    include_retry_stats_in_summary: bool = Field(
+        default=True,
+        description="Include retry statistics in sync summary log.",
+    )
+
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
     export_deck_description: str = ""

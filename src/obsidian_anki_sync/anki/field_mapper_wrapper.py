@@ -23,6 +23,7 @@ def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
         FieldMappingError: If mapping fails or sentinels are missing
     """
     if "<!-- BEGIN_CARDS -->" not in apf_html:
-        raise FieldMappingError("Missing <!-- BEGIN_CARDS --> sentinel")
+        msg = "Missing <!-- BEGIN_CARDS --> sentinel"
+        raise FieldMappingError(msg)
 
     return _map_apf_to_anki_fields(apf_html, note_type)

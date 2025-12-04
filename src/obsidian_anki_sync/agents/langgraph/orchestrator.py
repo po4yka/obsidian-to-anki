@@ -34,6 +34,7 @@ from obsidian_anki_sync.agents.models import (
 )
 from obsidian_anki_sync.agents.slug_utils import generate_agent_slug_base
 from obsidian_anki_sync.agents.unified_agent import UnifiedAgentSelector
+from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .model_factory import ModelFactory
@@ -949,19 +950,23 @@ class LangGraphOrchestrator:
                 note_id=metadata.id,
             )
         except TimeoutError:
-            logger.warning(
+            # Upgrade to error - timeouts indicate resource issues
+            logger.error(
                 "post_pipeline_tasks_timeout",
                 pipeline_id=pipeline_id,
                 note_id=metadata.id,
                 timeout=post_pipeline_timeout,
+                error_code=ErrorCode.PRV_MEMORY_FAILED.value,
                 message="Post-pipeline tasks timed out, returning result anyway",
             )
         except Exception as e:
-            logger.warning(
+            # Upgrade to error - failures affect learning and observability
+            logger.error(
                 "post_pipeline_tasks_failed",
                 pipeline_id=pipeline_id,
                 note_id=metadata.id,
                 error=str(e),
+                error_code=ErrorCode.PRV_MEMORY_FAILED.value,
                 message="Post-pipeline tasks failed, returning result anyway",
             )
 

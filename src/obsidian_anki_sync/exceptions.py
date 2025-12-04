@@ -37,7 +37,18 @@ Usage Examples:
     except ConfigurationError as e:
         print(f"Configuration error: {e}")
         print(f"Suggestion: {e.suggestion}")
+
+    # Use structured error codes
+    from obsidian_anki_sync.error_codes import ErrorCode
+
+    raise GeneratorError(
+        "Generation timed out",
+        error_code=ErrorCode.GEN_TIMEOUT_PRIMARY.value,
+        context={"timeout_seconds": 300, "model": "gpt-4"},
+    )
 """
+
+from typing import Any
 
 
 class ObsidianAnkiSyncError(Exception):
@@ -49,24 +60,55 @@ class ObsidianAnkiSyncError(Exception):
     Attributes:
         message: Human-readable error message
         suggestion: Optional suggestion for resolving the error
+        error_code: Structured error code for machine-readable handling
+        context: Additional context for debugging (e.g., file paths, model names)
     """
 
-    def __init__(self, message: str, suggestion: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        suggestion: str | None = None,
+        error_code: str | None = None,
+        context: dict[str, Any] | None = None,
+    ):
         """Initialize the exception.
 
         Args:
             message: Human-readable error message
             suggestion: Optional suggestion for resolving the error
+            error_code: Structured error code (e.g., "GEN-TIMEOUT-001")
+            context: Additional context for debugging
         """
         self.message = message
         self.suggestion = suggestion
+        self.error_code = error_code
+        self.context = context or {}
         super().__init__(self._format_message())
 
     def _format_message(self) -> str:
-        """Format the error message with suggestion if available."""
+        """Format the error message with error code and suggestion if available."""
+        parts = []
+        if self.error_code:
+            parts.append(f"[{self.error_code}] {self.message}")
+        else:
+            parts.append(self.message)
         if self.suggestion:
-            return f"{self.message}\n\nSuggestion: {self.suggestion}"
-        return self.message
+            parts.append(f"\nSuggestion: {self.suggestion}")
+        return "".join(parts)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert exception to dictionary for structured logging.
+
+        Returns:
+            Dictionary with error details
+        """
+        return {
+            "message": self.message,
+            "error_code": self.error_code,
+            "suggestion": self.suggestion,
+            "context": self.context,
+            "type": type(self).__name__,
+        }
 
 
 # Configuration Errors

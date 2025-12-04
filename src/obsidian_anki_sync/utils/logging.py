@@ -697,3 +697,110 @@ def get_logger(name: str) -> Any:
     logger = structlog.get_logger(name)
     # The logger name is automatically set by add_logger_name processor
     return logger
+
+
+def log_error_with_context(
+    logger: Any,
+    event: str,
+    error: Exception,
+    include_traceback: bool = True,
+    max_traceback_frames: int = 3,
+    **extra_context: Any,
+) -> None:
+    """Log error with full context preservation.
+
+    This helper ensures consistent error logging with:
+    - Error message and type
+    - Structured error code (if available)
+    - Traceback (optional, last N frames)
+    - Additional context fields
+
+    Args:
+        logger: Structlog logger instance
+        event: Event name for the log entry
+        error: Exception to log
+        include_traceback: Whether to include traceback
+        max_traceback_frames: Number of traceback frames to include
+        **extra_context: Additional context fields to include
+
+    Example:
+        try:
+            generate_cards(...)
+        except GeneratorError as e:
+            log_error_with_context(
+                logger,
+                "card_generation_failed",
+                e,
+                note_path=str(path),
+                qa_pairs_count=len(qa_pairs),
+            )
+    """
+    import traceback as tb_module
+
+    error_context: dict[str, Any] = {
+        "error": str(error),
+        "error_type": type(error).__name__,
+    }
+
+    # Extract error_code if available (from our custom exceptions)
+    if hasattr(error, "error_code") and error.error_code:
+        error_context["error_code"] = error.error_code
+
+    # Extract suggestion if available
+    if hasattr(error, "suggestion") and error.suggestion:
+        error_context["suggestion"] = error.suggestion
+
+    # Extract exception context if available
+    if hasattr(error, "context") and error.context:
+        error_context["error_context"] = error.context
+
+    # Include traceback for debugging
+    if include_traceback and hasattr(error, "__traceback__") and error.__traceback__:
+        tb_frames = tb_module.format_tb(error.__traceback__)
+        # Keep only the last N frames to avoid log bloat
+        if len(tb_frames) > max_traceback_frames:
+            tb_frames = tb_frames[-max_traceback_frames:]
+        error_context["traceback"] = "".join(tb_frames)
+
+    # Merge with extra context
+    logger.error(event, **error_context, **extra_context)
+
+
+def log_state_transition(
+    logger: Any,
+    pipeline_id: str | None,
+    from_stage: str,
+    to_stage: str,
+    reason: str,
+    **extra_context: Any,
+) -> None:
+    """Log a pipeline state transition for debugging.
+
+    This helper provides consistent state transition logging for
+    tracing card generation pipeline flow.
+
+    Args:
+        logger: Structlog logger instance
+        pipeline_id: Unique identifier for the pipeline run
+        from_stage: Previous stage name
+        to_stage: New stage name
+        reason: Why the transition occurred
+        **extra_context: Additional context fields
+
+    Example:
+        log_state_transition(
+            logger,
+            pipeline_id=state.get("pipeline_id"),
+            from_stage="pre_validation",
+            to_stage="generation",
+            reason="pre_validation passed",
+        )
+    """
+    logger.debug(
+        "pipeline_state_transition",
+        pipeline_id=pipeline_id,
+        from_stage=from_stage,
+        to_stage=to_stage,
+        reason=reason,
+        **extra_context,
+    )
