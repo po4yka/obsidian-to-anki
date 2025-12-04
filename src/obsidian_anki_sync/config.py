@@ -31,9 +31,10 @@ class CircuitBreakerDomainConfig(BaseModel):
 class RetryConfig(BaseModel):
     """Retry configuration for agent operations."""
 
-    max_retries: int = Field(default=3, ge=0)
-    initial_delay: float = Field(default=1.0, ge=0.0)
+    max_retries: int = Field(default=5, ge=0)
+    initial_delay: float = Field(default=2.0, ge=0.0)
     backoff_factor: float = Field(default=2.0, ge=1.0)
+    max_delay: float = Field(default=60.0, ge=1.0)
     jitter: bool = True
 
 
@@ -326,6 +327,13 @@ class Config(BaseSettings):
 
     # Legacy OpenRouter settings (for backward compatibility)
     openrouter_model: str = "x-ai/grok-4.1-fast:free"
+
+    # Fallback model for when primary model fails (e.g., empty completions)
+    # Used automatically when models like deepseek/deepseek-v3.2 return empty responses
+    fallback_llm_model: str = Field(
+        default="qwen/qwen3-max",
+        description="Fallback model to use when primary model fails with empty completions",
+    )
 
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None

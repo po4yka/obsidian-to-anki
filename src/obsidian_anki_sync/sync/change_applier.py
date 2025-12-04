@@ -7,7 +7,11 @@ import asyncio
 from typing import TYPE_CHECKING, Any, cast
 
 from obsidian_anki_sync.anki.client import AnkiClient
-from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
+from obsidian_anki_sync.anki.field_mapper import (
+    EmptyNoteError,
+    map_apf_to_anki_fields,
+    validate_anki_note_fields,
+)
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import AnkiConnectError
 from obsidian_anki_sync.models import Card, SyncAction
@@ -204,11 +208,29 @@ class ChangeApplier:
 
         Args:
             card: Card to create
+
+        Raises:
+            EmptyNoteError: If required fields are empty
+            CardOperationError: If card creation fails
+            AnkiConnectError: If AnkiConnect communication fails
         """
         logger.info("creating_card", slug=card.slug)
 
         # Map fields
         fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+        # Validate fields BEFORE sending to AnkiConnect
+        # This prevents "cannot create note because it is empty" errors
+        try:
+            validate_anki_note_fields(fields, card.note_type, card.slug)
+        except EmptyNoteError as e:
+            logger.error(
+                "card_validation_failed_empty_fields",
+                slug=card.slug,
+                error=str(e),
+            )
+            self.db.update_card_status(card.slug, "failed", str(e))
+            raise
 
         try:
             with CardTransaction(self.anki, self.db) as txn:
@@ -427,6 +449,22 @@ class ChangeApplier:
                 )
                 fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
 
+                # Validate fields BEFORE adding to batch
+                # Skip cards with empty required fields
+                try:
+                    validate_anki_note_fields(fields, card.note_type, card.slug)
+                except EmptyNoteError as e:
+                    logger.error(
+                        "batch_card_validation_failed_empty_fields",
+                        slug=card.slug,
+                        error=str(e),
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    if self.progress:
+                        self.progress.increment_stat("errors")
+                    self.db.update_card_status(card.slug, "failed", str(e))
+                    continue  # Skip this card, continue with others
+
                 note_payload = {
                     "deckName": self.config.anki_deck_name,
                     "modelName": self._get_anki_model_name(card.note_type),
@@ -436,19 +474,6 @@ class ChangeApplier:
                 }
                 if card.guid:
                     note_payload["guid"] = card.guid
-
-                # Debug: Log payload for empty note check
-                if not note_payload["fields"].get("Primary Title") or not note_payload[
-                    "fields"
-                ].get("Primary Key point (code block)"):
-                    logger.warning(
-                        "sending_potentially_empty_card_to_anki",
-                        slug=card.slug,
-                        fields_preview={
-                            k: v[:50] + "..." if v else "EMPTY"
-                            for k, v in note_payload["fields"].items()
-                        },
-                    )
 
                 note_payloads.append(note_payload)
                 card_data.append((card, fields, card.tags, card.apf_html))

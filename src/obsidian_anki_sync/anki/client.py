@@ -251,8 +251,9 @@ class AnkiClient(IAnkiClient):
         logger.debug("metadata_cache_invalidated")
 
     @retry(
-        max_attempts=3,
-        initial_delay=1.0,
+        max_attempts=5,
+        initial_delay=2.0,
+        backoff_factor=2.0,
         exceptions=(httpx.HTTPError, httpx.TimeoutException, AnkiConnectError),
     )
     def invoke(self, action: str, params: dict | None = None) -> Any:

@@ -182,6 +182,7 @@ class OpenRouterProvider(BaseLLMProvider):
         max_tokens: Maximum tokens in response (default: 2048)
         site_url: Your site URL for OpenRouter rankings (optional)
         site_name: Your site name for OpenRouter rankings (optional)
+        fallback_model: Model to use when primary model fails with empty completions
     """
 
     def __init__(
@@ -193,6 +194,7 @@ class OpenRouterProvider(BaseLLMProvider):
         site_url: str | None = None,
         site_name: str | None = None,
         verbose_logging: bool = False,
+        fallback_model: str | None = None,
         **kwargs: Any,
     ):
         """Initialize OpenRouter provider.
@@ -205,11 +207,15 @@ class OpenRouterProvider(BaseLLMProvider):
             site_url: Your site URL (optional, for rankings)
             site_name: Your site name (optional, for rankings)
             verbose_logging: Whether to log detailed initialization info
+            fallback_model: Model to use when primary model fails with empty completions.
+                Defaults to "qwen/qwen3-max" for models with known structured output issues.
             **kwargs: Additional configuration options
 
         Raises:
             ValueError: If no API key is provided or found in environment
         """
+        # Default fallback model for empty completion issues
+        self.fallback_model = fallback_model or "qwen/qwen3-max"
         # Try to get API key from environment if not provided
         if api_key is None:
             api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -572,6 +578,31 @@ class OpenRouterProvider(BaseLLMProvider):
                         request_start_time=request_start_time,
                     )
                     continue
+
+                # All retries exhausted - try fallback model if available
+                if (
+                    "empty completion" in str(e).lower()
+                    and self.fallback_model
+                    and model != self.fallback_model
+                    and model in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES
+                ):
+                    logger.warning(
+                        "empty_completion_fallback_to_different_model",
+                        original_model=model,
+                        fallback_model=self.fallback_model,
+                        reason="Primary model returned empty completion after retries",
+                    )
+                    return self.generate(
+                        model=self.fallback_model,
+                        prompt=prompt,
+                        system=system,
+                        temperature=temperature,
+                        format=format,
+                        json_schema=json_schema,
+                        stream=stream,
+                        reasoning_enabled=reasoning_enabled,
+                        reasoning_effort=reasoning_effort,
+                    )
                 raise
 
         # Should not reach here, but satisfy type checker

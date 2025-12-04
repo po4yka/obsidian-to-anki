@@ -16,6 +16,90 @@ from obsidian_anki_sync.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class EmptyNoteError(FieldMappingError):
+    """Raised when attempting to create an Anki note with empty required fields."""
+
+
+def validate_anki_note_fields(
+    fields: dict[str, str],
+    note_type: str,
+    slug: str | None = None,
+) -> None:
+    """Validate that Anki note fields are not empty before sending to AnkiConnect.
+
+    This prevents the "cannot create note because it is empty" error from AnkiConnect.
+
+    Args:
+        fields: Dictionary of field name -> field value
+        note_type: The Anki note type (e.g., "APF::Simple")
+        slug: Optional slug for logging context
+
+    Raises:
+        EmptyNoteError: If required fields are empty or the note would be rejected
+    """
+    # Required fields that must have content for APF note types
+    required_fields_by_type = {
+        "APF::Simple": ["Primary Title", "Primary Key point (code block)"],
+        "APF::Missing (Cloze)": ["Primary Title", "Primary Key point (code block)"],
+        "APF::Missing": ["Primary Title", "Primary Key point (code block)"],
+        "APF::Draw": ["Primary Title", "Primary Key point (code block)"],
+    }
+
+    # Get required fields for this note type (default to Simple's requirements)
+    required_fields = required_fields_by_type.get(
+        note_type, required_fields_by_type["APF::Simple"]
+    )
+
+    # Check each required field
+    empty_fields = []
+    for field_name in required_fields:
+        value = fields.get(field_name, "")
+        # Check if field is empty or contains only whitespace/HTML tags
+        stripped = _strip_html_and_whitespace(value)
+        if not stripped:
+            empty_fields.append(field_name)
+
+    if empty_fields:
+        logger.error(
+            "anki_note_validation_failed",
+            slug=slug,
+            note_type=note_type,
+            empty_fields=empty_fields,
+            fields_preview={
+                k: (v[:50] + "..." if len(v) > 50 else v) if v else "EMPTY"
+                for k, v in fields.items()
+            },
+        )
+        msg = (
+            f"Cannot create Anki note: required fields are empty: {empty_fields}. "
+            f"Note type: {note_type}"
+        )
+        if slug:
+            msg = f"[{slug}] {msg}"
+        raise EmptyNoteError(msg)
+
+    logger.debug(
+        "anki_note_validation_passed",
+        slug=slug,
+        note_type=note_type,
+        field_count=len(fields),
+    )
+
+
+def _strip_html_and_whitespace(value: str) -> str:
+    """Strip HTML tags and whitespace from a value for validation purposes."""
+    if not value:
+        return ""
+    # Remove HTML tags
+    stripped = re.sub(r"<[^>]+>", "", value)
+    # Remove whitespace
+    stripped = stripped.strip()
+    # Remove common empty placeholders
+    if stripped in ("", "&nbsp;", " "):
+        return ""
+    return stripped
+
+
 def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
     """
     Map APF HTML to Anki note type fields.
@@ -58,7 +142,36 @@ def parse_apf_card(apf_html: str) -> dict:
 
     Returns:
         Dict of parsed fields
+
+    Raises:
+        ValueError: If APF content is empty, contains only whitespace,
+            has no valid card block, or is missing required structure.
     """
+    # Validate input is not empty or whitespace-only
+    if not apf_html or not apf_html.strip():
+        logger.error(
+            "parse_apf_card_empty_input",
+            apf_html_length=len(apf_html) if apf_html else 0,
+        )
+        msg = "APF content is empty or contains only whitespace"
+        raise ValueError(msg)
+
+    # Check for sentinel values that indicate parsing failure upstream
+    sentinel_patterns = [
+        "<!-- EMPTY_APF_CONTENT -->",
+        "<!-- APF_GENERATION_FAILED -->",
+        "<!-- NO_CARD_GENERATED -->",
+    ]
+    for sentinel in sentinel_patterns:
+        if sentinel in apf_html:
+            logger.error(
+                "parse_apf_card_sentinel_detected",
+                sentinel=sentinel,
+                apf_html_preview=apf_html[:200],
+            )
+            msg = f"APF content contains failure sentinel: {sentinel}"
+            raise ValueError(msg)
+
     logger.debug("parse_apf_card_input", apf_html_length=len(apf_html))
 
     # Extract card block (between BEGIN_CARDS and END_CARDS)
@@ -71,7 +184,7 @@ def parse_apf_card(apf_html: str) -> dict:
             "parse_apf_card_no_block",
             apf_html_preview=apf_html[:500] if apf_html else "empty",
         )
-        msg = "No card block found"
+        msg = "No card block found (missing BEGIN_CARDS/END_CARDS markers)"
         raise ValueError(msg)
 
     card_content = match.group(1).strip()

@@ -186,6 +186,10 @@ class ProviderFactory:
                 "max_tokens": max_tokens,
                 "site_url": getattr(config, "openrouter_site_url", None),
                 "site_name": getattr(config, "openrouter_site_name", None),
+                # Fallback model for empty completions (e.g., DeepSeek structured output issues)
+                "fallback_model": getattr(
+                    config, "fallback_llm_model", "qwen/qwen3-max"
+                ),
             }
 
         elif provider_type == "openai":
