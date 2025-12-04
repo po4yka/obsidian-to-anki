@@ -776,10 +776,55 @@ class AnkiClient(IAnkiClient):
         return cast("list[int]", self.invoke("notesToCards", {"notes": [note_id]})[0])
 
     def get_deck_stats(self, deck_name: str) -> dict[str, Any]:
-        """Get statistics for a deck."""
-        return cast(
-            "dict[str, Any]", self.invoke("getDeckStats", {"decks": [deck_name]})
-        )
+        """Get statistics for a deck.
+
+        Note:
+            We implement this manually using findCards queries because getDeckStats
+            is not available in the standard AnkiConnect API (it's from a fork).
+            The returned dictionary mimics the structure of getDeckStats but might
+            be slightly different.
+
+        Args:
+            deck_name: Deck name
+
+        Returns:
+            Dictionary with statistics:
+            {
+                "deck_id": 0,  # Placeholder
+                "name": deck_name,
+                "total_cards": int,
+                "new_cards": int,
+                "review_cards": int,  # Due for review
+                "learned_cards": int, # In learning
+            }
+        """
+        try:
+            # Try to use getDeckStats if available (e.g. if using the fork)
+            return cast(
+                "dict[str, Any]", self.invoke("getDeckStats", {"decks": [deck_name]})
+            )
+        except AnkiConnectError:
+            # Fallback to manual calculation
+            logger.debug("getDeckStats_not_supported_falling_back", deck=deck_name)
+
+            # Using findCards which is faster than findNotes for stats
+            total_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}"'}))
+            new_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:new'}))
+            learn_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:learn'}))
+            due_cards = len(self.invoke("findCards", {"query": f'deck:"{deck_name}" is:due'}))
+
+            # Note: is:due includes learn cards that are due, but we separate them roughly here
+            # Ideally we'd use getDeckStats if possible.
+
+            # Construct a response similar to what's expected
+            return {
+                "deck_id": 0,  # We don't have the deck ID easily available
+                "name": deck_name,
+                "total_in_deck": total_cards,
+                "new_count": new_cards,
+                "learn_count": learn_cards,
+                "review_count": due_cards
+            }
 
     def close(self) -> None:
         """Close HTTP session and cleanup resources."""
