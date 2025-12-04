@@ -297,11 +297,30 @@ class LangGraphOrchestrator:
 
         from obsidian_anki_sync.models import Card, Manifest
         from obsidian_anki_sync.utils.content_hash import compute_content_hash
+        from obsidian_anki_sync.anki.field_mapper import map_apf_to_anki_fields
 
         cards: list[Card] = []
         qa_lookup = {qa.card_index: qa for qa in qa_pairs}
 
         for gen_card in generated_cards:
+            # Validate that we can extract fields from the generated HTML
+            try:
+                # Use default note type for validation check
+                fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
+                if not fields.get("Primary Title"):
+                    logger.warning(
+                        "empty_fields_detected_in_generated_card",
+                        slug=gen_card.slug,
+                        apf_html_preview=gen_card.apf_html[:500],
+                        hint="Card fields extraction failed. Check APF format."
+                    )
+            except Exception as e:
+                logger.warning(
+                    "field_extraction_failed_during_conversion",
+                    slug=gen_card.slug,
+                    error=str(e)
+                )
+
             # Create manifest
             # Safely extract slug_base by removing -index-lang suffix
             parts = gen_card.slug.rsplit("-", 2)

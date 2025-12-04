@@ -327,15 +327,36 @@ def _validate_manifest(
 
 
 def _check_field_headers(block: str, card_num: int, result: ValidationResult) -> None:
-    """Check that field headers are present and in order."""
+    """Check that field headers are present and contain content."""
     # Required headers
-    required = ["<!-- Title -->", "<!-- Key point", "<!-- Key point notes -->"]
+    required = ["<!-- Title -->", "<!-- Key point (code block / image) -->", "<!-- Key point notes -->"]
 
     for header in required:
         if header not in block:
+            # Fallback for older templates using shorter header
+            if header == "<!-- Key point (code block / image) -->" and "<!-- Key point -->" in block:
+                continue
+            
             result.errors.append(
                 f"Card {card_num}: Missing required field header '{header}'"
             )
+            continue
+
+        # Check that field is not empty (has content before the next tag)
+        # Escape the header for regex
+        escaped_header = re.escape(header)
+        # Match content starting after header until next <!-- or end of string
+        # Use DOTALL to match newlines
+        pattern = rf"{escaped_header}\s*(.*?)(?=<!--|\Z)"
+        match = re.search(pattern, block, re.DOTALL)
+        
+        if match:
+            content = match.group(1).strip()
+            # For Title and Key point, empty content is an error
+            if not content and (header == "<!-- Title -->" or "Key point" in header):
+                result.errors.append(
+                    f"Card {card_num}: Field '{header}' is empty"
+                )
 
 
 def _validate_cloze_density(

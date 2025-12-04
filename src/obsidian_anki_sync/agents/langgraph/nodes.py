@@ -1244,6 +1244,32 @@ async def post_validation_node(state: PipelineState) -> PipelineState:
     linter_valid = state.get("linter_valid", False)
     llm_template_overridden = False
 
+    # ENFORCEMENT: If linter failed, the card IS invalid, regardless of LLM opinion.
+    if not linter_valid and state.get("linter_results"):
+        # Collect all errors from linter results
+        all_linter_errors = []
+        for res in state.get("linter_results", []):
+            if res.get("errors"):
+                all_linter_errors.extend(res["errors"])
+        
+        error_msg = "; ".join(all_linter_errors[:3]) # First 3 errors
+        if len(all_linter_errors) > 3:
+            error_msg += f" (+{len(all_linter_errors)-3} more)"
+
+        # Log the override if LLM thought it was valid
+        if post_result.is_valid:
+            logger.warning(
+                "llm_validation_overridden_by_linter_failure",
+                llm_judgment="valid",
+                linter_errors=all_linter_errors,
+                reason="linter_is_authoritative"
+            )
+        
+        # Force invalid status
+        post_result.is_valid = False
+        post_result.error_type = "template"
+        post_result.error_details = f"Linter failed: {error_msg}"
+
     if not post_result.is_valid and post_result.error_type == "template":
         if linter_valid:
             # Template compliance: LINTER is authoritative

@@ -14,7 +14,8 @@ MODELS_WITH_STRUCTURED_OUTPUT_ISSUES = {
     "qwen/qwen3-next-80b-a3b-instruct",
     "qwen/qwen3-32b",  # Smaller model, may have structured output quirks
     "qwen/qwen3-30b-a3b",  # Smaller model, may have structured output quirks
-    # Note: deepseek/deepseek-v3.2 supports tool calling well, not listed here
+    # Note: deepseek/deepseek-v3.2 supports tool calling well, but fails strict schema
+    "deepseek/deepseek-v3.2",
 }
 
 # Models that support OpenRouter's reasoning-effort contract and their default auto effort
@@ -90,9 +91,6 @@ MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
     # xAI Grok 4.1 Fast - excellent structured output support
     # Best practices: temperature=0 for deterministic output, disable reasoning for JSON
     "x-ai/grok-4.1-fast:free",
-    # DeepSeek V3.2 - supports tool calling and structured outputs
-    # GPT-5 class reasoning, gold-medal performance on IMO/IOI 2025
-    "deepseek/deepseek-v3.2",
 }
 
 # HTTP status codes that should be retried
