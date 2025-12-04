@@ -13,7 +13,7 @@ from obsidian_anki_sync.anki.field_mapper import (
     validate_anki_note_fields,
 )
 from obsidian_anki_sync.config import Config
-from obsidian_anki_sync.exceptions import AnkiConnectError
+from obsidian_anki_sync.exceptions import AnkiConnectError, FieldMappingError
 from obsidian_anki_sync.models import Card, SyncAction
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.sync.transactions import CardOperationError, CardTransaction
@@ -216,8 +216,19 @@ class ChangeApplier:
         """
         logger.info("creating_card", slug=card.slug)
 
-        # Map fields
-        fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+        # Map fields - this may raise FieldMappingError for invalid APF content
+        try:
+            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+        except FieldMappingError as e:
+            logger.error(
+                "card_mapping_failed",
+                slug=card.slug,
+                error=str(e),
+                apf_html_length=len(card.apf_html) if card.apf_html else 0,
+            )
+            error_msg = f"Failed to map APF content for card {card.slug}: {e}"
+            self.db.update_card_status(card.slug, "failed", str(e))
+            raise CardOperationError(error_msg) from e
 
         # Validate fields BEFORE sending to AnkiConnect
         # This prevents "cannot create note because it is empty" errors
@@ -289,11 +300,42 @@ class ChangeApplier:
         Args:
             card: Card to update
             anki_guid: Anki note ID
+
+        Raises:
+            EmptyNoteError: If required fields are empty
+            CardOperationError: If card update fails
+            AnkiConnectError: If AnkiConnect communication fails
         """
         logger.info("updating_card", slug=card.slug, anki_guid=anki_guid)
 
-        # Map fields
-        fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+        # Map fields - this may raise FieldMappingError for invalid APF content
+        try:
+            fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+        except FieldMappingError as e:
+            logger.error(
+                "card_update_mapping_failed",
+                slug=card.slug,
+                anki_guid=anki_guid,
+                error=str(e),
+                apf_html_length=len(card.apf_html) if card.apf_html else 0,
+            )
+            error_msg = f"Failed to map APF content for card {card.slug}: {e}"
+            self.db.update_card_status(card.slug, "failed", str(e))
+            raise CardOperationError(error_msg) from e
+
+        # Validate fields BEFORE sending to AnkiConnect
+        # This prevents "cannot create note because it is empty" errors
+        try:
+            validate_anki_note_fields(fields, card.note_type, card.slug)
+        except EmptyNoteError as e:
+            logger.error(
+                "card_update_validation_failed_empty_fields",
+                slug=card.slug,
+                anki_guid=anki_guid,
+                error=str(e),
+            )
+            self.db.update_card_status(card.slug, "failed", str(e))
+            raise
 
         try:
             with CardTransaction(self.anki, self.db) as txn:
@@ -447,7 +489,22 @@ class ChangeApplier:
                         card.apf_html[:200] if card.apf_html else "empty"
                     ),
                 )
-                fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+                # Map fields - skip cards with invalid APF content
+                try:
+                    fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+                except FieldMappingError as e:
+                    logger.error(
+                        "batch_card_mapping_failed",
+                        slug=card.slug,
+                        error=str(e),
+                        apf_html_length=len(card.apf_html) if card.apf_html else 0,
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    if self.progress:
+                        self.progress.increment_stat("errors")
+                    self.db.update_card_status(card.slug, "failed", str(e))
+                    continue  # Skip this card, continue with others
 
                 # Validate fields BEFORE adding to batch
                 # Skip cards with empty required fields
@@ -702,7 +759,40 @@ class ChangeApplier:
                     continue
 
                 card = action.card
-                fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+
+                # Map fields - skip cards with invalid APF content
+                try:
+                    fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
+                except FieldMappingError as e:
+                    logger.error(
+                        "batch_update_mapping_failed",
+                        slug=card.slug,
+                        anki_guid=action.anki_guid,
+                        error=str(e),
+                        apf_html_length=len(card.apf_html) if card.apf_html else 0,
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    if self.progress:
+                        self.progress.increment_stat("errors")
+                    self.db.update_card_status(card.slug, "failed", str(e))
+                    continue  # Skip this card, continue with others
+
+                # Validate fields BEFORE adding to batch
+                # Skip cards with empty required fields
+                try:
+                    validate_anki_note_fields(fields, card.note_type, card.slug)
+                except EmptyNoteError as e:
+                    logger.error(
+                        "batch_update_validation_failed_empty_fields",
+                        slug=card.slug,
+                        anki_guid=action.anki_guid,
+                        error=str(e),
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    if self.progress:
+                        self.progress.increment_stat("errors")
+                    self.db.update_card_status(card.slug, "failed", str(e))
+                    continue  # Skip this card, continue with others
 
                 field_updates.append({"id": action.anki_guid, "fields": fields})
                 tag_updates.append((action.anki_guid, card.tags))

@@ -48,7 +48,8 @@ class GeneratorAgent:
     """Agent for generating APF cards using local LLM.
 
     Uses powerful model (qwen3:32b) for high-quality card generation.
-    Reuses existing APF generation logic from APFGenerator.
+    Note: This is a legacy generator. New code should use
+    agents/pydantic/generator.py with JSON -> APF conversion.
     """
 
     def __init__(
@@ -278,7 +279,7 @@ class GeneratorAgent:
             msg = f"Empty answer for language '{lang}' in card {qa_pair.card_index}"
             raise ValueError(msg)
 
-        # Build user prompt (reuse logic from APFGenerator)
+        # Build user prompt for card generation
         user_prompt = self._build_user_prompt(
             question=question,
             answer=answer,

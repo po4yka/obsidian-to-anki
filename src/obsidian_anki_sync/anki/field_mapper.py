@@ -112,13 +112,31 @@ def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
         Dict of field name -> field value
 
     Raises:
-        FieldMappingError: If mapping fails
+        FieldMappingError: If mapping fails or APF content is invalid
     """
     try:
         parsed = parse_apf_card(apf_html)
+    except ValueError as e:
+        # ValueError indicates structural issues with APF content
+        # (empty content, missing markers, sentinel values, invalid header)
+        logger.error(
+            "apf_parse_failed_structural",
+            error=str(e),
+            apf_html_length=len(apf_html) if apf_html else 0,
+            apf_html_preview=apf_html[:200] if apf_html else "empty",
+        )
+        msg = f"APF content is invalid or malformed: {e}"
+        raise FieldMappingError(msg) from e
     except Exception as e:
+        # Unexpected parsing errors
+        logger.error(
+            "apf_parse_failed_unexpected",
+            error=str(e),
+            error_type=type(e).__name__,
+            apf_html_length=len(apf_html) if apf_html else 0,
+        )
         msg = f"Failed to parse APF card: {e}"
-        raise FieldMappingError(msg)
+        raise FieldMappingError(msg) from e
 
     # Map based on note type
     if note_type == "APF::Simple":

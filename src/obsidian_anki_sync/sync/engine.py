@@ -32,7 +32,6 @@ except ImportError:
     before_sleep_log = None  # type: ignore
 
 from obsidian_anki_sync.anki.client import AnkiClient
-from obsidian_anki_sync.apf.generator import APFGenerator
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.models import Card, ManifestData, SyncAction
@@ -116,7 +115,8 @@ class SyncEngine:
             delete_mode=config.delete_mode,
         )
 
-        # Initialize card generator (APFGenerator or LangGraphOrchestrator)
+        # Initialize card generator (LangGraphOrchestrator with PydanticAI)
+        # Note: Legacy APFGenerator has been removed. Agent system is now required.
         if config.use_langgraph or config.use_pydantic_ai:
             if not AGENTS_AVAILABLE:
                 msg = (
@@ -137,7 +137,7 @@ class SyncEngine:
                 console=console,
                 transient=False,
             ) as progress:
-                task = progress.add_task("Initializing agent system...", total=4)
+                task = progress.add_task("Initializing agent system...", total=3)
 
                 logger.info("initializing_langgraph_orchestrator")
                 progress.update(
@@ -147,11 +147,6 @@ class SyncEngine:
                 progress.update(
                     task, advance=1, description="LangGraph orchestrator ready"
                 )
-
-                # Still keep for backward compat
-                progress.update(task, description="Initializing APF generator...")
-                self.apf_gen = APFGenerator(config)
-                progress.update(task, advance=1, description="APF generator ready")
                 self.use_agents = True
 
                 # Configure LLM-based Q&A extraction when using agents
@@ -197,10 +192,25 @@ class SyncEngine:
                 )
                 progress.update(task, advance=1, description="QA extractor ready")
         else:
-            self.apf_gen = APFGenerator(config)
-            self.agent_orchestrator: LangGraphOrchestrator | None = None  # type: ignore
-            self.use_agents = False
-            # No LLM extraction when not using agents
+            # Legacy non-agent mode is no longer supported
+            # Automatically enable agent system
+            logger.warning(
+                "legacy_mode_deprecated",
+                message="Non-agent mode is deprecated. Enabling agent system automatically.",
+            )
+            config.use_langgraph = True
+            config.use_pydantic_ai = True
+
+            if not AGENTS_AVAILABLE:
+                msg = (
+                    "Agent system is required but not available. "
+                    "Please ensure agent dependencies are installed."
+                )
+                raise RuntimeError(msg)
+
+            self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
+            self.use_agents = True
+            # No LLM extraction in this minimal fallback mode
             self.qa_extractor = None
 
         self.changes: list[SyncAction] = []
@@ -272,7 +282,7 @@ class SyncEngine:
         # Initialize component classes
         self.card_generator = CardGenerator(
             config=config,
-            apf_gen=self.apf_gen,
+            apf_gen=None,  # Legacy APFGenerator removed - using PydanticAI agents
             agent_orchestrator=self.agent_orchestrator,
             use_agents=self.use_agents,
             agent_card_cache=self._agent_card_cache,

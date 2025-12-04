@@ -362,6 +362,19 @@ class Config(BaseSettings):
         description="Include retry statistics in sync summary log.",
     )
 
+    # APF Generation retry configuration
+    generation_max_retries: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="Max retries for failed APF generation with sentinel validation.",
+    )
+
+    generation_retry_prompt_mode: str = Field(
+        default="constrained",
+        description="Prompt mode for retries: 'constrained' or 'verbose'.",
+    )
+
     # Deck export settings (for .apkg generation) - optional with defaults
     export_deck_name: str | None = None
     export_deck_description: str = ""
@@ -599,7 +612,8 @@ class Config(BaseSettings):
     pre_validator_temperature: float | None = None
     pre_validator_max_tokens: int | None = None
     # Generation
-    generator_model: str = ""
+    # Default to Qwen model which handles structured JSON output reliably
+    generator_model: str = "qwen/qwen3-next-80b-a3b-instruct"
     generator_temperature: float | None = None
     generator_max_tokens: int | None = None
     # Post-Validation

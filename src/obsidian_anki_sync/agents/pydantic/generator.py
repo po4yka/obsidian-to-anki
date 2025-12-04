@@ -1,6 +1,7 @@
 """Card generation agent using PydanticAI.
 
-Generates APF cards from Q/A pairs using structured outputs.
+Generates APF cards from Q/A pairs using structured JSON outputs,
+then converts JSON to APF HTML via the APFRenderer.
 """
 
 from pydantic_ai import Agent
@@ -13,11 +14,13 @@ from obsidian_anki_sync.agents.exceptions import (
 )
 from obsidian_anki_sync.agents.improved_prompts import CARD_GENERATION_SYSTEM_PROMPT
 from obsidian_anki_sync.agents.models import GeneratedCard, GenerationResult
+from obsidian_anki_sync.apf.renderer import APFRenderer, APFSentinelValidator
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
 from obsidian_anki_sync.utils.logging import get_logger
 
-from .models import CardGenerationOutput, GenerationDeps
+from .card_schema import CardGenerationSpec, CardSpec
+from .models import GenerationDeps
 
 logger = get_logger(__name__)
 
@@ -25,8 +28,9 @@ logger = get_logger(__name__)
 class GeneratorAgentAI:
     """PydanticAI-based card generation agent.
 
-    Generates APF cards from Q/A pairs using structured outputs.
-    Ensures type-safe card generation with validation.
+    Generates structured JSON card specifications from Q/A pairs,
+    then converts them to APF HTML using the APFRenderer.
+    This approach ensures deterministic, well-formed APF output.
     """
 
     def __init__(self, model: OpenAIChatModel, temperature: float = 0.3):
@@ -38,15 +42,17 @@ class GeneratorAgentAI:
         """
         self.model = model
         self.temperature = temperature
+        self.renderer = APFRenderer()
+        self.validator = APFSentinelValidator()
 
-        # Use improved system prompt with few-shot examples
+        # Use improved system prompt for JSON output
         self.system_prompt = CARD_GENERATION_SYSTEM_PROMPT
 
-        # Create PydanticAI agent
-        # CardGenerationOutput has nested GeneratedCard objects - use output_retries
-        self.agent: Agent[GenerationDeps, CardGenerationOutput] = Agent(
+        # Create PydanticAI agent with CardGenerationSpec output type
+        # The agent outputs structured JSON, which we convert to APF HTML
+        self.agent: Agent[GenerationDeps, CardGenerationSpec] = Agent(
             model=self.model,
-            output_type=CardGenerationOutput,
+            output_type=CardGenerationSpec,
             system_prompt=self.system_prompt,
             output_retries=5,  # PydanticAI output validation retries
         )
@@ -63,6 +69,13 @@ class GeneratorAgentAI:
         rag_examples: list[dict] | None = None,
     ) -> GenerationResult:
         """Generate APF cards from Q/A pairs.
+
+        The process:
+        1. Build prompt with Q/A pairs and metadata
+        2. Get structured JSON (CardGenerationSpec) from LLM
+        3. Convert each CardSpec to APF HTML using APFRenderer
+        4. Validate APF output has all required sentinels
+        5. Return GenerationResult with all cards
 
         Args:
             note_content: Full note content for context
@@ -92,7 +105,99 @@ class GeneratorAgentAI:
         )
 
         # Build generation prompt
-        prompt = f"""Generate APF cards for these Q&A pairs:
+        prompt = self._build_prompt(
+            metadata=metadata,
+            qa_pairs=qa_pairs,
+            slug_base=slug_base,
+            rag_enrichment=rag_enrichment,
+            rag_examples=rag_examples,
+        )
+
+        try:
+            # Run agent to get structured JSON
+            result = await self.agent.run(prompt, deps=deps)
+            spec: CardGenerationSpec = result.output
+
+            logger.debug(
+                "pydantic_ai_json_received",
+                card_count=len(spec.cards),
+                confidence=spec.confidence,
+            )
+
+            # Convert JSON cards to APF HTML
+            generated_cards = self._convert_specs_to_cards(
+                specs=spec.cards,
+                qa_pairs=qa_pairs,
+                metadata=metadata,
+                slug_base=slug_base,
+                overall_confidence=spec.confidence,
+            )
+
+            if not generated_cards:
+                msg = "No valid cards generated"
+                raise GenerationError(
+                    msg,
+                    details={
+                        "title": metadata.title,
+                        "qa_pairs_count": len(qa_pairs),
+                        "raw_specs_count": len(spec.cards),
+                    },
+                )
+
+            generation_result = GenerationResult(
+                cards=generated_cards,
+                total_cards=len(generated_cards),
+                generation_time=0.0,
+                model_used=str(self.model),
+            )
+
+            logger.info(
+                "pydantic_ai_generation_complete",
+                cards_generated=len(generated_cards),
+                confidence=spec.confidence,
+            )
+
+            return generation_result
+
+        except GenerationError:
+            raise
+        except ValueError as e:
+            logger.error("pydantic_ai_generation_parse_error", error=str(e))
+            msg = "Failed to parse generation output"
+            raise StructuredOutputError(
+                msg,
+                details={"error": str(e), "title": metadata.title},
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_generation_timeout", error=str(e))
+            msg = "Card generation timed out"
+            raise ModelError(msg, details={"title": metadata.title}) from e
+        except Exception as e:
+            logger.error("pydantic_ai_generation_failed", error=str(e))
+            msg = f"Card generation failed: {e!s}"
+            raise GenerationError(msg, details={"title": metadata.title}) from e
+
+    def _build_prompt(
+        self,
+        metadata: NoteMetadata,
+        qa_pairs: list[QAPair],
+        slug_base: str,
+        rag_enrichment: dict | None = None,
+        rag_examples: list[dict] | None = None,
+    ) -> str:
+        """Build the generation prompt for the LLM.
+
+        Args:
+            metadata: Note metadata
+            qa_pairs: Q/A pairs to convert
+            slug_base: Base slug for card identifiers
+            rag_enrichment: Optional RAG context enrichment
+            rag_examples: Optional few-shot examples
+
+        Returns:
+            Formatted prompt string
+        """
+        prompt = f"""Generate JSON card specifications for these Q&A pairs:
 
 Title: {metadata.title}
 Topic: {metadata.topic}
@@ -121,90 +226,107 @@ Slug Base: {slug_base}
                 a = example.get("answer", "")[:200]
                 prompt += f"\nExample {i}:\nQ: {q}\nA: {a}\n"
 
-        prompt += f"\nQ&A Pairs ({len(qa_pairs)}):\n"
+        prompt += f"\n## Q&A Pairs to Convert ({len(qa_pairs)} pairs)\n"
 
         for idx, qa in enumerate(qa_pairs, 1):
-            prompt += f"\n{idx}. Q: {qa.question_en[:100]}...\n   A: {qa.answer_en[:100]}...\n"
+            # Include both English and Russian if available
+            q_en = qa.question_en[:200] if qa.question_en else ""
+            a_en = qa.answer_en[:300] if qa.answer_en else ""
+            q_ru = qa.question_ru[:200] if qa.question_ru else ""
+            a_ru = qa.answer_ru[:300] if qa.answer_ru else ""
 
-        prompt += (
-            "\nGenerate complete APF HTML cards for all Q&A pairs in all languages."
-        )
+            prompt += f"\n### Pair {idx} (card_index: {qa.card_index})\n"
+            if q_en:
+                prompt += f"Q (EN): {q_en}\n"
+                prompt += f"A (EN): {a_en}\n"
+            if q_ru:
+                prompt += f"Q (RU): {q_ru}\n"
+                prompt += f"A (RU): {a_ru}\n"
 
-        try:
-            # Run agent (output_retries configured in Agent constructor)
-            result = await self.agent.run(prompt, deps=deps)
-            output: CardGenerationOutput = result.output
+        prompt += f"""
+## Instructions
+- Generate cards for ALL Q&A pairs above
+- Create separate cards for each language (EN and RU if both present)
+- Use slug format: "{slug_base}-{{card_index}}-{{lang}}"
+- Return valid JSON matching the CardGenerationSpec schema
+"""
 
-            # Convert cards to GeneratedCard instances with content hashes
-            generated_cards: list[GeneratedCard] = []
-            qa_lookup = {qa.card_index: qa for qa in qa_pairs}
-            for card in output.cards:
-                try:
-                    qa_pair = qa_lookup.get(card.card_index)
-                    content_hash = ""
-                    if qa_pair is not None:
-                        content_hash = compute_content_hash(
-                            qa_pair, metadata, card.lang
-                        )
+        return prompt
 
-                    # Create new card with computed content_hash
-                    generated_card = GeneratedCard(
-                        card_index=card.card_index,
-                        slug=card.slug,
-                        lang=card.lang,
-                        apf_html=card.apf_html,
-                        confidence=card.confidence
-                        if card.confidence
-                        else output.confidence,
-                        content_hash=content_hash,
-                    )
-                    generated_cards.append(generated_card)
-                except (AttributeError, ValueError) as e:
+    def _convert_specs_to_cards(
+        self,
+        specs: list[CardSpec],
+        qa_pairs: list[QAPair],
+        metadata: NoteMetadata,
+        slug_base: str,
+        overall_confidence: float,
+    ) -> list[GeneratedCard]:
+        """Convert JSON CardSpecs to GeneratedCard with APF HTML.
+
+        Args:
+            specs: List of CardSpec from LLM
+            qa_pairs: Original Q/A pairs for content hash
+            metadata: Note metadata
+            slug_base: Base slug for identifiers
+            overall_confidence: Overall generation confidence
+
+        Returns:
+            List of GeneratedCard with APF HTML content
+        """
+        generated_cards: list[GeneratedCard] = []
+        qa_lookup = {qa.card_index: qa for qa in qa_pairs}
+
+        for spec in specs:
+            try:
+                # Fill in manifest data from our known values
+                spec.slug_base = slug_base
+                if not spec.source_path and metadata.file_path:
+                    spec.source_path = str(metadata.file_path)
+
+                # Render JSON spec to APF HTML
+                apf_html = self.renderer.render(spec)
+
+                # Validate APF has all sentinels
+                missing = self.validator.validate(apf_html)
+                if missing:
                     logger.warning(
-                        "invalid_generated_card", error=str(e), card=str(card)
+                        "apf_render_missing_sentinels",
+                        slug=spec.slug,
+                        missing=missing,
                     )
+                    # This shouldn't happen with our renderer, but log it
                     continue
 
-            if not generated_cards:
-                msg = "No valid cards generated"
-                raise GenerationError(
-                    msg,
-                    details={
-                        "title": metadata.title,
-                        "qa_pairs_count": len(qa_pairs),
-                        "raw_cards_count": len(output.cards),
-                    },
+                # Compute content hash for change detection
+                qa_pair = qa_lookup.get(spec.card_index)
+                content_hash = ""
+                if qa_pair is not None:
+                    content_hash = compute_content_hash(qa_pair, metadata, spec.lang)
+
+                # Create GeneratedCard
+                generated_card = GeneratedCard(
+                    card_index=spec.card_index,
+                    slug=spec.slug,
+                    lang=spec.lang,
+                    apf_html=apf_html,
+                    confidence=overall_confidence,
+                    content_hash=content_hash,
+                )
+                generated_cards.append(generated_card)
+
+                logger.debug(
+                    "card_spec_converted",
+                    slug=spec.slug,
+                    lang=spec.lang,
+                    apf_length=len(apf_html),
                 )
 
-            generation_result = GenerationResult(
-                cards=generated_cards,
-                total_cards=len(generated_cards),
-                generation_time=0.0,
-                model_used=str(self.model),
-            )
+            except Exception as e:
+                logger.warning(
+                    "card_spec_conversion_failed",
+                    slug=getattr(spec, "slug", "unknown"),
+                    error=str(e),
+                )
+                continue
 
-            logger.info(
-                "pydantic_ai_generation_complete",
-                cards_generated=len(generated_cards),
-                confidence=output.confidence,
-            )
-
-            return generation_result
-
-        except GenerationError:
-            raise
-        except ValueError as e:
-            logger.error("pydantic_ai_generation_parse_error", error=str(e))
-            msg = "Failed to parse generation output"
-            raise StructuredOutputError(
-                msg,
-                details={"error": str(e), "title": metadata.title},
-            ) from e
-        except TimeoutError as e:
-            logger.error("pydantic_ai_generation_timeout", error=str(e))
-            msg = "Card generation timed out"
-            raise ModelError(msg, details={"title": metadata.title}) from e
-        except Exception as e:
-            logger.error("pydantic_ai_generation_failed", error=str(e))
-            msg = f"Card generation failed: {e!s}"
-            raise GenerationError(msg, details={"title": metadata.title}) from e
+        return generated_cards

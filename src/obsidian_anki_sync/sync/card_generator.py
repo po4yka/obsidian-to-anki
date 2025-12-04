@@ -1,26 +1,21 @@
 """Card generation component for SyncEngine.
 
-Handles generation of cards from Q/A pairs using either agent system or direct APF generation.
+Handles generation of cards from Q/A pairs using the agent system.
+Legacy APFGenerator support has been removed in favor of PydanticAI agents.
 """
 
 import hashlib
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import diskcache
 
 from obsidian_anki_sync.agents.models import HighlightResult
-from obsidian_anki_sync.apf.generator import APFGenerator
-from obsidian_anki_sync.apf.html_validator import validate_card_html
-from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import CardGenerationError
 from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
-from obsidian_anki_sync.sync.slug_generator import create_manifest, generate_slug
 from obsidian_anki_sync.utils.async_runner import AsyncioRunner
-from obsidian_anki_sync.utils.content_hash import compute_content_hash
-from obsidian_anki_sync.utils.guid import deterministic_guid
 from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -36,7 +31,7 @@ class CardGenerator:
     def __init__(
         self,
         config: Config,
-        apf_gen: APFGenerator,
+        apf_gen: Any | None = None,  # Legacy APFGenerator, now deprecated and unused
         agent_orchestrator: "LangGraphOrchestrator | None" = None,
         use_agents: bool = False,
         agent_card_cache: diskcache.Cache | None = None,
@@ -54,7 +49,7 @@ class CardGenerator:
 
         Args:
             config: Service configuration
-            apf_gen: APFGenerator instance
+            apf_gen: Deprecated - legacy APFGenerator instance (no longer used)
             agent_orchestrator: Optional agent orchestrator
             use_agents: Whether to use agent system
             agent_card_cache: Cache for agent-generated cards
@@ -68,7 +63,7 @@ class CardGenerator:
             existing_cards_for_duplicate_detection: Existing cards from Anki for duplicate detection
         """
         self.config = config
-        self.apf_gen = apf_gen
+        self.apf_gen = apf_gen  # Deprecated, kept for backward compatibility
         self.agent_orchestrator = agent_orchestrator
         self.use_agents = use_agents
         self._agent_card_cache = agent_card_cache
@@ -349,168 +344,14 @@ class CardGenerator:
             msg = f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
             raise ValueError(msg)
 
-        # Check cache for non-agent generation
-        content_hash = compute_content_hash(qa_pair, metadata, lang)
-        cache_key = f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
-
-        cache_hit = False
-        try:
-            if self._apf_card_cache:
-                cache_start_time = time.time()
-                cached_card = self._apf_card_cache.get(cache_key)
-                cache_duration = time.time() - cache_start_time
-                if cached_card is not None:
-                    if cached_card.content_hash == content_hash:
-                        cache_hit = True
-                        elapsed_ms = round((time.time() - start_time) * 1000, 2)
-                        self._cache_hits += 1
-                        self._cache_stats["hits"] += 1
-                        logger.debug(
-                            "cache_hit",
-                            operation="apf_card_generation",
-                            cache_key=cache_key[:8],
-                            slug=cached_card.slug,
-                            elapsed_ms=elapsed_ms,
-                            cache_duration=round(cache_duration, 4),
-                        )
-                        return cached_card  # type: ignore[no-any-return]
-                    else:
-                        logger.debug(
-                            "cache_miss",
-                            operation="apf_card_generation",
-                            cache_key=cache_key[:8],
-                            reason="content_hash_mismatch",
-                        )
-        except Exception as e:
-            logger.warning(
-                "cache_read_error",
-                operation="apf_card_generation",
-                cache_key=cache_key[:8],
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-
-        if not cache_hit:
-            self._cache_misses += 1
-            self._cache_stats["misses"] += 1
-            logger.debug(
-                "cache_miss",
-                operation="apf_card_generation",
-                cache_key=cache_key[:8],
-                reason="not_found",
-            )
-
-        # Generate slug - use thread-safe method in parallel mode
-        if self._slug_counters and self._slug_counter_lock:
-            import re
-            import unicodedata
-
-            path_parts = Path(relative_path).with_suffix("").parts
-            slug_parts = []
-            for part in path_parts:
-                normalized = unicodedata.normalize("NFKD", part)
-                ascii_segment = normalized.encode("ascii", "ignore").decode("ascii")
-                ascii_segment = re.sub(r"[^a-z0-9-]", "-", ascii_segment.lower())
-                ascii_segment = re.sub(r"-+", "-", ascii_segment).strip("-")
-                if ascii_segment:
-                    slug_parts.append(ascii_segment)
-            sanitized = "-".join(slug_parts) or "note"
-            base_without_suffix = f"{sanitized}-p{qa_pair.card_index:02d}"
-            slug_base = base_without_suffix[:70]
-
-            # Use thread-safe counter
-            with self._slug_counter_lock:
-                initial_slug = f"{slug_base}-{lang}"
-                if initial_slug not in self._slug_counters:
-                    self._slug_counters[initial_slug] = 0
-                    slug = initial_slug
-                else:
-                    self._slug_counters[initial_slug] += 1
-                    collision_count = self._slug_counters[initial_slug]
-                    slug = f"{initial_slug}-{collision_count}"
-            hash6 = None
-        else:
-            # Sequential mode - use standard generate_slug
-            slug, slug_base, hash6 = generate_slug(
-                relative_path, qa_pair.card_index, lang, existing_slugs
-            )
-
-        # Compute deterministic GUID
-        guid = deterministic_guid(
-            [metadata.id, relative_path, str(qa_pair.card_index), lang]
+        # Legacy non-agent generation has been removed.
+        # All card generation now goes through the agent system.
+        msg = (
+            "Legacy APFGenerator has been removed. "
+            "All card generation must use the agent system (use_agents=True). "
+            "Set use_langgraph=True or use_pydantic_ai=True in config."
         )
-
-        # Create manifest
-        manifest = create_manifest(
-            slug,
-            slug_base if "slug_base" in locals() else slug.rsplit("-", 1)[0],
-            lang,
-            relative_path,
-            qa_pair.card_index,
-            metadata,
-            guid,
-            hash6,
-        )
-
-        # Generate APF card via LLM
-        card = cast(
-            "Card", self.apf_gen.generate_card(qa_pair, metadata, manifest, lang)
-        )
-
-        # Ensure content hash is set
-        if not card.content_hash:
-            card.content_hash = content_hash
-
-        # Validate APF format
-        validation = validate_apf(card.apf_html, slug)
-        if validation.errors:
-            self.stats["validation_errors"] = self.stats.get(
-                "validation_errors", 0
-            ) + len(validation.errors)
-            logger.error("apf_validation_errors", slug=slug, errors=validation.errors)
-            msg = f"APF validation failed for {slug}: {validation.errors[0]}"
-            raise ValueError(msg)
-        if validation.warnings:
-            logger.debug(
-                "apf_validation_warnings", slug=slug, warnings=validation.warnings
-            )
-
-        html_errors = validate_card_html(card.apf_html)
-        if html_errors:
-            logger.error("apf_html_invalid", slug=slug, errors=html_errors)
-            msg = f"Invalid HTML formatting for {slug}: {html_errors[0]}"
-            raise ValueError(msg)
-
-        # Cache the generated card
-        try:
-            if self._apf_card_cache:
-                cache_write_start = time.time()
-                self._apf_card_cache.set(cache_key, card)
-                cache_write_duration = time.time() - cache_write_start
-                logger.debug(
-                    "cache_write",
-                    operation="apf_card_generation",
-                    cache_key=cache_key[:8],
-                    slug=slug,
-                    duration=round(cache_write_duration, 4),
-                    cache_size_bytes=len(str(card).encode()),
-                    content_hash=content_hash[:8],
-                )
-        except Exception as e:
-            logger.warning(
-                "cache_write_error",
-                operation="apf_card_generation",
-                cache_key=cache_key[:8],
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-
-        # Log generation time
-        elapsed = time.time() - start_time
-        self._cache_stats["generation_times"].append(elapsed)
-        logger.info("card_generated", slug=slug, elapsed_seconds=round(elapsed, 2))
-
-        return card
+        raise RuntimeError(msg)
 
     def _extract_pipeline_error_message(self, result: "AgentPipelineResult") -> str:
         """Extract a comprehensive and user-friendly error message from pipeline result.

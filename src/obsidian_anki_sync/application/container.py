@@ -151,7 +151,6 @@ def setup_container(container: DependencyContainer) -> None:
     """
     # Import here to avoid circular imports
     from obsidian_anki_sync.anki.client import AnkiClient
-    from obsidian_anki_sync.apf.generator import APFGenerator
     from obsidian_anki_sync.config import Config
     from obsidian_anki_sync.obsidian.parser import create_note_parser
     from obsidian_anki_sync.providers.factory import ProviderFactory
@@ -181,7 +180,20 @@ def setup_container(container: DependencyContainer) -> None:
         ILLMProvider, lambda: ProviderFactory.create_from_config(config)
     )
 
-    container.register_factory(ICardGenerator, lambda: APFGenerator(config))
+    # ICardGenerator: Legacy APFGenerator has been removed.
+    # Card generation now uses LangGraphOrchestrator with PydanticAI agents.
+    # The ICardGenerator interface is deprecated and may be removed in future.
+    def create_card_generator():
+        from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
+
+        # Ensure agent system is enabled
+        if not config.use_langgraph:
+            config.use_langgraph = True
+        if not config.use_pydantic_ai:
+            config.use_pydantic_ai = True
+        return LangGraphOrchestrator(config)
+
+    container.register_factory(ICardGenerator, create_card_generator)
 
     container.register_factory(INoteParser, lambda: create_note_parser())
 

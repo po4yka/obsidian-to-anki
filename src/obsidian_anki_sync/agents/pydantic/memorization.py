@@ -63,7 +63,7 @@ class MemorizationQualityAgentAI:
         # Create dependencies
         deps = PostValidationDeps(cards=cards, metadata=metadata, strict_mode=True)
 
-        # Build assessment prompt
+        # Build assessment prompt with ALL card content
         prompt = f"""Assess memorization quality of these {len(cards)} Anki cards:
 
 Metadata:
@@ -73,18 +73,46 @@ Metadata:
 
 Cards to assess:
 """
-        for card in cards[:5]:
+        # Include ALL cards in the prompt, not just first 5
+        for card in cards:
             prompt += f"\nCard {card.card_index} ({card.lang}): {card.slug}\n"
+
+            # Extract front text from APF HTML
             front_match = card.apf_html.split("<!-- Front -->")
             if len(front_match) > 1:
-                front_text = front_match[1].split("<!-- Back -->")[0].strip()[:150]
-                prompt += f"Front: {front_text}...\n"
+                front_text = front_match[1].split("<!-- Back -->")[0].strip()
+                # Limit to 300 chars to keep prompt manageable
+                if len(front_text) > 300:
+                    front_text = front_text[:300] + "..."
+                prompt += f"Front: {front_text}\n"
+            else:
+                prompt += "Front: (empty or missing)\n"
+
+            # Extract back text from APF HTML
             back_match = card.apf_html.split("<!-- Back -->")
             if len(back_match) > 1:
-                back_text = back_match[1].split("<!--")[0].strip()[:150]
-                prompt += f"Back: {back_text}...\n"
+                # Get content between "<!-- Back -->" and next comment
+                back_section = back_match[1]
+                # Find the end of back section (either <!-- Extra --> or end of string)
+                extra_pos = back_section.find("<!-- Extra -->")
+                if extra_pos > 0:
+                    back_text = back_section[:extra_pos].strip()
+                else:
+                    # Find any other comment that might end the back section
+                    next_comment = back_section.find("<!--")
+                    if next_comment > 0:
+                        back_text = back_section[:next_comment].strip()
+                    else:
+                        back_text = back_section.strip()
 
-        prompt += f"\nAssess all {len(cards)} cards for memorization effectiveness."
+                # Limit to 300 chars to keep prompt manageable
+                if len(back_text) > 300:
+                    back_text = back_text[:300] + "..."
+                prompt += f"Back: {back_text}\n"
+            else:
+                prompt += "Back: (empty or missing)\n"
+
+        prompt += f"\nAssess all {len(cards)} cards listed above for memorization effectiveness."
 
         try:
             # Run agent (output_retries configured in Agent constructor)

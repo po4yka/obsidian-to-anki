@@ -774,83 +774,67 @@ def export(
 
             console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
 
-            # Generate cards using the sync engine's generation logic
-            from .apf.generator import APFGenerator
-
+            # Generate cards using the agent system (legacy APFGenerator removed)
             cards: list[Card] = []
 
-            if config.use_langgraph or config.use_pydantic_ai:
-                console.print(
-                    "[cyan]Using LangGraph agent system for generation...[/cyan]"
+            # Always use agent system for card generation
+            # Legacy non-agent mode has been removed
+            if not config.use_langgraph and not config.use_pydantic_ai:
+                logger.info(
+                    "enabling_agent_system",
+                    reason="Legacy non-agent mode removed, enabling agent system",
                 )
-                import asyncio
-                import inspect
+                config.use_langgraph = True
+                config.use_pydantic_ai = True
 
-                from .agents.langgraph import LangGraphOrchestrator
+            console.print(
+                "[cyan]Using LangGraph agent system for generation...[/cyan]"
+            )
+            import asyncio
+            import inspect
 
-                orchestrator = LangGraphOrchestrator(config)
+            from .agents.langgraph import LangGraphOrchestrator
 
-                for note_path_tuple in note_paths:
-                    try:
-                        note_path, note_content = note_path_tuple
-                        metadata, qa_pairs = parse_note(note_path)
-                        # Handle both sync and async orchestrators
-                        if inspect.iscoroutinefunction(orchestrator.process_note):
-                            result = asyncio.run(
-                                orchestrator.process_note(
-                                    note_content, metadata, qa_pairs, note_path
-                                )
-                            )
-                        else:
-                            result = orchestrator.process_note(
+            orchestrator = LangGraphOrchestrator(config)
+
+            for note_path_tuple in note_paths:
+                try:
+                    note_path, note_content = note_path_tuple
+                    metadata, qa_pairs = parse_note(note_path)
+                    # Handle both sync and async orchestrators
+                    if inspect.iscoroutinefunction(orchestrator.process_note):
+                        result = asyncio.run(
+                            orchestrator.process_note(
                                 note_content, metadata, qa_pairs, note_path
                             )
+                        )
+                    else:
+                        result = orchestrator.process_note(
+                            note_content, metadata, qa_pairs, note_path
+                        )
 
-                        if result.success and result.generation:
-                            generated_cards = result.generation.cards
-                            # Convert GeneratedCard to Card using orchestrator's method
-                            converted_cards = orchestrator.convert_to_cards(
-                                generated_cards, metadata, qa_pairs, note_path
-                            )
-                            cards.extend(converted_cards)
-                            console.print(
-                                f"  [green][/green] {metadata.title} "
-                                f"({len(generated_cards)} cards)"
-                            )
-                        else:
-                            error_msg = "Pipeline failed"
-                            if result.post_validation:
-                                error_msg = (
-                                    result.post_validation.error_details or error_msg
-                                )
-                            console.print(
-                                f"  [red][/red] {metadata.title}: {error_msg}"
-                            )
-                    except Exception as e:
-                        console.print(f"  [red][/red] {note_path.name}: {e}")
-
-            else:
-                console.print("[cyan]Using OpenRouter for generation...[/cyan]")
-                generator = APFGenerator(config)
-
-                for note_path_tuple in note_paths:
-                    try:
-                        note_path, _ = note_path_tuple
-                        metadata, qa_pairs = parse_note(note_path)
-
-                        for qa in qa_pairs:
-                            for lang in metadata.language_tags:
-                                card = generator.generate_card(
-                                    metadata, qa, lang, note_path
-                                )
-                                cards.append(card)
-
+                    if result.success and result.generation:
+                        generated_cards = result.generation.cards
+                        # Convert GeneratedCard to Card using orchestrator's method
+                        converted_cards = orchestrator.convert_to_cards(
+                            generated_cards, metadata, qa_pairs, note_path
+                        )
+                        cards.extend(converted_cards)
                         console.print(
                             f"  [green][/green] {metadata.title} "
-                            f"({len(qa_pairs) * len(metadata.language_tags)} cards)"
+                            f"({len(generated_cards)} cards)"
                         )
-                    except Exception as e:
-                        console.print(f"  [red][/red] {note_path.name}: {e}")
+                    else:
+                        error_msg = "Pipeline failed"
+                        if result.post_validation:
+                            error_msg = (
+                                result.post_validation.error_details or error_msg
+                            )
+                        console.print(
+                            f"  [red][/red] {metadata.title}: {error_msg}"
+                        )
+                except Exception as e:
+                    console.print(f"  [red][/red] {note_path.name}: {e}")
 
             if not cards:
                 console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
