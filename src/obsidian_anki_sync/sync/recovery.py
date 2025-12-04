@@ -10,15 +10,15 @@ These inconsistencies can occur due to:
 - Database corruption
 """
 
-import logging
 from typing import Any
 
 from obsidian_anki_sync.anki.client import AnkiClient
 from obsidian_anki_sync.exceptions import AnkiConnectError
+from obsidian_anki_sync.utils.logging import get_logger
 
 from .state_db import StateDB
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CardRecovery:
