@@ -251,18 +251,6 @@ client.unsuspend_cards([1234567890, 9876543210])
 **API Action**: `suspend`/`unsuspend`
 **Parameters**: `{"cards": list[int]}`
 
-#### guiBrowse
-
-Open Anki browser with a search query.
-
-```python
-client.gui_browse("deck:MyDeck tag:interview")
-# Returns: list[int] - Note IDs in browser
-```
-
-**API Action**: `guiBrowse`
-**Parameters**: `{"query": str}`
-
 #### getCollectionStatsHtml
 
 Get collection statistics.
@@ -313,6 +301,26 @@ client.gui_browse("deck:MyDeck")
 
 **API Action**: `guiBrowse`
 **Parameters**: `{"query": str}`
+
+#### getDeckStats
+
+Get statistics for a deck. This method tries to use `getDeckStats` (supported by some AnkiConnect forks) and falls back to manual calculation using multiple `findCards` queries if the action is not available.
+
+```python
+stats = client.get_deck_stats("MyDeck")
+# Returns: dict
+# {
+#     "deck_id": 0,
+#     "name": "MyDeck",
+#     "total_in_deck": 100,
+#     "new_count": 10,
+#     "learn_count": 5,
+#     "review_count": 15
+# }
+```
+
+**API Action**: `getDeckStats` (optional, with fallback)
+**Parameters**: `{"decks": [str]}`
 
 #### sync
 
