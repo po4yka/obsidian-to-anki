@@ -67,6 +67,7 @@ class GeneratorAgentAI:
         slug_base: str,
         rag_enrichment: dict | None = None,
         rag_examples: list[dict] | None = None,
+        source_path: str | None = None,
     ) -> GenerationResult:
         """Generate APF cards from Q/A pairs.
 
@@ -84,6 +85,7 @@ class GeneratorAgentAI:
             slug_base: Base slug for card identifiers
             rag_enrichment: Optional RAG context enrichment data
             rag_examples: Optional few-shot examples from RAG
+            source_path: Optional source file path for manifest
 
         Returns:
             GenerationResult with all generated cards
@@ -131,6 +133,7 @@ class GeneratorAgentAI:
                 metadata=metadata,
                 slug_base=slug_base,
                 overall_confidence=spec.confidence,
+                source_path=source_path,
             )
 
             if not generated_cards:
@@ -260,6 +263,7 @@ Slug Base: {slug_base}
         metadata: NoteMetadata,
         slug_base: str,
         overall_confidence: float,
+        source_path: str | None = None,
     ) -> list[GeneratedCard]:
         """Convert JSON CardSpecs to GeneratedCard with APF HTML.
 
@@ -269,6 +273,7 @@ Slug Base: {slug_base}
             metadata: Note metadata
             slug_base: Base slug for identifiers
             overall_confidence: Overall generation confidence
+            source_path: Optional source file path for manifest
 
         Returns:
             List of GeneratedCard with APF HTML content
@@ -280,8 +285,8 @@ Slug Base: {slug_base}
             try:
                 # Fill in manifest data from our known values
                 spec.slug_base = slug_base
-                if not spec.source_path and metadata.file_path:
-                    spec.source_path = str(metadata.file_path)
+                if not spec.source_path and source_path:
+                    spec.source_path = source_path
 
                 # Render JSON spec to APF HTML
                 apf_html = self.renderer.render(spec)

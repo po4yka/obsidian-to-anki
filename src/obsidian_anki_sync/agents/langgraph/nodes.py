@@ -999,6 +999,7 @@ async def generation_node(state: PipelineState) -> PipelineState:
                 metadata=metadata.model_dump(),
                 qa_pairs=qa_dicts,
                 slug_base=state["slug_base"],
+                source_path=state.get("file_path"),
             )
             # Convert unified result to GenerationResult
             gen_result = unified_result.data

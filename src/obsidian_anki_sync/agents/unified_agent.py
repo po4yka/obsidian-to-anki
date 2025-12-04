@@ -161,6 +161,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
         metadata: dict[str, Any],
         qa_pairs: list[dict[str, Any]],
         slug_base: str,
+        source_path: str | None = None,
     ) -> UnifiedAgentResult:
         """Generate APF cards using PydanticAI."""
         try:
@@ -172,7 +173,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
 
             agent = self._get_agent("generator")
             result = await agent.generate_cards(
-                note_content, note_metadata, qa_list, slug_base
+                note_content, note_metadata, qa_list, slug_base, source_path=source_path
             )
 
             return UnifiedAgentResult(
