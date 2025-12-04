@@ -53,6 +53,7 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     import json
 
     result_payload = {
+        "job_id": mock_job.job_id,
         "success": True,
         "cards": [
             {
@@ -139,8 +140,7 @@ async def test_process_note_job():
 
     # Mock Redis in context
     mock_redis = AsyncMock()
-    ctx = {"config": Config(), "orchestrator": AsyncMock(),
-           "redis": mock_redis}
+    ctx = {"config": Config(), "orchestrator": AsyncMock(), "redis": mock_redis}
 
     # Mock orchestrator result
     mock_result = MagicMock()
@@ -184,16 +184,19 @@ async def test_process_note_job():
         ]
 
         result_queue = "test-queue"
+        job_id = "job-with-result"
         result = await process_note_job(
             ctx,
             "/tmp/test.md",
             "test.md",
-            metadata_dict,
-            qa_pairs_dicts,
+            job_id=job_id,
+            metadata_dict=metadata_dict,
+            qa_pairs_dicts=qa_pairs_dicts,
             result_queue_name=result_queue,
         )
 
         assert result["success"] is True
+        assert result["job_id"] == job_id
         assert len(result["cards"]) == 1
         assert result["cards"][0]["slug"] == "test-card"
 
@@ -203,6 +206,7 @@ async def test_process_note_job():
         import json
 
         payload = json.loads(mock_redis.rpush.call_args[0][1])
+        assert payload["job_id"] == job_id
         assert payload["success"] is True
         assert payload["cards"][0]["slug"] == "test-card"
 
@@ -264,12 +268,14 @@ async def test_process_note_job_fallbacks_when_redis_missing():
             ctx,
             "/tmp/test.md",
             "test.md",
+            job_id="fallback-job",
             metadata_dict=metadata_dict,
             qa_pairs_dicts=qa_pairs_dicts,
             result_queue_name="test-queue",
         )
 
     assert result["success"] is True
+    assert result["job_id"] == "fallback-job"
     create_pool_mock.assert_awaited_once()
     fallback_redis.rpush.assert_awaited_once()
     fallback_redis.expire.assert_awaited_once_with("test-queue", 3600)
