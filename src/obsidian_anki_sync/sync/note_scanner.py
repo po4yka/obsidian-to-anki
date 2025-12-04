@@ -471,6 +471,9 @@ class NoteScanner:
                     error=e,
                     processing_stage="qa_extraction",
                 )
+                # Fail-fast: re-raise in strict mode
+                if getattr(self.config, "strict_mode", True):
+                    raise
             except (
                 ParserError,
                 yaml.YAMLError,
@@ -491,6 +494,9 @@ class NoteScanner:
                     error=e,
                     processing_stage="parsing",
                 )
+                # Fail-fast: re-raise in strict mode
+                if getattr(self.config, "strict_mode", True):
+                    raise
             except Exception as e:
                 logger.exception(
                     "unexpected_parsing_error",
@@ -506,6 +512,9 @@ class NoteScanner:
                     error=e,
                     processing_stage="processing",
                 )
+                # Fail-fast: re-raise in strict mode
+                if getattr(self.config, "strict_mode", True):
+                    raise
 
             # Progress indicator
             notes_processed += 1
@@ -691,6 +700,12 @@ class NoteScanner:
                                     error_samples[result_info["error_type"]].append(
                                         f"{relative_path}: {result_info['error']}"
                                     )
+                            # Fail-fast: abort processing in strict mode
+                            if getattr(self.config, "strict_mode", True):
+                                for f in future_to_note:
+                                    f.cancel()
+                                msg = f"Note processing failed: {result_info['error']}"
+                                raise RuntimeError(msg)
 
                 except Exception as e:
                     logger.exception(
@@ -707,6 +722,11 @@ class NoteScanner:
                             error_samples[error_type_name].append(
                                 f"{relative_path}: {e!s}"
                             )
+                    # Fail-fast: re-raise in strict mode (cancels remaining futures)
+                    if getattr(self.config, "strict_mode", True):
+                        for f in future_to_note:
+                            f.cancel()
+                        raise
 
                 # Progress indicator
                 if notes_processed % 10 == 0 or notes_processed == len(note_files):
@@ -1178,6 +1198,10 @@ class NoteScanner:
                                 error_samples["queue_error"].append(
                                     f"Queue Error: {relative_path}: {error_msg}"
                                 )
+                            # Fail-fast: abort in strict mode
+                            if getattr(self.config, "strict_mode", True):
+                                msg = f"Queue job failed: {error_msg}"
+                                raise RuntimeError(msg)
 
                         logger.info(
                             "queue_progress",
