@@ -2,13 +2,11 @@
 
 ## Provider Comparison
 
-| Provider       | Type        | Best For         | Cost          |
-| -------------- | ----------- | ---------------- | ------------- |
-| **Ollama**     | Local/Cloud | Privacy, offline | Free (local)  |
-| **LM Studio**  | Local       | GUI, testing     | Free          |
-| **OpenRouter** | Cloud       | Latest models    | Pay-per-token |
-| **OpenAI**     | Cloud       | GPT models       | Pay-per-token |
-| **Anthropic**  | Cloud       | Claude models    | Pay-per-token |
+| Provider       | Type        | Best For                   | Cost          |
+| -------------- | ----------- | -------------------------- | ------------- |
+| **Ollama**     | Local/Cloud | Privacy, offline           | Free (local)  |
+| **LM Studio**  | Local       | GUI, testing               | Free          |
+| **OpenRouter** | Cloud       | Qwen/Deepseek/Kimi/Minimax | Pay-per-token |
 
 ## Configuration Examples
 
@@ -31,7 +29,7 @@ ollama pull qwen3:32b
 ```yaml
 llm_provider: "openrouter"
 openrouter_api_key: "${OPENROUTER_API_KEY}"
-generator_model: "anthropic/claude-3-5-sonnet-20241022"
+generator_model: "qwen/qwen-2.5-72b-instruct"
 openrouter_site_url: "https://yourapp.example.com" # Optional attribution
 openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 ```
@@ -42,7 +40,7 @@ openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
     which instantiates the OpenAI SDK with `base_url=https://openrouter.ai/api/v1`.
 -   **Agent system** builds on `src/obsidian_anki_sync/providers/openrouter/provider.py` and
     `pydantic_ai_models.py`. The provider handles retry logic, structured-output fallbacks,
-    and Grok-only reasoning toggles, while PydanticAI reuses that HTTP stack.
+    and reasoning toggles for DeepSeek models, while PydanticAI reuses that HTTP stack.
 -   **Preflight checks** (`obsidian-anki-sync check`) call `/models` to ensure the API key is
     valid but do not yet query credits or prompt-cache telemetry.
 
@@ -64,7 +62,7 @@ openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 #### Reasoning Controls
 
 -   Use `llm_reasoning_effort` (`auto|minimal|low|medium|high|none`) to map to OpenRouter’s
-    `reasoning.effort` payload for Grok, o3, and DeepSeek reasoning models.
+    `reasoning.effort` payload for DeepSeek reasoning models.
 -   Stage-level overrides via `reasoning_effort_overrides` allow LangGraph agents to request
     higher effort for generation while keeping validators lean.
 
@@ -79,22 +77,6 @@ openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 
 See `.docs/IMPLEMENTATION_NOTES/openrouter-usage.md` for the detailed baseline.
 
-### OpenAI
-
-```yaml
-llm_provider: "openai"
-openai_api_key: "${OPENAI_API_KEY}"
-generator_model: "gpt-4o"
-```
-
-### Anthropic
-
-```yaml
-llm_provider: "anthropic"
-anthropic_api_key: "${ANTHROPIC_API_KEY}"
-generator_model: "claude-3-5-sonnet-20241022"
-```
-
 ### LM Studio
 
 ```yaml
@@ -107,17 +89,17 @@ lm_studio_base_url: "http://localhost:1234/v1"
 Model cascade: Agent-specific -> Default -> Provider default
 
 ```yaml
-default_llm_model: "openai/gpt-4o-mini"
-generator_model: "anthropic/claude-3-5-sonnet-20241022" # Override
+default_llm_model: "deepseek/deepseek-v3.2" # Latest: Excellent reasoning, 163K context
+generator_model: "deepseek/deepseek-v3.2" # Override: Latest reasoning model
 ```
 
 ## Recommended Models by Agent
 
-| Agent          | Requirement  | Recommended                 |
-| -------------- | ------------ | --------------------------- |
-| Pre-Validator  | Fast, cheap  | gpt-4o-mini, claude-3-haiku |
-| Generator      | High quality | claude-3-5-sonnet, gpt-4o   |
-| Post-Validator | Balanced     | gpt-4o, claude-3-5-sonnet   |
+| Agent          | Requirement  | Recommended                                                         |
+| -------------- | ------------ | ------------------------------------------------------------------- |
+| Pre-Validator  | Fast, cheap  | qwen/qwen-2.5-7b-instruct (latest: $0.04/$0.10, 33K context)        |
+| Generator      | High quality | deepseek/deepseek-v3.2 (latest: excellent reasoning, 163K context)  |
+| Post-Validator | Balanced     | deepseek/deepseek-v3.2 (latest: excellent reasoning for validation) |
 
 ## Security
 

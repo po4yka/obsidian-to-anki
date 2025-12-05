@@ -50,7 +50,7 @@ Your response must be a JSON object with two keys:
     prompt = prompt_template.replace("{text}", text_to_check)
 
     # Use specified model or default
-    check_model = model or "gpt-4o-mini"
+    check_model = model or "qwen/qwen-2.5-32b-instruct"
 
     try:
         if hasattr(llm_client, "chat") and hasattr(llm_client.chat, "completions"):

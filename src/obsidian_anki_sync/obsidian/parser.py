@@ -47,20 +47,11 @@ class _ParserState(threading.local):
 _thread_local_state = _ParserState()
 
 
-# Backward compatibility - global state (deprecated, kept for legacy code)
-_USE_LLM_EXTRACTION = False
-_QA_EXTRACTOR_AGENT: QAExtractorAgent | None = None
-_ENFORCE_LANGUAGE_VALIDATION = False
-_GLOBAL_STATE_LOCK = threading.RLock()
-
-
 @contextmanager
 def temporarily_disable_llm_extraction() -> Any:
     """Temporarily disable LLM extraction state.
 
-    This context manager now works with thread-local state, making it thread-safe.
-    It first checks thread-local state, then falls back to global state for
-    backward compatibility.
+    This context manager works with thread-local state, making it thread-safe.
     """
     # Save current thread-local state
     previous_flag = getattr(_thread_local_state, "use_llm_extraction", False)
@@ -85,83 +76,6 @@ def temporarily_disable_llm_extraction() -> Any:
         logger.debug("llm_extraction_restored", enabled=previous_flag)
 
 
-def configure_llm_extraction(
-    llm_provider: BaseLLMProvider | None,
-    model: str = "qwen3:8b",
-    temperature: float = 0.0,
-    reasoning_enabled: bool = False,
-    enforce_language_validation: bool = False,
-) -> None:
-    """Configure LLM-based Q&A extraction using global state (deprecated).
-
-    DEPRECATED: This function sets global state which is not thread-safe when used
-    with concurrent processing. Use create_qa_extractor() and pass the extractor
-    to parse functions explicitly instead.
-
-    This function now also sets thread-local state for the calling thread to
-    maintain backward compatibility while improving thread safety.
-
-    Args:
-        llm_provider: LLM provider instance (None to disable)
-        model: Model to use for extraction
-        temperature: Sampling temperature
-        reasoning_enabled: Enable reasoning mode for models that support it
-        enforce_language_validation: Enforce bilingual validation
-    """
-    global _USE_LLM_EXTRACTION, _QA_EXTRACTOR_AGENT, _ENFORCE_LANGUAGE_VALIDATION
-
-    # Emit deprecation warning
-    warnings.warn(
-        "configure_llm_extraction() is deprecated and not thread-safe. "
-        "Use create_qa_extractor() and pass qa_extractor parameter to "
-        "parse_note() and parse_qa_pairs() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    if llm_provider is None:
-        # Update global state (with lock for safety)
-        with _GLOBAL_STATE_LOCK:
-            _USE_LLM_EXTRACTION = False
-            _QA_EXTRACTOR_AGENT = None
-            _ENFORCE_LANGUAGE_VALIDATION = False
-
-        # Update thread-local state
-        _thread_local_state.use_llm_extraction = False
-        _thread_local_state.qa_extractor_agent = None
-        _thread_local_state.enforce_language_validation = False
-
-        logger.info("llm_extraction_disabled")
-        return
-
-    from obsidian_anki_sync.agents.qa_extractor import QAExtractorAgent
-
-    extractor = QAExtractorAgent(
-        llm_provider=llm_provider,
-        model=model,
-        temperature=temperature,
-        reasoning_enabled=reasoning_enabled,
-    )
-
-    # Update global state (with lock for safety)
-    with _GLOBAL_STATE_LOCK:
-        _QA_EXTRACTOR_AGENT = extractor
-        _USE_LLM_EXTRACTION = True
-        _ENFORCE_LANGUAGE_VALIDATION = enforce_language_validation
-
-    # Update thread-local state for calling thread
-    _thread_local_state.qa_extractor_agent = extractor
-    _thread_local_state.use_llm_extraction = True
-    _thread_local_state.enforce_language_validation = enforce_language_validation
-
-    logger.info(
-        "llm_extraction_enabled",
-        model=model,
-        temperature=temperature,
-        enforce_language_validation=enforce_language_validation,
-    )
-
-
 def create_qa_extractor(
     llm_provider: BaseLLMProvider,
     model: str = "qwen3:8b",
@@ -172,7 +86,7 @@ def create_qa_extractor(
 ) -> QAExtractorAgent:
     """Create a QA extractor agent for LLM-based extraction.
 
-    This is the preferred way to use LLM extraction instead of configure_llm_extraction().
+    This is the preferred way to use LLM extraction.
 
     Args:
         llm_provider: LLM provider instance
@@ -200,12 +114,11 @@ def create_qa_extractor(
 def _get_qa_extractor(
     explicit_extractor: QAExtractorAgent | None,
 ) -> QAExtractorAgent | None:
-    """Get QA extractor from explicit parameter, thread-local, or global state.
+    """Get QA extractor from explicit parameter or thread-local state.
 
     Priority order:
     1. Explicit parameter (highest priority)
     2. Thread-local state (thread-safe)
-    3. Global state (backward compatibility, not thread-safe)
 
     Args:
         explicit_extractor: Explicitly provided extractor
@@ -221,31 +134,18 @@ def _get_qa_extractor(
     if getattr(_thread_local_state, "use_llm_extraction", False):
         return getattr(_thread_local_state, "qa_extractor_agent", None)
 
-    # Priority 3: Global state (backward compatibility)
-    with _GLOBAL_STATE_LOCK:
-        if _USE_LLM_EXTRACTION:
-            return _QA_EXTRACTOR_AGENT
-
     return None
 
 
 def _get_enforce_language_validation() -> bool:
-    """Get language validation setting from thread-local or global state.
-
-    Priority order:
-    1. Thread-local state (thread-safe)
-    2. Global state (backward compatibility)
+    """Get language validation setting from thread-local state.
 
     Returns:
         Whether to enforce language validation
     """
-    # Priority 1: Thread-local state
     if hasattr(_thread_local_state, "enforce_language_validation"):
         return _thread_local_state.enforce_language_validation
-
-    # Priority 2: Global state
-    with _GLOBAL_STATE_LOCK:
-        return _ENFORCE_LANGUAGE_VALIDATION
+    return False
 
 
 def set_thread_qa_extractor(
@@ -298,7 +198,7 @@ def parse_note(
     Args:
         file_path: Path to the markdown file
         qa_extractor: Optional QA extractor agent for LLM-based extraction.
-                     If None, uses global state for backward compatibility.
+                     If None, uses thread-local state.
         tolerant_parsing: If True, validation errors are logged as warnings instead
                         of raising ParserError. Allows parsing to proceed with
                         imperfect notes that can be repaired later.
@@ -340,7 +240,8 @@ def parse_note(
             msg = f"Failed to read file {resolved_path}: {e}"
             raise ParserError(msg)
         except Exception as e:
-            logger.exception("unexpected_file_read_error", file=str(resolved_path))
+            logger.exception("unexpected_file_read_error",
+                             file=str(resolved_path))
             msg = f"Unexpected error reading {resolved_path}: {e}"
             raise ParserError(msg)
 
@@ -480,14 +381,15 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
         Preprocessed content with fixed YAML syntax
     """
     # Extract frontmatter section
-    frontmatter_match = re.match(r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
+    frontmatter_match = re.match(
+        r"^(---\s*\n)(.*?)(\n---\s*\n)", content, re.DOTALL)
     if not frontmatter_match:
         return content
 
     frontmatter_start = frontmatter_match.group(1)
     frontmatter_body = frontmatter_match.group(2)
     frontmatter_end = frontmatter_match.group(3)
-    rest_content = content[frontmatter_match.end() :]
+    rest_content = content[frontmatter_match.end():]
 
     # Fix backticks in YAML arrays/strings
     # Pattern: matches backticks around words in arrays or after colons
@@ -527,7 +429,8 @@ def _preprocess_yaml_frontmatter(content: str) -> str:
             line = lines[i]
 
             # Check if this line is a field with an inline array
-            inline_array_match = re.match(r"^(\w[\w\-]*)\s*:\s*\[(.*)\]\s*$", line)
+            inline_array_match = re.match(
+                r"^(\w[\w\-]*)\s*:\s*\[(.*)\]\s*$", line)
 
             if inline_array_match:
                 field_name = inline_array_match.group(1)
@@ -755,7 +658,8 @@ def parse_frontmatter(content: str, file_path: Path) -> NoteMetadata:
         raise ParserError(msg)
 
     # Validate required fields
-    required_fields = ["id", "title", "topic", "language_tags", "created", "updated"]
+    required_fields = ["id", "title", "topic",
+                       "language_tags", "created", "updated"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         msg = f"Missing required fields in {file_path}: {missing}"
@@ -834,7 +738,7 @@ def parse_qa_pairs(
         metadata: Parsed metadata
         file_path: Optional file path for logging
         qa_extractor: Optional QA extractor agent for LLM-based extraction.
-                     If None, checks thread-local and global state for backward compatibility.
+                     If None, checks thread-local state.
         tolerant_parsing: If True, allows parsing to proceed even with incomplete Q&A pairs.
                         Missing sections will be handled by repair agent.
 
@@ -902,7 +806,8 @@ def parse_qa_pairs(
     )
 
     # Strip frontmatter
-    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
+    content = re.sub(r"^---\s*\n.*?\n---\s*\n", "",
+                     content, count=1, flags=re.DOTALL)
 
     # Normalize line endings and strip BOM
     content = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -964,7 +869,8 @@ def parse_qa_pairs(
 
         # Try to parse this block as a Q/A pair
         try:
-            qa_pair = _parse_single_qa_block(block, card_index, metadata, file_path)
+            qa_pair = _parse_single_qa_block(
+                block, card_index, metadata, file_path)
             if qa_pair:
                 qa_pairs.append(qa_pair)
                 card_index += 1
@@ -991,7 +897,8 @@ def parse_qa_pairs(
                             qa_pairs.extend(extracted_pairs)
                             logger.info(
                                 "llm_extraction_recovered_incomplete_block",
-                                file=str(file_path) if file_path else "unknown",
+                                file=str(
+                                    file_path) if file_path else "unknown",
                                 card_index=card_index,
                                 recovered_pairs=len(extracted_pairs),
                             )
@@ -1007,7 +914,8 @@ def parse_qa_pairs(
                         # Fall through to add to failed_blocks
 
                 # Block was skipped (incomplete or invalid)
-                failed_blocks.append((card_index, "Incomplete or invalid Q/A block"))
+                failed_blocks.append(
+                    (card_index, "Incomplete or invalid Q/A block"))
         except ParserError as e:
             logger.error(
                 "qa_parse_error",
@@ -1427,7 +1335,8 @@ def _normalize_sources(value: Any) -> list[dict[str, str]]:
         if item is None:
             continue
         if isinstance(item, dict):
-            normalized.append({k: str(v) for k, v in item.items() if v is not None})
+            normalized.append({k: str(v)
+                              for k, v in item.items() if v is not None})
         else:
             text = str(item).strip()
             if text:

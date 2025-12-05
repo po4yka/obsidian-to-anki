@@ -45,8 +45,8 @@ class TestModelSelection:
         )
 
         model = config.get_model_for_agent("generator")
-        # All presets now use x-ai/grok-4.1-fast:free (free, high quality, 2M context)
-        assert model == "x-ai/grok-4.1-fast:free"
+        # All presets now use qwen/qwen-2.5-32b-instruct
+        assert model == "qwen/qwen-2.5-32b-instruct"
 
     def test_get_model_for_agent_fallback_to_default(self, temp_dir):
         """Test fallback to default_llm_model when preset is invalid."""
@@ -178,11 +178,11 @@ class TestModelPresets:
     @pytest.mark.parametrize(
         ("preset", "expected_generator"),
         [
-            # All presets now use x-ai/grok-4.1-fast:free (free, high quality, 2M context)
-            ("cost_effective", "x-ai/grok-4.1-fast:free"),
-            ("balanced", "x-ai/grok-4.1-fast:free"),
-            ("high_quality", "x-ai/grok-4.1-fast:free"),
-            ("fast", "x-ai/grok-4.1-fast:free"),
+            # All presets now use qwen/qwen-2.5-32b-instruct
+            ("cost_effective", "qwen/qwen-2.5-32b-instruct"),
+            ("balanced", "qwen/qwen-2.5-32b-instruct"),
+            ("high_quality", "qwen/qwen-2.5-32b-instruct"),
+            ("fast", "qwen/qwen-2.5-32b-instruct"),
         ],
     )
     def test_preset_generator_models(self, temp_dir, preset, expected_generator):

@@ -48,8 +48,6 @@ class GeneratorAgent:
     """Agent for generating APF cards using local LLM.
 
     Uses powerful model (qwen3:32b) for high-quality card generation.
-    Note: This is a legacy generator. New code should use
-    agents/pydantic/generator.py with JSON -> APF conversion.
     """
 
     def __init__(
@@ -298,8 +296,6 @@ class GeneratorAgent:
             "qwen3:8b": 8192,
             "qwen3:14b": 8192,
             "qwen3:32b": 32768,
-            "llama3:8b": 8192,
-            "llama3:70b": 8192,
         }
 
         model_limit = context_limits.get(self.model, 8192)
@@ -451,7 +447,8 @@ class GeneratorAgent:
                 response_text = None
                 if hasattr(e, "__context__") and hasattr(e.__context__, "response"):
                     try:
-                        response_text = getattr(e.__context__, "response", None)
+                        response_text = getattr(
+                            e.__context__, "response", None)
                     except (AttributeError, TypeError) as attr_err:
                         # Defensive: Ignore if response extraction fails
                         logger.debug(
@@ -515,7 +512,8 @@ class GeneratorAgent:
                     user_message=format_llm_error_for_user(llm_error),
                     duration=round(card_duration, 2),
                     attempts_made=attempt,
-                    debug_artifact=str(artifact_path) if artifact_path else None,
+                    debug_artifact=str(
+                        artifact_path) if artifact_path else None,
                 )
 
                 # Record failure metrics
@@ -749,7 +747,8 @@ Now generate the card following this structure:
             ParsedCardStructure with the extracted components
         """
         # Extract title
-        title_match = re.search(r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
+        title_match = re.search(
+            r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
 
         # Extract key point code block (preserve exactly)
@@ -849,8 +848,6 @@ Now generate the card following this structure:
             "qwen3:8b": 8192,
             "qwen3:14b": 8192,
             "qwen3:32b": 32768,
-            "llama3:8b": 8192,
-            "llama3:70b": 8192,
         }
         model_limit = context_limits.get(self.model, 8192)
         utilization_pct = (estimated_tokens / model_limit) * 100
@@ -974,7 +971,8 @@ Now generate the card following this structure:
 
                 # Categorize and handle errors
                 llm_error = categorize_llm_error(error=e, model=self.model)
-                log_llm_error(llm_error, slug=manifest.slug, lang=lang, attempt=attempt)
+                log_llm_error(llm_error, slug=manifest.slug,
+                              lang=lang, attempt=attempt)
 
                 if attempt == max_retries:
                     # Record failure metrics
@@ -1212,7 +1210,8 @@ Translated content:"""
 
             # Very short response (less than 500 chars) for card generation
             if len(stripped) < 500:
-                indicators.append(f"very_short_response ({len(stripped)} chars)")
+                indicators.append(
+                    f"very_short_response ({len(stripped)} chars)")
 
         return indicators
 
@@ -1291,7 +1290,8 @@ Translated content:"""
             apf_html = apf_html[: end_of_cards_pos + len("END_OF_CARDS")]
         else:
             # Fallback: Strip after manifest comment
-            manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
+            manifest_match = re.search(
+                r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
             if manifest_match:
                 end_pos = manifest_match.end()
                 apf_html = apf_html[:end_pos]
@@ -1301,7 +1301,8 @@ Translated content:"""
         if tags_match:
             # Use tags from model output
             tags = tags_match.group(1).strip().split()
-            logger.debug("extracted_tags_from_output", slug=manifest.slug, tags=tags)
+            logger.debug("extracted_tags_from_output",
+                         slug=manifest.slug, tags=tags)
         else:
             # Generate tags deterministically
             tags = self._generate_tags(metadata, manifest.lang)
@@ -1343,7 +1344,8 @@ Translated content:"""
             and has_end_of_cards
         ):
             # Missing wrapper sentinels, add them
-            logger.debug("adding_missing_wrapper_sentinels", slug=manifest.slug)
+            logger.debug("adding_missing_wrapper_sentinels",
+                         slug=manifest.slug)
 
             # Wrap the card content
             lines = []
@@ -1364,7 +1366,8 @@ Translated content:"""
             apf_html = "\n".join(lines)
 
         # 9. Normalize card header to match validator expectations
-        apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
+        apf_html = self._normalize_card_header(
+            apf_html, manifest, card_type, tags)
 
         # 10. Fix HTML validation issues: wrap standalone <code> in <pre><code>
         apf_html = self._fix_code_tags(apf_html)
@@ -1455,7 +1458,8 @@ Translated content:"""
                 slug_match = re.search(r"slug:\s*([^\s|]+)", header)
                 slug = slug_match.group(1) if slug_match else manifest.slug
 
-                card_type_match = re.search(r"CardType:\s*(\w+)", header, re.IGNORECASE)
+                card_type_match = re.search(
+                    r"CardType:\s*(\w+)", header, re.IGNORECASE)
                 card_type = (
                     card_type_match.group(1).capitalize()
                     if card_type_match
@@ -1480,11 +1484,13 @@ Translated content:"""
                 else:
                     # Safe access to tags with fallback to empty list
                     manifest_tags = getattr(manifest, "tags", [])
-                    tags_str = " ".join(manifest_tags[:6]) if manifest_tags else ""
+                    tags_str = " ".join(
+                        manifest_tags[:6]) if manifest_tags else ""
 
                 # Build correct header
                 fixed_header = f"<!-- Card {card_num} | slug: {slug} | CardType: {card_type} | Tags: {tags_str} -->"
-                html = html[: match.start()] + fixed_header + html[match.end() :]
+                html = html[: match.start()] + fixed_header + \
+                    html[match.end():]
                 logger.debug(
                     "pre_validation_fix_card_header", card_num=card_num, slug=slug
                 )
@@ -1526,7 +1532,8 @@ Translated content:"""
                 )
             else:
                 html += f"\n{manifest_comment}"
-            logger.debug("pre_validation_fix_added_manifest", slug=manifest.slug)
+            logger.debug("pre_validation_fix_added_manifest",
+                         slug=manifest.slug)
         else:
             # Validate manifest JSON
             try:
@@ -1543,10 +1550,13 @@ Translated content:"""
                     manifest_data["lang"] = manifest.lang
                     manifest_data["type"] = manifest_type
                     manifest_data["tags"] = manifest_tags
-                    new_manifest_json = json.dumps(manifest_data, separators=(",", ":"))
+                    new_manifest_json = json.dumps(
+                        manifest_data, separators=(",", ":"))
                     new_manifest = f"<!-- manifest: {new_manifest_json} -->"
-                    html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
-                    logger.debug("pre_validation_fix_manifest_slug", slug=manifest.slug)
+                    html = re.sub(manifest_pattern, new_manifest,
+                                  html, flags=re.DOTALL)
+                    logger.debug("pre_validation_fix_manifest_slug",
+                                 slug=manifest.slug)
             except json.JSONDecodeError:
                 # Invalid JSON, replace it
                 # Safe access to optional attributes with sensible defaults
@@ -1559,10 +1569,13 @@ Translated content:"""
                     "type": manifest_type,
                     "tags": manifest_tags,
                 }
-                new_manifest_json = json.dumps(manifest_data, separators=(",", ":"))
+                new_manifest_json = json.dumps(
+                    manifest_data, separators=(",", ":"))
                 new_manifest = f"<!-- manifest: {new_manifest_json} -->"
-                html = re.sub(manifest_pattern, new_manifest, html, flags=re.DOTALL)
-                logger.debug("pre_validation_fix_manifest_json", slug=manifest.slug)
+                html = re.sub(manifest_pattern, new_manifest,
+                              html, flags=re.DOTALL)
+                logger.debug("pre_validation_fix_manifest_json",
+                             slug=manifest.slug)
 
         return html
 
@@ -1578,7 +1591,8 @@ Translated content:"""
         # Match <code>...</code> tags (non-greedy to match individual tags)
         fixed_html = html
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-        matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+        matches = list(re.finditer(
+            code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
 
         # Process matches in reverse order to avoid offset issues
         for match in reversed(matches):
@@ -1588,10 +1602,11 @@ Translated content:"""
 
             # Check if this code tag is already inside a <pre> tag
             # Look backwards for <pre> tag
-            context_before = fixed_html[max(0, start_pos - 500) : start_pos]
+            context_before = fixed_html[max(0, start_pos - 500): start_pos]
             # Find the last <pre> tag before this code
             pre_matches = list(
-                re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE)
+                re.finditer(r"<pre(?:\s[^>]*)?>",
+                            context_before, re.IGNORECASE)
             )
             if pre_matches:
                 last_pre = pre_matches[-1]
@@ -1604,7 +1619,8 @@ Translated content:"""
 
             # This is a standalone <code> tag, wrap it
             wrapped = f"<pre>{code_tag}</pre>"
-            fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
+            fixed_html = fixed_html[:start_pos] + \
+                wrapped + fixed_html[end_pos:]
 
         return fixed_html
 
@@ -1749,7 +1765,8 @@ Translated content:"""
                     re.DOTALL | re.IGNORECASE,
                 )
                 if code_content_match:
-                    card_data["code_sample"] = code_content_match.group(1).strip()
+                    card_data["code_sample"] = code_content_match.group(
+                        1).strip()
 
         except Exception as e:
             logger.debug(
@@ -1805,7 +1822,8 @@ Translated content:"""
         match = re.search(card_header_pattern, apf_html)
         if match:
             apf_html = (
-                apf_html[: match.start()] + correct_header + apf_html[match.end() :]
+                apf_html[: match.start()] + correct_header +
+                apf_html[match.end():]
             )
             logger.debug(
                 "normalized_card_header",

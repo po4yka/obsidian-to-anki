@@ -23,7 +23,7 @@ Usage:
         client=client,
         base_url=base_url,
         headers=headers,
-        model="openai/gpt-4o-mini",
+        model="qwen/qwen-2.5-32b-instruct",
         messages=[{"role": "user", "content": "Hello"}],
     )
 """
@@ -299,7 +299,7 @@ def chat_completion(
         client: HTTP client instance
         base_url: OpenRouter API base URL
         headers: Request headers (must include Authorization)
-        model: Model identifier (e.g., "openai/gpt-4o-mini")
+        model: Model identifier (e.g., "qwen/qwen-2.5-32b-instruct")
         messages: List of message dicts with role and content
         temperature: Sampling temperature (0.0-2.0)
         max_tokens: Maximum tokens to generate
@@ -440,7 +440,7 @@ def chat_completion_with_tools(
         client: HTTP client instance
         base_url: OpenRouter API base URL
         headers: Request headers (must include Authorization)
-        model: Model identifier (e.g., "openai/gpt-4o-mini")
+        model: Model identifier (e.g., "qwen/qwen-2.5-32b-instruct")
         messages: List of message dicts with role and content
         tools: List of tool definitions (OpenAI function calling format)
         tool_choice: Tool selection mode ("auto", "none", "required", or specific)
@@ -596,7 +596,7 @@ def chat_completion_structured(
         client: HTTP client instance
         base_url: OpenRouter API base URL
         headers: Request headers (must include Authorization)
-        model: Model identifier (e.g., "openai/gpt-4o-mini")
+        model: Model identifier (e.g., "qwen/qwen-2.5-32b-instruct")
         messages: List of message dicts with role and content
         json_schema: JSON schema for response format
         temperature: Sampling temperature (0.0 recommended for structured output)

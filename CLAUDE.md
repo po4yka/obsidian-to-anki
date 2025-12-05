@@ -97,7 +97,7 @@ uv run arq obsidian_anki_sync.worker.WorkerSettings
 
 -   Unified interface via `BaseLLMProvider` (`base.py`)
 -   Factory pattern (`factory.py`) creates provider instances from config
--   Providers: Ollama, OpenAI, Anthropic, OpenRouter, LM Studio
+-   Provider: OpenRouter
 -   PydanticAI integration for structured outputs (`pydantic_ai_models.py`)
 
 **Configuration** (`config.py`):
@@ -175,7 +175,7 @@ Models are configured via preset + optional overrides:
 model_preset: "balanced" # or "cost_effective", "high_quality", "fast"
 
 # Override specific agents
-generator_model: "openai/gpt-4-turbo-preview"
+generator_model: "qwen/qwen-2.5-72b-instruct"
 pre_validator_model: "qwen/qwen-2.5-14b-instruct"
 ```
 

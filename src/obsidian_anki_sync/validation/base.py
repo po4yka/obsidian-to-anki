@@ -38,7 +38,7 @@ class AutoFix(BaseModel):
     """Represents an automatic fix for a validation issue.
 
     Fix functions can either:
-    - Take no args and use captured self.content/frontmatter (legacy)
+    - Take no args and use captured self.content/frontmatter
     - Take (content, frontmatter) args for cumulative fixes (preferred)
     """
 

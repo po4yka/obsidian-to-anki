@@ -170,7 +170,7 @@ class PydanticAIModelFactory:
         configuration and other enhancements not available in standard OpenAIModel.
 
         Args:
-            model_name: Model identifier (e.g., "x-ai/grok-4.1-fast:free")
+            model_name: Model identifier (e.g., "qwen/qwen-2.5-32b-instruct")
             api_key: OpenRouter API key
             base_url: OpenRouter API base URL
             site_url: Site URL for rankings
@@ -209,7 +209,7 @@ class PydanticAIModelFactory:
         OpenRouter provides access to multiple LLM providers through an OpenAI-compatible API.
 
         Args:
-            model_name: Model identifier (e.g., "openai/gpt-4", "anthropic/claude-3-opus")
+            model_name: Model identifier (e.g., "qwen/qwen-2.5-72b-instruct", "deepseek/deepseek-chat")
             api_key: OpenRouter API key (if not provided, uses OPENROUTER_API_KEY env var)
             base_url: OpenRouter API base URL
             site_url: Your site URL for OpenRouter rankings (optional)
@@ -315,7 +315,7 @@ class PydanticAIModelFactory:
             ValueError: If provider is not supported or configuration is invalid
         """
         provider = provider or config.llm_provider
-        model_name = model_name or config.generator_model
+        model_name = model_name or config.get_model_for_agent("generator")
 
         resolved_effort = reasoning_effort or config.get_reasoning_effort(agent_type)
 
@@ -380,7 +380,7 @@ class PydanticAIModelFactory:
 
 
 def create_openrouter_model_from_env(
-    model_name: str = "anthropic/claude-3-5-sonnet",
+    model_name: str = "qwen/qwen-2.5-72b-instruct",
 ) -> OpenAIChatModel:
     """Convenience function to create OpenRouter model from environment variables.
 
@@ -390,7 +390,7 @@ def create_openrouter_model_from_env(
     - OPENROUTER_SITE_NAME (optional): Your site name for rankings
 
     Args:
-        model_name: Model to use (default: anthropic/claude-3-5-sonnet)
+        model_name: Model to use (default: qwen/qwen-2.5-72b-instruct)
 
     Returns:
         Configured OpenAIChatModel instance

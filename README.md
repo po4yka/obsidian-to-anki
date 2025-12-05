@@ -12,7 +12,6 @@ Sync Obsidian Q&A notes to Anki flashcards using LLM generation with multi-agent
 
 -   **Bidirectional Sync**: Sync between Obsidian notes and Anki cards
 -   **Multi-Agent System**: LangGraph and PydanticAI orchestration
--   **Multi-Provider Support**: Ollama, OpenAI, Anthropic, OpenRouter, LM Studio
 -   **Memory Learning**: Continuous quality improvement via patterns
 -   **Privacy-First**: 100% local processing with Ollama
 -   **Bilingual**: English/Russian with auto-detection
@@ -85,7 +84,7 @@ graph TB
     end
 
     subgraph "External Services"
-        G[LLM Providers<br/>Ollama/OpenAI/Anthropic]
+        G[LLM Providers<br/>Ollama/OpenRouter]
         H[AnkiConnect API<br/>Card Management]
         I[SQLite Database<br/>State & Progress]
     end
@@ -188,7 +187,7 @@ sequenceDiagram
     ```bash
     brew install ollama
     ollama serve
-    ollama pull llama3.2:3b qwen2.5:7b qwen2.5:14b
+    ollama pull qwen2.5:7b qwen2.5:14b qwen2.5:32b
     ```
 
     Cloud:
@@ -205,11 +204,11 @@ sequenceDiagram
     source_dir: "Notes"        # Folder containing Q&A notes
     anki_deck_name: "My Deck"
 
-    llm_provider: "ollama"     # ollama|openai|anthropic|openrouter|lm_studio
+    llm_provider: "ollama"     # ollama|openrouter|lm_studio
     use_langgraph: true
     use_pydantic_ai: true
 
-    pre_validator_model: "llama3.2:3b"
+    pre_validator_model: "qwen2.5:7b"
     generator_model: "qwen2.5:14b"
     post_validator_model: "qwen2.5:7b"
     ```
@@ -272,22 +271,16 @@ graph TD
     end
 
     subgraph "Cloud Providers"
-        C[OpenAI<br/>GPT-4 quality<br/>Always available<br/>Token-based pricing<br/>Enterprise security]
-        D[Anthropic<br/>Claude excellence<br/>Safety-focused<br/>Premium quality<br/>API key required]
-        E[OpenRouter<br/>Multi-model access<br/>Model marketplace<br/>Cost optimization<br/>Best value]
+        E[OpenRouter<br/>Multi-model access<br/>Qwen/Deepseek/Kimi/Minimax<br/>Cost optimization<br/>Best value]
     end
 
     A --> F{Choose Based On:}
     B --> F
-    C --> F
-    D --> F
     E --> F
 
     F --> G[Privacy Needs<br/>→ Ollama]
     F --> H[GUI Preference<br/>→ LM Studio]
-    F --> I[Quality Priority<br/>→ Anthropic]
     F --> J[Cost Optimization<br/>→ OpenRouter]
-    F --> K[Simplicity<br/>→ OpenAI]
 
     style A fill:#e8f5e8
     style B fill:#e3f2fd

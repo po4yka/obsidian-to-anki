@@ -86,12 +86,14 @@ class OpenAIProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 
@@ -156,7 +158,7 @@ class OpenAIProvider(BaseLLMProvider):
         """Generate completion from OpenAI.
 
         Args:
-            model: Model name (e.g., "gpt-4", "gpt-3.5-turbo")
+            model: Model name (OpenAI provider no longer supported)
             prompt: User prompt
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-2.0)

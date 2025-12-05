@@ -12,7 +12,7 @@ AI validation provides intelligent fixes for Q&A notes using LLM providers.
 
 ```yaml
 enable_ai_validation: true
-ai_validation_model: "openai/gpt-4o-mini"
+ai_validation_model: "qwen/qwen-2.5-32b-instruct"
 ai_validation_temperature: 0.1
 
 ai_validation:
@@ -26,7 +26,7 @@ Or via environment:
 
 ```bash
 export ENABLE_AI_VALIDATION=true
-export AI_VALIDATION_MODEL="openai/gpt-4o-mini"
+export AI_VALIDATION_MODEL="qwen/qwen-2.5-32b-instruct"
 ```
 
 ## Usage
@@ -73,7 +73,7 @@ for fix in validator.get_safe_fixes():
 | Title generation | 2-3s per title |
 | List formatting  | <0.1s (regex)  |
 
-**Tips:** Use faster models (gpt-4o-mini), batch processing, caching.
+**Tips:** Use faster models (qwen/qwen-2.5-32b-instruct), batch processing, caching.
 
 ## Error Handling
 

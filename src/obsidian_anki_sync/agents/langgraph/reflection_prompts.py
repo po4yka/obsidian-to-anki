@@ -138,7 +138,7 @@ Recommend revision only if enrichments are actively harmful or significantly sub
     return base_prompt
 
 
-# Legacy prompt variables for backward compatibility
+# Prompt variables for convenience
 GENERATION_REFLECTION_PROMPT = get_generation_reflection_prompt("general")
 ENRICHMENT_REFLECTION_PROMPT = get_enrichment_reflection_prompt("general")
 
@@ -241,6 +241,6 @@ Prioritize quality over quantity in enrichments."""
     return base_prompt
 
 
-# Legacy prompt variables for backward compatibility
+# Prompt variables for convenience
 REVISION_PROMPT_GENERATION = get_revision_prompt_generation("general")
 REVISION_PROMPT_ENRICHMENT = get_revision_prompt_enrichment("general")

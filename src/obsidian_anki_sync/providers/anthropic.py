@@ -89,12 +89,14 @@ class AnthropicProvider(BaseLLMProvider):
         # This provider is used in sync contexts, so async client is not needed
         self.client = httpx.Client(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
         self.async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=5,
+                                max_connections=10),
             headers=headers,
         )
 
@@ -125,7 +127,7 @@ class AnthropicProvider(BaseLLMProvider):
             # Make a minimal request to check connectivity
             # Using a small model and minimal tokens
             test_payload = {
-                "model": "claude-3-haiku-20240307",
+                "model": "qwen/qwen-2.5-32b-instruct",
                 "max_tokens": 10,
                 "messages": [{"role": "user", "content": "Hi"}],
             }
@@ -148,24 +150,13 @@ class AnthropicProvider(BaseLLMProvider):
         """List available Claude models.
 
         Returns:
-            List of model identifiers
+            List of model identifiers (empty - Claude models removed)
 
         Note:
-            Anthropic doesn't provide a models endpoint, so we return
-            a hardcoded list of known models.
+            Anthropic provider no longer supports Claude models.
+            Use OpenRouter with qwen/deepseek/kimi/minimax models instead.
         """
-        models = [
-            # Claude 3 models
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
-            # Claude 2 models
-            "claude-2.1",
-            "claude-2.0",
-            # Claude Instant
-            "claude-instant-1.2",
-        ]
-        return models
+        return []
 
     def generate(
         self,
@@ -182,7 +173,7 @@ class AnthropicProvider(BaseLLMProvider):
         """Generate completion from Claude.
 
         Args:
-            model: Model name (e.g., "claude-3-opus-20240229", "claude-3-sonnet-20240229")
+            model: Model name (Anthropic provider no longer supports models)
             prompt: User prompt
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)
@@ -348,7 +339,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)
@@ -528,7 +520,8 @@ class AnthropicProvider(BaseLLMProvider):
                 model=model,
                 error=str(e),
                 response_data=str(data) if "data" in locals() else "N/A",
-                response_data_length=len(str(data)) if "data" in locals() else 0,
+                response_data_length=len(
+                    str(data)) if "data" in locals() else 0,
             )
             msg = f"Failed to parse Anthropic response: {e}"
             raise ValueError(msg)

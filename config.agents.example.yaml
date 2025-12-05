@@ -40,33 +40,32 @@ agent_execution_mode: "parallel"
 ollama_base_url: "http://localhost:11434"
 
 # Pre-Validator Agent Configuration
-# Performs fast structural checks before expensive card generation
-pre_validator_model: "qwen3:8b" # Lightweight model for validation
-pre_validator_temperature: 0.0 # Deterministic validation
 pre_validation_enabled: true # Enable/disable pre-validation
 
-# Generator Agent Configuration
-# Generates APF cards using powerful local LLM
-generator_model: "qwen3:32b" # Powerful model for generation
-generator_temperature: 0.3 # Some creativity for card generation
-
 # Post-Validator Agent Configuration
-# Validates generated cards for quality and correctness
-post_validator_model: "qwen3:14b" # Medium model with reasoning
-post_validator_temperature: 0.0 # Deterministic validation
 post_validation_max_retries: 3 # Retry with auto-fix if validation fails
 post_validation_auto_fix: true # Attempt automatic corrections
 post_validation_strict_mode: true # Strict quality requirements
 
 # =============================================================================
-# LEGACY OPENROUTER CONFIGURATION (Fallback)
+# MODEL CONFIGURATION
 # =============================================================================
-# These settings are used when use_langgraph: false
-# Requires OPENROUTER_API_KEY environment variable
+# Model configuration uses preset system with optional overrides
+model_preset: "balanced"
+default_llm_model: "qwen3:32b"
 
-openrouter_model: "openai/gpt-4"
-llm_temperature: 0.2
-llm_top_p: 0.3
+# Optional: Override specific tasks (only specify what differs from preset)
+# model_overrides:
+#   pre_validation:
+#     model_name: "qwen3:8b"
+#     temperature: 0.0
+#   generation:
+#     model_name: "qwen3:32b"
+#     temperature: 0.3
+#   post_validation:
+#     model_name: "qwen3:14b"
+#     temperature: 0.0
+
 # =============================================================================
 # USAGE NOTES
 # =============================================================================

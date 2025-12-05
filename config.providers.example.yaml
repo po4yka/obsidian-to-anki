@@ -41,9 +41,6 @@ openrouter_base_url: "https://openrouter.ai/api/v1"
 openrouter_site_url: null # Optional: your site URL for rankings
 openrouter_site_name: null # Optional: your site name for rankings
 
-# Legacy OpenRouter model (for backward compatibility when not using agent system)
-openrouter_model: "openai/gpt-4"
-
 # ============================================================================
 # Agent System Configuration
 # ============================================================================
@@ -85,7 +82,7 @@ post_validation_strict_mode: true
 # --- EXAMPLE 2: LM Studio with Local Models ---
 # llm_provider: "lm_studio"
 # lm_studio_base_url: "http://localhost:1234/v1"
-# pre_validator_model: "lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF"
+# pre_validator_model: "lmstudio-community/Qwen2.5-7B-Instruct-GGUF"
 # generator_model: "lmstudio-community/Qwen2.5-32B-Instruct-GGUF"
 # post_validator_model: "lmstudio-community/Qwen2.5-14B-Instruct-GGUF"
 
@@ -111,9 +108,9 @@ post_validation_strict_mode: true
 # llm_provider: "ollama"
 # ollama_base_url: "https://api.ollama.com"
 # ollama_api_key: "your-ollama-cloud-key"  # Or set OLLAMA_API_KEY env var
-# pre_validator_model: "llama3:8b"
-# generator_model: "llama3:70b"
-# post_validator_model: "llama3:70b"
+# pre_validator_model: "qwen2.5:7b"
+# generator_model: "qwen2.5:32b"
+# post_validator_model: "qwen2.5:14b"
 
 # --- EXAMPLE 5: Mixed Setup (Not Recommended) ---
 # Note: All agents must use the same provider. You cannot mix providers.
@@ -147,7 +144,7 @@ export_output_path: null # Set to generate .apkg file
 # - You want complete privacy and offline operation
 # - You have sufficient hardware (Mac with Apple Silicon recommended)
 # - You need cost-free unlimited usage
-# - Models: qwen3:8b, qwen3:14b, qwen3:32b, llama3:70b, etc.
+# - Models: qwen3:8b, qwen3:14b, qwen3:32b, qwen2.5:7b, qwen2.5:14b, qwen2.5:32b, etc.
 
 # Use LM Studio when:
 # - You prefer a GUI for model management
@@ -156,7 +153,7 @@ export_output_path: null # Set to generate .apkg file
 # - Compatible with same models as Ollama (GGUF format)
 
 # Use OpenRouter when:
-# - You need access to state-of-the-art models (GPT-4, Claude 3, etc.)
+# - You need access to state-of-the-art models (Qwen, Deepseek, Kimi, Minimax)
 # - You don't have local hardware capable of running large models
 # - You want consistent performance without hardware limitations
 # - You're okay with per-token pricing and cloud dependency

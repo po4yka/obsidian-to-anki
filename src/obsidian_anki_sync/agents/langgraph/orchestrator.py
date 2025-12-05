@@ -138,8 +138,10 @@ class LangGraphOrchestrator:
                 config, "enable_duplicate_detection", False
             )  # Default to False
         )
-        self.enable_highlight_agent = getattr(config, "enable_highlight_agent", True)
-        self.highlight_max_candidates = getattr(config, "highlight_max_candidates", 3)
+        self.enable_highlight_agent = getattr(
+            config, "enable_highlight_agent", True)
+        self.highlight_max_candidates = getattr(
+            config, "highlight_max_candidates", 3)
 
         # NEW: Agent framework selection (can be overridden by memory)
         self.agent_framework = (
@@ -151,7 +153,7 @@ class LangGraphOrchestrator:
         # NEW: Initialize unified agent selector for framework switching
         self.agent_selector = UnifiedAgentSelector(config)
 
-        # Initialize ModelFactory (still needed for some legacy functionality)
+        # Initialize ModelFactory
         self.model_factory = ModelFactory(config)
 
         # Initialize WorkflowBuilder
@@ -161,13 +163,14 @@ class LangGraphOrchestrator:
         self.memory_store = None
         self.advanced_memory_store = None
 
-        # Legacy ChromaDB memory store
+        # ChromaDB memory store
         if getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
             try:
                 memory_storage_path = getattr(
                     config, "memory_storage_path", Path(".agent_memory")
                 )
-                enable_semantic_search = getattr(config, "enable_semantic_search", True)
+                enable_semantic_search = getattr(
+                    config, "enable_semantic_search", True)
 
                 self.memory_store = AgentMemoryStore(
                     storage_path=memory_storage_path,
@@ -179,7 +182,8 @@ class LangGraphOrchestrator:
                     path=str(memory_storage_path),
                 )
             except Exception as e:
-                logger.warning("langgraph_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "langgraph_memory_store_init_failed", error=str(e))
 
         # NEW: Advanced MongoDB memory store (deferred connection)
         self.advanced_memory_store = None
@@ -200,7 +204,8 @@ class LangGraphOrchestrator:
                 )
                 logger.info("advanced_memory_store_deferred_connection")
             except Exception as e:
-                logger.warning("advanced_memory_store_init_failed", error=str(e))
+                logger.warning(
+                    "advanced_memory_store_init_failed", error=str(e))
 
         # NEW: Enhanced observability system
         self.observability = None
@@ -212,7 +217,8 @@ class LangGraphOrchestrator:
                 self.observability = EnhancedObservabilitySystem(config)
                 logger.info("enhanced_observability_system_initialized")
             except Exception as e:
-                logger.warning("enhanced_observability_init_failed", error=str(e))
+                logger.warning(
+                    "enhanced_observability_init_failed", error=str(e))
 
         # RAG integration for context enrichment and duplicate detection
         self.rag_integration = None
@@ -280,7 +286,8 @@ class LangGraphOrchestrator:
                     logger.warning("advanced_memory_store_connection_failed")
                     self.advanced_memory_store = None
             except Exception as e:
-                logger.warning("advanced_memory_store_async_setup_failed", error=str(e))
+                logger.warning(
+                    "advanced_memory_store_async_setup_failed", error=str(e))
                 self.advanced_memory_store = None
 
     def convert_to_cards(
@@ -292,7 +299,7 @@ class LangGraphOrchestrator:
     ) -> list[Card]:
         """Convert GeneratedCard instances to Card instances.
 
-        This method replicates the legacy orchestrator's card conversion logic.
+        This method converts GeneratedCard instances to Card instances.
         """
         import hashlib
 
@@ -307,7 +314,8 @@ class LangGraphOrchestrator:
             # Validate that we can extract fields from the generated HTML
             try:
                 # Use default note type for validation check
-                fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
+                fields = map_apf_to_anki_fields(
+                    gen_card.apf_html, "APF::Simple")
 
                 # Log all extracted fields for debugging purposes
                 logger.debug(
@@ -356,7 +364,8 @@ class LangGraphOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(
+                    qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
@@ -676,7 +685,7 @@ class LangGraphOrchestrator:
                 ),
                 # NEW: Agent framework configuration (dynamically determined)
                 "agent_framework": optimal_framework,
-                "agent_selector": runtime_key,  # Present for backward compatibility
+                "agent_selector": runtime_key,
                 # Cached model names (models fetched via runtime registry)
                 "pre_validator_model": self.config.get_model_for_agent("pre_validator"),
                 "card_splitting_model": self.config.get_model_for_agent(
@@ -975,7 +984,8 @@ class LangGraphOrchestrator:
             pipeline_id=pipeline_id,
             note_id=metadata.id,
             success=success,
-            cards_count=len(generation.cards) if generation and generation.cards else 0,
+            cards_count=len(
+                generation.cards) if generation and generation.cards else 0,
         )
         return result
 
@@ -1028,7 +1038,8 @@ class LangGraphOrchestrator:
                     timestamp=start_time,
                 )
                 self.observability.record_metrics(metrics)
-                logger.info("observability_metrics_recorded", pipeline_id=pipeline_id)
+                logger.info("observability_metrics_recorded",
+                            pipeline_id=pipeline_id)
             except Exception as e:
                 logger.warning(
                     "observability_metrics_recording_failed",

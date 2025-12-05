@@ -266,7 +266,7 @@ def test_grok_reasoning_enabled_for_complex_schema(
     }
 
     result = openrouter_provider.generate_json(
-        model="x-ai/grok-4.1-fast:free",
+        model="qwen/qwen-2.5-32b-instruct",
         prompt="Extract complex QAs from this text",
         system="You are an expert at QA extraction",
         temperature=0.0,
@@ -311,7 +311,7 @@ def test_grok_reasoning_disabled_for_simple_schema(
     }
 
     result = openrouter_provider.generate_json(
-        model="x-ai/grok-4.1-fast:free",
+        model="qwen/qwen-2.5-32b-instruct",
         prompt="What is the capital of France?",
         system="Answer questions directly",
         temperature=0.0,
@@ -341,7 +341,7 @@ def test_grok_explicit_reasoning_enabled_parameter(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast:free",
+        model="qwen/qwen-2.5-32b-instruct",
         prompt="Analyze this text",
         system="Be analytical",
         temperature=0.0,
@@ -368,7 +368,7 @@ def test_reasoning_effort_explicit_value(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast:free",
+        model="qwen/qwen-2.5-32b-instruct",
         prompt="Test explicit effort",
         system="system",
         temperature=0.0,
@@ -401,7 +401,7 @@ def test_generate_streaming_returns_chunk_iterator(
     )
 
     result = openrouter_provider.generate(
-        model="x-ai/grok-4.1-fast:free",
+        model="qwen/qwen-2.5-32b-instruct",
         prompt="Say hello",
         system="You are concise",
         stream=True,

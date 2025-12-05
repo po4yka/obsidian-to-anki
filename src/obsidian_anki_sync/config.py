@@ -71,7 +71,8 @@ class Config(BaseSettings):
 
     # Required fields
     # Obsidian paths - vault_path can be empty string from env, will be validated
-    vault_path: Path | str = Field(default="", description="Path to Obsidian vault")
+    vault_path: Path | str = Field(
+        default="", description="Path to Obsidian vault")
     source_dir: Path = Field(
         default=Path(), description="Source directory within vault"
     )
@@ -133,7 +134,8 @@ class Config(BaseSettings):
     anki_deck_name: str = Field(
         default="Interview Questions", description="Anki deck name"
     )
-    anki_note_type: str = Field(default="APF::Simple", description="Anki note type")
+    anki_note_type: str = Field(
+        default="APF::Simple", description="Anki note type")
 
     # Anki model name mapping (internal -> actual Anki model name)
     # Maps internal note type names to actual Anki model names
@@ -150,7 +152,8 @@ class Config(BaseSettings):
     )
 
     # Runtime settings
-    run_mode: str = Field(default="apply", description="Run mode: 'apply' or 'dry-run'")
+    run_mode: str = Field(
+        default="apply", description="Run mode: 'apply' or 'dry-run'")
     delete_mode: str = Field(
         default="delete", description="Delete mode: 'delete' or 'archive'"
     )
@@ -324,9 +327,6 @@ class Config(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_site_url: str | None = None
     openrouter_site_name: str | None = None
-
-    # Legacy OpenRouter settings (for backward compatibility)
-    openrouter_model: str = "x-ai/grok-4.1-fast:free"
 
     # Fallback model for when primary model fails (e.g., empty completions)
     # Used automatically when models like deepseek/deepseek-v3.2 return empty responses
@@ -588,38 +588,22 @@ class Config(BaseSettings):
     model_preset: str = "balanced"
 
     # Default model used by ALL agents unless specifically overridden
-    # Only used if model_preset is not set or for backward compatibility
-    default_llm_model: str = "x-ai/grok-4.1-fast:free"
+    # Only used if model_preset is not set
+    # Latest: Excellent reasoning, 163K context
+    default_llm_model: str = "deepseek/deepseek-v3.2"
 
-    # Per-agent model overrides (optional - overrides preset defaults)
-    # Set model to empty string ("") to use preset default
-    # Set temperature/max_tokens to None to use preset default
+    # Unified model override system
+    # Override specific tasks (only specify what differs from preset)
+    # Format: {'task_name': {'model_name': '...', 'temperature': 0.3, 'max_tokens': 8192, ...}}
+    # Task names: qa_extraction, parser_repair, note_correction, pre_validation, generation,
+    #            post_validation, context_enrichment, memorization_quality, card_splitting,
+    #            split_validator, duplicate_detection, reasoning, reflection, highlight
+    model_overrides: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Model overrides per task. Format: {'task_name': {'model_name': '...', 'temperature': 0.3, ...}}",
+    )
 
-    # QA Extraction
-    qa_extractor_model: str = ""
-    qa_extractor_temperature: float | None = None
-    qa_extractor_max_tokens: int | None = None
-    # Parser Repair (reactive - only runs when parsing fails)
-    parser_repair_model: str = ""
-    parser_repair_temperature: float | None = None
-    parser_repair_max_tokens: int | None = None
-    # Note Correction (proactive - runs before parsing if enabled)
-    note_correction_model: str = ""
-    note_correction_temperature: float | None = None
-    note_correction_max_tokens: int | None = None
-    # Pre-Validation
-    pre_validator_model: str = ""
-    pre_validator_temperature: float | None = None
-    pre_validator_max_tokens: int | None = None
-    # Generation
-    # Default to Qwen model which handles structured JSON output reliably
-    generator_model: str = "qwen/qwen3-next-80b-a3b-instruct"
-    generator_temperature: float | None = None
-    generator_max_tokens: int | None = None
-    # Post-Validation
-    post_validator_model: str = ""
-    post_validator_temperature: float | None = None
-    post_validator_max_tokens: int | None = None
+    # Post-Validation specific settings (not model selection)
     post_validator_timeout_seconds: float = Field(
         default=2700.0,
         ge=5.0,
@@ -635,16 +619,6 @@ class Config(BaseSettings):
         ge=0.0,
         description="Maximum jitter (seconds) added to the backoff delay",
     )
-    # Context Enrichment
-    context_enrichment_model: str = ""
-    # Memorization Quality
-    memorization_quality_model: str = ""
-    # Card Splitting
-    card_splitting_model: str = ""
-    # Split Validation
-    split_validator_model: str = ""
-    # Duplicate Detection
-    duplicate_detection_model: str = ""
 
     # LangGraph Workflow Configuration
     langgraph_max_retries: int = 3
@@ -687,16 +661,7 @@ class Config(BaseSettings):
         default=False,
         description="Log reasoning traces to logger (can be verbose)",
     )
-    reasoning_model: str = Field(
-        default="",
-        description="Model for reasoning nodes (uses generator_model if empty)",
-    )
-    reasoning_temperature: float = Field(
-        default=0.1,
-        ge=0.0,
-        le=1.0,
-        description="Temperature for reasoning model (lower = more deterministic)",
-    )
+    # Reasoning model configuration moved to model_overrides["reasoning"]
     cot_enabled_stages: list[str] = Field(
         default_factory=lambda: [
             "pre_validation",
@@ -721,16 +686,7 @@ class Config(BaseSettings):
         default=False,
         description="Log reflection traces to logger (can be verbose)",
     )
-    reflection_model: str = Field(
-        default="",
-        description="Model for reflection nodes (uses generator_model if empty)",
-    )
-    reflection_temperature: float = Field(
-        default=0.2,
-        ge=0.0,
-        le=1.0,
-        description="Temperature for reflection model",
-    )
+    # Reflection model configuration moved to model_overrides["reflection"]
     max_revisions: int = Field(
         default=2,
         ge=0,
@@ -770,61 +726,18 @@ class Config(BaseSettings):
     # Primary agent framework selection
     agent_framework: str = Field(
         default="pydantic_ai",
-        description="Primary agent framework: 'pydantic_ai' or 'langchain'",
+        description="Primary agent framework: 'pydantic_ai' or 'memory_enhanced'",
     )
 
     @field_validator("agent_framework")
     @classmethod
     def validate_agent_framework(cls, v: str) -> str:
         """Validate agent framework selection."""
-        valid_frameworks = ["pydantic_ai", "langchain"]
+        valid_frameworks = ["pydantic_ai", "memory_enhanced"]
         if v not in valid_frameworks:
             msg = f"agent_framework must be one of {valid_frameworks}, got '{v}'"
             raise ValueError(msg)
         return v
-
-    # LangChain Agent Type Configuration
-    # Specify which LangChain agent type to use for each task
-    langchain_generator_type: str = Field(
-        default="tool_calling",
-        description="LangChain agent type for card generation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
-    )
-    langchain_pre_validator_type: str = Field(
-        default="react",
-        description="LangChain agent type for pre-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
-    )
-    langchain_post_validator_type: str = Field(
-        default="tool_calling",
-        description="LangChain agent type for post-validation: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
-    )
-    langchain_enrichment_type: str = Field(
-        default="structured_chat",
-        description="LangChain agent type for context enrichment: 'tool_calling', 'react', 'structured_chat', 'json_chat'",
-    )
-
-    @field_validator(
-        "langchain_generator_type",
-        "langchain_pre_validator_type",
-        "langchain_post_validator_type",
-        "langchain_enrichment_type",
-    )
-    @classmethod
-    def validate_langchain_agent_type(cls, v: str) -> str:
-        """Validate LangChain agent type selection."""
-        valid_types = ["tool_calling", "react", "structured_chat", "json_chat"]
-        if v not in valid_types:
-            msg = f"LangChain agent type must be one of {valid_types}, got '{v}'"
-            raise ValueError(msg)
-        return v
-
-    # Agent Framework Fallback Configuration
-    agent_fallback_on_error: str = Field(
-        default="pydantic_ai",
-        description="Fallback agent framework when primary framework fails",
-    )
-    agent_fallback_on_timeout: str = Field(
-        default="react", description="Fallback agent type when primary agent times out"
-    )
 
     # Enhancement Agents (optional quality improvements)
     enable_card_splitting: bool = True  # Analyze if note should be split
@@ -864,10 +777,7 @@ class Config(BaseSettings):
         le=10,
         description="Maximum number of QA candidates suggested by highlight agent",
     )
-    highlight_model: str = Field(
-        default="",
-        description="Override model for highlight agent (empty string uses preset/default)",
-    )
+    # Highlight model configuration moved to model_overrides["highlight"]
 
     # Performance Optimization Settings
     enable_batch_operations: bool = True  # Enable batch Anki and DB operations
@@ -912,8 +822,7 @@ class Config(BaseSettings):
     def get_model_for_agent(self, agent_type: str) -> str:
         """Get the model name for a specific agent.
 
-        Uses new model configuration system with presets if available,
-        falls back to legacy configuration.
+        Uses model configuration system with presets.
 
         Args:
             agent_type: Agent type (e.g., "pre_validator", "generator", "context_enrichment")
@@ -944,29 +853,49 @@ class Config(BaseSettings):
 
         task = agent_to_task.get(agent_type)
 
-        # Check for explicit override first
-        # Maps agent type to the override field (empty string = use preset)
-        agent_model_map = {
-            "pre_validator": self.pre_validator_model,
-            "generator": self.generator_model,
-            "post_validator": self.post_validator_model,
-            "context_enrichment": self.context_enrichment_model,
-            "memorization_quality": self.memorization_quality_model,
-            "card_splitting": self.card_splitting_model,
-            "split_validator": self.split_validator_model,
-            "duplicate_detection": self.duplicate_detection_model,
-            "qa_extractor": self.qa_extractor_model,
-            "parser_repair": self.parser_repair_model,
-            "note_correction": self.note_correction_model or self.parser_repair_model,
-            "reasoning": self.reasoning_model or self.generator_model,  # CoT reasoning
-            "reflection": self.reflection_model
-            or self.generator_model,  # Self-reflection
-            "highlight": self.highlight_model or self.pre_validator_model,
+        # Map agent types to task names for override lookup
+        agent_to_task_name = {
+            "pre_validator": "pre_validation",
+            "generator": "generation",
+            "post_validator": "post_validation",
+            "context_enrichment": "context_enrichment",
+            "memorization_quality": "memorization_quality",
+            "card_splitting": "card_splitting",
+            "split_validator": "card_splitting",  # Reuse card_splitting task
+            "duplicate_detection": "duplicate_detection",
+            "qa_extractor": "qa_extraction",
+            "parser_repair": "parser_repair",
+            "note_correction": "parser_repair",  # Reuse parser_repair task
+            "reasoning": "reasoning",
+            "reflection": "reflection",
+            "highlight": "highlight",
         }
 
-        explicit_model = agent_model_map.get(agent_type, "")
-        if explicit_model:
-            return explicit_model
+        task_name = agent_to_task_name.get(agent_type)
+
+        # Check for explicit override in model_overrides
+        if task_name and task_name in self.model_overrides:
+            override = self.model_overrides[task_name]
+            if "model_name" in override and override["model_name"]:
+                return override["model_name"]
+
+        # Special fallback cases for backward compatibility
+        if agent_type == "note_correction" and "parser_repair" in self.model_overrides:
+            override = self.model_overrides["parser_repair"]
+            if "model_name" in override and override["model_name"]:
+                return override["model_name"]
+        if agent_type == "reasoning" and "generation" in self.model_overrides:
+            override = self.model_overrides["generation"]
+            if "model_name" in override and override["model_name"]:
+                return override["model_name"]
+        if agent_type == "reflection" and "generation" in self.model_overrides:
+            override = self.model_overrides["generation"]
+            if "model_name" in override and override["model_name"]:
+                return override["model_name"]
+        if agent_type == "highlight" and "pre_validation" in self.model_overrides:
+            override = self.model_overrides["pre_validation"]
+            if "model_name" in override and override["model_name"]:
+                return override["model_name"]
 
         # Use preset system if task is known
         if task:
@@ -1007,44 +936,12 @@ class Config(BaseSettings):
         except (ValueError, AttributeError):
             preset = ModelPreset.BALANCED
 
-        # Build overrides from config
-        overrides: dict[str, Any] = {}
+        # Get overrides from model_overrides dict
+        task_overrides = self.model_overrides.get(task.lower(), {})
 
-        # Task-specific overrides
-        if task == "qa_extraction":
-            if self.qa_extractor_temperature is not None:
-                overrides["temperature"] = self.qa_extractor_temperature
-            if self.qa_extractor_max_tokens is not None:
-                overrides["max_tokens"] = self.qa_extractor_max_tokens
-        elif task == "generation":
-            if self.generator_temperature is not None:
-                overrides["temperature"] = self.generator_temperature
-            if self.generator_max_tokens is not None:
-                overrides["max_tokens"] = self.generator_max_tokens
-        elif task == "pre_validation":
-            if self.pre_validator_temperature is not None:
-                overrides["temperature"] = self.pre_validator_temperature
-            if self.pre_validator_max_tokens is not None:
-                overrides["max_tokens"] = self.pre_validator_max_tokens
-        elif task == "post_validation":
-            if self.post_validator_temperature is not None:
-                overrides["temperature"] = self.post_validator_temperature
-            if self.post_validator_max_tokens is not None:
-                overrides["max_tokens"] = self.post_validator_max_tokens
-        elif task == "parser_repair":
-            if self.parser_repair_temperature is not None:
-                overrides["temperature"] = self.parser_repair_temperature
-            if self.parser_repair_max_tokens is not None:
-                overrides["max_tokens"] = self.parser_repair_max_tokens
-
-        # Get model config from preset
-        config = get_model_config(model_task, preset, overrides if overrides else None)
-
-        # Override model name if explicitly set
-        explicit_model = self.get_model_for_agent(task)
-        if explicit_model and explicit_model != config.model_name:
-            config.model_name = explicit_model
-            config.capabilities = None  # Will be recalculated
+        # Get model config from preset with overrides
+        config = get_model_config(
+            model_task, preset, task_overrides if task_overrides else None)
 
         return {
             "model_name": config.model_name,
@@ -1114,7 +1011,8 @@ class Config(BaseSettings):
 
         validated_vault = validate_vault_path(vault_path, allow_symlinks=False)
         _ = validate_source_dir(validated_vault, self.source_dir)
-        validated_db = validate_db_path(self.db_path, vault_path=validated_vault)
+        validated_db = validate_db_path(
+            self.db_path, vault_path=validated_vault)
 
         parent_dir = validated_db.parent
         if not parent_dir.exists():
@@ -1339,7 +1237,7 @@ def load_config(
     Args:
         config_path: Optional explicit path to config file.
         strict_config: If True (default), raise ConfigurationError on YAML parse errors.
-            If False, continue with empty config on parse errors (legacy behavior).
+            If False, continue with empty config on parse errors.
 
     Returns:
         Loaded Config object.
@@ -1369,7 +1267,8 @@ def load_config(
                 "config_searching", source="environment_variable", path=env_path
             )
         candidate_paths.append(Path.cwd() / "config.yaml")
-        default_repo_config = Path(__file__).resolve().parents[2] / "config.yaml"
+        default_repo_config = Path(
+            __file__).resolve().parents[2] / "config.yaml"
         candidate_paths.append(default_repo_config)
         logger.debug(
             "config_searching",
@@ -1381,7 +1280,8 @@ def load_config(
     for candidate in candidate_paths:
         if candidate.exists():
             resolved_config_path = candidate
-            logger.info("config_file_found", config_path=str(resolved_config_path))
+            logger.info("config_file_found",
+                        config_path=str(resolved_config_path))
             break
 
     if not resolved_config_path:
@@ -1415,7 +1315,7 @@ def load_config(
                     f"Original error: {e}"
                 )
                 raise ConfigurationError(msg, suggestion=suggestion) from e
-            # In non-strict mode, continue with empty yaml_data (legacy behavior)
+            # In non-strict mode, continue with empty yaml_data
 
     # Convert YAML data to environment variable format for pydantic-settings
     # pydantic-settings will automatically load from .env file via model_config
@@ -1469,9 +1369,109 @@ def load_config(
             if export_output_str:
                 export_output_path = Path(str(export_output_str))
 
+        # Migrate old individual model fields to model_overrides structure
+        legacy_model_fields = [
+            "qa_extractor_model", "parser_repair_model", "note_correction_model",
+            "pre_validator_model", "generator_model", "post_validator_model",
+            "context_enrichment_model", "memorization_quality_model",
+            "card_splitting_model", "split_validator_model",
+            "duplicate_detection_model", "reasoning_model", "reflection_model",
+            "highlight_model"
+        ]
+        legacy_temp_fields = [
+            "qa_extractor_temperature", "parser_repair_temperature",
+            "note_correction_temperature", "pre_validator_temperature",
+            "generator_temperature", "post_validator_temperature"
+        ]
+        legacy_max_tokens_fields = [
+            "qa_extractor_max_tokens", "parser_repair_max_tokens",
+            "note_correction_max_tokens", "pre_validator_max_tokens",
+            "generator_max_tokens", "post_validator_max_tokens"
+        ]
+
+        # Map legacy field names to task names
+        field_to_task = {
+            "qa_extractor_model": "qa_extraction",
+            "parser_repair_model": "parser_repair",
+            "note_correction_model": "parser_repair",  # Reuse parser_repair
+            "pre_validator_model": "pre_validation",
+            "generator_model": "generation",
+            "post_validator_model": "post_validation",
+            "context_enrichment_model": "context_enrichment",
+            "memorization_quality_model": "memorization_quality",
+            "card_splitting_model": "card_splitting",
+            "split_validator_model": "card_splitting",  # Reuse card_splitting
+            "duplicate_detection_model": "duplicate_detection",
+            "reasoning_model": "reasoning",
+            "reflection_model": "reflection",
+            "highlight_model": "highlight",
+        }
+
+        # Check for legacy fields and migrate to model_overrides
+        model_overrides: dict[str, dict[str, Any]] = {}
+        if "model_overrides" in yaml_data:
+            model_overrides = yaml_data.get("model_overrides", {})
+
+        has_legacy_fields = False
+        for field_name in legacy_model_fields:
+            if field_name in yaml_data and yaml_data[field_name]:
+                has_legacy_fields = True
+                task_name = field_to_task.get(field_name)
+                if task_name:
+                    if task_name not in model_overrides:
+                        model_overrides[task_name] = {}
+                    model_overrides[task_name]["model_name"] = yaml_data[field_name]
+
+        # Migrate temperature fields
+        temp_field_to_task = {
+            "qa_extractor_temperature": "qa_extraction",
+            "parser_repair_temperature": "parser_repair",
+            "note_correction_temperature": "parser_repair",
+            "pre_validator_temperature": "pre_validation",
+            "generator_temperature": "generation",
+            "post_validator_temperature": "post_validation",
+        }
+        for field_name in legacy_temp_fields:
+            if field_name in yaml_data and yaml_data[field_name] is not None:
+                has_legacy_fields = True
+                task_name = temp_field_to_task.get(field_name)
+                if task_name:
+                    if task_name not in model_overrides:
+                        model_overrides[task_name] = {}
+                    model_overrides[task_name]["temperature"] = yaml_data[field_name]
+
+        # Migrate max_tokens fields
+        tokens_field_to_task = {
+            "qa_extractor_max_tokens": "qa_extraction",
+            "parser_repair_max_tokens": "parser_repair",
+            "note_correction_max_tokens": "parser_repair",
+            "pre_validator_max_tokens": "pre_validation",
+            "generator_max_tokens": "generation",
+            "post_validator_max_tokens": "post_validation",
+        }
+        for field_name in legacy_max_tokens_fields:
+            if field_name in yaml_data and yaml_data[field_name] is not None:
+                has_legacy_fields = True
+                task_name = tokens_field_to_task.get(field_name)
+                if task_name:
+                    if task_name not in model_overrides:
+                        model_overrides[task_name] = {}
+                    model_overrides[task_name]["max_tokens"] = yaml_data[field_name]
+
+        # Warn about legacy fields
+        if has_legacy_fields:
+            logger.warning(
+                "legacy_model_fields_detected",
+                message="Individual model fields (e.g., qa_extractor_model, generator_model) are deprecated. "
+                "They have been migrated to model_overrides structure. "
+                "Please update your config.yaml to use the new format.",
+            )
+
         # Create config instance - pydantic-settings will load from env vars
         # We pass YAML-specific values directly
         config_kwargs: dict[str, Any] = {}
+        if model_overrides:
+            config_kwargs["model_overrides"] = model_overrides
         if source_subdirs is not None:
             config_kwargs["source_subdirs"] = source_subdirs
         if export_output_path is not None:
@@ -1493,7 +1493,8 @@ def load_config(
             config = Config(**config_kwargs)
             logger.info(
                 "config_loaded",
-                vault_path=str(config.vault_path) if config.vault_path else None,
+                vault_path=str(
+                    config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
                 use_agents=getattr(config, "use_agents", False),
                 use_langgraph=getattr(config, "use_langgraph", False),
@@ -1503,7 +1504,8 @@ def load_config(
                 "config_validation_error",
                 error=str(e),
                 error_type=type(e).__name__,
-                config_path=str(resolved_config_path) if resolved_config_path else None,
+                config_path=str(
+                    resolved_config_path) if resolved_config_path else None,
             )
             raise
 

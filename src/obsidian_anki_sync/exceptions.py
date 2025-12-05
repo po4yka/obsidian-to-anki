@@ -44,7 +44,7 @@ Usage Examples:
     raise GeneratorError(
         "Generation timed out",
         error_code=ErrorCode.GEN_TIMEOUT_PRIMARY.value,
-        context={"timeout_seconds": 300, "model": "gpt-4"},
+        context={"timeout_seconds": 300, "model": "qwen/qwen-2.5-32b-instruct"},
     )
 """
 
@@ -472,7 +472,7 @@ class TruncationError(ProviderError):
         super().__init__(message, suggestion)
 
 
-# Export helper functions for backward compatibility
+# Export helper functions
 
 
 def get_exception_hierarchy() -> dict[str, list[str]]:

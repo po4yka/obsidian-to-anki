@@ -174,15 +174,14 @@ def setup_container(container: DependencyContainer) -> None:
         ),
     )
 
-    container.register_factory(IStateRepository, lambda: StateDB(config.db_path))
+    container.register_factory(
+        IStateRepository, lambda: StateDB(config.db_path))
 
     container.register_factory(
         ILLMProvider, lambda: ProviderFactory.create_from_config(config)
     )
 
-    # ICardGenerator: Legacy APFGenerator has been removed.
-    # Card generation now uses LangGraphOrchestrator with PydanticAI agents.
-    # The ICardGenerator interface is deprecated and may be removed in future.
+    # ICardGenerator: Card generation uses LangGraphOrchestrator with PydanticAI agents.
     def create_card_generator():
         from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 

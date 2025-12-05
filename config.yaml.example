@@ -59,14 +59,14 @@ use_pydantic_ai: true  # Enable PydanticAI for structured outputs
 # All agents will use this model by default.
 #
 # For OpenRouter (recommended):
-default_llm_model: "openrouter/polaris-alpha"
+default_llm_model: "deepseek/deepseek-v3.2"  # Latest: Excellent reasoning, 163K context
 #
 # Other options:
-# default_llm_model: "openai/gpt-4o-mini"
-# default_llm_model: "openai/gpt-4o"
-# default_llm_model: "anthropic/claude-3-5-sonnet"
-# default_llm_model: "google/gemini-pro-1.5"
-# default_llm_model: "meta-llama/llama-3.1-70b-instruct"
+# default_llm_model: "qwen/qwen-2.5-7b-instruct"  # Fast, cheap ($0.04/$0.10)
+# default_llm_model: "qwen/qwen-2.5-72b-instruct"  # Higher quality
+# default_llm_model: "deepseek/deepseek-chat"  # Cost-effective with structured outputs
+# default_llm_model: "moonshotai/kimi-k2-thinking"  # Latest: 256K context, advanced reasoning
+# default_llm_model: "minimax/minimax-m2"  # Latest: Excellent for creative/agentic tasks (204K context)
 
 # -----------------------------------------------------------------------------
 # Per-Agent Model Overrides (optional)
@@ -74,9 +74,12 @@ default_llm_model: "openrouter/polaris-alpha"
 # Leave these EMPTY to use default_llm_model for all agents.
 # Only set them if you want specific agents to use different models.
 #
-# Example: Use expensive model for generation, cheap for validation
-# generator_model: "anthropic/claude-3-5-sonnet"
-# pre_validator_model: "openai/gpt-4o-mini"
+# Example: Use latest models optimized for each task
+# generator_model: "deepseek/deepseek-v3.2"  # Latest: Excellent reasoning for generation
+# pre_validator_model: "qwen/qwen-2.5-7b-instruct"  # Latest: Fast, cheap validation
+# post_validator_model: "deepseek/deepseek-v3.2"  # Latest: Excellent reasoning for validation
+# context_enrichment_model: "minimax/minimax-m2"  # Latest: Excellent for creative tasks
+# card_splitting_model: "moonshotai/kimi-k2-thinking"  # Latest: 256K context for complex decisions
 #
 pre_validator_model: ""  # Empty = use default
 generator_model: ""  # Empty = use default

@@ -1026,42 +1026,6 @@ class OpenRouterProvider(BaseLLMProvider):
             had_json_schema=bool(json_schema),
         )
 
-        # Enhanced fallback for Grok models: try with reasoning enabled first
-        if (
-            should_fallback_to_basic_json(
-                model, error.response.status_code, json_schema
-            )
-            and "grok" in model.lower()
-            and json_schema
-            and not reasoning_enabled
-        ):
-            logger.info(
-                "grok_structured_output_failed_trying_with_reasoning",
-                model=model,
-                error_message=error_info["error_message"],
-            )
-            try:
-                # Try again with reasoning enabled
-                result = self.generate(
-                    model=model,
-                    prompt=prompt,
-                    system=system,
-                    temperature=temperature,
-                    format=format,
-                    json_schema=json_schema,
-                    stream=stream,
-                    reasoning_enabled=True,  # Enable reasoning for fallback
-                    reasoning_effort=reasoning_effort,
-                )
-                return result
-            except Exception as retry_error:
-                logger.warning(
-                    "grok_reasoning_fallback_failed",
-                    model=model,
-                    retry_error=str(retry_error),
-                )
-                # Continue to basic JSON fallback
-
         # Fallback to basic JSON for problematic models
         if should_fallback_to_basic_json(
             model, error.response.status_code, json_schema
@@ -1129,42 +1093,6 @@ class OpenRouterProvider(BaseLLMProvider):
                 reasoning_effort=reasoning_effort,
             )
         except ValueError as e:
-            # Enhanced fallback for Grok models: try with reasoning enabled first
-            if (
-                "empty completion" in str(e).lower()
-                and json_schema
-                and "grok" in model.lower()
-                and not reasoning_enabled
-            ):
-                logger.info(
-                    "generate_json_grok_fallback_with_reasoning",
-                    model=model,
-                    reason="Empty completion with json_schema, trying with reasoning enabled",
-                )
-                try:
-                    result = self.generate(
-                        model=model,
-                        prompt=prompt,
-                        system=system,
-                        temperature=temperature,
-                        format="",  # Use schema-based format
-                        json_schema=json_schema,
-                        reasoning_enabled=True,  # Enable reasoning for fallback
-                        reasoning_effort=reasoning_effort,
-                    )
-                    # Check if reasoning fallback also returned empty
-                    response_text = result.get("response", "")
-                    if not response_text or response_text.strip() == "":
-                        msg = f"Model {model} returned empty completion even with reasoning enabled."
-                        raise ValueError(msg) from e
-                except Exception as reasoning_error:
-                    logger.warning(
-                        "grok_reasoning_fallback_failed_in_generate_json",
-                        model=model,
-                        error=str(reasoning_error),
-                    )
-                    # Continue to basic JSON fallback
-
             # If structured output failed (empty completion), try fallback without schema
             if "empty completion" in str(e).lower() and json_schema:
                 logger.info(

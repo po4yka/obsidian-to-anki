@@ -116,7 +116,7 @@ class SyncEngine:
         )
 
         # Initialize card generator (LangGraphOrchestrator with PydanticAI)
-        # Note: Legacy APFGenerator has been removed. Agent system is now required.
+        # Note: Agent system is required.
         if config.use_langgraph or config.use_pydantic_ai:
             if not AGENTS_AVAILABLE:
                 msg = (
@@ -137,13 +137,15 @@ class SyncEngine:
                 console=console,
                 transient=False,
             ) as progress:
-                task = progress.add_task("Initializing agent system...", total=3)
+                task = progress.add_task(
+                    "Initializing agent system...", total=3)
 
                 logger.info("initializing_langgraph_orchestrator")
                 progress.update(
                     task, description="Initializing LangGraph orchestrator..."
                 )
-                self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
+                self.agent_orchestrator = LangGraphOrchestrator(
+                    config)  # type: ignore
                 progress.update(
                     task, advance=1, description="LangGraph orchestrator ready"
                 )
@@ -153,11 +155,10 @@ class SyncEngine:
                 from obsidian_anki_sync.obsidian.parser import create_qa_extractor
 
                 qa_extractor_model = config.get_model_for_agent("qa_extractor")
-                qa_extractor_temp = getattr(config, "qa_extractor_temperature", None)
-                if qa_extractor_temp is None:
                     model_config = config.get_model_config_for_task("qa_extraction")
                     qa_extractor_temp = model_config.get("temperature", 0.0)
-                reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
+                reasoning_enabled = getattr(
+                    config, "llm_reasoning_enabled", False)
 
                 logger.info(
                     "configuring_llm_qa_extraction",
@@ -169,7 +170,8 @@ class SyncEngine:
                 # Create a real provider instance for the extractor
                 # We cannot use self.agent_orchestrator.provider because it's a dummy provider
                 # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
-                progress.update(task, description="Creating QA extraction provider...")
+                progress.update(
+                    task, description="Creating QA extraction provider...")
                 qa_provider = ProviderFactory.create_from_config(
                     config, verbose_logging=False
                 )
@@ -177,7 +179,8 @@ class SyncEngine:
                     task, advance=1, description="QA extraction provider ready"
                 )
 
-                progress.update(task, description="Creating QA extractor agent...")
+                progress.update(
+                    task, description="Creating QA extractor agent...")
                 self.qa_extractor = create_qa_extractor(
                     llm_provider=qa_provider,
                     model=qa_extractor_model,
@@ -190,17 +193,10 @@ class SyncEngine:
                         config, "repair_missing_sections", True
                     ),
                 )
-                progress.update(task, advance=1, description="QA extractor ready")
+                progress.update(task, advance=1,
+                                description="QA extractor ready")
         else:
-            # Legacy non-agent mode is no longer supported
-            # Automatically enable agent system
-            logger.warning(
-                "legacy_mode_deprecated",
-                message="Non-agent mode is deprecated. Enabling agent system automatically.",
-            )
-            config.use_langgraph = True
-            config.use_pydantic_ai = True
-
+            # Agent system is required
             if not AGENTS_AVAILABLE:
                 msg = (
                     "Agent system is required but not available. "
@@ -208,9 +204,9 @@ class SyncEngine:
                 )
                 raise RuntimeError(msg)
 
-            self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
+            self.agent_orchestrator = LangGraphOrchestrator(
+                config)  # type: ignore
             self.use_agents = True
-            # No LLM extraction in this minimal fallback mode
             self.qa_extractor = None
 
         self.changes: list[SyncAction] = []
@@ -282,7 +278,6 @@ class SyncEngine:
         # Initialize component classes
         self.card_generator = CardGenerator(
             config=config,
-            apf_gen=None,  # Legacy APFGenerator removed - using PydanticAI agents
             agent_orchestrator=self.agent_orchestrator,
             use_agents=self.use_agents,
             agent_card_cache=self._agent_card_cache,
@@ -500,7 +495,8 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(
+            f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -613,7 +609,8 @@ class SyncEngine:
             if self.use_agents and getattr(
                 self.config, "enable_duplicate_detection", False
             ):
-                logger.info("sync_phase_started", phase="fetching_existing_cards")
+                logger.info("sync_phase_started",
+                            phase="fetching_existing_cards")
                 fetch_start_time = time.time()
                 existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
                 fetch_duration = time.time() - fetch_start_time
@@ -879,7 +876,8 @@ class SyncEngine:
             from obsidian_anki_sync.utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(session_id=self.progress.progress.session_id)
+                log_session_summary(
+                    session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:
@@ -970,7 +968,7 @@ class SyncEngine:
         for action_type, count in sorted(action_counts.items()):
             pass
 
-    # Legacy methods removed - functionality moved to component classes:
+    # Methods moved to component classes:
     # - NoteScanner: _scan_obsidian_notes, _scan_obsidian_notes_parallel,
     #   _process_single_note_with_retry, _process_single_note, _calculate_optimal_workers
     # - CardGenerator: _generate_cards_with_agents, _generate_card

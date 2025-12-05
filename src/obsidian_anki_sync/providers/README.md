@@ -52,17 +52,20 @@ All providers implement this interface:
 Generate a completion from the LLM.
 
 **Parameters:**
-- `model` (str): Model identifier
-- `prompt` (str): User prompt/question
-- `system` (str, optional): System prompt
-- `temperature` (float): Sampling temperature (0.0-1.0)
-- `format` (str): Response format ("json" for structured output)
-- `stream` (bool): Enable streaming (not yet implemented)
+
+-   `model` (str): Model identifier
+-   `prompt` (str): User prompt/question
+-   `system` (str, optional): System prompt
+-   `temperature` (float): Sampling temperature (0.0-1.0)
+-   `format` (str): Response format ("json" for structured output)
+-   `stream` (bool): Enable streaming (not yet implemented)
 
 **Returns:**
-- `dict`: Response with at least `"response"` key containing generated text
+
+-   `dict`: Response with at least `"response"` key containing generated text
 
 **Example:**
+
 ```python
 result = provider.generate(
     model="qwen3:8b",
@@ -80,15 +83,18 @@ print(result["response"])
 Generate a JSON response from the LLM.
 
 **Parameters:**
-- `model` (str): Model identifier
-- `prompt` (str): User prompt (should request JSON format)
-- `system` (str, optional): System prompt
-- `temperature` (float): Sampling temperature
+
+-   `model` (str): Model identifier
+-   `prompt` (str): User prompt (should request JSON format)
+-   `system` (str, optional): System prompt
+-   `temperature` (float): Sampling temperature
 
 **Returns:**
-- `dict`: Parsed JSON response
+
+-   `dict`: Parsed JSON response
 
 **Example:**
+
 ```python
 result = provider.generate_json(
     model="qwen3:8b",
@@ -105,9 +111,11 @@ print(result)  # {"languages": [{"name": "Python", "year": 1991}, ...]}
 Check if the provider is accessible and healthy.
 
 **Returns:**
-- `bool`: True if provider is accessible
+
+-   `bool`: True if provider is accessible
 
 **Example:**
+
 ```python
 if provider.check_connection():
     print("Provider is ready")
@@ -122,9 +130,11 @@ else:
 List available models from the provider.
 
 **Returns:**
-- `list[str]`: List of model identifiers
+
+-   `list[str]`: List of model identifiers
 
 **Example:**
+
 ```python
 models = provider.list_models()
 for model in models:
@@ -138,9 +148,11 @@ for model in models:
 Get the human-readable name of the provider.
 
 **Returns:**
-- `str`: Provider name (e.g., "Ollama", "LM Studio")
+
+-   `str`: Provider name (e.g., "Ollama", "LM Studio")
 
 **Example:**
+
 ```python
 print(f"Using provider: {provider.get_provider_name()}")
 ```
@@ -154,6 +166,7 @@ print(f"Using provider: {provider.get_provider_name()}")
 Supports both local and cloud Ollama deployments.
 
 **Constructor:**
+
 ```python
 OllamaProvider(
     base_url="http://localhost:11434",
@@ -163,9 +176,11 @@ OllamaProvider(
 ```
 
 **Additional Methods:**
-- `pull_model(model: str) -> bool`: Pull a model from Ollama registry
+
+-   `pull_model(model: str) -> bool`: Pull a model from Ollama registry
 
 **Example:**
+
 ```python
 from obsidian_anki_sync.providers import OllamaProvider
 
@@ -190,6 +205,7 @@ if provider.pull_model("qwen3:8b"):
 Provides OpenAI-compatible API for LM Studio.
 
 **Constructor:**
+
 ```python
 LMStudioProvider(
     base_url="http://localhost:1234/v1",
@@ -199,6 +215,7 @@ LMStudioProvider(
 ```
 
 **Example:**
+
 ```python
 from obsidian_anki_sync.providers import LMStudioProvider
 
@@ -208,7 +225,7 @@ provider = LMStudioProvider(
 )
 
 response = provider.generate(
-    model="lmstudio-community/Meta-Llama-3-8B-Instruct-GGUF",
+    model="lmstudio-community/Qwen2.5-7B-Instruct-GGUF",
     prompt="Explain Python decorators",
     temperature=0.5
 )
@@ -223,6 +240,7 @@ response = provider.generate(
 Provides access to multiple cloud LLM providers.
 
 **Constructor:**
+
 ```python
 OpenRouterProvider(
     api_key=None,  # Required, or set OPENROUTER_API_KEY env var
@@ -235,6 +253,7 @@ OpenRouterProvider(
 ```
 
 **Example:**
+
 ```python
 from obsidian_anki_sync.providers import OpenRouterProvider
 import os
@@ -246,7 +265,7 @@ provider = OpenRouterProvider(
 )
 
 response = provider.generate(
-    model="anthropic/claude-3-opus",
+    model="qwen/qwen-2.5-72b-instruct",
     prompt="Write a haiku about Python",
     temperature=0.8
 )
@@ -267,13 +286,16 @@ Factory class for creating provider instances.
 Create a provider instance based on type.
 
 **Parameters:**
-- `provider_type` (str): Provider type ("ollama", "lm_studio", "openrouter")
-- `**kwargs`: Provider-specific configuration
+
+-   `provider_type` (str): Provider type ("ollama", "lm_studio", "openrouter")
+-   `**kwargs`: Provider-specific configuration
 
 **Returns:**
-- `BaseLLMProvider`: Initialized provider instance
+
+-   `BaseLLMProvider`: Initialized provider instance
 
 **Example:**
+
 ```python
 from obsidian_anki_sync.providers import ProviderFactory
 
@@ -304,12 +326,15 @@ provider = ProviderFactory.create_provider(
 Create a provider instance from a Config object.
 
 **Parameters:**
-- `config` (Config): Configuration object with provider settings
+
+-   `config` (Config): Configuration object with provider settings
 
 **Returns:**
-- `BaseLLMProvider`: Initialized provider instance
+
+-   `BaseLLMProvider`: Initialized provider instance
 
 **Example:**
+
 ```python
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.providers import ProviderFactory
@@ -330,9 +355,11 @@ provider = ProviderFactory.create_from_config(config)
 List all supported provider types.
 
 **Returns:**
-- `list[str]`: List of supported provider identifiers
+
+-   `list[str]`: List of supported provider identifiers
 
 **Example:**
+
 ```python
 providers = ProviderFactory.list_supported_providers()
 print(f"Supported providers: {', '.join(providers)}")
@@ -386,9 +413,9 @@ orchestrator = LangGraphOrchestrator(config, provider=provider)
 
 ---
 
-## Backward Compatibility
+## Compatibility
 
-The legacy `OllamaClient` class now inherits from `BaseLLMProvider`:
+The `OllamaClient` class inherits from `BaseLLMProvider`:
 
 ```python
 from obsidian_anki_sync.agents.ollama_client import OllamaClient
@@ -434,6 +461,7 @@ orchestrator = LangGraphOrchestrator(config, provider=provider)
 To add a new provider:
 
 1. **Create provider class:**
+
    ```python
    from obsidian_anki_sync.providers.base import BaseLLMProvider
 
@@ -456,6 +484,7 @@ To add a new provider:
    ```
 
 2. **Add to factory:**
+
    ```python
    # In factory.py
    PROVIDER_MAP = {
@@ -467,6 +496,7 @@ To add a new provider:
    ```
 
 3. **Update configuration:**
+
    ```python
    # In config.py
    @dataclass
@@ -477,6 +507,7 @@ To add a new provider:
    ```
 
 4. **Add factory support:**
+
    ```python
    # In factory.py create_from_config()
    elif provider_type == "myprovider":

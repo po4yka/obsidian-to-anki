@@ -208,10 +208,10 @@ def build_payload(
     Returns:
         Request payload dictionary
     """
-    # For Grok 4.1 Fast with JSON schema: use temperature=0 for deterministic output
+    # Use temperature=0 for deterministic structured outputs
     effective_temperature = temperature
     if json_schema and model in MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS:
-        if "grok" in model.lower() and temperature > 0:
+        if temperature > 0:
             effective_temperature = 0.0
 
     payload: dict[str, Any] = {

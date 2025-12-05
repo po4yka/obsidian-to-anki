@@ -37,7 +37,7 @@ class OutputFixingParser(Generic[T]):
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
 
-        model = OpenAIChatModel("gpt-4o-mini")
+        model = OpenAIChatModel("qwen/qwen-2.5-32b-instruct")
         agent = Agent(model, output_type=MyModel)
 
         fixing_parser = OutputFixingParser(agent, fix_model=model)

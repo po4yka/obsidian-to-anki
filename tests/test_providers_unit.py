@@ -82,7 +82,8 @@ def test_factory_create_from_config_ollama(temp_dir):
         db_path=temp_dir / "test.db",
     )
 
-    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
+    provider = ProviderFactory.create_from_config(
+        config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)
     assert provider.base_url == "http://localhost:11434"
@@ -119,7 +120,8 @@ def test_base_provider_safe_config_redacts_api_key():
         def list_models(self):
             return []
 
-    provider = TestProvider(api_key="secret-key-123", base_url="http://test.com")
+    provider = TestProvider(api_key="secret-key-123",
+                            base_url="http://test.com")
 
     safe_config = provider._safe_config_for_logging()
 
@@ -257,7 +259,7 @@ def ollama_provider():
 def test_ollama_generate_success(ollama_provider):
     """Ollama provider successfully generates completion."""
     mock_response = {
-        "model": "llama2",
+        "model": "qwen2.5:7b",
         "response": "Generated text response",
         "done": True,
         "context": [1, 2, 3],
@@ -271,7 +273,7 @@ def test_ollama_generate_success(ollama_provider):
         return_value=httpx.Response(200, json=mock_response)
     )
 
-    result = ollama_provider.generate(model="llama2", prompt="Hello world")
+    result = ollama_provider.generate(model="qwen2.5:7b", prompt="Hello world")
 
     assert result["response"] == "Generated text response"
     assert result["done"] is True
@@ -299,7 +301,7 @@ def test_ollama_generate_with_system_prompt(ollama_provider):
     )
 
     result = ollama_provider.generate(
-        model="llama2", prompt="User prompt", system="System prompt"
+        model="qwen2.5:7b", prompt="User prompt", system="System prompt"
     )
 
     assert result["response"] == "System-guided response"
@@ -326,7 +328,7 @@ def test_ollama_generate_with_json_format(ollama_provider):
     )
 
     result = ollama_provider.generate(
-        model="llama2", prompt="Generate JSON", format="json"
+        model="qwen2.5:7b", prompt="Generate JSON", format="json"
     )
 
     assert result["response"] == '{"key": "value"}'
@@ -352,7 +354,8 @@ def test_ollama_generate_with_temperature(ollama_provider):
         return_value=httpx.Response(200, json=mock_response)
     )
 
-    result = ollama_provider.generate(model="llama2", prompt="Test", temperature=0.9)
+    result = ollama_provider.generate(
+        model="qwen2.5:7b", prompt="Test", temperature=0.9)
 
     assert result["response"] == "Creative response"
     assert route.call_count == 1
@@ -392,9 +395,9 @@ def test_ollama_list_models_success(ollama_provider):
     """Ollama provider lists available models."""
     mock_response = {
         "models": [
-            {"name": "llama2:7b"},
+            {"name": "qwen2.5:7b"},
             {"name": "qwen:14b"},
-            {"name": "mistral:latest"},
+            {"name": "qwen2.5:32b"},
         ]
     }
 
@@ -405,9 +408,9 @@ def test_ollama_list_models_success(ollama_provider):
     result = ollama_provider.list_models()
 
     assert len(result) == 3
-    assert "llama2:7b" in result
+    assert "qwen2.5:7b" in result
     assert "qwen:14b" in result
-    assert "mistral:latest" in result
+    assert "qwen2.5:32b" in result
 
 
 @respx.mock
@@ -429,11 +432,12 @@ def test_ollama_list_models_failure(ollama_provider):
 def test_ollama_generate_http_500_error(ollama_provider):
     """Ollama provider raises HTTPStatusError on server error."""
     respx.post("http://localhost:11434/api/generate").mock(
-        return_value=httpx.Response(500, json={"error": "Internal server error"})
+        return_value=httpx.Response(
+            500, json={"error": "Internal server error"})
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        ollama_provider.generate(model="llama2", prompt="Test")
+        ollama_provider.generate(model="qwen2.5:7b", prompt="Test")
 
 
 @respx.mock
@@ -455,7 +459,7 @@ def test_ollama_generate_connection_error(ollama_provider):
     )
 
     with pytest.raises(httpx.RequestError):
-        ollama_provider.generate(model="llama2", prompt="Test")
+        ollama_provider.generate(model="qwen2.5:7b", prompt="Test")
 
 
 @respx.mock
@@ -466,7 +470,7 @@ def test_ollama_generate_timeout_error(ollama_provider):
     )
 
     with pytest.raises(httpx.TimeoutException):
-        ollama_provider.generate(model="llama2", prompt="Test")
+        ollama_provider.generate(model="qwen2.5:7b", prompt="Test")
 
 
 @respx.mock
@@ -477,7 +481,7 @@ def test_ollama_generate_malformed_json_response(ollama_provider):
     )
 
     with pytest.raises(json.JSONDecodeError):
-        ollama_provider.generate(model="llama2", prompt="Test")
+        ollama_provider.generate(model="qwen2.5:7b", prompt="Test")
 
 
 @respx.mock
@@ -487,7 +491,7 @@ def test_ollama_pull_model_success(ollama_provider):
         return_value=httpx.Response(200, json={"status": "success"})
     )
 
-    result = ollama_provider.pull_model("llama2:7b")
+    result = ollama_provider.pull_model("qwen2.5:7b")
 
     assert result is True
 
@@ -507,7 +511,8 @@ def test_ollama_pull_model_failure(ollama_provider):
 def test_ollama_generate_streaming_not_implemented(ollama_provider):
     """Ollama provider raises NotImplementedError for streaming."""
     with pytest.raises(NotImplementedError, match="Streaming is not yet supported"):
-        ollama_provider.generate(model="llama2", prompt="Test", stream=True)
+        ollama_provider.generate(
+            model="qwen2.5:7b", prompt="Test", stream=True)
 
 
 # Test Ollama Context Manager
@@ -594,6 +599,7 @@ def test_factory_create_from_config_uses_default_provider_ollama(temp_dir):
     # Verify default is ollama
     assert config.llm_provider == "ollama"
 
-    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
+    provider = ProviderFactory.create_from_config(
+        config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)

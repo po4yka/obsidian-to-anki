@@ -124,7 +124,7 @@ class YAMLValidator(BaseValidator):
         # New format: topic-NNN (e.g., android-001, kotlin-042)
         new_pattern = r"^(\w+)-(\d{3})$"
 
-        # Old format for backward compatibility: YYYYMMDD-HHmmss
+        # Old format support: YYYYMMDD-HHmmss
         old_pattern = r"^\d{8}-\d{6}$"
 
         new_match = re.match(new_pattern, id_value)
@@ -142,10 +142,10 @@ class YAMLValidator(BaseValidator):
             else:
                 self.add_passed("ID format valid")
         elif old_match:
-            # Old timestamp format (deprecated but still valid)
+            # Old timestamp format (still supported)
             try:
                 datetime.strptime(id_value.split("-")[0], "%Y%m%d")
-                self.add_passed("ID format valid (legacy timestamp)")
+                self.add_passed("ID format valid (old timestamp format)")
             except ValueError:
                 self.add_issue(
                     Severity.WARNING,

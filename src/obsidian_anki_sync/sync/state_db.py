@@ -220,7 +220,7 @@ class StateDB(IStateRepository):
             )
         """
         )
-        # Ensure card_guid column exists for legacy databases
+        # Ensure card_guid column exists for database compatibility
         cursor.execute(
             """
             PRAGMA table_info(cards)
@@ -414,7 +414,8 @@ class StateDB(IStateRepository):
         # Add missing columns
         for col_name, col_type in columns_to_add.items():
             if col_name not in existing_columns:
-                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                cursor.execute(
+                    f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
 
         # Add index for creation_status (after column is created)
@@ -429,7 +430,8 @@ class StateDB(IStateRepository):
         import time
 
         start_time = time.time()
-        logger.debug("db_transaction_start", operation="insert_card", slug=card.slug)
+        logger.debug("db_transaction_start",
+                     operation="insert_card", slug=card.slug)
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -532,7 +534,8 @@ class StateDB(IStateRepository):
         """Get all cards from a source note."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM cards WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM cards WHERE source_path = ?", (source_path,))
         return [dict(row) for row in cursor.fetchall()]
 
     def get_all_cards(self) -> list[DomainCard]:
@@ -549,7 +552,8 @@ class StateDB(IStateRepository):
                 slug = row_dict.get("slug", "")
                 lang = row_dict.get("lang", "en")
                 slug_base = row_dict.get(
-                    "slug_base", slug.rsplit("-", 1)[0] if "-" in slug else slug
+                    "slug_base", slug.rsplit(
+                        "-", 1)[0] if "-" in slug else slug
                 )
                 source_path = row_dict.get("source_path", "")
                 source_anchor = row_dict.get("source_anchor", "")
@@ -603,7 +607,8 @@ class StateDB(IStateRepository):
                 )
                 cards.append(card)
             except Exception as e:
-                logger.warning("failed_to_convert_card", error=str(e), row=row_dict)
+                logger.warning("failed_to_convert_card",
+                               error=str(e), row=row_dict)
                 continue
         return cards
 
@@ -1513,7 +1518,8 @@ class StateDB(IStateRepository):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM note_index WHERE source_path = ?", (source_path,))
+        cursor.execute(
+            "SELECT * FROM note_index WHERE source_path = ?", (source_path,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
@@ -1692,7 +1698,8 @@ class StateDB(IStateRepository):
         cursor.execute("SELECT COUNT(*) FROM card_index WHERE in_database = 1")
         cards_in_database = cursor.fetchone()[0]
 
-        cursor.execute("SELECT status, COUNT(*) FROM card_index GROUP BY status")
+        cursor.execute(
+            "SELECT status, COUNT(*) FROM card_index GROUP BY status")
         card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
@@ -1724,7 +1731,7 @@ class StateDB(IStateRepository):
             raise
 
     # Checkpoint methods removed (were unused dead code)
-    # Table sync_checkpoints kept for backward compatibility
+    # Table sync_checkpoints kept for compatibility
 
     # IStateRepository interface implementation
 

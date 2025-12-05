@@ -95,7 +95,7 @@ class BaseLLMProvider(ABC):
         """Generate a completion from the LLM.
 
         Args:
-            model: Model identifier (e.g., "qwen3:8b", "gpt-4")
+            model: Model identifier (e.g., "qwen3:8b", "qwen/qwen-2.5-32b-instruct")
             prompt: User prompt/question
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)

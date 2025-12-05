@@ -1,14 +1,11 @@
 """OpenRouter provider implementation.
 
-This module provides backward compatibility by re-exporting from the
-refactored openrouter package. The actual implementation is now split
-across multiple modules in the openrouter/ directory for better
-maintainability.
+This module re-exports from the refactored openrouter package.
+The actual implementation is split across multiple modules in the
+openrouter/ directory for better maintainability.
 
 For new code, import directly from openrouter package:
     from .openrouter import OpenRouterProvider
-
-This file will be maintained for backward compatibility.
 """
 
 # Re-export everything from the refactored package

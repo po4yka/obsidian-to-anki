@@ -122,7 +122,8 @@ class VaultIndexer:
                                 continue
 
                     # Parse the note with repair if enabled
-                    repair_enabled = getattr(self.config, "parser_repair_enabled", True)
+                    repair_enabled = getattr(
+                        self.config, "parser_repair_enabled", True)
                     if repair_enabled:
                         # Try to get LLM provider for repair
                         llm_provider_for_repair = None
@@ -142,7 +143,8 @@ class VaultIndexer:
                             )
                             # Continue without repair provider
 
-                        repair_model = self.config.get_model_for_agent("parser_repair")
+                        repair_model = self.config.get_model_for_agent(
+                            "parser_repair")
                         tolerant_parsing = getattr(
                             self.config, "tolerant_parsing", True
                         )
@@ -168,7 +170,8 @@ class VaultIndexer:
                         metadata, qa_pairs = parse_note(file_path)
 
                     # Get file modification time
-                    file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    file_mtime = datetime.fromtimestamp(
+                        file_path.stat().st_mtime)
 
                     # Serialize metadata for storage
                     metadata_json = json.dumps(
@@ -230,7 +233,8 @@ class VaultIndexer:
                     try:
                         note_content = ""
                         with suppress(Exception):
-                            note_content = file_path.read_text(encoding="utf-8")
+                            note_content = file_path.read_text(
+                                encoding="utf-8")
 
                         self.archiver.archive_note(
                             note_path=file_path,
@@ -394,7 +398,7 @@ class AnkiIndexer:
                     # Update card index with Anki information
                     existing_card = self.db.get_card_index_by_slug(slug)
 
-                    # Get optional fields from raw manifest dict for backward compatibility
+                    # Get optional fields from raw manifest dict
                     note_id = manifest_dict.get("note_id")
                     note_title = manifest_dict.get("note_title")
 
@@ -408,7 +412,8 @@ class AnkiIndexer:
                             anki_guid=note_info["noteId"],
                             note_id=note_id,
                             note_title=note_title,
-                            in_obsidian=existing_card.get("in_obsidian", False),
+                            in_obsidian=existing_card.get(
+                                "in_obsidian", False),
                             in_anki=True,
                             in_database=True,
                         )
@@ -499,7 +504,8 @@ class SyncIndexer:
                             note_id=manifest.note_id,
                             note_title=manifest.note_title,
                             content_hash=db_card.content_hash,
-                            in_obsidian=existing_card.get("in_obsidian", False),
+                            in_obsidian=existing_card.get(
+                                "in_obsidian", False),
                             in_anki=existing_card.get("in_anki", False),
                             in_database=True,
                         )
@@ -571,7 +577,8 @@ def build_full_index(
         enabled=config.enable_problematic_notes_archival,
     )
     vault_indexer = VaultIndexer(config, db, archiver=archiver)
-    combined_stats["vault"] = vault_indexer.index_vault(incremental=incremental)
+    combined_stats["vault"] = vault_indexer.index_vault(
+        incremental=incremental)
 
     # Index database cards
     sync_indexer = SyncIndexer(db)
@@ -579,7 +586,8 @@ def build_full_index(
 
     # Index Anki cards
     anki_indexer = AnkiIndexer(db, anki_client)
-    combined_stats["anki"] = anki_indexer.index_anki_cards(config.anki_deck_name)
+    combined_stats["anki"] = anki_indexer.index_anki_cards(
+        config.anki_deck_name)
 
     # Get overall statistics
     combined_stats["overall"] = db.get_index_statistics()

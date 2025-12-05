@@ -248,14 +248,15 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
         model_name = config.get_model_for_agent("note_correction")
         if not model_name or model_name == "":
             # Fallback to parser repair model if note correction model not set
-            model_name = getattr(config, "parser_repair_model", "qwen3:8b")
+            model_name = config.get_model_for_agent("parser_repair")
 
         # Create provider for note correction (reuse parser repair infrastructure)
         from obsidian_anki_sync.providers.factory import ProviderFactory
 
         provider = ProviderFactory.create_from_config(config)
         correction_model = model_name
-        correction_temp = getattr(config, "note_correction_temperature", 0.0)
+        correction_config = config.get_model_config_for_task("parser_repair")
+        correction_temp = correction_config.get("temperature", 0.0)
 
         # Create repair agent for proactive correction
         correction_agent = ParserRepairAgent(

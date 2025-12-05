@@ -180,7 +180,7 @@ class OllamaProvider(BaseLLMProvider):
         """Generate completion from Ollama.
 
         Args:
-            model: Model name (e.g., "qwen3:8b", "llama3:70b")
+            model: Model name (e.g., "qwen3:8b", "qwen2.5:32b")
             prompt: User prompt
             system: System prompt (optional)
             temperature: Sampling temperature (0.0-1.0)

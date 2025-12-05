@@ -26,12 +26,12 @@ export OLLAMA_BASE_URL="http://localhost:11434"
 
 ## Model Presets
 
-| Preset           | Pre-validator | Generator         | Post-validator | Best For            |
-| ---------------- | ------------- | ----------------- | -------------- | ------------------- |
-| `cost_effective` | gpt-4o-mini   | claude-3-5-sonnet | gpt-4o-mini    | Budget, high volume |
-| `balanced`       | gpt-4o-mini   | claude-3-5-sonnet | gpt-4o         | Quality + cost      |
-| `high_quality`   | gpt-4o        | claude-3-5-sonnet | o1-preview     | Maximum quality     |
-| `fast`           | gpt-4o-mini   | gpt-4o-mini       | gpt-4o-mini    | Testing             |
+| Preset           | Pre-validator             | Generator                  | Post-validator            | Best For            |
+| ---------------- | ------------------------- | -------------------------- | ------------------------- | ------------------- |
+| `cost_effective` | qwen/qwen-2.5-7b-instruct | qwen/qwen-2.5-32b-instruct | deepseek/deepseek-v3.2    | Budget, high volume |
+| `balanced`       | qwen/qwen-2.5-7b-instruct | deepseek/deepseek-v3.2     | deepseek/deepseek-v3.2    | Quality + cost      |
+| `high_quality`   | qwen/qwen-2.5-7b-instruct | deepseek/deepseek-v3.2     | deepseek/deepseek-v3.2    | Maximum quality     |
+| `fast`           | qwen/qwen-2.5-7b-instruct | qwen/qwen-2.5-7b-instruct  | qwen/qwen-2.5-7b-instruct | Testing             |
 
 ## Provider Examples
 
@@ -48,7 +48,7 @@ generator_model: "qwen3:32b"
 ```yaml
 llm_provider: "openrouter"
 openrouter_api_key: "${OPENROUTER_API_KEY}"
-generator_model: "anthropic/claude-3-5-sonnet-20241022"
+generator_model: "deepseek/deepseek-v3.2" # Latest: Excellent reasoning, 163K context
 openrouter_site_url: "https://yourapp.example.com" # Optional attribution
 openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 ```
@@ -75,24 +75,18 @@ openrouter_site_name: "Obsidian → Anki Sync" # Optional attribution
 -   **Preflight checks** – `obsidian-anki-sync check` currently validates `/models`. Credit
     telemetry (`/key`) and prompt-cache reporting are part of the ongoing upgrade.
 
-### OpenAI
-
-```yaml
-llm_provider: "openai"
-openai_api_key: "${OPENAI_API_KEY}"
-generator_model: "gpt-4o"
-```
-
 ## Agent Configuration
 
 ```yaml
-# Model overrides
-pre_validator_model: "openai/gpt-4o-mini"
-generator_model: "anthropic/claude-3-5-sonnet-20241022"
-post_validator_model: "openai/gpt-4o"
+# Model overrides (using latest models)
+pre_validator_model: "qwen/qwen-2.5-7b-instruct" # Latest: Fast, cheap ($0.04/$0.10)
+generator_model: "deepseek/deepseek-v3.2" # Latest: Excellent reasoning, 163K context
+post_validator_model: "deepseek/deepseek-v3.2" # Latest: Excellent reasoning for validation
 
 # Optional agents
-context_enrichment_model: "minimax/minimax-m2"
+context_enrichment_model: "minimax/minimax-m2" # Latest: Excellent for creative tasks (204K context)
+card_splitting_model: "moonshotai/kimi-k2-thinking" # Latest: 256K context, advanced reasoning
+memorization_quality_model: "moonshotai/kimi-k2" # Strong reasoning capabilities
 enable_highlight_agent: true
 
 # Performance
@@ -115,7 +109,7 @@ batch_size: 50
 
 ```yaml
 enable_ai_validation: true
-ai_validation_model: "openai/gpt-4o-mini"
+ai_validation_model: "qwen/qwen-2.5-7b-instruct" # Latest: Fast, cheap validation
 min_qa_score: 0.8
 require_frontmatter: true
 ```

@@ -7,7 +7,7 @@ format for LLM generation. Markdown is converted to HTML at the Anki boundary.
 Key features:
 - Fast Markdown parsing with mistune (4-5x faster than python-markdown)
 - Syntax highlighting with Pygments
-- HTML sanitization with nh3 (20x faster than deprecated bleach)
+- HTML sanitization with nh3
 """
 
 from obsidian_anki_sync.apf.markdown_converter import (

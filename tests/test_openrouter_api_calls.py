@@ -83,7 +83,8 @@ class TestCheckConnection:
     @respx.mock
     def test_timeout(self, http_client: httpx.Client) -> None:
         """check_connection handles timeout gracefully."""
-        respx.get(f"{BASE_URL}/models").mock(side_effect=httpx.TimeoutException("timeout"))
+        respx.get(
+            f"{BASE_URL}/models").mock(side_effect=httpx.TimeoutException("timeout"))
 
         result = check_connection(http_client, BASE_URL, timeout=1.0)
 
@@ -124,9 +125,9 @@ class TestListModels:
         """list_models returns model list on success."""
         mock_response = {
             "data": [
-                {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"},
-                {"id": "anthropic/claude-3-haiku", "name": "Claude 3 Haiku"},
-                {"id": "google/gemini-2.0-flash-001", "name": "Gemini 2.0 Flash"},
+                {"id": "qwen/qwen-2.5-32b-instruct", "name": "Qwen 2.5 32B"},
+                {"id": "deepseek/deepseek-chat", "name": "DeepSeek Chat"},
+                {"id": "moonshotai/kimi-k2", "name": "Kimi K2"},
             ]
         }
         respx.get(f"{BASE_URL}/models").mock(
@@ -137,8 +138,8 @@ class TestListModels:
 
         assert result.success is True
         assert result.data["count"] == 3
-        assert "openai/gpt-4o-mini" in result.data["models"]
-        assert "anthropic/claude-3-haiku" in result.data["models"]
+        assert "qwen/qwen-2.5-32b-instruct" in result.data["models"]
+        assert "deepseek/deepseek-chat" in result.data["models"]
 
     @respx.mock
     def test_empty_models(self, http_client: httpx.Client) -> None:
@@ -263,7 +264,7 @@ class TestChatCompletion:
         mock_response = {
             "id": "chatcmpl-123",
             "object": "chat.completion",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "index": 0,
@@ -288,14 +289,14 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Hello"}],
         )
 
         assert result.success is True
         assert result.content == "Hello! How can I help you today?"
         assert result.finish_reason == "stop"
-        assert result.model == "openai/gpt-4o-mini"
+        assert result.model == "qwen/qwen-2.5-32b-instruct"
         assert result.usage["prompt_tokens"] == 10
         assert result.usage["completion_tokens"] == 8
 
@@ -306,7 +307,7 @@ class TestChatCompletion:
         """chat_completion handles system + user messages."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {"role": "assistant", "content": "I am a helpful assistant."},
@@ -323,7 +324,7 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "Who are you?"},
@@ -341,7 +342,8 @@ class TestChatCompletion:
         respx.post(f"{BASE_URL}/chat/completions").mock(
             return_value=httpx.Response(
                 429,
-                json={"error": {"message": "Rate limit exceeded", "code": "rate_limit"}},
+                json={"error": {"message": "Rate limit exceeded",
+                                "code": "rate_limit"}},
             )
         )
 
@@ -349,7 +351,7 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Hello"}],
         )
 
@@ -364,7 +366,7 @@ class TestChatCompletion:
         """chat_completion handles empty choices array."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [],
             "usage": {},
         }
@@ -376,7 +378,7 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Hello"}],
         )
 
@@ -390,7 +392,7 @@ class TestChatCompletion:
         """chat_completion captures length finish reason (truncation)."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {"role": "assistant", "content": "Truncated response..."},
@@ -407,7 +409,7 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Tell me a long story"}],
             max_tokens=100,
         )
@@ -423,7 +425,7 @@ class TestChatCompletion:
         json_content = json.dumps({"answer": "42", "confidence": 0.95})
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {"role": "assistant", "content": json_content},
@@ -440,7 +442,7 @@ class TestChatCompletion:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Answer in JSON"}],
             response_format={"type": "json_object"},
         )
@@ -465,7 +467,7 @@ class TestChatCompletionWithTools:
         """chat_completion_with_tools returns tool calls correctly."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {
@@ -510,8 +512,9 @@ class TestChatCompletionWithTools:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
-            messages=[{"role": "user", "content": "What's the weather in San Francisco?"}],
+            model="qwen/qwen-2.5-32b-instruct",
+            messages=[
+                {"role": "user", "content": "What's the weather in San Francisco?"}],
             tools=tools,
         )
 
@@ -588,7 +591,7 @@ class TestChatCompletionWithTools:
         """chat_completion_with_tools handles no tool being called."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {
@@ -619,7 +622,7 @@ class TestChatCompletionWithTools:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "What is 2+2?"}],
             tools=tools,
             tool_choice="auto",
@@ -636,7 +639,7 @@ class TestChatCompletionWithTools:
         """chat_completion_with_tools handles multiple parallel tool calls."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {
@@ -688,7 +691,7 @@ class TestChatCompletionWithTools:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Weather in NY and London?"}],
             tools=tools,
         )
@@ -719,7 +722,7 @@ class TestChatCompletionStructured:
         json_content = json.dumps({"name": "John", "age": 30, "active": True})
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {"role": "assistant", "content": json_content},
@@ -750,8 +753,9 @@ class TestChatCompletionStructured:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
-            messages=[{"role": "user", "content": "Give me user info for John, 30, active"}],
+            model="qwen/qwen-2.5-32b-instruct",
+            messages=[
+                {"role": "user", "content": "Give me user info for John, 30, active"}],
             json_schema=json_schema,
         )
 
@@ -768,7 +772,7 @@ class TestChatCompletionStructured:
         """chat_completion_structured handles invalid JSON in response."""
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {
@@ -793,7 +797,7 @@ class TestChatCompletionStructured:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Return JSON"}],
             json_schema=json_schema,
         )
@@ -820,7 +824,7 @@ class TestChatCompletionStructured:
         )
         mock_response = {
             "id": "chatcmpl-123",
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
                     "message": {"role": "assistant", "content": json_content},
@@ -858,7 +862,7 @@ class TestChatCompletionStructured:
             client=http_client,
             base_url=BASE_URL,
             headers=auth_headers,
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             messages=[{"role": "user", "content": "Extract QA pairs"}],
             json_schema=json_schema,
         )
@@ -933,7 +937,7 @@ class TestChatCompletionResult:
             latency_ms=150.5,
             content="Hello world",
             finish_reason="stop",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen-2.5-32b-instruct",
             usage={"prompt_tokens": 10, "completion_tokens": 5},
             tool_calls=[{"id": "call_1", "function": {"name": "test"}}],
         )
