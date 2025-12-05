@@ -11,6 +11,7 @@ from obsidian_anki_sync.anki.field_mapper import (
     EmptyNoteError,
     map_apf_to_anki_fields,
     validate_anki_note_fields,
+    validate_field_names_match_anki,
 )
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import AnkiConnectError, FieldMappingError
@@ -242,6 +243,33 @@ class ChangeApplier:
             )
             self.db.update_card_status(card.slug, "failed", str(e))
             raise
+
+        # Get the actual Anki model name and validate field names match
+        model_name = self._get_anki_model_name(card.note_type)
+        try:
+            anki_field_names = self.anki.get_model_field_names(model_name)
+            validate_field_names_match_anki(fields, model_name, anki_field_names, card.slug)
+        except FieldMappingError as e:
+            logger.error(
+                "card_field_name_mismatch",
+                slug=card.slug,
+                model_name=model_name,
+                error=str(e),
+            )
+            self.db.update_card_status(card.slug, "failed", str(e))
+            raise CardOperationError(str(e)) from e
+
+        # Log fields being sent to Anki for diagnostics
+        logger.debug(
+            "sending_card_to_anki",
+            slug=card.slug,
+            model_name=model_name,
+            field_names=list(fields.keys()),
+            field_values_preview={
+                k: (v[:100] + "..." if len(v) > 100 else v) if v else "EMPTY"
+                for k, v in fields.items()
+            },
+        )
 
         try:
             with CardTransaction(self.anki, self.db) as txn:
@@ -522,9 +550,37 @@ class ChangeApplier:
                     self.db.update_card_status(card.slug, "failed", str(e))
                     continue  # Skip this card, continue with others
 
+                # Validate field names match what Anki expects
+                model_name = self._get_anki_model_name(card.note_type)
+                try:
+                    anki_field_names = self.anki.get_model_field_names(model_name)
+                    validate_field_names_match_anki(
+                        fields, model_name, anki_field_names, card.slug
+                    )
+                except FieldMappingError as e:
+                    logger.error(
+                        "batch_card_field_name_mismatch",
+                        slug=card.slug,
+                        model_name=model_name,
+                        error=str(e),
+                    )
+                    self.stats["errors"] = self.stats.get("errors", 0) + 1
+                    if self.progress:
+                        self.progress.increment_stat("errors")
+                    self.db.update_card_status(card.slug, "failed", str(e))
+                    continue  # Skip this card, continue with others
+
+                # Log fields being sent for diagnostics
+                logger.debug(
+                    "batch_sending_card_to_anki",
+                    slug=card.slug,
+                    model_name=model_name,
+                    field_names=list(fields.keys()),
+                )
+
                 note_payload = {
                     "deckName": self.config.anki_deck_name,
-                    "modelName": self._get_anki_model_name(card.note_type),
+                    "modelName": model_name,
                     "fields": fields,
                     "tags": card.tags,
                     "options": {"allowDuplicate": False},

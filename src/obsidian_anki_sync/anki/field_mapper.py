@@ -100,6 +100,60 @@ def _strip_html_and_whitespace(value: str) -> str:
     return stripped
 
 
+def validate_field_names_match_anki(
+    fields: dict[str, str],
+    model_name: str,
+    anki_field_names: list[str],
+    slug: str | None = None,
+) -> None:
+    """Validate that field names match what Anki expects for the note type.
+
+    This prevents the "cannot create note because it is empty" error that occurs
+    when field names don't match the Anki model's expected field names.
+
+    Args:
+        fields: Dictionary of field name -> field value to be sent to Anki
+        model_name: Name of the Anki note type (model)
+        anki_field_names: List of field names from Anki's modelFieldNames API
+        slug: Optional slug for logging context
+
+    Raises:
+        FieldMappingError: If field names don't match what Anki expects
+    """
+    sent_field_names = set(fields.keys())
+    expected_field_names = set(anki_field_names)
+
+    missing = expected_field_names - sent_field_names
+    extra = sent_field_names - expected_field_names
+
+    if missing or extra:
+        logger.error(
+            "anki_field_name_mismatch",
+            slug=slug,
+            model_name=model_name,
+            missing_fields=list(missing),
+            extra_fields=list(extra),
+            sent_fields=list(sent_field_names),
+            anki_expects=anki_field_names,
+        )
+        msg = (
+            f"Field name mismatch for model '{model_name}'. "
+            f"Missing fields: {sorted(missing) if missing else 'none'}. "
+            f"Extra fields: {sorted(extra) if extra else 'none'}. "
+            f"Anki expects: {anki_field_names}"
+        )
+        if slug:
+            msg = f"[{slug}] {msg}"
+        raise FieldMappingError(msg)
+
+    logger.debug(
+        "anki_field_names_validated",
+        slug=slug,
+        model_name=model_name,
+        field_count=len(fields),
+    )
+
+
 def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
     """
     Map APF HTML to Anki note type fields.

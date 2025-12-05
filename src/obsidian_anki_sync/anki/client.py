@@ -4,7 +4,7 @@ import contextlib
 import random
 import time
 from types import TracebackType
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypedDict, cast
 
 import httpx
 
@@ -15,6 +15,22 @@ from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.retry import retry
 
 logger = get_logger(__name__)
+
+
+class DuplicateScopeOptions(TypedDict, total=False):
+    """Options for duplicate checking scope."""
+
+    deckName: str
+    checkFlds: list[str]
+    checkChildren: bool
+
+
+class NoteOptions(TypedDict, total=False):
+    """Options for note creation."""
+
+    allowDuplicate: bool
+    duplicateScope: Literal["deck", "collection"]
+    duplicateScopeOptions: DuplicateScopeOptions
 
 
 class AnkiClient(IAnkiClient):
@@ -345,7 +361,7 @@ class AnkiClient(IAnkiClient):
         model_name: str,
         fields: dict[str, str],
         tags: list[str | None] | None = None,
-        options: dict[str, Any | None] | None = None,
+        options: NoteOptions | None = None,
         guid: str | None = None,
     ) -> dict[str, Any]:
         note_payload: dict[str, Any] = {
@@ -408,7 +424,7 @@ class AnkiClient(IAnkiClient):
         model_name: str,
         fields: dict[str, str],
         tags: list[str | None] | None = None,
-        options: dict[str, Any | None] | None = None,
+        options: NoteOptions | None = None,
         guid: str | None = None,
     ) -> int:
         """
@@ -424,6 +440,22 @@ class AnkiClient(IAnkiClient):
         Returns:
             Note ID
         """
+        # Validate deck existence
+        known_decks = self.get_deck_names()
+        if deck_name not in known_decks:
+            known_decks = self.get_deck_names(use_cache=False)
+            if deck_name not in known_decks:
+                msg = f"Deck '{deck_name}' not found in Anki."
+                raise AnkiConnectError(msg)
+
+        # Validate model existence
+        known_models = self.get_model_names()
+        if model_name not in known_models:
+            known_models = self.get_model_names(use_cache=False)
+            if model_name not in known_models:
+                msg = f"Note type '{model_name}' not found in Anki."
+                raise AnkiConnectError(msg)
+
         note_payload = self._build_note_payload(
             deck_name=deck_name,
             model_name=model_name,
@@ -444,9 +476,25 @@ class AnkiClient(IAnkiClient):
         model_name: str,
         fields: dict[str, str],
         tags: list[str | None] | None = None,
-        options: dict[str, Any | None] | None = None,
+        options: NoteOptions | None = None,
         guid: str | None = None,
     ) -> int:
+        # Validate deck existence
+        known_decks = await self.get_deck_names_async()
+        if deck_name not in known_decks:
+            known_decks = await self.get_deck_names_async(use_cache=False)
+            if deck_name not in known_decks:
+                msg = f"Deck '{deck_name}' not found in Anki."
+                raise AnkiConnectError(msg)
+
+        # Validate model existence
+        known_models = await self.get_model_names_async()
+        if model_name not in known_models:
+            known_models = await self.get_model_names_async(use_cache=False)
+            if model_name not in known_models:
+                msg = f"Note type '{model_name}' not found in Anki."
+                raise AnkiConnectError(msg)
+
         note_payload = self._build_note_payload(
             deck_name=deck_name,
             model_name=model_name,
@@ -482,6 +530,28 @@ class AnkiClient(IAnkiClient):
         if not notes:
             return []
 
+        # Validate existence of all decks and models in the batch
+        required_decks = {n.get("deckName") for n in notes if n.get("deckName")}
+        required_models = {n.get("modelName") for n in notes if n.get("modelName")}
+
+        known_decks = set(self.get_deck_names())
+        missing_decks = required_decks - known_decks
+        if missing_decks:
+            known_decks = set(self.get_deck_names(use_cache=False))
+            missing_decks = required_decks - known_decks
+            if missing_decks:
+                msg = f"Decks not found: {', '.join(sorted(missing_decks))}"
+                raise AnkiConnectError(msg)
+
+        known_models = set(self.get_model_names())
+        missing_models = required_models - known_models
+        if missing_models:
+            known_models = set(self.get_model_names(use_cache=False))
+            missing_models = required_models - known_models
+            if missing_models:
+                msg = f"Note types not found: {', '.join(sorted(missing_models))}"
+                raise AnkiConnectError(msg)
+
         result = cast("list[int | None]", self.invoke("addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
@@ -499,6 +569,28 @@ class AnkiClient(IAnkiClient):
     async def add_notes_async(self, notes: list[dict[str, Any]]) -> list[int | None]:
         if not notes:
             return []
+
+        # Validate existence of all decks and models in the batch
+        required_decks = {n.get("deckName") for n in notes if n.get("deckName")}
+        required_models = {n.get("modelName") for n in notes if n.get("modelName")}
+
+        known_decks = set(await self.get_deck_names_async())
+        missing_decks = required_decks - known_decks
+        if missing_decks:
+            known_decks = set(await self.get_deck_names_async(use_cache=False))
+            missing_decks = required_decks - known_decks
+            if missing_decks:
+                msg = f"Decks not found: {', '.join(sorted(missing_decks))}"
+                raise AnkiConnectError(msg)
+
+        known_models = set(await self.get_model_names_async())
+        missing_models = required_models - known_models
+        if missing_models:
+            known_models = set(await self.get_model_names_async(use_cache=False))
+            missing_models = required_models - known_models
+            if missing_models:
+                msg = f"Note types not found: {', '.join(sorted(missing_models))}"
+                raise AnkiConnectError(msg)
 
         result = cast(
             "list[int | None]", await self.invoke_async("addNotes", {"notes": notes})
