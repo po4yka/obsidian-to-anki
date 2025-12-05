@@ -1,10 +1,12 @@
 """CLI commands for vault validation."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
+
+from obsidian_anki_sync.config import Config
 
 from .shared import get_config_and_logger
 
@@ -439,3 +441,118 @@ def validate_clear_cache(
     )
 
     logger.info("validate_cache_cleared", entries_cleared=cleared_count)
+
+
+def run_lint_note(
+    config: Config,
+    logger: Any,
+    note_path: Path,
+    enforce_bilingual: bool,
+    check_code_fences: bool,
+) -> None:
+    """Execute the lint-note operation.
+
+    Args:
+        config: Configuration object
+        logger: Logger instance
+        note_path: Path to note file
+        enforce_bilingual: Require complete Q/A pairs for every language tag
+        check_code_fences: Validate that code fences are balanced
+
+    Raises:
+        typer.Exit: On lint-note failure
+    """
+    logger.info("lint_note_started", path=str(note_path))
+
+    # Security: Check file size to prevent DoS attacks
+    try:
+        file_size = note_path.stat().st_size
+        max_file_size = 10 * 1024 * 1024  # 10MB limit
+        if file_size > max_file_size:
+            console.print(
+                f"[bold red]Error:[/bold red] File too large: {note_path} "
+                f"({file_size} bytes). Maximum allowed size is {max_file_size} bytes."
+            )
+            raise typer.Exit(code=1)
+    except OSError as exc:
+        console.print(f"[bold red]Failed to check file size:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    try:
+        content = note_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        console.print(f"[bold red]Failed to read note:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    from obsidian_anki_sync.obsidian.note_validator import validate_note_structure
+    from obsidian_anki_sync.obsidian.parser import parse_frontmatter
+
+    metadata = parse_frontmatter(content, note_path)
+    errors = validate_note_structure(
+        metadata,
+        content,
+        enforce_languages=enforce_bilingual,
+        check_code_fences=check_code_fences,
+    )
+
+    if errors:
+        console.print(f"[bold red]Found {len(errors)} issue(s):[/bold red]")
+        for issue in errors:
+            console.print(f"  [red]- {issue}[/red]")
+        logger.warning("lint_note_failed", path=str(note_path), errors=errors)
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]No lint issues detected.[/bold green]")
+    logger.info("lint_note_passed", path=str(note_path))
+
+
+def run_validate(
+    config: Config,
+    logger: Any,
+    note_path: Path,
+) -> None:
+    """Execute the validate operation.
+
+    Args:
+        config: Configuration object
+        logger: Logger instance
+        note_path: Path to note file
+
+    Raises:
+        typer.Exit: On validate failure
+    """
+    logger.info("validate_started", note_path=str(note_path))
+
+    from obsidian_anki_sync.obsidian.parser import parse_note
+    from obsidian_anki_sync.obsidian.validator import validate_note
+
+    try:
+        metadata, qa_pairs = parse_note(note_path)
+
+        # Display parsed information
+        console.print()
+        console.print(f"[bold]Parsed:[/bold] {note_path}")
+        console.print(f"  [cyan]Title:[/cyan] {metadata.title}")
+        console.print(f"  [cyan]Topic:[/cyan] {metadata.topic}")
+        console.print(
+            f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
+        console.print(f"  [cyan]Q/A pairs:[/cyan] {len(qa_pairs)}")
+
+        # Validate
+        errors = validate_note(metadata, qa_pairs, note_path)
+
+        if errors:
+            console.print("\n[bold red]Validation errors:[/bold red]")
+            for error in errors:
+                console.print(f"  [red]- {error}[/red]")
+            logger.error("validation_failed", errors=errors)
+        else:
+            console.print("\n[bold green] Validation passed![/bold green]")
+            logger.info("validation_passed")
+
+    except Exception as e:
+        logger.error("validation_error", error=str(e))
+        console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+    logger.info("validate_completed")

@@ -20,13 +20,12 @@ class TestStateDB:
         db_path = temp_dir / "test.db"
 
         with StateDB(db_path) as db:
-            # Should create tables
-            conn = db._get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [row[0] for row in cursor.fetchall()]
-
-            assert "cards" in tables
+            # Should create tables - test by trying to insert and retrieve a card
+            card = self._make_test_card("test-slug-en")
+            db.insert_card(card, anki_guid=12345)
+            result = db.get_by_slug("test-slug-en")
+            assert result is not None
+            assert result["slug"] == "test-slug-en"
 
     def test_insert_card(self, temp_dir) -> None:
         """Test inserting a card."""

@@ -60,6 +60,15 @@ from .retry_policies import (
 )
 from .state import PipelineState
 
+# Node modules (following SOLID principles and Clean Architecture)
+from . import (
+    correction_nodes,
+    detection_nodes,
+    enhancement_nodes,
+    generation_nodes,
+    validation_nodes,
+)
+
 # Optional: Swarm pattern (requires langgraph-swarm package)
 try:
     from .swarm_orchestrator import LangGraphSwarmOrchestrator, SwarmResult

@@ -4,16 +4,12 @@ from langgraph.graph import END, StateGraph
 
 from obsidian_anki_sync.config import Config
 
-from .nodes import (
-    autofix_node,
-    card_splitting_node,
-    context_enrichment_node,
-    duplicate_detection_node,
-    generation_node,
-    highlight_node,
+from .correction_nodes import autofix_node, note_correction_node
+from .detection_nodes import duplicate_detection_node, highlight_node
+from .enhancement_nodes import context_enrichment_node, memorization_quality_node
+from .generation_nodes import card_splitting_node, generation_node
+from .validation_nodes import (
     linter_validation_node,
-    memorization_quality_node,
-    note_correction_node,
     post_validation_node,
     pre_validation_node,
     split_validation_node,

@@ -2,25 +2,41 @@
 
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
-from rich.console import Console
-from rich.prompt import Prompt
-from rich.table import Table
 
+from .cli_commands.anki_handler import (
+    run_export_deck,
+    run_import_deck,
+    run_list_decks,
+    run_list_models,
+    run_query_anki,
+    run_show_model_fields,
+)
+from .cli_commands.check_handler import run_check_setup
+from .cli_commands.export_handler import run_export
+from .cli_commands.format_handler import run_format
+from .cli_commands.generate_handler import run_generate_cards
+from .cli_commands.index_handler import (
+    run_clean_progress,
+    run_show_index,
+    run_show_progress,
+)
+from .cli_commands.init_handler import run_init
+from .cli_commands.log_handler import (
+    run_analyze_logs,
+    run_list_problematic_notes,
+)
 from .cli_commands.rag_commands import rag_app
-from .cli_commands.shared import get_config_and_logger
+from .cli_commands.shared import console, get_config_and_logger
 from .cli_commands.sync_handler import run_sync
-from .cli_commands.validate_commands import validate_app
-from .obsidian.note_validator import validate_note_structure
-from .obsidian.parser import parse_frontmatter
-from .utils.log_analyzer import LogAnalyzer
-from .utils.preflight import run_preflight_checks
-from .utils.problematic_notes import ProblematicNotesArchiver
-
-if TYPE_CHECKING:
-    from .models import Card
+from .cli_commands.test_run_handler import run_test_run
+from .cli_commands.validate_commands import (
+    run_lint_note,
+    run_validate,
+    validate_app,
+)
 
 app = typer.Typer(
     name="obsidian-anki-sync",
@@ -151,8 +167,6 @@ def sync(
             config.use_pydantic_ai = use_langgraph
             logger.info("langgraph_system_override",
                         use_langgraph=use_langgraph)
-            logger.info("langgraph_system_override",
-                        use_langgraph=use_langgraph)
 
         if use_queue:
             config.enable_queue = True
@@ -246,124 +260,24 @@ def test_run(
     ] = False,
 ) -> None:
     """Run a sample by processing N random notes."""
-    import time
-
-    start_time = time.time()
     config, logger = get_config_and_logger(
         config_path, log_level, verbose=verbose)
-
-    # Log command entry
-    logger.info(
-        "cli_command_started",
-        command="test-run",
-        count=count,
-        dry_run=dry_run,
-        use_langgraph=use_langgraph,
-        config_path=str(config_path) if config_path else None,
-        log_level=log_level,
-        index=index,
-        vault_path=str(config.vault_path) if config.vault_path else None,
-    )
 
     # Override LangGraph setting if CLI flag is provided
     if use_langgraph is not None:
         config.use_langgraph = use_langgraph
         # Enable PydanticAI when using LangGraph
         config.use_pydantic_ai = use_langgraph
-        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
-    logger.info("test_run_started", sample_count=count, dry_run=dry_run)
-
-    # Run pre-flight checks (skip Anki if dry-run)
-    console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
-
-    _passed, results = run_preflight_checks(
-        config, check_anki=not dry_run, check_llm=True
+    # Delegate to test-run handler
+    run_test_run(
+        config=config,
+        logger=logger,
+        count=count,
+        dry_run=dry_run,
+        use_langgraph=use_langgraph,
+        index=index,
     )
-
-    # Display results
-    for result in results:
-        if result.passed:
-            icon = "[green]PASS[/green]"
-        elif result.severity == "warning":
-            icon = "[yellow]WARN[/yellow]"
-        else:
-            icon = "[red]FAIL[/red]"
-
-        console.print(f"{icon} {result.name}: {result.message}")
-
-        if not result.passed and result.fix_suggestion:
-            console.print(f"  [dim]{result.fix_suggestion}[/dim]")
-
-    console.print()
-
-    # Check for errors
-    errors = [r for r in results if not r.passed and r.severity == "error"]
-
-    if errors:
-        console.print(
-            f"\n[bold red]Pre-flight checks failed with {len(errors)} error(s).[/bold red]"
-        )
-        console.print("[yellow]Fix the errors above and try again.[/yellow]\n")
-        raise typer.Exit(code=1)
-
-    console.print("[bold green]All pre-flight checks passed![/bold green]\n")
-
-    from .anki.client import AnkiClient
-    from .sync.engine import SyncEngine
-    from .sync.state_db import StateDB
-    from .utils.progress_display import ProgressDisplay
-
-    try:
-        with StateDB(config.db_path) as db, AnkiClient(config.anki_connect_url) as anki:
-            # Create progress display for visual feedback
-            progress_display = ProgressDisplay(show_reflections=True)
-
-            engine = SyncEngine(config, db, anki)
-            engine.set_progress_display(progress_display)
-
-            stats = engine.sync(
-                dry_run=dry_run,
-                sample_size=count,
-                build_index=index,
-            )
-
-            mode_text = "dry-run" if dry_run else "applied"
-            console.print(
-                f"\n[cyan]Processed sample of {count} notes ({mode_text}).[/cyan]"
-            )
-
-            # Create a Rich table for results
-            table = Table(
-                title="Sample Results", show_header=True, header_style="bold magenta"
-            )
-            table.add_column("Metric", style="cyan")
-            table.add_column("Value", style="green")
-
-            for key, value in stats.items():
-                table.add_row(key, str(value))
-
-            console.print(table)
-
-            duration = time.time() - start_time
-            logger.info(
-                "cli_command_completed",
-                command="test-run",
-                duration=round(duration, 2),
-                success=True,
-                stats=stats,
-            )
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(
-            "cli_command_failed",
-            command="test-run",
-            duration=round(duration, 2),
-            error=str(e),
-            error_type=type(e).__name__,
-            exc_info=True,
-        )
-        raise
 
 
 @app.command(name="lint-note")
@@ -396,46 +310,16 @@ def lint_note(
     ] = None,
 ) -> None:
     """Lint a note for bilingual completeness and formatting issues."""
-    _, logger = get_config_and_logger(config_path, log_level)
-    logger.info("lint_note_started", path=str(note_path))
+    config, logger = get_config_and_logger(config_path, log_level)
 
-    # Security: Check file size to prevent DoS attacks
-    try:
-        file_size = note_path.stat().st_size
-        max_file_size = 10 * 1024 * 1024  # 10MB limit
-        if file_size > max_file_size:
-            console.print(
-                f"[bold red]Error:[/bold red] File too large: {note_path} "
-                f"({file_size} bytes). Maximum allowed size is {max_file_size} bytes."
-            )
-            raise typer.Exit(code=1)
-    except OSError as exc:
-        console.print(f"[bold red]Failed to check file size:[/bold red] {exc}")
-        raise typer.Exit(code=1)
-
-    try:
-        content = note_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        console.print(f"[bold red]Failed to read note:[/bold red] {exc}")
-        raise typer.Exit(code=1)
-
-    metadata = parse_frontmatter(content, note_path)
-    errors = validate_note_structure(
-        metadata,
-        content,
-        enforce_languages=enforce_bilingual,
+    # Delegate to lint-note handler
+    run_lint_note(
+        config=config,
+        logger=logger,
+        note_path=note_path,
+        enforce_bilingual=enforce_bilingual,
         check_code_fences=check_code_fences,
     )
-
-    if errors:
-        console.print(f"[bold red]Found {len(errors)} issue(s):[/bold red]")
-        for issue in errors:
-            console.print(f"  [red]- {issue}[/red]")
-        logger.warning("lint_note_failed", path=str(note_path), errors=errors)
-        raise typer.Exit(code=1)
-
-    console.print("[bold green]No lint issues detected.[/bold green]")
-    logger.info("lint_note_passed", path=str(note_path))
 
 
 @app.command()
@@ -452,43 +336,14 @@ def validate(
     ] = "INFO",
 ) -> None:
     """Validate note structure and APF compliance."""
-    _config, logger = get_config_and_logger(config_path, log_level)
+    config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("validate_started", note_path=str(note_path))
-
-    from .obsidian.parser import parse_note
-    from .obsidian.validator import validate_note
-
-    try:
-        metadata, qa_pairs = parse_note(note_path)
-
-        # Display parsed information
-        console.print()
-        console.print(f"[bold]Parsed:[/bold] {note_path}")
-        console.print(f"  [cyan]Title:[/cyan] {metadata.title}")
-        console.print(f"  [cyan]Topic:[/cyan] {metadata.topic}")
-        console.print(
-            f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
-        console.print(f"  [cyan]Q/A pairs:[/cyan] {len(qa_pairs)}")
-
-        # Validate
-        errors = validate_note(metadata, qa_pairs, note_path)
-
-        if errors:
-            console.print("\n[bold red]Validation errors:[/bold red]")
-            for error in errors:
-                console.print(f"  [red]- {error}[/red]")
-            logger.error("validation_failed", errors=errors)
-        else:
-            console.print("\n[bold green] Validation passed![/bold green]")
-            logger.info("validation_passed")
-
-    except Exception as e:
-        logger.error("validation_error", error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
-
-    logger.info("validate_completed")
+    # Delegate to validate handler
+    run_validate(
+        config=config,
+        logger=logger,
+        note_path=note_path,
+    )
 
 
 @app.command()
@@ -506,53 +361,8 @@ def init(
     """Initialize configuration and database."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("init_started")
-
-    # Create .env template if it doesn't exist
-    env_path = Path(".env")
-    if not env_path.exists():
-        env_template = """# Obsidian configuration
-VAULT_PATH=/path/to/your/vault
-SOURCE_DIR=interview_questions/InterviewQuestions
-
-# Anki configuration
-ANKI_CONNECT_URL=http://127.0.0.1:8765
-ANKI_DECK_NAME=Interview Questions
-ANKI_NOTE_TYPE=APF::Simple
-
-# Deck export configuration (for .apkg file generation)
-# EXPORT_DECK_NAME=Interview Questions  # Defaults to ANKI_DECK_NAME
-# EXPORT_DECK_DESCRIPTION=Generated from Obsidian notes
-# EXPORT_OUTPUT_PATH=output.apkg
-
-# OpenRouter LLM configuration
-OPENROUTER_API_KEY=your_api_key_here
-OPENROUTER_MODEL=qwen/qwen-2.5-32b-instruct
-LLM_TEMPERATURE=0.2
-LLM_TOP_P=0.3
-
-# Runtime configuration
-RUN_MODE=apply
-DELETE_MODE=delete
-DB_PATH=.sync_state.db
-LOG_LEVEL=INFO
-"""
-        env_path.write_text(env_template)
-        console.print(f"[green] Created .env template at {env_path}[/green]")
-        logger.info("env_template_created", path=str(env_path))
-    else:
-        console.print(f"[yellow].env already exists at {env_path}[/yellow]")
-
-    # Initialize database
-    from .sync.state_db import StateDB
-
-    with StateDB(config.db_path):
-        pass  # Database schema is initialized in __init__
-
-    console.print(f"[green] Initialized database at {config.db_path}[/green]")
-    logger.info("database_initialized", path=str(config.db_path))
-
-    logger.info("init_completed")
+    # Delegate to init handler
+    run_init(config=config, logger=logger)
 
 
 @app.command(name="decks")
@@ -570,27 +380,8 @@ def list_decks(
     """List deck names available via AnkiConnect."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("list_decks_started")
-
-    from .anki.client import AnkiClient
-
-    try:
-        with AnkiClient(config.anki_connect_url) as anki:
-            decks = sorted(anki.get_deck_names())
-
-        if not decks:
-            console.print("[yellow]No decks available.[/yellow]")
-        else:
-            console.print("\n[bold]Decks:[/bold]")
-            for deck in decks:
-                console.print(f"  [cyan]• {deck}[/cyan]")
-
-        logger.info("list_decks_completed", count=len(decks))
-
-    except Exception as e:
-        logger.error("list_decks_failed", error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
+    # Delegate to list_decks handler
+    run_list_decks(config=config, logger=logger)
 
 
 @app.command(name="models")
@@ -608,27 +399,8 @@ def list_models(
     """List note models (types) available in Anki."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("list_models_started")
-
-    from .anki.client import AnkiClient
-
-    try:
-        with AnkiClient(config.anki_connect_url) as anki:
-            models = sorted(anki.get_model_names())
-
-        if not models:
-            console.print("[yellow]No models available.[/yellow]")
-        else:
-            console.print("\n[bold]Models:[/bold]")
-            for model in models:
-                console.print(f"  [cyan]• {model}[/cyan]")
-
-        logger.info("list_models_completed", count=len(models))
-
-    except Exception as e:
-        logger.error("list_models_failed", error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
+    # Delegate to list_models handler
+    run_list_models(config=config, logger=logger)
 
 
 @app.command(name="model-fields")
@@ -647,30 +419,8 @@ def show_model_fields(
     """Show field names for a specific Anki model."""
     config, logger = get_config_and_logger(config_path, log_level)
 
-    logger.info("model_fields_started", model=model_name)
-
-    from .anki.client import AnkiClient
-
-    try:
-        with AnkiClient(config.anki_connect_url) as anki:
-            fields = anki.get_model_field_names(model_name)
-
-        if not fields:
-            console.print(
-                f"[yellow]Model '{model_name}' has no fields or does not exist.[/yellow]"
-            )
-        else:
-            console.print(f"\n[bold]Fields for model '{model_name}':[/bold]")
-            for field in fields:
-                console.print(f"  [cyan]• {field}[/cyan]")
-
-        logger.info("model_fields_completed",
-                    model=model_name, count=len(fields))
-
-    except Exception as e:
-        logger.error("model_fields_failed", model=model_name, error=str(e))
-        console.print(f"\n[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(code=1)
+    # Delegate to show_model_fields handler
+    run_show_model_fields(config=config, logger=logger, model_name=model_name)
 
 
 @app.command()
