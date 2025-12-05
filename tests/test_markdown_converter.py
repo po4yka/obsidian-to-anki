@@ -735,6 +735,94 @@ class TestRendererMethods:
         assert "language-unknownlang12345" in result
 
 
+class TestMistuneHtmlBugFixes:
+    """Tests for mistune.html() bug fixes - should use html.escape() not mistune.html()."""
+
+    def test_block_code_fallback_escapes_html_chars(self) -> None:
+        """Code block fallback should escape < > & without adding <p> tags."""
+        from obsidian_anki_sync.apf.markdown_converter import AnkiHighlightRenderer
+
+        renderer = AnkiHighlightRenderer()
+        # Use a language that Pygments doesn't know to trigger fallback path
+        result = renderer.block_code("<script>alert('xss')</script>", info="unknownlang")
+        assert "&lt;script&gt;" in result
+        # Should NOT have nested <p> tags (which mistune.html() would add)
+        assert "<p>" not in result
+
+    def test_highlight_code_fallback_escapes_html_chars(self) -> None:
+        """highlight_code fallback should escape HTML without adding <p> tags."""
+        result = highlight_code("<div>test</div>", language="nonexistent_lang_xyz")
+        assert "&lt;div&gt;" in result
+        # Should NOT have nested <p> tags
+        assert "<p>" not in result
+
+    def test_basic_markdown_code_block_escapes_html(self) -> None:
+        """_basic_markdown_to_html code blocks should escape HTML properly."""
+        from obsidian_anki_sync.apf.markdown_converter import _basic_markdown_to_html
+
+        md = """```html
+<script>alert('xss')</script>
+```"""
+        result = _basic_markdown_to_html(md)
+        # Should escape the script tag
+        assert "&lt;script&gt;" in result
+        # Should NOT have nested <p> tags from mistune.html()
+        assert "<p>" not in result or result.count("<p>") <= 1
+
+    def test_inline_code_escapes_html_chars(self) -> None:
+        """Inline code should escape HTML chars without line breaks."""
+        result = convert_markdown_to_html("`<div>test</div>`")
+        assert "&lt;div&gt;" in result
+        # Should NOT have nested <p> tags inside code
+        assert "<code" in result
+        # The code content should not contain separate paragraphs
+        assert "<p>" not in result.split("<code")[1].split("</code")[0]
+
+
+class TestIsAlreadyHtmlFalsePositives:
+    """Tests for _is_already_html() false positive fixes."""
+
+    def test_plain_text_with_code_word(self) -> None:
+        """Plain text with 'code' word should not be detected as HTML."""
+        assert not _is_already_html("Let me explain the code structure")
+        assert not _is_already_html("This code example shows...")
+
+    def test_plain_text_with_span_word(self) -> None:
+        """Plain text with 'span' word should not be detected as HTML."""
+        assert not _is_already_html("This span of text is important")
+        assert not _is_already_html("The timespan is 5 minutes")
+
+    def test_plain_text_with_pre_word(self) -> None:
+        """Plain text with 'pre' word should not be detected as HTML."""
+        assert not _is_already_html("This is a prerequisite")
+        assert not _is_already_html("Let me present the following")
+
+    def test_plain_text_with_div_word(self) -> None:
+        """Plain text with 'div' word should not be detected as HTML."""
+        assert not _is_already_html("The dividend is 100")
+        assert not _is_already_html("Individual items are listed")
+
+    def test_actual_html_tags_detected(self) -> None:
+        """Actual HTML tags should still be detected."""
+        assert _is_already_html("<p>This is a paragraph</p>")
+        assert _is_already_html("<code>inline code</code>")
+        assert _is_already_html('<div class="test">content</div>')
+        assert _is_already_html("<span>text</span>")
+        assert _is_already_html("<pre>preformatted</pre>")
+
+    def test_self_closing_tags_detected(self) -> None:
+        """Self-closing HTML tags should be detected."""
+        assert _is_already_html("<br/>")
+        assert _is_already_html("<hr />")
+        assert _is_already_html('<img src="test.png"/>')
+
+    def test_tags_with_attributes_detected(self) -> None:
+        """HTML tags with attributes should be detected."""
+        assert _is_already_html('<a href="url">link</a>')
+        assert _is_already_html('<code class="language-python">code</code>')
+        assert _is_already_html('<div style="color: red">text</div>')
+
+
 class TestAttributeBuilding:
     """Tests for attribute building helper."""
 

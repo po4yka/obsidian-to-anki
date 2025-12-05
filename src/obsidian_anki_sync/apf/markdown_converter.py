@@ -8,6 +8,7 @@ Pygments for syntax highlighting, and nh3 for HTML sanitization.
 """
 
 import re
+from html import escape
 
 import mistune
 import nh3
@@ -113,7 +114,7 @@ class AnkiHighlightRenderer(mistune.HTMLRenderer):
         except ClassNotFound:
             # Fallback to plain text
             lang_class = f"language-{lang}" if lang else "language-text"
-            escaped_code = mistune.html(code.strip())
+            escaped_code = escape(code.strip())
             return f'<pre><code class="{lang_class}">{escaped_code}</code></pre>\n'
 
         # Use Pygments for highlighting
@@ -124,7 +125,6 @@ class AnkiHighlightRenderer(mistune.HTMLRenderer):
         """Render inline code with language-text class."""
         # Use html.escape, not mistune.html (which is a markdown parser that would
         # wrap text in <p> tags, breaking inline code formatting)
-        from html import escape
         escaped = escape(text)
         return f'<code class="language-text">{escaped}</code>'
 
@@ -133,6 +133,10 @@ class AnkiHighlightRenderer(mistune.HTMLRenderer):
         # Preserve cloze syntax that might have been escaped
         text = _restore_cloze_syntax(text)
         return f"<p>{text}</p>\n"
+
+
+# Module-level cached converter for performance
+_MISTUNE_CONVERTER: mistune.Markdown | None = None
 
 
 def _create_mistune_converter() -> mistune.Markdown:
@@ -148,6 +152,17 @@ def _create_mistune_converter() -> mistune.Markdown:
             "footnotes",
         ],
     )
+
+
+def _get_mistune_converter() -> mistune.Markdown:
+    """Get or create cached mistune converter.
+
+    The converter is stateless and can be safely reused across calls.
+    """
+    global _MISTUNE_CONVERTER
+    if _MISTUNE_CONVERTER is None:
+        _MISTUNE_CONVERTER = _create_mistune_converter()
+    return _MISTUNE_CONVERTER
 
 
 def _restore_cloze_syntax(text: str) -> str:
@@ -179,7 +194,7 @@ def convert_markdown_to_html(md_content: str, sanitize: bool = True) -> str:
         return md_content
 
     try:
-        converter = _create_mistune_converter()
+        converter = _get_mistune_converter()
         result = converter(md_content)
         # With HTMLRenderer, mistune returns a string
         html: str = result if isinstance(result, str) else str(result)
@@ -207,7 +222,7 @@ def _basic_markdown_to_html(md_content: str) -> str:
     # Code blocks (must be first to avoid conflicts)
     html = re.sub(
         r"```(\w*)\n(.*?)\n```",
-        lambda m: f'<pre><code class="language-{m.group(1) or "text"}">{mistune.html(m.group(2))}</code></pre>',
+        lambda m: f'<pre><code class="language-{m.group(1) or "text"}">{escape(m.group(2))}</code></pre>',
         html,
         flags=re.DOTALL,
     )
@@ -278,22 +293,22 @@ def _ensure_code_language_classes(html: str) -> str:
 
 
 def _is_already_html(content: str) -> bool:
-    """Check if content is already HTML (not Markdown)."""
-    html_indicators = [
-        "<pre>",
-        "<code",
-        "<strong>",
-        "<em>",
-        "<ul>",
-        "<ol>",
-        "<li>",
-        "<table>",
-        "<div>",
-        "<span>",
-        "<p>",
-    ]
-    content_lower = content.lower()
-    return any(indicator in content_lower for indicator in html_indicators)
+    """Check if content is already HTML (not Markdown).
+
+    Uses regex to match actual HTML tags, avoiding false positives from
+    words like 'code', 'span', 'pre' that contain tag names as substrings.
+    """
+    # Match actual HTML tags: <tag>, <tag attr="val">, </tag>, <tag/>
+    # This avoids false positives like "Let me explain the code" matching "<code"
+    _html_tags = (
+        "p|pre|code|strong|em|b|i|ul|ol|li|table|tr|td|th|"
+        "div|span|br|hr|blockquote|h[1-6]|a|img"
+    )
+    html_tag_pattern = re.compile(
+        rf"<(?:{_html_tags})(?:\s[^>]*)?/?>",
+        re.IGNORECASE,
+    )
+    return bool(html_tag_pattern.search(content))
 
 
 def convert_apf_field_to_html(field_content: str) -> str:
@@ -410,7 +425,7 @@ def highlight_code(code: str, language: str | None = None) -> str:
         result: str = highlight(code, lexer, formatter)
         return result
     except ClassNotFound:
-        escaped = mistune.html(code)
+        escaped = escape(code)
         lang_class = f"language-{language}" if language else "language-text"
         return f'<pre><code class="{lang_class}">{escaped}</code></pre>'
 
