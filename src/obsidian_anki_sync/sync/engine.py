@@ -155,8 +155,8 @@ class SyncEngine:
                 from obsidian_anki_sync.obsidian.parser import create_qa_extractor
 
                 qa_extractor_model = config.get_model_for_agent("qa_extractor")
-                    model_config = config.get_model_config_for_task("qa_extraction")
-                    qa_extractor_temp = model_config.get("temperature", 0.0)
+                model_config = config.get_model_config_for_task("qa_extraction")
+                qa_extractor_temp = model_config.get("temperature", 0.0)
                 reasoning_enabled = getattr(
                     config, "llm_reasoning_enabled", False)
 
