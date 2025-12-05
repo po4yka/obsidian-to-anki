@@ -308,8 +308,6 @@ class SyncEngine:
             progress_tracker=progress_tracker,
             progress_display=None,  # Will be set via set_progress_display()
             stats=self.stats,
-            slug_counters=self._slug_counters,
-            slug_counter_lock=self._slug_counter_lock,
         )
 
         self.anki_state_manager = AnkiStateManager(
