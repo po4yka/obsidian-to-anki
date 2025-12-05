@@ -225,6 +225,86 @@ class NoteScanner(INoteScanner):
 
         self.sync_run_id = sync_run_id
 
+    def _scan_notes_sequential(
+        self,
+        note_files: list[tuple[Any, str]],
+        obsidian_cards: dict[str, Card],
+        existing_slugs: set[str],
+        error_by_type: defaultdict[str, int],
+        error_samples: dict[str, list[str]],
+        qa_extractor: Any = None,
+        on_batch_complete: Callable[[list[Card]], None] | None = None,
+    ) -> dict[str, Card]:
+        """Scan notes using sequential processing.
+
+        Args:
+            note_files: List of (file_path, relative_path) tuples
+            obsidian_cards: Dict to populate with cards
+            existing_slugs: Set of existing slugs (will be updated)
+            error_by_type: Dict to aggregate errors by type
+            error_samples: Dict to store sample errors
+            qa_extractor: Optional QA extractor
+            on_batch_complete: Optional callback for atomic batch processing
+
+        Returns:
+            Dict of slug -> Card
+        """
+        logger.info("sequential_scan_started", total_notes=len(note_files))
+
+        for file_path, relative_path in note_files:
+            try:
+                cards_dict, new_slugs, result_info = self.note_processor.process_note(
+                    file_path=file_path,
+                    relative_path=relative_path,
+                    existing_slugs=existing_slugs,
+                    qa_extractor=qa_extractor,
+                )
+
+                # Update tracking structures
+                obsidian_cards.update(cards_dict)
+                existing_slugs.update(new_slugs)
+
+                # Handle errors from processing
+                if result_info.get("errors"):
+                    for error_type, count in result_info["errors"].items():
+                        error_by_type[error_type] += count
+                        if error_type not in error_samples:
+                            error_samples[error_type] = []
+                        if result_info.get("error_samples", {}).get(error_type):
+                            error_samples[error_type].extend(
+                                result_info["error_samples"][error_type][:3]  # Limit samples
+                            )
+                            error_samples[error_type] = error_samples[error_type][:10]  # Limit total samples
+
+                # Call batch completion callback if provided
+                if on_batch_complete and cards_dict:
+                    on_batch_complete(list(cards_dict.values()))
+
+                # Update progress
+                if self.progress:
+                    self.progress.increment_processed()
+
+            except Exception as e:
+                logger.exception("note_processing_error", path=relative_path, error=str(e))
+                error_type = type(e).__name__
+                error_by_type[error_type] += 1
+                if error_type not in error_samples:
+                    error_samples[error_type] = []
+                if len(error_samples[error_type]) < 10:
+                    error_samples[error_type].append(f"{relative_path}: {str(e)}")
+
+                # Update progress even on error
+                if self.progress:
+                    self.progress.increment_processed()
+
+        logger.info(
+            "sequential_scan_completed",
+            total_cards=len(obsidian_cards),
+            total_errors=sum(error_by_type.values()),
+        )
+
+        return obsidian_cards
+
     def _bind_sync_context(self) -> None:
         """Bind the current sync_run_id to the logging context if available."""
 
