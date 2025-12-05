@@ -2,6 +2,7 @@
 
 import contextlib
 import random
+import re
 import time
 from types import TracebackType
 from typing import Any, Literal, TypedDict, cast
@@ -378,6 +379,160 @@ class AnkiClient(IAnkiClient):
             note_payload["guid"] = guid
         return note_payload
 
+    def _validate_note_fields(
+        self,
+        model_name: str,
+        fields: dict[str, str],
+        context: str | None = None,
+    ) -> None:
+        """Validate note fields before sending to Anki.
+
+        Checks that:
+        1. Field names match what Anki expects for the model
+        2. The first field (sort field) is not empty
+
+        Args:
+            model_name: Anki note type name
+            fields: Field name -> value mapping
+            context: Optional context for error messages (e.g., slug)
+
+        Raises:
+            AnkiConnectError: If validation fails
+        """
+        # Get expected field names from Anki
+        expected_fields = self.get_model_field_names(model_name)
+        if not expected_fields:
+            msg = f"No fields found for model '{model_name}'"
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        sent_fields = set(fields.keys())
+        expected_set = set(expected_fields)
+
+        # Check for field name mismatch
+        missing = expected_set - sent_fields
+        extra = sent_fields - expected_set
+
+        if missing or extra:
+            logger.error(
+                "note_field_validation_failed",
+                context=context,
+                model_name=model_name,
+                missing_fields=sorted(missing) if missing else None,
+                extra_fields=sorted(extra) if extra else None,
+                sent_fields=sorted(sent_fields),
+                expected_fields=expected_fields,
+            )
+            msg = (
+                f"Field name mismatch for model '{model_name}'. "
+                f"Missing: {sorted(missing) if missing else 'none'}. "
+                f"Extra: {sorted(extra) if extra else 'none'}. "
+                f"Anki expects: {expected_fields}"
+            )
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        # Check that the first field (sort field) is not empty
+        # Anki considers a note "empty" if the first field has no content
+        first_field = expected_fields[0]
+        first_value = fields.get(first_field, "")
+
+        # Strip HTML tags and whitespace to check for actual content
+        stripped = re.sub(r"<[^>]+>", "", first_value).strip()
+        if not stripped or stripped in ("&nbsp;", " "):
+            logger.error(
+                "note_first_field_empty",
+                context=context,
+                model_name=model_name,
+                first_field=first_field,
+                first_value_preview=first_value[:100] if first_value else "EMPTY",
+            )
+            msg = (
+                f"First field '{first_field}' is empty or contains only whitespace/HTML. "
+                f"Anki will reject this note as empty."
+            )
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        logger.debug(
+            "note_field_validation_passed",
+            context=context,
+            model_name=model_name,
+            field_count=len(fields),
+            first_field=first_field,
+        )
+
+    async def _validate_note_fields_async(
+        self,
+        model_name: str,
+        fields: dict[str, str],
+        context: str | None = None,
+    ) -> None:
+        """Async version of _validate_note_fields."""
+        expected_fields = await self.get_model_field_names_async(model_name)
+        if not expected_fields:
+            msg = f"No fields found for model '{model_name}'"
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        sent_fields = set(fields.keys())
+        expected_set = set(expected_fields)
+
+        missing = expected_set - sent_fields
+        extra = sent_fields - expected_set
+
+        if missing or extra:
+            logger.error(
+                "note_field_validation_failed",
+                context=context,
+                model_name=model_name,
+                missing_fields=sorted(missing) if missing else None,
+                extra_fields=sorted(extra) if extra else None,
+                sent_fields=sorted(sent_fields),
+                expected_fields=expected_fields,
+            )
+            msg = (
+                f"Field name mismatch for model '{model_name}'. "
+                f"Missing: {sorted(missing) if missing else 'none'}. "
+                f"Extra: {sorted(extra) if extra else 'none'}. "
+                f"Anki expects: {expected_fields}"
+            )
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        first_field = expected_fields[0]
+        first_value = fields.get(first_field, "")
+        stripped = re.sub(r"<[^>]+>", "", first_value).strip()
+
+        if not stripped or stripped in ("&nbsp;", " "):
+            logger.error(
+                "note_first_field_empty",
+                context=context,
+                model_name=model_name,
+                first_field=first_field,
+                first_value_preview=first_value[:100] if first_value else "EMPTY",
+            )
+            msg = (
+                f"First field '{first_field}' is empty or contains only whitespace/HTML. "
+                f"Anki will reject this note as empty."
+            )
+            if context:
+                msg = f"[{context}] {msg}"
+            raise AnkiConnectError(msg)
+
+        logger.debug(
+            "note_field_validation_passed",
+            context=context,
+            model_name=model_name,
+            field_count=len(fields),
+            first_field=first_field,
+        )
+
     def notes_info(self, note_ids: list[int]) -> list[dict]:
         """
         Get information about notes.
@@ -456,6 +611,9 @@ class AnkiClient(IAnkiClient):
                 msg = f"Note type '{model_name}' not found in Anki."
                 raise AnkiConnectError(msg)
 
+        # Validate field names and content before sending to Anki
+        self._validate_note_fields(model_name, fields, context=guid)
+
         note_payload = self._build_note_payload(
             deck_name=deck_name,
             model_name=model_name,
@@ -494,6 +652,9 @@ class AnkiClient(IAnkiClient):
             if model_name not in known_models:
                 msg = f"Note type '{model_name}' not found in Anki."
                 raise AnkiConnectError(msg)
+
+        # Validate field names and content before sending to Anki
+        await self._validate_note_fields_async(model_name, fields, context=guid)
 
         note_payload = self._build_note_payload(
             deck_name=deck_name,
@@ -552,6 +713,13 @@ class AnkiClient(IAnkiClient):
                 msg = f"Note types not found: {', '.join(sorted(missing_models))}"
                 raise AnkiConnectError(msg)
 
+        # Validate field names and content for each note before sending to Anki
+        for i, note in enumerate(notes):
+            model_name = note.get("modelName", "")
+            fields = note.get("fields", {})
+            context = note.get("guid") or f"batch_note_{i}"
+            self._validate_note_fields(model_name, fields, context=context)
+
         result = cast("list[int | None]", self.invoke("addNotes", {"notes": notes}))
 
         successful = sum(1 for note_id in result if note_id is not None)
@@ -591,6 +759,13 @@ class AnkiClient(IAnkiClient):
             if missing_models:
                 msg = f"Note types not found: {', '.join(sorted(missing_models))}"
                 raise AnkiConnectError(msg)
+
+        # Validate field names and content for each note before sending to Anki
+        for i, note in enumerate(notes):
+            model_name = note.get("modelName", "")
+            fields = note.get("fields", {})
+            context = note.get("guid") or f"batch_note_{i}"
+            await self._validate_note_fields_async(model_name, fields, context=context)
 
         result = cast(
             "list[int | None]", await self.invoke_async("addNotes", {"notes": notes})
