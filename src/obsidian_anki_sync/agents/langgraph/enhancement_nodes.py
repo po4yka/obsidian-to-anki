@@ -6,17 +6,18 @@ context and quality assessments:
 - Memorization quality: Evaluates cards for spaced repetition effectiveness
 """
 
+import asyncio
 import time
 
 from obsidian_anki_sync.agents.models import (
     ContextEnrichmentResult,
+    GeneratedCard,
     MemorizationQualityResult,
 )
 from obsidian_anki_sync.agents.pydantic import (
     ContextEnrichmentAgentAI,
     MemorizationQualityAgentAI,
 )
-from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.providers.pydantic_ai_models import (
     create_openrouter_model_from_env,

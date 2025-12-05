@@ -5,14 +5,15 @@ This module implements nodes responsible for detecting issues and duplicates:
 - Highlight agent: Suggests candidate Q&A pairs when generation fails
 """
 
+import asyncio
 import time
 
 from obsidian_anki_sync.agents.exceptions import HighlightError
+from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.agents.pydantic import (
     DuplicateDetectionAgentAI,
     HighlightAgentAI,
 )
-from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.models import NoteMetadata
 from obsidian_anki_sync.providers.pydantic_ai_models import (
     create_openrouter_model_from_env,
@@ -20,7 +21,12 @@ from obsidian_anki_sync.providers.pydantic_ai_models import (
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .node_helpers import increment_step_count
-from .state import PipelineState, get_agent_selector, get_config, get_model, get_rag_integration
+from .state import (
+    PipelineState,
+    get_config,
+    get_model,
+    get_rag_integration,
+)
 
 logger = get_logger(__name__)
 

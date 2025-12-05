@@ -4,6 +4,7 @@ This module provides a generator agent that leverages the advanced memory store
 to create higher-quality Anki cards based on learned patterns and user preferences.
 """
 
+import asyncio
 import time
 from typing import Any
 
@@ -77,14 +78,10 @@ class MemoryEnhancedGenerator(UnifiedAgentInterface):
 
         try:
             # Try to connect (handles async properly)
-            import asyncio
-
             if asyncio.iscoroutinefunction(self.memory_store.connect):
                 connected = await self.memory_store.connect()
             else:
                 # Synchronous wrapper for async connect
-                import asyncio
-
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # Schedule connection for later

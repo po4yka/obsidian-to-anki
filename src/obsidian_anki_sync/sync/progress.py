@@ -410,6 +410,20 @@ class ProgressTracker:
                 return status == "failed"
             return False
 
+    def increment_processed(self, count: int = 1) -> None:
+        """Increment the number of processed notes.
+
+        This is used by note_scanner to track progress during scanning phase
+        without needing full note completion tracking.
+
+        Args:
+            count: Number of notes processed (default 1)
+        """
+        with self._progress_lock:
+            self.progress.notes_processed += count
+            self.progress.updated_at = datetime.now()
+            self.db.save_progress(self.progress)
+
     def increment_stat(self, stat: str, count: int = 1) -> None:
         """Increment a statistic counter."""
         with self._progress_lock:
