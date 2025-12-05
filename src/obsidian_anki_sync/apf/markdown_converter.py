@@ -122,7 +122,10 @@ class AnkiHighlightRenderer(mistune.HTMLRenderer):
 
     def codespan(self, text: str) -> str:
         """Render inline code with language-text class."""
-        escaped = mistune.html(text)
+        # Use html.escape, not mistune.html (which is a markdown parser that would
+        # wrap text in <p> tags, breaking inline code formatting)
+        from html import escape
+        escaped = escape(text)
         return f'<code class="language-text">{escaped}</code>'
 
     def paragraph(self, text: str) -> str:
