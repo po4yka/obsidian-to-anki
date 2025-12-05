@@ -325,12 +325,12 @@ class LangGraphOrchestrator:
                     extracted_fields=fields,
                 )
 
-                if not fields.get("Primary Title"):
+                if not fields.get("\u2605 Title"):
                     logger.warning(
-                        "empty_primary_title_detected_in_generated_card",
+                        "empty_title_detected_in_generated_card",
                         slug=gen_card.slug,
                         apf_html_preview=gen_card.apf_html[:500],
-                        hint="Card fields extraction failed (Primary Title is empty). Check APF format.",
+                        hint="Card fields extraction failed (Title is empty). Check APF format.",
                     )
                     continue  # Skip this card
 
