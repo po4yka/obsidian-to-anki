@@ -107,8 +107,6 @@ class SyncEngine:
             "sync_engine_configuration",
             llm_provider=config.llm_provider,
             llm_timeout=config.llm_timeout,
-            use_langgraph=config.use_langgraph,
-            use_pydantic_ai=config.use_pydantic_ai,
             vault_path=str(config.vault_path),
             anki_deck=config.anki_deck_name,
             run_mode=config.run_mode,
@@ -116,98 +114,83 @@ class SyncEngine:
         )
 
         # Initialize card generator (LangGraphOrchestrator with PydanticAI)
-        # Note: Agent system is required.
-        if config.use_langgraph or config.use_pydantic_ai:
-            if not AGENTS_AVAILABLE:
-                msg = (
-                    "LangGraph agent system requested but not available. "
-                    "Please ensure agent dependencies are installed."
-                )
-                raise RuntimeError(msg)
+        if not AGENTS_AVAILABLE:
+            msg = (
+                "LangGraph agent system is required but not available. "
+                "Please ensure agent dependencies are installed."
+            )
+            raise RuntimeError(msg)
 
-            # Show progress bar for initialization
-            logger.info("starting_agent_initialization_progress")
-            from rich.console import Console
-            from rich.progress import Progress, SpinnerColumn, TextColumn
+        # Show progress bar for initialization
+        logger.info("starting_agent_initialization_progress")
+        from rich.console import Console
+        from rich.progress import Progress, SpinnerColumn, TextColumn
 
-            console = Console()
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-                transient=False,
-            ) as progress:
-                task = progress.add_task(
-                    "Initializing agent system...", total=3)
+        console = Console()
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task(
+                "Initializing agent system...", total=3)
 
-                logger.info("initializing_langgraph_orchestrator")
-                progress.update(
-                    task, description="Initializing LangGraph orchestrator..."
-                )
-                self.agent_orchestrator = LangGraphOrchestrator(
-                    config)  # type: ignore
-                progress.update(
-                    task, advance=1, description="LangGraph orchestrator ready"
-                )
-                self.use_agents = True
-
-                # Configure LLM-based Q&A extraction when using agents
-                from obsidian_anki_sync.obsidian.parser import create_qa_extractor
-
-                qa_extractor_model = config.get_model_for_agent("qa_extractor")
-                model_config = config.get_model_config_for_task("qa_extraction")
-                qa_extractor_temp = model_config.get("temperature", 0.0)
-                reasoning_enabled = getattr(
-                    config, "llm_reasoning_enabled", False)
-
-                logger.info(
-                    "configuring_llm_qa_extraction",
-                    model=qa_extractor_model,
-                    temperature=qa_extractor_temp,
-                    reasoning_enabled=reasoning_enabled,
-                )
-
-                # Create a real provider instance for the extractor
-                # We cannot use self.agent_orchestrator.provider because it's a dummy provider
-                # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
-                progress.update(
-                    task, description="Creating QA extraction provider...")
-                qa_provider = ProviderFactory.create_from_config(
-                    config, verbose_logging=False
-                )
-                progress.update(
-                    task, advance=1, description="QA extraction provider ready"
-                )
-
-                progress.update(
-                    task, description="Creating QA extractor agent...")
-                self.qa_extractor = create_qa_extractor(
-                    llm_provider=qa_provider,
-                    model=qa_extractor_model,
-                    temperature=qa_extractor_temp,
-                    reasoning_enabled=reasoning_enabled,
-                    enable_content_generation=getattr(
-                        config, "enable_content_generation", True
-                    ),
-                    repair_missing_sections=getattr(
-                        config, "repair_missing_sections", True
-                    ),
-                )
-                progress.update(task, advance=1,
-                                description="QA extractor ready")
-        else:
-            # Agent system is required
-            if not AGENTS_AVAILABLE:
-                msg = (
-                    "Agent system is required but not available. "
-                    "Please ensure agent dependencies are installed."
-                )
-                raise RuntimeError(msg)
-
+            logger.info("initializing_langgraph_orchestrator")
+            progress.update(
+                task, description="Initializing LangGraph orchestrator..."
+            )
             self.agent_orchestrator = LangGraphOrchestrator(
                 config)  # type: ignore
+            progress.update(
+                task, advance=1, description="LangGraph orchestrator ready"
+            )
             self.use_agents = True
-            self.qa_extractor = None
+
+            # Configure LLM-based Q&A extraction when using agents
+            from obsidian_anki_sync.obsidian.parser import create_qa_extractor
+
+            qa_extractor_model = config.get_model_for_agent("qa_extractor")
+            model_config = config.get_model_config_for_task("qa_extraction")
+            qa_extractor_temp = model_config.get("temperature", 0.0)
+            reasoning_enabled = getattr(
+                config, "llm_reasoning_enabled", False)
+
+            logger.info(
+                "configuring_llm_qa_extraction",
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
+            )
+
+            # Create a real provider instance for the extractor
+            # We cannot use self.agent_orchestrator.provider because it's a dummy provider
+            # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
+            progress.update(
+                task, description="Creating QA extraction provider...")
+            qa_provider = ProviderFactory.create_from_config(
+                config, verbose_logging=False
+            )
+            progress.update(
+                task, advance=1, description="QA extraction provider ready"
+            )
+
+            progress.update(
+                task, description="Creating QA extractor agent...")
+            self.qa_extractor = create_qa_extractor(
+                llm_provider=qa_provider,
+                model=qa_extractor_model,
+                temperature=qa_extractor_temp,
+                reasoning_enabled=reasoning_enabled,
+                enable_content_generation=getattr(
+                    config, "enable_content_generation", True
+                ),
+                repair_missing_sections=getattr(
+                    config, "repair_missing_sections", True
+                ),
+            )
+            progress.update(task, advance=1,
+                            description="QA extractor ready")
 
         self.changes: list[SyncAction] = []
         self.stats = {

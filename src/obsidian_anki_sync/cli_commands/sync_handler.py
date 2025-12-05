@@ -143,7 +143,7 @@ def run_sync(
                         mode_label="Dry Run" if dry_run else "Apply",
                         incremental=incremental,
                         queue_enabled=getattr(config, "enable_queue", False),
-                        langgraph_enabled=config.use_langgraph,
+                        langgraph_enabled=True,  # Agent system always enabled
                         vault_label=(
                             str(config.vault_path)
                             if config.vault_path

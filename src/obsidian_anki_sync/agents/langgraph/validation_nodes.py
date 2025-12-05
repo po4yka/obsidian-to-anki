@@ -11,12 +11,12 @@ import asyncio
 import time
 
 from obsidian_anki_sync.agents.exceptions import (
-    HighlightError,
     ModelError,
     PreValidationError,
     StructuredOutputError,
 )
 from obsidian_anki_sync.agents.models import (
+    GeneratedCard,
     PostValidationResult,
     PreValidationResult,
 )
@@ -26,8 +26,6 @@ from obsidian_anki_sync.agents.pydantic import (
     SplitValidatorAgentAI,
 )
 from obsidian_anki_sync.apf.linter import validate_apf
-from obsidian_anki_sync.error_codes import ErrorCode
-from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.providers.pydantic_ai_models import (
     create_openrouter_model_from_env,
@@ -36,7 +34,7 @@ from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.resilience import compute_jittered_backoff
 
 from .node_helpers import increment_step_count
-from .state import PipelineState, get_agent_selector, get_config, get_model
+from .state import PipelineState, get_config, get_model
 
 logger = get_logger(__name__)
 

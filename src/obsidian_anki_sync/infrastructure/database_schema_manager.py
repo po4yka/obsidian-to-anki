@@ -4,9 +4,10 @@ Handles table creation, index creation, and schema migrations.
 """
 
 import sqlite3
-from pathlib import Path
 
-from obsidian_anki_sync.infrastructure.database_connection_manager import DatabaseConnectionManager
+from obsidian_anki_sync.infrastructure.database_connection_manager import (
+    DatabaseConnectionManager,
+)
 from obsidian_anki_sync.utils.logging import get_logger
 
 logger = get_logger(__name__)

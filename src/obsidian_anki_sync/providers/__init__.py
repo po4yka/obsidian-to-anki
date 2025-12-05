@@ -1,11 +1,9 @@
 """LLM provider abstractions and implementations."""
 
-from .anthropic import AnthropicProvider
 from .base import BaseLLMProvider
 from .factory import ProviderFactory
 from .lm_studio import LMStudioProvider
 from .ollama import OllamaProvider
-from .openai import OpenAIProvider
 from .openrouter import OpenRouterProvider
 
 try:
@@ -21,13 +19,10 @@ except ModuleNotFoundError:
     _PYDANTIC_MODELS_AVAILABLE = False
 
 __all__ = [
-    # Provider implementations
-    "AnthropicProvider",
     # Core providers
     "BaseLLMProvider",
     "LMStudioProvider",
     "OllamaProvider",
-    "OpenAIProvider",
     "OpenRouterProvider",
     "ProviderFactory",
 ]

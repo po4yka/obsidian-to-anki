@@ -5,11 +5,9 @@ from typing import Any, cast
 from obsidian_anki_sync.exceptions import ProviderError
 from obsidian_anki_sync.utils.logging import get_logger
 
-from .anthropic import AnthropicProvider
 from .base import BaseLLMProvider
 from .lm_studio import LMStudioProvider
 from .ollama import OllamaProvider
-from .openai import OpenAIProvider
 from .openrouter import OpenRouterProvider
 
 logger = get_logger(__name__)
@@ -19,7 +17,7 @@ class ProviderFactory:
     """Factory for creating LLM provider instances.
 
     This factory creates the appropriate provider based on configuration,
-    supporting Ollama (local/cloud), LM Studio, OpenRouter, OpenAI, and Anthropic.
+    supporting Ollama (local/cloud), LM Studio, and OpenRouter.
     """
 
     PROVIDER_MAP = {
@@ -27,9 +25,6 @@ class ProviderFactory:
         "lm_studio": LMStudioProvider,
         "lmstudio": LMStudioProvider,  # Alias
         "openrouter": OpenRouterProvider,
-        "openai": OpenAIProvider,
-        "anthropic": AnthropicProvider,
-        "claude": AnthropicProvider,  # Alias for Anthropic
     }
 
     @classmethod
@@ -39,7 +34,7 @@ class ProviderFactory:
         """Create a provider instance based on type.
 
         Args:
-            provider_type: Provider type ("ollama", "lm_studio", "openrouter", "openai", "anthropic", "claude")
+            provider_type: Provider type ("ollama", "lm_studio", "openrouter")
             verbose_logging: Whether to log detailed initialization info
             **kwargs: Provider-specific configuration parameters
 
@@ -54,18 +49,6 @@ class ProviderFactory:
             >>> provider = ProviderFactory.create_provider(
             ...     "ollama",
             ...     base_url="http://localhost:11434"
-            ... )
-
-            # Create OpenAI provider
-            >>> provider = ProviderFactory.create_provider(
-            ...     "openai",
-            ...     api_key="sk-..."
-            ... )
-
-            # Create Anthropic (Claude) provider
-            >>> provider = ProviderFactory.create_provider(
-            ...     "anthropic",
-            ...     api_key="sk-ant-..."
             ... )
 
             # Create OpenRouter provider
@@ -190,31 +173,6 @@ class ProviderFactory:
                 "fallback_model": getattr(
                     config, "fallback_llm_model", "qwen/qwen3-max"
                 ),
-            }
-
-        elif provider_type == "openai":
-            kwargs = {
-                "api_key": getattr(config, "openai_api_key", None),
-                "base_url": getattr(
-                    config, "openai_base_url", "https://api.openai.com/v1"
-                ),
-                "organization": getattr(config, "openai_organization", None),
-                "timeout": getattr(config, "llm_timeout", 120.0),
-                "max_retries": getattr(config, "openai_max_retries", 3),
-            }
-
-        elif provider_type in ("anthropic", "claude"):
-            # Use 'or' to handle both missing attribute AND explicit None value
-            max_tokens = getattr(config, "llm_max_tokens", None) or 4096
-            kwargs = {
-                "api_key": getattr(config, "anthropic_api_key", None),
-                "base_url": getattr(
-                    config, "anthropic_base_url", "https://api.anthropic.com"
-                ),
-                "api_version": getattr(config, "anthropic_api_version", "2023-06-01"),
-                "timeout": getattr(config, "llm_timeout", 120.0),
-                "max_tokens": max_tokens,
-                "max_retries": getattr(config, "anthropic_max_retries", 3),
             }
 
         else:

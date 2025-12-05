@@ -2,12 +2,15 @@
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from obsidian_anki_sync.infrastructure.database_connection_manager import (
     DatabaseConnectionManager,
 )
 from obsidian_anki_sync.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from obsidian_anki_sync.sync.progress import SyncProgress
 
 logger = get_logger(__name__)
 

@@ -1,34 +1,22 @@
 """Command-line interface for the sync service."""
 
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.console import Console
+from rich.prompt import Prompt
+from rich.table import Table
 
 from .cli_commands.anki_handler import (
-    run_export_deck,
-    run_import_deck,
     run_list_decks,
     run_list_models,
-    run_query_anki,
     run_show_model_fields,
 )
-from .cli_commands.check_handler import run_check_setup
-from .cli_commands.export_handler import run_export
-from .cli_commands.format_handler import run_format
-from .cli_commands.generate_handler import run_generate_cards
-from .cli_commands.index_handler import (
-    run_clean_progress,
-    run_show_index,
-    run_show_progress,
-)
 from .cli_commands.init_handler import run_init
-from .cli_commands.log_handler import (
-    run_analyze_logs,
-    run_list_problematic_notes,
-)
+from .cli_commands.log_handler import LogAnalyzer, ProblematicNotesArchiver
 from .cli_commands.rag_commands import rag_app
 from .cli_commands.shared import console, get_config_and_logger
 from .cli_commands.sync_handler import run_sync
@@ -38,6 +26,10 @@ from .cli_commands.validate_commands import (
     run_validate,
     validate_app,
 )
+from .utils.preflight import run_preflight_checks
+
+if TYPE_CHECKING:
+    from .models import Card
 
 app = typer.Typer(
     name="obsidian-anki-sync",
@@ -53,8 +45,6 @@ app.add_typer(rag_app, name="rag",
 app.add_typer(
     validate_app, name="validate", help="Vault validation commands for Q&A notes"
 )
-
-console = Console()
 
 
 @app.command()
@@ -97,18 +87,11 @@ def sync(
             "--no-resume", help="Disable automatic resume of incomplete syncs"
         ),
     ] = False,
-    use_langgraph: Annotated[
-        bool | None,
-        typer.Option(
-            "--use-langgraph/--no-langgraph",
-            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
-        ),
-    ] = None,
     use_queue: Annotated[
         bool,
         typer.Option(
             "--use-queue",
-            help="Use Redis queue for parallel processing (requires --use-langgraph)",
+            help="Use Redis queue for parallel processing",
         ),
     ] = False,
     redis_url: Annotated[
@@ -153,7 +136,6 @@ def sync(
         sample_size=sample,
         resume=resume,
         no_resume=no_resume,
-        use_langgraph=use_langgraph,
         config_path=str(config_path) if config_path else None,
         log_level=log_level,
         verbose=verbose,
@@ -161,24 +143,10 @@ def sync(
     )
 
     try:
-        # Override LangGraph setting if CLI flag is provided
-        if use_langgraph is not None:
-            config.use_langgraph = use_langgraph
-            # Enable PydanticAI when using LangGraph
-            config.use_pydantic_ai = use_langgraph
-            logger.info("langgraph_system_override",
-                        use_langgraph=use_langgraph)
-
         if use_queue:
             config.enable_queue = True
             config.redis_url = redis_url
-            if not config.use_langgraph:
-                logger.warning(
-                    "queue_requires_langgraph",
-                    message="Enabling LangGraph because queue is enabled",
-                )
-                config.use_langgraph = True
-                config.use_pydantic_ai = True
+
         # Delegate to sync handler
         run_sync(
             config=config,
@@ -228,13 +196,6 @@ def test_run(
             help="Preview changes without applying (default: --dry-run)",
         ),
     ] = True,
-    use_langgraph: Annotated[
-        bool | None,
-        typer.Option(
-            "--use-langgraph/--no-langgraph",
-            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
-        ),
-    ] = None,
     config_path: Annotated[
         Path | None,
         typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -264,19 +225,12 @@ def test_run(
     config, logger = get_config_and_logger(
         config_path, log_level, verbose=verbose)
 
-    # Override LangGraph setting if CLI flag is provided
-    if use_langgraph is not None:
-        config.use_langgraph = use_langgraph
-        # Enable PydanticAI when using LangGraph
-        config.use_pydantic_ai = use_langgraph
-
     # Delegate to test-run handler
     run_test_run(
         config=config,
         logger=logger,
         count=count,
         dry_run=dry_run,
-        use_langgraph=use_langgraph,
         index=index,
     )
 
@@ -438,13 +392,6 @@ def export(
         str,
         typer.Option("--deck-description", help="Description for the deck"),
     ] = "",
-    use_langgraph: Annotated[
-        bool | None,
-        typer.Option(
-            "--use-langgraph/--no-langgraph",
-            help="Use LangGraph agent system for card generation (requires OpenRouter/PydanticAI)",
-        ),
-    ] = None,
     sample_size: Annotated[
         int | None,
         typer.Option(
@@ -462,13 +409,6 @@ def export(
 ) -> None:
     """Export Obsidian notes to Anki deck file (.apkg)."""
     config, logger = get_config_and_logger(config_path, log_level)
-
-    # Override LangGraph setting if CLI flag is provided
-    if use_langgraph is not None:
-        config.use_langgraph = use_langgraph
-        # Enable PydanticAI when using LangGraph
-        config.use_pydantic_ai = use_langgraph
-        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
     # Determine output path
     output_path = output or config.export_output_path or Path("output.apkg")
@@ -547,15 +487,6 @@ def export(
 
             # Generate cards using the agent system
             cards: list[Card] = []
-
-            # Always use agent system for card generation
-            if not config.use_langgraph and not config.use_pydantic_ai:
-                logger.info(
-                    "enabling_agent_system",
-                    reason="Agent system is required",
-                )
-                config.use_langgraph = True
-                config.use_pydantic_ai = True
 
             console.print(
                 "[cyan]Using LangGraph agent system for generation...[/cyan]"

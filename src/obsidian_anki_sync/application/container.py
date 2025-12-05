@@ -185,11 +185,6 @@ def setup_container(container: DependencyContainer) -> None:
     def create_card_generator():
         from obsidian_anki_sync.agents.langgraph import LangGraphOrchestrator
 
-        # Ensure agent system is enabled
-        if not config.use_langgraph:
-            config.use_langgraph = True
-        if not config.use_pydantic_ai:
-            config.use_pydantic_ai = True
         return LangGraphOrchestrator(config)
 
     container.register_factory(ICardGenerator, create_card_generator)

@@ -319,38 +319,30 @@ class CardGenerator:
         """
         start_time = time.time()
 
-        # Use agent system if enabled
-        if self.use_agents:
-            if not note_content or all_qa_pairs is None:
-                msg = "note_content and all_qa_pairs required when using agent system"
-                raise ValueError(msg)
-
-            # Generate all cards for the note (cached)
-            all_cards = self.generate_with_agents(
-                note_content, metadata, all_qa_pairs, relative_path
-            )
-
-            # Find the specific card for this qa_pair and lang
-            for card in all_cards:
-                if card.manifest.card_index == qa_pair.card_index and card.lang == lang:
-                    elapsed_ms = round((time.time() - start_time) * 1000, 2)
-                    self._cache_stats["hits"] += 1
-                    logger.debug(
-                        "card_generation_cache_hit_agent",
-                        slug=card.slug,
-                        elapsed_ms=elapsed_ms,
-                    )
-                    return card
-
-            msg = f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
+        # Agent system is always enabled
+        if not note_content or all_qa_pairs is None:
+            msg = "note_content and all_qa_pairs required for agent system"
             raise ValueError(msg)
 
-        # All card generation goes through the agent system.
-        msg = (
-            "Card generation requires the agent system. "
-            "Set use_langgraph=True or use_pydantic_ai=True in config."
+        # Generate all cards for the note (cached)
+        all_cards = self.generate_with_agents(
+            note_content, metadata, all_qa_pairs, relative_path
         )
-        raise RuntimeError(msg)
+
+        # Find the specific card for this qa_pair and lang
+        for card in all_cards:
+            if card.manifest.card_index == qa_pair.card_index and card.lang == lang:
+                elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                self._cache_stats["hits"] += 1
+                logger.debug(
+                    "card_generation_cache_hit_agent",
+                    slug=card.slug,
+                    elapsed_ms=elapsed_ms,
+                )
+                return card
+
+        msg = f"Agent system did not generate card for index={qa_pair.card_index}, lang={lang}"
+        raise ValueError(msg)
 
     def _extract_pipeline_error_message(self, result: "AgentPipelineResult") -> str:
         """Extract a comprehensive and user-friendly error message from pipeline result.

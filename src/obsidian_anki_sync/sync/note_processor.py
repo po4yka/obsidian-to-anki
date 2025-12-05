@@ -2,7 +2,6 @@
 
 import errno
 from collections.abc import Collection
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -11,10 +10,13 @@ except ImportError:
     from concurrent.futures import ThreadPoolExecutor
 
 from obsidian_anki_sync.domain.interfaces.note_scanner import INoteProcessor
-from obsidian_anki_sync.exceptions import ParserError, TruncationError
+from obsidian_anki_sync.exceptions import ParserError
 from obsidian_anki_sync.models import Card, QAPair
 from obsidian_anki_sync.obsidian.parser import parse_note
-from obsidian_anki_sync.sync.scanner_utils import ThreadSafeSlugView, wait_for_fd_headroom
+from obsidian_anki_sync.sync.scanner_utils import (
+    ThreadSafeSlugView,
+    wait_for_fd_headroom,
+)
 from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -78,39 +80,34 @@ class SingleNoteProcessor(INoteProcessor):
         }
 
         try:
-            # Read full note content if using agent system
+            # Read full note content for agent system
             note_content = ""
-            use_agents = getattr(self.config, "use_langgraph", False) or getattr(
-                self.config, "use_pydantic_ai", False
-            )
-            if use_agents:
-                try:
-                    file_size = file_path.stat().st_size
-                    max_content_size = int(
-                        self.config.max_note_content_size_mb * 1024 * 1024
-                    )
+            try:
+                file_size = file_path.stat().st_size
+                max_content_size = int(
+                    self.config.max_note_content_size_mb * 1024 * 1024
+                )
 
-                    if file_size > max_content_size:
-                        logger.warning(
-                            "note_content_too_large_skipping_agents",
-                            file=relative_path,
-                            size_mb=round(file_size / (1024 * 1024), 2),
-                            max_size_mb=self.config.max_note_content_size_mb,
-                        )
-                        use_agents = False
-                    else:
-                        note_content = file_path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError) as e:
-                    if isinstance(e, OSError) and e.errno in (
-                        errno.EMFILE,
-                        errno.ENFILE,
-                    ):
-                        raise
+                if file_size > max_content_size:
                     logger.warning(
-                        "failed_to_read_note_content",
+                        "note_content_too_large",
                         file=relative_path,
-                        error=str(e),
+                        size_mb=round(file_size / (1024 * 1024), 2),
+                        max_size_mb=self.config.max_note_content_size_mb,
                     )
+                else:
+                    note_content = file_path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError) as e:
+                if isinstance(e, OSError) and e.errno in (
+                    errno.EMFILE,
+                    errno.ENFILE,
+                ):
+                    raise
+                logger.warning(
+                    "failed_to_read_note_content",
+                    file=relative_path,
+                    error=str(e),
+                )
 
             # Parse note
             metadata, qa_pairs = parse_note(

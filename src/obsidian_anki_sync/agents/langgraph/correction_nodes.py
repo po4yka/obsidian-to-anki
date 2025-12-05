@@ -10,14 +10,10 @@ import time
 
 from obsidian_anki_sync.agents.models import NoteCorrectionResult
 from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent
-from obsidian_anki_sync.models import NoteMetadata
-from obsidian_anki_sync.providers.pydantic_ai_models import (
-    create_openrouter_model_from_env,
-)
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .node_helpers import increment_step_count
-from .state import PipelineState, get_agent_selector, get_config, get_model
+from .state import PipelineState, get_config
 
 logger = get_logger(__name__)
 
@@ -127,8 +123,6 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     Returns:
         Updated state with corrected note content
     """
-    from obsidian_anki_sync.agents.models import NoteCorrectionResult
-    from obsidian_anki_sync.agents.parser_repair import ParserRepairAgent
 
     # Check step limit (best practice: cycle protection)
     if not increment_step_count(state, "note_correction"):

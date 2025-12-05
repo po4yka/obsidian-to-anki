@@ -14,7 +14,6 @@ from obsidian_anki_sync.agents.models import (
 )
 from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.error_codes import ErrorCode
-from obsidian_anki_sync.agents.models import GeneratedCard
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.providers.pydantic_ai_models import (
     create_openrouter_model_from_env,
@@ -22,7 +21,13 @@ from obsidian_anki_sync.providers.pydantic_ai_models import (
 from obsidian_anki_sync.utils.logging import get_logger, log_state_transition
 
 from .node_helpers import increment_step_count
-from .state import PipelineState, get_agent_selector, get_config, get_model, get_rag_integration
+from .state import (
+    PipelineState,
+    get_agent_selector,
+    get_config,
+    get_model,
+    get_rag_integration,
+)
 
 logger = get_logger(__name__)
 

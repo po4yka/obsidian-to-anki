@@ -1,7 +1,6 @@
 """Repository for note index data operations."""
 
 from datetime import datetime
-from typing import Any
 
 from obsidian_anki_sync.infrastructure.database_connection_manager import (
     DatabaseConnectionManager,

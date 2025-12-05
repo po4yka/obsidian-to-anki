@@ -222,39 +222,6 @@ MODEL_CAPABILITIES: dict[str, ModelCapabilities] = {
         speed_tier=2,  # Fast
         quality_tier=4,  # Good quality for size
     ),
-    # Latest DeepSeek models (December 2025)
-    "deepseek/deepseek-v3.2": ModelCapabilities(
-        supports_structured_outputs=True,
-        supports_reasoning=True,  # Excellent reasoning capabilities
-        max_output_tokens=16384,
-        context_window=163840,  # 163K context window
-        cost_per_1m_prompt=0.14,  # Competitive pricing
-        cost_per_1m_completion=0.56,
-        speed_tier=3,
-        quality_tier=5,  # Excellent quality, rivals GPT-5
-    ),
-    # Latest Minimax models (December 2025)
-    "minimax/minimax-m2": ModelCapabilities(
-        supports_structured_outputs=True,
-        supports_reasoning=False,
-        max_output_tokens=8192,
-        context_window=204800,  # 204K context window
-        cost_per_1m_prompt=0.10,
-        cost_per_1m_completion=0.40,
-        speed_tier=3,
-        quality_tier=5,  # Excellent for coding and agentic tasks
-    ),
-    # Latest Kimi models (December 2025)
-    "moonshotai/kimi-k2-thinking": ModelCapabilities(
-        supports_structured_outputs=True,
-        supports_reasoning=True,  # Thinking model for advanced reasoning
-        max_output_tokens=16384,
-        context_window=262144,  # 256K context window
-        cost_per_1m_prompt=0.12,
-        cost_per_1m_completion=0.48,
-        speed_tier=4,  # Slower due to thinking process
-        quality_tier=5,  # Excellent for complex reasoning tasks
-    ),
 }
 
 # Default model for all tasks - DeepSeek V3.2 (latest, excellent reasoning, 163K context)

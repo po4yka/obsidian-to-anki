@@ -28,16 +28,6 @@ from .models import (
 from .provider import OpenRouterProvider
 
 __all__ = [
-    # Atomic API calls
-    "APICallResult",
-    "ChatCompletionResult",
-    "chat_completion",
-    "chat_completion_structured",
-    "chat_completion_with_tools",
-    "check_connection",
-    "create_openrouter_client",
-    "fetch_key_status",
-    "list_models",
     # Constants
     "CONTEXT_SAFETY_MARGIN",
     "DEFAULT_CONTEXT_WINDOW",
@@ -47,6 +37,16 @@ __all__ = [
     "MODELS_WITH_STRUCTURED_OUTPUT_ISSUES",
     "MODEL_CONTEXT_WINDOWS",
     "MODEL_MAX_OUTPUT_TOKENS",
+    # Atomic API calls
+    "APICallResult",
+    "ChatCompletionResult",
     # Provider class
     "OpenRouterProvider",
+    "chat_completion",
+    "chat_completion_structured",
+    "chat_completion_with_tools",
+    "check_connection",
+    "create_openrouter_client",
+    "fetch_key_status",
+    "list_models",
 ]

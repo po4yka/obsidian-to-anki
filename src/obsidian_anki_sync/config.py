@@ -310,18 +310,6 @@ class Config(BaseSettings):
     # LM Studio provider settings
     lm_studio_base_url: str = "http://localhost:1234/v1"
 
-    # OpenAI provider settings
-    openai_api_key: str = ""
-    openai_base_url: str = "https://api.openai.com/v1"
-    openai_organization: str | None = None
-    openai_max_retries: int = 3
-
-    # Anthropic provider settings
-    anthropic_api_key: str = ""
-    anthropic_base_url: str = "https://api.anthropic.com"
-    anthropic_api_version: str = "2023-06-01"
-    anthropic_max_retries: int = 3
-
     # OpenRouter provider settings
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -575,10 +563,6 @@ class Config(BaseSettings):
     llm_slow_request_threshold: float = Field(
         default=60.0, description="Threshold in seconds for logging slow LLM requests"
     )
-
-    # LangGraph + PydanticAI Agent System (new!)
-    use_langgraph: bool = False  # Enable LangGraph-based orchestration
-    use_pydantic_ai: bool = False  # Enable PydanticAI for structured outputs
 
     # ============================================================================
     # Unified Model Configuration System
@@ -876,25 +860,25 @@ class Config(BaseSettings):
         # Check for explicit override in model_overrides
         if task_name and task_name in self.model_overrides:
             override = self.model_overrides[task_name]
-            if "model_name" in override and override["model_name"]:
+            if override.get("model_name"):
                 return override["model_name"]
 
         # Special fallback cases for backward compatibility
         if agent_type == "note_correction" and "parser_repair" in self.model_overrides:
             override = self.model_overrides["parser_repair"]
-            if "model_name" in override and override["model_name"]:
+            if override.get("model_name"):
                 return override["model_name"]
         if agent_type == "reasoning" and "generation" in self.model_overrides:
             override = self.model_overrides["generation"]
-            if "model_name" in override and override["model_name"]:
+            if override.get("model_name"):
                 return override["model_name"]
         if agent_type == "reflection" and "generation" in self.model_overrides:
             override = self.model_overrides["generation"]
-            if "model_name" in override and override["model_name"]:
+            if override.get("model_name"):
                 return override["model_name"]
         if agent_type == "highlight" and "pre_validation" in self.model_overrides:
             override = self.model_overrides["pre_validation"]
-            if "model_name" in override and override["model_name"]:
+            if override.get("model_name"):
                 return override["model_name"]
 
         # Use preset system if task is known
@@ -1074,22 +1058,6 @@ class Config(BaseSettings):
                 suggestion="Set OPENROUTER_API_KEY environment variable or openrouter_api_key in config.yaml",
             )
 
-        if provider_lower == "openai" and not self.openai_api_key:
-            msg = "OpenAI API key is required when using OpenAI provider."
-            raise ConfigurationError(
-                msg,
-                suggestion="Set OPENAI_API_KEY environment variable or openai_api_key in config.yaml. "
-                "Get your API key from https://platform.openai.com/api-keys",
-            )
-
-        if provider_lower in ("anthropic", "claude") and not self.anthropic_api_key:
-            msg = "Anthropic API key is required when using Anthropic/Claude provider."
-            raise ConfigurationError(
-                msg,
-                suggestion="Set ANTHROPIC_API_KEY environment variable or anthropic_api_key in config.yaml. "
-                "Get your API key from https://console.anthropic.com/",
-            )
-
         if self.run_mode not in ("apply", "dry-run"):
             msg = f"Invalid run_mode: {self.run_mode}"
             raise ConfigurationError(
@@ -1150,8 +1118,6 @@ class Config(BaseSettings):
         # Validate retry bounds for various retry settings
         retry_attrs = [
             ("queue_max_retries", self.queue_max_retries if self.enable_queue else 3),
-            ("openai_max_retries", self.openai_max_retries),
-            ("anthropic_max_retries", self.anthropic_max_retries),
             ("post_validation_max_retries", self.post_validation_max_retries),
             ("langgraph_max_retries", self.langgraph_max_retries),
         ]
@@ -1369,109 +1335,11 @@ def load_config(
             if export_output_str:
                 export_output_path = Path(str(export_output_str))
 
-        # Migrate old individual model fields to model_overrides structure
-        legacy_model_fields = [
-            "qa_extractor_model", "parser_repair_model", "note_correction_model",
-            "pre_validator_model", "generator_model", "post_validator_model",
-            "context_enrichment_model", "memorization_quality_model",
-            "card_splitting_model", "split_validator_model",
-            "duplicate_detection_model", "reasoning_model", "reflection_model",
-            "highlight_model"
-        ]
-        legacy_temp_fields = [
-            "qa_extractor_temperature", "parser_repair_temperature",
-            "note_correction_temperature", "pre_validator_temperature",
-            "generator_temperature", "post_validator_temperature"
-        ]
-        legacy_max_tokens_fields = [
-            "qa_extractor_max_tokens", "parser_repair_max_tokens",
-            "note_correction_max_tokens", "pre_validator_max_tokens",
-            "generator_max_tokens", "post_validator_max_tokens"
-        ]
-
-        # Map legacy field names to task names
-        field_to_task = {
-            "qa_extractor_model": "qa_extraction",
-            "parser_repair_model": "parser_repair",
-            "note_correction_model": "parser_repair",  # Reuse parser_repair
-            "pre_validator_model": "pre_validation",
-            "generator_model": "generation",
-            "post_validator_model": "post_validation",
-            "context_enrichment_model": "context_enrichment",
-            "memorization_quality_model": "memorization_quality",
-            "card_splitting_model": "card_splitting",
-            "split_validator_model": "card_splitting",  # Reuse card_splitting
-            "duplicate_detection_model": "duplicate_detection",
-            "reasoning_model": "reasoning",
-            "reflection_model": "reflection",
-            "highlight_model": "highlight",
-        }
-
-        # Check for legacy fields and migrate to model_overrides
-        model_overrides: dict[str, dict[str, Any]] = {}
-        if "model_overrides" in yaml_data:
-            model_overrides = yaml_data.get("model_overrides", {})
-
-        has_legacy_fields = False
-        for field_name in legacy_model_fields:
-            if field_name in yaml_data and yaml_data[field_name]:
-                has_legacy_fields = True
-                task_name = field_to_task.get(field_name)
-                if task_name:
-                    if task_name not in model_overrides:
-                        model_overrides[task_name] = {}
-                    model_overrides[task_name]["model_name"] = yaml_data[field_name]
-
-        # Migrate temperature fields
-        temp_field_to_task = {
-            "qa_extractor_temperature": "qa_extraction",
-            "parser_repair_temperature": "parser_repair",
-            "note_correction_temperature": "parser_repair",
-            "pre_validator_temperature": "pre_validation",
-            "generator_temperature": "generation",
-            "post_validator_temperature": "post_validation",
-        }
-        for field_name in legacy_temp_fields:
-            if field_name in yaml_data and yaml_data[field_name] is not None:
-                has_legacy_fields = True
-                task_name = temp_field_to_task.get(field_name)
-                if task_name:
-                    if task_name not in model_overrides:
-                        model_overrides[task_name] = {}
-                    model_overrides[task_name]["temperature"] = yaml_data[field_name]
-
-        # Migrate max_tokens fields
-        tokens_field_to_task = {
-            "qa_extractor_max_tokens": "qa_extraction",
-            "parser_repair_max_tokens": "parser_repair",
-            "note_correction_max_tokens": "parser_repair",
-            "pre_validator_max_tokens": "pre_validation",
-            "generator_max_tokens": "generation",
-            "post_validator_max_tokens": "post_validation",
-        }
-        for field_name in legacy_max_tokens_fields:
-            if field_name in yaml_data and yaml_data[field_name] is not None:
-                has_legacy_fields = True
-                task_name = tokens_field_to_task.get(field_name)
-                if task_name:
-                    if task_name not in model_overrides:
-                        model_overrides[task_name] = {}
-                    model_overrides[task_name]["max_tokens"] = yaml_data[field_name]
-
-        # Warn about legacy fields
-        if has_legacy_fields:
-            logger.warning(
-                "legacy_model_fields_detected",
-                message="Individual model fields (e.g., qa_extractor_model, generator_model) are deprecated. "
-                "They have been migrated to model_overrides structure. "
-                "Please update your config.yaml to use the new format.",
-            )
-
         # Create config instance - pydantic-settings will load from env vars
         # We pass YAML-specific values directly
         config_kwargs: dict[str, Any] = {}
-        if model_overrides:
-            config_kwargs["model_overrides"] = model_overrides
+        if "model_overrides" in yaml_data:
+            config_kwargs["model_overrides"] = yaml_data.get("model_overrides", {})
         if source_subdirs is not None:
             config_kwargs["source_subdirs"] = source_subdirs
         if export_output_path is not None:
@@ -1496,8 +1364,6 @@ def load_config(
                 vault_path=str(
                     config.vault_path) if config.vault_path else None,
                 llm_provider=getattr(config, "llm_provider", None),
-                use_agents=getattr(config, "use_agents", False),
-                use_langgraph=getattr(config, "use_langgraph", False),
             )
         except Exception as e:
             logger.error(

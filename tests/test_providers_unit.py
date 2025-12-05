@@ -97,9 +97,6 @@ def test_factory_list_supported_providers():
 
     assert "ollama" in providers
     assert "openrouter" in providers
-    assert "openai" in providers
-    assert "anthropic" in providers
-    assert "claude" in providers
     assert "lm_studio" in providers
     assert "lmstudio" in providers
 

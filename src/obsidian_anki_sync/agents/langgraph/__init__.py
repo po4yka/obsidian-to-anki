@@ -12,6 +12,14 @@ Public API:
 - Self-Reflection models and nodes for output evaluation and revision
 """
 
+# Node modules (following SOLID principles and Clean Architecture)
+from . import (
+    correction_nodes,
+    detection_nodes,
+    enhancement_nodes,
+    generation_nodes,
+    validation_nodes,
+)
 from .orchestrator import LangGraphOrchestrator
 from .reasoning_models import (
     CardSplittingReasoningOutput,
@@ -59,15 +67,6 @@ from .retry_policies import (
     is_transient_error,
 )
 from .state import PipelineState
-
-# Node modules (following SOLID principles and Clean Architecture)
-from . import (
-    correction_nodes,
-    detection_nodes,
-    enhancement_nodes,
-    generation_nodes,
-    validation_nodes,
-)
 
 # Optional: Swarm pattern (requires langgraph-swarm package)
 try:

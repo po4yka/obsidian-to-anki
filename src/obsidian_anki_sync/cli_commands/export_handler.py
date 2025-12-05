@@ -27,7 +27,6 @@ def run_export(
     output: Path | None,
     deck_name: str | None,
     deck_description: str,
-    use_langgraph: bool | None,
     sample_size: int | None,
 ) -> None:
     """Execute the export operation.
@@ -38,19 +37,11 @@ def run_export(
         output: Output .apkg file path
         deck_name: Name for the exported deck
         deck_description: Description for the deck
-        use_langgraph: Override LangGraph setting
         sample_size: Export only N random notes
 
     Raises:
         typer.Exit: On export failure
     """
-    # Override LangGraph setting if CLI flag is provided
-    if use_langgraph is not None:
-        config.use_langgraph = use_langgraph
-        # Enable PydanticAI when using LangGraph
-        config.use_pydantic_ai = use_langgraph
-        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
-
     # Determine output path
     output_path = output or config.export_output_path or Path("output.apkg")
 
@@ -122,15 +113,6 @@ def run_export(
 
             # Generate cards using the agent system
             cards: list[Card] = []
-
-            # Always use agent system for card generation
-            if not config.use_langgraph and not config.use_pydantic_ai:
-                logger.info(
-                    "enabling_agent_system",
-                    reason="Agent system is required",
-                )
-                config.use_langgraph = True
-                config.use_pydantic_ai = True
 
             console.print(
                 "[cyan]Using LangGraph agent system for generation...[/cyan]"

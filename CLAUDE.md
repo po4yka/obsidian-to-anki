@@ -88,8 +88,7 @@ uv run arq obsidian_anki_sync.worker.WorkerSettings
 
 **Agent Orchestration** (`agents/`):
 
--   Two orchestrator options: Legacy (`orchestrator.py`) or LangGraph (`langgraph_orchestrator.py`)
--   LangGraph uses state machine workflow with conditional routing and retries
+-   LangGraph orchestrator (`langgraph_orchestrator.py`) uses state machine workflow with conditional routing and retries
 -   Multi-stage pipeline: Pre-Validator → Generator → Post-Validator
 -   Optional enhancement agents: Context Enrichment, Memorization Quality, Card Splitting, Duplicate Detection
 
@@ -97,7 +96,7 @@ uv run arq obsidian_anki_sync.worker.WorkerSettings
 
 -   Unified interface via `BaseLLMProvider` (`base.py`)
 -   Factory pattern (`factory.py`) creates provider instances from config
--   Provider: OpenRouter
+-   Providers: Ollama, LM Studio, OpenRouter
 -   PydanticAI integration for structured outputs (`pydantic_ai_models.py`)
 
 **Configuration** (`config.py`):
@@ -144,17 +143,15 @@ uv run arq obsidian_anki_sync.worker.WorkerSettings
 
 ### Agent System
 
-The agent system has two implementations:
+The agent system uses LangGraph orchestrator with state machine architecture:
 
--   **Legacy** (`agents/orchestrator.py`): Simple sequential pipeline
 -   **LangGraph** (`agents/langgraph_orchestrator.py`): State machine with conditional routing, persistence
+-   PydanticAI for structured outputs
 
 Enable via config:
 
 ```yaml
 use_agent_system: true
-use_langgraph: true # Use LangGraph orchestrator
-use_pydantic_ai: true # Use PydanticAI for structured outputs
 ```
 
 LangGraph workflow nodes:

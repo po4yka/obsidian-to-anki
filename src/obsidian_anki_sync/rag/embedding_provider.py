@@ -2,7 +2,6 @@
 
 Supports multiple embedding backends:
 - OpenRouter (via OpenAI-compatible API)
-- OpenAI directly
 - Local models via Ollama
 
 Uses LangChain embeddings for compatibility with vector stores.
@@ -29,7 +28,6 @@ class EmbeddingProvider:
 
     Supports:
     - OpenRouter: Uses OpenAI-compatible embeddings API
-    - OpenAI: Uses native OpenAI embeddings
     - Ollama: Uses local Ollama embeddings
 
     Implements caching to avoid re-embedding unchanged content.
@@ -38,7 +36,6 @@ class EmbeddingProvider:
     # Default embedding models per provider
     DEFAULT_MODELS = {
         "openrouter": "openai/text-embedding-3-small",
-        "openai": "text-embedding-3-small",
         "ollama": "nomic-embed-text",
     }
 
@@ -103,14 +100,6 @@ class EmbeddingProvider:
                 timeout=self.config.llm_timeout,
             )
 
-        elif self.provider == "openai":
-            return OpenAIEmbeddings(
-                model=self.model_name,
-                openai_api_key=self.config.openai_api_key,
-                openai_api_base=self.config.openai_base_url,
-                timeout=self.config.llm_timeout,
-            )
-
         elif self.provider == "ollama":
             # Use OllamaEmbeddings from langchain-community
             try:
@@ -130,7 +119,7 @@ class EmbeddingProvider:
         else:
             msg = (
                 f"Provider '{self.provider}' does not support embeddings. "
-                f"Supported providers: openrouter, openai, ollama"
+                f"Supported providers: openrouter, ollama"
             )
             raise ValueError(msg)
 

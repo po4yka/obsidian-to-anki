@@ -16,8 +16,8 @@ def mock_components():
     config.db_path = Path("/tmp/test.db")
     config.max_concurrent_generations = 1
     config.auto_adjust_workers = False
-    config.use_langgraph = False
-    config.use_pydantic_ai = False
+    config.llm_provider = "ollama"
+    config.llm_timeout = 60.0
 
     state_db = MagicMock()
     state_db.get_all_cards.return_value = []
@@ -42,11 +42,16 @@ def test_atomic_sync_callback(mock_components):
         ) as MockAnkiStateManager,
         patch("obsidian_anki_sync.sync.engine.ChangeApplier") as MockChangeApplier,
         patch("obsidian_anki_sync.sync.engine.CardGenerator") as MockCardGenerator,
+        patch("obsidian_anki_sync.sync.engine.ProviderFactory") as MockProviderFactory,
     ):
         # Setup mock instances
         note_scanner_instance = MockNoteScanner.return_value
         anki_state_manager_instance = MockAnkiStateManager.return_value
         change_applier_instance = MockChangeApplier.return_value
+
+        # Mock provider factory
+        mock_provider = MagicMock()
+        MockProviderFactory.create_from_config.return_value = mock_provider
 
         # Mock fetch_state
         anki_state_manager_instance.fetch_state.return_value = {}

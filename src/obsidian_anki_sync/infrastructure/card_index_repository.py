@@ -1,7 +1,5 @@
 """Repository for card index data operations."""
 
-from typing import Any
-
 from obsidian_anki_sync.infrastructure.database_connection_manager import (
     DatabaseConnectionManager,
 )

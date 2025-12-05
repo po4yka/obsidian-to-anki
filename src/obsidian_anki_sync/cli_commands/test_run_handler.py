@@ -22,7 +22,6 @@ def run_test_run(
     logger: Any,
     count: int = 10,
     dry_run: bool = True,
-    use_langgraph: bool | None = None,
     index: bool = False,
 ) -> None:
     """Execute the test-run operation.
@@ -32,7 +31,6 @@ def run_test_run(
         logger: Logger instance
         count: Number of random notes to process
         dry_run: Preview changes without applying
-        use_langgraph: Override LangGraph setting
         index: Build full vault index before sampling
 
     Raises:
@@ -46,19 +44,11 @@ def run_test_run(
         command="test-run",
         count=count,
         dry_run=dry_run,
-        use_langgraph=use_langgraph,
         config_path=str(config.config_path) if config.config_path else None,
         log_level=config.log_level,
         index=index,
         vault_path=str(config.vault_path) if config.vault_path else None,
     )
-
-    # Override LangGraph setting if CLI flag is provided
-    if use_langgraph is not None:
-        config.use_langgraph = use_langgraph
-        # Enable PydanticAI when using LangGraph
-        config.use_pydantic_ai = use_langgraph
-        logger.info("langgraph_system_override", use_langgraph=use_langgraph)
 
     logger.info("test_run_started", sample_count=count, dry_run=dry_run)
 

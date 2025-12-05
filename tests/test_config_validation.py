@@ -23,7 +23,9 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            generator_model="custom/generator-model",
+            model_overrides={
+                "generation": {"model_name": "custom/generator-model"}
+            },
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -40,13 +42,12 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            generator_model="",
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
         model = config.get_model_for_agent("generator")
-        # All presets now use qwen/qwen-2.5-32b-instruct
-        assert model == "qwen/qwen-2.5-32b-instruct"
+        # Balanced preset uses deepseek/deepseek-v3.2
+        assert model == "deepseek/deepseek-v3.2"
 
     def test_get_model_for_agent_fallback_to_default(self, temp_dir):
         """Test fallback to default_llm_model when preset is invalid."""
@@ -58,7 +59,6 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="invalid_preset",
-            generator_model="",
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -75,7 +75,9 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            pre_validator_model="custom/pre-validator",
+            model_overrides={
+                "pre_validation": {"model_name": "custom/pre-validator"}
+            },
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -92,7 +94,9 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="high_quality",
-            post_validator_model="custom/post-validator",
+            model_overrides={
+                "post_validation": {"model_name": "custom/post-validator"}
+            },
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -109,7 +113,9 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            context_enrichment_model="custom/enrichment",
+            model_overrides={
+                "context_enrichment": {"model_name": "custom/enrichment"}
+            },
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -142,8 +148,12 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            generator_temperature=0.7,
-            generator_max_tokens=4096,
+            model_overrides={
+                "generation": {
+                    "temperature": 0.7,
+                    "max_tokens": 4096
+                }
+            },
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -178,11 +188,10 @@ class TestModelPresets:
     @pytest.mark.parametrize(
         ("preset", "expected_generator"),
         [
-            # All presets now use qwen/qwen-2.5-32b-instruct
             ("cost_effective", "qwen/qwen-2.5-32b-instruct"),
-            ("balanced", "qwen/qwen-2.5-32b-instruct"),
-            ("high_quality", "qwen/qwen-2.5-32b-instruct"),
-            ("fast", "qwen/qwen-2.5-32b-instruct"),
+            ("balanced", "deepseek/deepseek-v3.2"),
+            ("high_quality", "deepseek/deepseek-v3.2"),
+            ("fast", "qwen/qwen-2.5-7b-instruct"),
         ],
     )
     def test_preset_generator_models(self, temp_dir, preset, expected_generator):
@@ -195,7 +204,6 @@ class TestModelPresets:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset=preset,
-            generator_model="",
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -296,31 +304,6 @@ class TestConfigurationValidation:
                 openrouter_api_key="",
             )
 
-    def test_missing_openai_api_key(self, temp_dir):
-        """Test error when OpenAI provider is selected without API key."""
-        vault_path = temp_dir / "vault"
-        vault_path.mkdir()
-
-        with pytest.raises(ConfigurationError, match="OpenAI API key is required"):
-            Config(
-                vault_path=vault_path,
-                source_dir=Path(),
-                llm_provider="openai",
-                openai_api_key="",
-            )
-
-    def test_missing_anthropic_api_key(self, temp_dir):
-        """Test error when Anthropic provider is selected without API key."""
-        vault_path = temp_dir / "vault"
-        vault_path.mkdir()
-
-        with pytest.raises(ConfigurationError, match="Anthropic API key is required"):
-            Config(
-                vault_path=vault_path,
-                source_dir=Path(),
-                llm_provider="anthropic",
-                anthropic_api_key="",
-            )
 
     def test_invalid_run_mode(self, temp_dir):
         """Test error for invalid run_mode."""
@@ -548,9 +531,6 @@ class TestProviderValidation:
             "lm_studio",
             "lmstudio",
             "openrouter",
-            "openai",
-            "anthropic",
-            "claude",
         ],
     )
     def test_valid_provider_names(self, temp_dir, provider):
@@ -560,9 +540,6 @@ class TestProviderValidation:
 
         api_keys = {
             "openrouter": "test-key",
-            "openai": "test-key",
-            "anthropic": "test-key",
-            "claude": "test-key",
         }
 
         kwargs = {
@@ -575,10 +552,6 @@ class TestProviderValidation:
         if provider in api_keys:
             if provider == "openrouter":
                 kwargs["openrouter_api_key"] = api_keys[provider]
-            elif provider == "openai":
-                kwargs["openai_api_key"] = api_keys[provider]
-            elif provider in ("anthropic", "claude"):
-                kwargs["anthropic_api_key"] = api_keys[provider]
 
         config = Config(**kwargs)
         assert config.llm_provider == provider
@@ -660,19 +633,6 @@ class TestConfigurationDefaults:
 
         assert config.model_preset == "balanced"
 
-    def test_default_agent_settings(self, temp_dir):
-        """Test default agent system settings."""
-        vault_path = temp_dir / "vault"
-        vault_path.mkdir()
-
-        config = Config(
-            vault_path=vault_path,
-            source_dir=Path(),
-            db_path=temp_dir / "test.db",
-        )
-
-        assert config.use_langgraph is False
-        assert config.use_pydantic_ai is False
 
     def test_default_performance_settings(self, temp_dir):
         """Test default performance optimization settings."""

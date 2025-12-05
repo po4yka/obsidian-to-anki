@@ -1,8 +1,8 @@
 """Parallel processing service for note scanning."""
 
 import contextvars
-import time
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -14,7 +14,7 @@ except ImportError:
 
 from obsidian_anki_sync.domain.interfaces.note_scanner import IParallelProcessor
 from obsidian_anki_sync.models import Card
-from obsidian_anki_sync.sync.scanner_utils import calculate_optimal_workers, ThreadSafeSlugView
+from obsidian_anki_sync.sync.scanner_utils import calculate_optimal_workers
 from obsidian_anki_sync.utils.logging import get_logger
 
 if TYPE_CHECKING:

@@ -291,7 +291,7 @@ class NoteScanner(INoteScanner):
                 if error_type not in error_samples:
                     error_samples[error_type] = []
                 if len(error_samples[error_type]) < 10:
-                    error_samples[error_type].append(f"{relative_path}: {str(e)}")
+                    error_samples[error_type].append(f"{relative_path}: {e!s}")
 
                 # Update progress even on error
                 if self.progress:

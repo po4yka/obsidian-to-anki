@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import threading
-import warnings
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path

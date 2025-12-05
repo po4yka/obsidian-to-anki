@@ -308,20 +308,18 @@ class PreflightChecker:
         """Check LLM provider configuration and connectivity."""
         provider_name = self.config.llm_provider
 
-        # Skip check if using agent system (will be checked separately)
-        if self.config.use_langgraph or self.config.use_pydantic_ai:
-            provider_type = "LangGraph"
-            self.results.append(
-                CheckResult(
-                    name="LLM Provider",
-                    passed=True,
-                    message=f"Using {provider_type} (OpenRouter/PydanticAI will be checked during sync)",
-                    severity="info",
-                )
+        # Agent system is always enabled - check is done during sync
+        self.results.append(
+            CheckResult(
+                name="LLM Provider",
+                passed=True,
+                message="Using LangGraph (OpenRouter/PydanticAI will be checked during sync)",
+                severity="info",
             )
-            return
+        )
+        return
 
-        # Check provider-specific configuration
+        # Check provider-specific configuration (unreachable - kept for reference)
         if provider_name == "openrouter":
             api_key = self.config.openrouter_api_key
             if not api_key or api_key == "your_api_key_here":
