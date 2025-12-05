@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection
 from typing import TYPE_CHECKING, Any
 
+from obsidian_anki_sync.models import Card, QAPair
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from obsidian_anki_sync.models import Card, QAPair
 
 
 class INoteScanner(ABC):

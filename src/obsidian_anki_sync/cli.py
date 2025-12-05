@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.console import Console
 
 from .cli_commands.anki_handler import (
     run_export_deck,
