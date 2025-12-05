@@ -3,6 +3,7 @@
 import csv
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from obsidian_anki_sync.utils.io import atomic_write
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .field_mapper import map_apf_to_anki_fields
+from .safe_exporter import safe_export_context
 
 logger = get_logger(__name__)
 
@@ -702,3 +704,140 @@ def _reconstruct_apf_from_fields(fields: dict[str, str], note_type: str) -> str:
         back = fields.get("Back", "")
         additional = fields.get("Additional", "")
         return f"<!-- APF::Simple -->\n<!-- BEGIN_CARDS -->\n<div class='card'><div class='front'>{front}</div><div class='back'>{back}</div></div>\n<!-- END_CARDS -->\n{additional}"
+
+
+# Safe export functions using new implementation
+
+def export_cards_to_yaml_safe(
+    cards: list[Card],
+    output_path: str | Path,
+    deck_name: str,
+    deck_description: str = "",
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    include_note_id: bool = True,
+    create_backup: bool = True,
+) -> dict[str, Any]:
+    """
+    Safely export cards to YAML file with validation, rollback, and progress tracking.
+
+    This is the recommended function for new code. It provides:
+    - Comprehensive input and output validation
+    - Transaction-like operations with rollback on failure
+    - Progress tracking and detailed error reporting
+    - Automatic backup creation and cleanup
+    - Resource management and memory safety
+
+    Args:
+        cards: List of Card objects to export
+        output_path: Path to output YAML file
+        deck_name: Deck name for metadata
+        deck_description: Optional deck description
+        progress_callback: Optional callback for progress updates
+        include_note_id: Whether to include noteId field for updates
+        create_backup: Whether to create backup of existing file
+
+    Returns:
+        Dictionary with operation results and metadata
+
+    Raises:
+        DeckExportError: If export fails (with automatic rollback)
+    """
+    with safe_export_context() as exporter:
+        return exporter.export_to_yaml(
+            cards=cards,
+            output_path=output_path,
+            deck_name=deck_name,
+            deck_description=deck_description,
+            progress_callback=progress_callback,
+            include_note_id=include_note_id,
+            create_backup=create_backup,
+        )
+
+
+def export_cards_to_csv_safe(
+    cards: list[Card],
+    output_path: str | Path,
+    deck_name: str,
+    deck_description: str = "",
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    include_note_id: bool = True,
+    create_backup: bool = True,
+) -> dict[str, Any]:
+    """
+    Safely export cards to CSV file with validation, rollback, and progress tracking.
+
+    This is the recommended function for new code. It provides:
+    - Comprehensive input and output validation
+    - Transaction-like operations with rollback on failure
+    - Progress tracking and detailed error reporting
+    - Automatic backup creation and cleanup
+    - Resource management and memory safety
+
+    Args:
+        cards: List of Card objects to export
+        output_path: Path to output CSV file
+        deck_name: Deck name for metadata
+        deck_description: Optional deck description
+        progress_callback: Optional callback for progress updates
+        include_note_id: Whether to include noteId field for updates
+        create_backup: Whether to create backup of existing file
+
+    Returns:
+        Dictionary with operation results and metadata
+
+    Raises:
+        DeckExportError: If export fails (with automatic rollback)
+    """
+    with safe_export_context() as exporter:
+        return exporter.export_to_csv(
+            cards=cards,
+            output_path=output_path,
+            deck_name=deck_name,
+            deck_description=deck_description,
+            progress_callback=progress_callback,
+            include_note_id=include_note_id,
+            create_backup=create_backup,
+        )
+
+
+def export_cards_to_apkg_safe(
+    cards: list[Card],
+    output_path: str | Path,
+    deck_name: str,
+    deck_description: str = "",
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    media_files: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Safely export cards to APKG file with validation, rollback, and progress tracking.
+
+    This is the recommended function for new code. It provides:
+    - Comprehensive input and output validation
+    - Transaction-like operations with rollback on failure
+    - Progress tracking and detailed error reporting
+    - Automatic backup creation and cleanup
+    - Resource management and memory safety
+
+    Args:
+        cards: List of Card objects to export
+        output_path: Path to output APKG file
+        deck_name: Deck name
+        deck_description: Optional deck description
+        progress_callback: Optional callback for progress updates
+        media_files: Optional list of media file paths to include
+
+    Returns:
+        Dictionary with operation results and metadata
+
+    Raises:
+        DeckExportError: If export fails (with automatic rollback)
+    """
+    with safe_export_context() as exporter:
+        return exporter.export_to_apkg(
+            cards=cards,
+            output_path=output_path,
+            deck_name=deck_name,
+            deck_description=deck_description,
+            progress_callback=progress_callback,
+            media_files=media_files,
+        )

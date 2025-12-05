@@ -13,6 +13,7 @@ def mock_components():
     config.vault_path = Path("/tmp/vault")
     config.source_dir = "notes"
     config.source_subdirs = []
+    config.db_path = Path("/tmp/test.db")
     config.max_concurrent_generations = 1
     config.auto_adjust_workers = False
     config.use_langgraph = False

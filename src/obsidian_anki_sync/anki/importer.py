@@ -2,6 +2,7 @@
 
 import csv
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from obsidian_anki_sync.exceptions import AnkiError, DeckImportError
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .client import AnkiClient
+from .safe_importer import safe_import_context
 
 logger = get_logger(__name__)
 
@@ -277,3 +279,95 @@ def _import_cards(
     logger.info("import_complete", **result)
 
     return result
+
+
+# Safe import functions using new implementation
+
+def import_cards_from_yaml_safe(
+    client: AnkiClient,
+    input_path: str | Path,
+    deck_name: str,
+    note_type: str | None = None,
+    key_field: str | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    batch_size: int = 50,
+) -> dict[str, int]:
+    """
+    Safely import cards from YAML file with validation, rollback, and progress tracking.
+
+    This is the recommended function for new code. It provides:
+    - Comprehensive input validation
+    - Transaction-like operations with rollback on failure
+    - Batch processing for large imports
+    - Progress tracking and detailed error reporting
+    - Resource cleanup and memory management
+
+    Args:
+        client: AnkiClient instance
+        input_path: Path to YAML file
+        deck_name: Target deck name
+        note_type: Note type to use (auto-detected if not provided)
+        key_field: Field to use for identifying existing notes (auto-detected if not provided)
+        progress_callback: Optional callback for progress updates
+        batch_size: Number of cards to process in each batch
+
+    Returns:
+        Dict with counts: {'created': int, 'updated': int, 'errors': int}
+
+    Raises:
+        DeckImportError: If import fails (with automatic rollback)
+    """
+    with safe_import_context(client, deck_name) as importer:
+        return importer.import_from_yaml(
+            input_path=input_path,
+            deck_name=deck_name,
+            note_type=note_type,
+            key_field=key_field,
+            progress_callback=progress_callback,
+            batch_size=batch_size,
+        )
+
+
+def import_cards_from_csv_safe(
+    client: AnkiClient,
+    input_path: str | Path,
+    deck_name: str,
+    note_type: str | None = None,
+    key_field: str | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    batch_size: int = 50,
+) -> dict[str, int]:
+    """
+    Safely import cards from CSV file with validation, rollback, and progress tracking.
+
+    This is the recommended function for new code. It provides:
+    - Comprehensive input validation
+    - Transaction-like operations with rollback on failure
+    - Batch processing for large imports
+    - Progress tracking and detailed error reporting
+    - Resource cleanup and memory management
+
+    Args:
+        client: AnkiClient instance
+        input_path: Path to CSV file
+        deck_name: Target deck name
+        note_type: Note type to use (auto-detected if not provided)
+        key_field: Field to use for identifying existing notes (auto-detected if not provided)
+        progress_callback: Optional callback for progress updates
+        batch_size: Number of cards to process in each batch
+
+    Returns:
+        Dict with counts: {'created': int, 'updated': int, 'errors': int}
+
+    Raises:
+        DeckImportError: If import fails (with automatic rollback)
+    """
+    with safe_import_context(client, deck_name) as importer:
+        return importer.import_from_csv(
+            input_path=input_path,
+            deck_name=deck_name,
+            note_type=note_type,
+            key_field=key_field,
+            progress_callback=progress_callback,
+            batch_size=batch_size,
+        )

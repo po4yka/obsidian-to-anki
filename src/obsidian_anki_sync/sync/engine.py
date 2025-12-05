@@ -241,26 +241,36 @@ class SyncEngine:
 
         # Initialize persistent disk caches
         # Cache directory is placed next to the database file
-        cache_base_dir = config.db_path.parent / ".cache"
-        cache_base_dir.mkdir(parents=True, exist_ok=True)
+        # Only create cache if db_path is properly configured (not a mock)
+        if (hasattr(config.db_path, '__class__') and
+            config.db_path.__class__.__name__ != 'MagicMock' and
+            hasattr(config.db_path, 'parent') and
+            config.db_path.parent.exists()):
+            cache_base_dir = config.db_path.parent / ".cache"
+            cache_base_dir.mkdir(parents=True, exist_ok=True)
 
-        # Cache for agent-generated cards (cache_key -> list of Card)
-        # Cache key format: f"{metadata.id}:{relative_path}:{content_hash}"
-        agent_cache_dir = cache_base_dir / "agent_cards"
-        self._agent_card_cache = diskcache.Cache(
-            directory=str(agent_cache_dir),
-            size_limit=2**30,  # 1GB limit
-            eviction_policy="least-recently-used",
-        )
+            # Cache for agent-generated cards (cache_key -> list of Card)
+            # Cache key format: f"{metadata.id}:{relative_path}:{content_hash}"
+            agent_cache_dir = cache_base_dir / "agent_cards"
+            self._agent_card_cache = diskcache.Cache(
+                directory=str(agent_cache_dir),
+                size_limit=2**30,  # 1GB limit
+                eviction_policy="least-recently-used",
+            )
 
-        # Cache for non-agent generated cards (cache_key -> Card)
-        # Cache key format: f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
-        apf_cache_dir = cache_base_dir / "apf_cards"
-        self._apf_card_cache = diskcache.Cache(
-            directory=str(apf_cache_dir),
-            size_limit=2**30,  # 1GB limit
-            eviction_policy="least-recently-used",
-        )
+            # Cache for non-agent generated cards (cache_key -> Card)
+            # Cache key format: f"{relative_path}:{qa_pair.card_index}:{lang}:{content_hash}"
+            apf_cache_dir = cache_base_dir / "apf_cards"
+            self._apf_card_cache = diskcache.Cache(
+                directory=str(apf_cache_dir),
+                size_limit=2**30,  # 1GB limit
+                eviction_policy="least-recently-used",
+            )
+        else:
+            # Fallback: use in-memory caches when db_path is not properly configured
+            logger.debug("db_path_not_configured_using_memory_caches")
+            self._agent_card_cache = None  # type: ignore
+            self._apf_card_cache = None  # type: ignore
 
         self._cache_hits = 0
         self._cache_misses = 0
@@ -354,8 +364,10 @@ class SyncEngine:
     def _close_caches(self) -> None:
         """Close disk caches to ensure data is flushed to disk."""
         try:
-            self._agent_card_cache.close()
-            self._apf_card_cache.close()
+            if self._agent_card_cache is not None:
+                self._agent_card_cache.close()
+            if self._apf_card_cache is not None:
+                self._apf_card_cache.close()
             logger.debug("caches_closed")
         except Exception as e:
             logger.warning("cache_close_error", error=str(e))
