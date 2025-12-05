@@ -13,6 +13,47 @@ from .models import HTTP_STATUS_RETRYABLE
 logger = get_logger(__name__)
 
 
+def sanitize_tool_calls(data: dict) -> tuple[dict, bool]:
+    """Sanitize malformed tool_calls in API response.
+
+    Some models (e.g., qwen/qwen3-next) return tool_calls with
+    function.arguments = None instead of a valid JSON string.
+    This causes Pydantic validation to fail in PydanticAI.
+
+    Args:
+        data: Parsed JSON response data
+
+    Returns:
+        Tuple of (sanitized_data, was_sanitized)
+    """
+    sanitized = False
+    choices = data.get("choices", [])
+
+    for choice in choices:
+        message = choice.get("message", {})
+        tool_calls = message.get("tool_calls", [])
+
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, dict):
+                continue
+
+            function = tool_call.get("function", {})
+            if not isinstance(function, dict):
+                continue
+
+            # Check if arguments is None or missing
+            if function.get("arguments") is None:
+                function["arguments"] = "{}"
+                sanitized = True
+                logger.warning(
+                    "sanitized_null_tool_call_arguments",
+                    tool_call_id=tool_call.get("id"),
+                    function_name=function.get("name"),
+                )
+
+    return data, sanitized
+
+
 def is_malformed_chat_completion(response_body: bytes) -> bool:
     """Check if a 200 response contains a malformed ChatCompletion.
 
@@ -236,6 +277,29 @@ class RetryTransport(httpx.AsyncHTTPTransport):
                         await response.aclose()
 
                         continue
+
+                    # Sanitize tool_calls with None arguments
+                    # Some models return function.arguments = None instead of "{}"
+                    try:
+                        data = json.loads(response.content)
+                        sanitized_data, was_sanitized = sanitize_tool_calls(data)
+
+                        if was_sanitized:
+                            # Create new response with sanitized body
+                            sanitized_body = json.dumps(sanitized_data).encode("utf-8")
+                            response = httpx.Response(
+                                status_code=response.status_code,
+                                headers=response.headers,
+                                content=sanitized_body,
+                                request=request,
+                            )
+                            logger.info(
+                                "openrouter_response_sanitized",
+                                url=str(request.url),
+                            )
+                    except (json.JSONDecodeError, TypeError):
+                        # If we can't parse/sanitize, just return original response
+                        pass
 
                 # For other status codes, return immediately
                 return response

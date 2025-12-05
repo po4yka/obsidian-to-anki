@@ -49,6 +49,20 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "qwen/qwen3-30b-a3b": 131072,  # 128K context (standard)
     # xAI Grok Series
     "x-ai/grok-4.1-fast:free": 2000000,  # 2M context window
+    # OpenAI models
+    "openai/gpt-4o": 128000,
+    "openai/gpt-4o-mini": 128000,
+    "openai/gpt-4-turbo": 128000,
+    # Google Gemini models
+    "google/gemini-2.0-flash-001": 1048576,  # 1M context
+    "google/gemini-2.0-flash-exp": 1048576,  # 1M context
+    "google/gemini-2.5-flash": 1048576,  # 1M context
+    # Anthropic Claude models
+    "anthropic/claude-3.5-sonnet": 200000,
+    "anthropic/claude-3.5-haiku": 200000,
+    # Mistral models
+    "mistralai/mistral-small-3.1-24b-instruct": 131072,  # 128K context
+    "mistralai/mistral-large-2411": 131072,  # 128K context
 }
 DEFAULT_CONTEXT_WINDOW = 131072  # 128k tokens
 CONTEXT_SAFETY_MARGIN = 1000  # Reserve tokens for safety
@@ -73,20 +87,46 @@ MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
     "qwen/qwen3-30b-a3b": 8192,
     # xAI Grok Series - supports larger outputs due to 2M context window
     "x-ai/grok-4.1-fast:free": 32768,  # Conservative limit for 2M context model
+    # OpenAI models - excellent structured output support
+    "openai/gpt-4o": 16384,
+    "openai/gpt-4o-mini": 16384,  # Cost-effective, great for structured output
+    "openai/gpt-4-turbo": 4096,
+    # Google Gemini models - good function calling
+    "google/gemini-2.0-flash-001": 8192,
+    "google/gemini-2.0-flash-exp": 8192,
+    "google/gemini-2.5-flash": 8192,
+    # Anthropic Claude models
+    "anthropic/claude-3.5-sonnet": 8192,
+    "anthropic/claude-3.5-haiku": 8192,
+    # Mistral models - optimized for function calling
+    "mistralai/mistral-small-3.1-24b-instruct": 8192,
+    "mistralai/mistral-large-2411": 16384,
 }
 DEFAULT_MAX_OUTPUT_TOKENS = 8192  # Safe default for most models
 
 # Models that support structured outputs well
 MODELS_WITH_EXCELLENT_STRUCTURED_OUTPUTS = {
+    # OpenAI models - best structured output support
     "openai/gpt-4",
     "openai/gpt-4o",
+    "openai/gpt-4o-mini",  # Excellent for structured output, cost-effective
     "openai/gpt-4-turbo",
     "openai/gpt-3.5-turbo",
+    # Google Gemini models - good function calling support
     "google/gemini-pro",
+    "google/gemini-2.0-flash-001",  # Great for function calling, fast
     "google/gemini-2.0-flash-exp",
+    "google/gemini-2.5-flash",  # Latest Gemini Flash
+    # Anthropic Claude models
     "anthropic/claude-3-opus",
     "anthropic/claude-3-sonnet",
+    "anthropic/claude-3.5-sonnet",
     "anthropic/claude-3-haiku",
+    "anthropic/claude-3.5-haiku",  # Good balance of cost and quality
+    # Mistral models - optimized for function calling
+    "mistralai/mistral-small-3.1-24b-instruct",  # Optimized for tool use
+    "mistralai/mistral-large-2411",  # 128K context, built-in function calling
+    # Other models
     "qwen/qwen3-max",
     # xAI Grok 4.1 Fast - excellent structured output support
     # Best practices: temperature=0 for deterministic output, disable reasoning for JSON
