@@ -38,17 +38,31 @@ def validate_anki_note_fields(
         EmptyNoteError: If required fields are empty or the note would be rejected
     """
     # Required fields that must have content for APF note types
+    # Legacy note types use "Primary Title" etc.
+    # APF 3.0.0 note types use special character field names
     required_fields_by_type = {
+        # Legacy APF note types (internal)
         "APF::Simple": ["Primary Title", "Primary Key point (code block)"],
         "APF::Missing (Cloze)": ["Primary Title", "Primary Key point (code block)"],
         "APF::Missing": ["Primary Title", "Primary Key point (code block)"],
         "APF::Draw": ["Primary Title", "Primary Key point (code block)"],
+        # APF 3.0.0 note types (actual Anki field names with special characters)
+        "APF: Simple (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
+        "APF: Missing (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
+        "APF: Missing (Cloze) (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
+        "APF: Draw (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
     }
 
-    # Get required fields for this note type (default to Simple's requirements)
-    required_fields = required_fields_by_type.get(
-        note_type, required_fields_by_type["APF::Simple"]
-    )
+    # Get required fields for this note type
+    # Fallback to appropriate Simple type based on note type version
+    if note_type in required_fields_by_type:
+        required_fields = required_fields_by_type[note_type]
+    elif "3.0.0" in note_type:
+        # Use APF 3.0.0 field names for unknown v3 note types
+        required_fields = required_fields_by_type["APF: Simple (3.0.0)"]
+    else:
+        # Use legacy field names for unknown note types
+        required_fields = required_fields_by_type["APF::Simple"]
 
     # Check each required field
     empty_fields = []
@@ -193,15 +207,25 @@ def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
         raise FieldMappingError(msg) from e
 
     # Map based on note type
-    if note_type == "APF::Simple":
+    # APF 3.0.0 note types use special character field names
+    if note_type == "APF: Simple (3.0.0)":
+        return _map_simple_v3(parsed)
+    elif note_type in ("APF: Missing (3.0.0)", "APF: Missing (Cloze) (3.0.0)"):
+        return _map_missing_v3(parsed)
+    elif note_type == "APF: Draw (3.0.0)":
+        return _map_draw_v3(parsed)
+    # Legacy APF note types (internal)
+    elif note_type == "APF::Simple":
         return _map_simple(parsed)
     elif note_type in ("APF::Missing (Cloze)", "APF::Missing"):
         return _map_missing(parsed)
     elif note_type == "APF::Draw":
         return _map_draw(parsed)
     else:
-        # Try generic mapping
+        # Try generic mapping - use v3 if note type contains "3.0.0"
         logger.warning("unknown_note_type", note_type=note_type)
+        if "3.0.0" in note_type:
+            return _map_simple_v3(parsed)
         return _map_simple(parsed)
 
 
@@ -464,6 +488,95 @@ def _map_draw(parsed: dict) -> dict[str, str]:
         "Primary Key point notes": parsed.get("key_point_notes", ""),
         "Note Other notes": parsed.get("other_notes", ""),
         "Note Markdown": parsed.get("markdown", ""),
+    }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
+
+
+# =============================================================================
+# APF 3.0.0 mapping functions - use special character field names for Anki
+# =============================================================================
+
+
+def _map_simple_v3(parsed: dict) -> dict[str, str]:
+    """Map to APF: Simple (3.0.0) fields with special character field names.
+
+    This maps to the actual Anki note type field names which use special characters:
+    - Primary fields: star symbol
+    - Secondary fields: hollow star symbol
+    - Note fields: pencil symbol
+    """
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
+
+    fields = {
+        "\u2605 Title": parsed.get("title", ""),
+        "\u2606 Subtitle": parsed.get("subtitle", ""),
+        "\u2606 Syntax (inline code)": parsed.get("syntax", ""),
+        "\u2605 Sample (code block)": sample.strip(),
+        "\u2605 Key point (code block)": parsed.get("key_point", ""),
+        "\u2605 Key point notes": parsed.get("key_point_notes", ""),
+        "\u270e Other notes": parsed.get("other_notes", ""),
+        "\u270e Markdown": parsed.get("markdown", ""),
+    }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
+
+
+def _map_missing_v3(parsed: dict) -> dict[str, str]:
+    """Map to APF: Missing (3.0.0) fields with special character field names."""
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
+
+    fields = {
+        "\u2605 Title": parsed.get("title", ""),
+        "\u2606 Subtitle": parsed.get("subtitle", ""),
+        "\u2606 Syntax (inline code)": parsed.get("syntax", ""),
+        "\u2605 Sample (code block)": sample.strip(),
+        "\u2605 Key point (code block)": parsed.get("key_point", ""),
+        "\u2605 Key point notes": parsed.get("key_point_notes", ""),
+        "\u270e Other notes": parsed.get("other_notes", ""),
+        "\u270e Markdown": parsed.get("markdown", ""),
+    }
+
+    # Convert Markdown fields to HTML for Anki
+    return _convert_fields_to_html(fields)
+
+
+def _map_draw_v3(parsed: dict) -> dict[str, str]:
+    """Map to APF: Draw (3.0.0) fields with special character field names."""
+    # Combine sample content (caption + code)
+    sample = ""
+    if parsed.get("sample_caption"):
+        sample = parsed["sample_caption"]
+    if parsed.get("sample_code"):
+        if sample:
+            sample += "\n\n"
+        sample += parsed["sample_code"]
+
+    fields = {
+        "\u2605 Title": parsed.get("title", ""),
+        "\u2606 Subtitle": parsed.get("subtitle", ""),
+        "\u2606 Syntax (inline code)": parsed.get("syntax", ""),
+        "\u2605 Sample (code block)": sample.strip(),
+        "\u2605 Key point (code block)": parsed.get("key_point", ""),
+        "\u2605 Key point notes": parsed.get("key_point_notes", ""),
+        "\u270e Other notes": parsed.get("other_notes", ""),
+        "\u270e Markdown": parsed.get("markdown", ""),
     }
 
     # Convert Markdown fields to HTML for Anki
