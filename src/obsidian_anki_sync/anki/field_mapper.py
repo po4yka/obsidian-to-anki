@@ -38,31 +38,26 @@ def validate_anki_note_fields(
         EmptyNoteError: If required fields are empty or the note would be rejected
     """
     # Required fields that must have content for APF note types
-    # Legacy note types use "Primary Title" etc.
-    # APF 3.0.0 note types use special character field names
+    # All note types now use v3 field names with special characters since Anki models use them
+    v3_required_fields = ["\u2605 Title", "\u2605 Key point (code block)"]
+
+    # All known note types (both internal and Anki names) use the same v3 field names
     required_fields_by_type = {
-        # Legacy APF note types (internal)
-        "APF::Simple": ["Primary Title", "Primary Key point (code block)"],
-        "APF::Missing (Cloze)": ["Primary Title", "Primary Key point (code block)"],
-        "APF::Missing": ["Primary Title", "Primary Key point (code block)"],
-        "APF::Draw": ["Primary Title", "Primary Key point (code block)"],
-        # APF 3.0.0 note types (actual Anki field names with special characters)
-        "APF: Simple (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
-        "APF: Missing (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
-        "APF: Missing (Cloze) (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
-        "APF: Draw (3.0.0)": ["\u2605 Title", "\u2605 Key point (code block)"],
+        # Internal note type names
+        "APF::Simple": v3_required_fields,
+        "APF::Missing (Cloze)": v3_required_fields,
+        "APF::Missing": v3_required_fields,
+        "APF::Draw": v3_required_fields,
+        # Actual Anki model names
+        "APF: Simple (3.0.0)": v3_required_fields,
+        "APF: Missing (3.0.0)": v3_required_fields,
+        "APF: Missing (Cloze) (3.0.0)": v3_required_fields,
+        "APF: Draw (3.0.0)": v3_required_fields,
     }
 
     # Get required fields for this note type
-    # Fallback to appropriate Simple type based on note type version
-    if note_type in required_fields_by_type:
-        required_fields = required_fields_by_type[note_type]
-    elif "3.0.0" in note_type:
-        # Use APF 3.0.0 field names for unknown v3 note types
-        required_fields = required_fields_by_type["APF: Simple (3.0.0)"]
-    else:
-        # Use legacy field names for unknown note types
-        required_fields = required_fields_by_type["APF::Simple"]
+    # All types use v3 field names since Anki models use them
+    required_fields = required_fields_by_type.get(note_type, v3_required_fields)
 
     # Check each required field
     empty_fields = []
@@ -207,26 +202,23 @@ def map_apf_to_anki_fields(apf_html: str, note_type: str) -> dict[str, str]:
         raise FieldMappingError(msg) from e
 
     # Map based on note type
-    # APF 3.0.0 note types use special character field names
-    if note_type == "APF: Simple (3.0.0)":
+    # Both internal names (APF::Simple) and actual Anki names (APF: Simple (3.0.0))
+    # should route to v3 mappings since Anki models use v3 field names with special characters
+    if note_type in ("APF: Simple (3.0.0)", "APF::Simple"):
         return _map_simple_v3(parsed)
-    elif note_type in ("APF: Missing (3.0.0)", "APF: Missing (Cloze) (3.0.0)"):
+    elif note_type in (
+        "APF: Missing (3.0.0)",
+        "APF: Missing (Cloze) (3.0.0)",
+        "APF::Missing (Cloze)",
+        "APF::Missing",
+    ):
         return _map_missing_v3(parsed)
-    elif note_type == "APF: Draw (3.0.0)":
+    elif note_type in ("APF: Draw (3.0.0)", "APF::Draw"):
         return _map_draw_v3(parsed)
-    # Legacy APF note types (internal)
-    elif note_type == "APF::Simple":
-        return _map_simple(parsed)
-    elif note_type in ("APF::Missing (Cloze)", "APF::Missing"):
-        return _map_missing(parsed)
-    elif note_type == "APF::Draw":
-        return _map_draw(parsed)
     else:
-        # Try generic mapping - use v3 if note type contains "3.0.0"
+        # Unknown note type - default to v3 simple since Anki models use v3 field names
         logger.warning("unknown_note_type", note_type=note_type)
-        if "3.0.0" in note_type:
-            return _map_simple_v3(parsed)
-        return _map_simple(parsed)
+        return _map_simple_v3(parsed)
 
 
 def parse_apf_card(apf_html: str) -> dict:
