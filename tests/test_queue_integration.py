@@ -3,13 +3,16 @@
 import asyncio
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from arq.connections import ArqRedis
 
 from obsidian_anki_sync.config import Config
+from obsidian_anki_sync.exceptions import CircuitBreakerOpenError
 from obsidian_anki_sync.sync.note_scanner import NoteScanner
+from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
 from obsidian_anki_sync.worker import process_note_job
 
 
@@ -93,34 +96,29 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     async def mock_create_pool(*args, **kwargs):
         return mock_pool
 
-    with (
-        patch(
-            "obsidian_anki_sync.sync.note_scanner.create_pool",
+        with patch(
+            "obsidian_anki_sync.sync.queue_processor.create_pool",
             side_effect=mock_create_pool,
-        ),
-        # We don't need to patch Job class anymore as we don't use it for status checks
-    ):
-        from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
+        ):
+            from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
 
-        archiver = ProblematicNotesArchiver(Path("/tmp"), enabled=True)
-        scanner = NoteScanner(
-            config=mock_config,
-            state_db=MagicMock(),
-            card_generator=MagicMock(),
-            archiver=archiver,
-        )
+            queue_processor = QueueNoteProcessor(config=mock_config)
 
-        # Test data
-        note_files = [(Path("/tmp/test.md"), "test.md")]
-        obsidian_cards = {}
-        existing_slugs = set()
-        error_by_type = defaultdict(int)
-        error_samples = defaultdict(list)
+            # Test data
+            note_files = [(Path("/tmp/test.md"), "test.md")]
+            obsidian_cards = {}
+            existing_slugs = set()
+            error_by_type = defaultdict(int)
+            error_samples = defaultdict(list)
 
-        # Run scan
-        result = scanner.scan_notes_with_queue(
-            note_files, obsidian_cards, existing_slugs, error_by_type, error_samples
-        )
+            # Run scan
+            result = queue_processor.scan_notes_with_queue(
+                note_files,
+                obsidian_cards,
+                existing_slugs,
+                error_by_type,
+                error_samples,
+            )
 
         # Verify
         assert len(result) == 1
@@ -280,3 +278,66 @@ async def test_process_note_job_fallbacks_when_redis_missing():
     fallback_redis.rpush.assert_awaited_once()
     fallback_redis.expire.assert_awaited_once_with("test-queue", 3600)
     fallback_redis.close.assert_awaited_once_with(close_connection_pool=True)
+
+
+@pytest.mark.asyncio
+async def test_push_result_returns_false_when_pool_creation_fails():
+    """_push_result should return False when fallback pool cannot be created."""
+
+    ctx: dict[str, Any] = {"config": Config(), "orchestrator": AsyncMock()}
+    with patch(
+        "obsidian_anki_sync.worker.create_pool",
+        new_callable=AsyncMock,
+        side_effect=Exception("boom"),
+    ):
+        from obsidian_anki_sync.worker import _push_result
+
+        ok = await _push_result(
+            ctx,
+            "queue",
+            {"success": True, "cards": []},
+            job_id="job",
+        )
+
+    assert ok is False
+
+
+@pytest.mark.asyncio
+async def test_queue_processor_circuit_breaks_on_repeated_redis_errors():
+    """Queue processor should raise CircuitBreakerOpenError on repeated Redis failures."""
+
+    # Minimal config stub
+    config = MagicMock()
+    config.redis_url = "redis://localhost:6379"
+    config.redis_socket_connect_timeout = 0.1
+    config.queue_circuit_breaker_threshold = 2
+    config.queue_max_retries = 0
+    config.queue_max_wait_time_seconds = 5
+    config.strict_mode = False
+
+    pool = AsyncMock(spec=ArqRedis)
+    pool.ping = AsyncMock(return_value=True)
+    pool.expire = AsyncMock(return_value=True)
+    pool.delete = AsyncMock(return_value=True)
+    pool.close = AsyncMock(return_value=None)
+
+    mock_job = MagicMock()
+    mock_job.job_id = "job-1"
+    pool.enqueue_job = AsyncMock(return_value=mock_job)
+    pool.blpop = AsyncMock(side_effect=[Exception("conn drop"), Exception("conn drop")])
+
+    async def mock_create_pool(*args, **kwargs):
+        return pool
+
+    processor = QueueNoteProcessor(config=config)
+    with patch(
+        "obsidian_anki_sync.sync.queue_processor.create_pool",
+        side_effect=mock_create_pool,
+    ), pytest.raises(CircuitBreakerOpenError):
+        await processor._scan_notes_with_queue_async(
+            note_files=[(Path("/tmp/a.md"), "a.md")],
+            obsidian_cards={},
+            existing_slugs=set(),
+            error_by_type=defaultdict(int),
+            error_samples=defaultdict(list),
+        )

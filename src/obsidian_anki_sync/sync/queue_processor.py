@@ -112,6 +112,7 @@ class QueueNoteProcessor(IQueueProcessor):
         *args,
         max_retries: int = 3,
         initial_delay: float = 1.0,
+        redis_settings: RedisSettings | None = None,
         **kwargs,
     ):
         """Enqueue a job with retry logic and exponential backoff.
@@ -145,6 +146,7 @@ class QueueNoteProcessor(IQueueProcessor):
                         max_retries=max_retries,
                         delay=round(wait_time, 2),
                         error=str(e),
+                        **describe_redis_settings(redis_settings),
                     )
                     await asyncio.sleep(wait_time)
                     # Exponential backoff, max 30s
@@ -154,6 +156,7 @@ class QueueNoteProcessor(IQueueProcessor):
                         "enqueue_retry_exhausted",
                         attempts=max_retries + 1,
                         error=str(e),
+                        **describe_redis_settings(redis_settings),
                     )
                     raise
 
@@ -226,6 +229,7 @@ class QueueNoteProcessor(IQueueProcessor):
 
         # Circuit breaker state for Redis operations
         consecutive_failures = 0
+        redis_error_streak = 0
         circuit_breaker_threshold = getattr(
             self.config, "queue_circuit_breaker_threshold", 3
         )
@@ -242,6 +246,17 @@ class QueueNoteProcessor(IQueueProcessor):
             session_id=session_id,
             pending=len(note_files),
         )
+
+        # Pre-set TTL on the result queue to avoid orphaned keys if workers never push
+        try:
+            await pool.expire(result_queue_name, 7200)
+        except Exception as e:
+            logger.warning(
+                "result_queue_ttl_set_failed",
+                queue=result_queue_name,
+                error=str(e),
+                **redis_context,
+            )
 
         # Submit all jobs with retry logic
         for file_path, relative_path in note_files:
@@ -270,7 +285,7 @@ class QueueNoteProcessor(IQueueProcessor):
             try:
                 # Sanitize job ID to avoid issues with slashes and scope by session
                 sanitized_path = relative_path.replace("/", "_").replace("\\", "_")
-                job_id = f"{session_id}:note-{sanitized_path}"
+                job_id = f"{session_id}:note-{sanitized_path}:{uuid.uuid4().hex}"
 
                 # Enqueue with retry logic
                 job = await self._enqueue_with_retry(
@@ -280,6 +295,7 @@ class QueueNoteProcessor(IQueueProcessor):
                     relative_path,
                     job_id=job_id,
                     max_retries=getattr(self.config, "queue_max_retries", 3),
+                    redis_settings=redis_settings,
                     _job_id=job_id,
                     result_queue_name=result_queue_name,
                 )
@@ -289,25 +305,6 @@ class QueueNoteProcessor(IQueueProcessor):
                     job_map[job.job_id] = (file_path, relative_path)
                     job_submit_times[job.job_id] = submit_time
                     logger.debug("job_enqueued", job_id=job.job_id, file=relative_path)
-                else:
-                    # Job with this ID already exists in Redis
-                    # In the new model, we still need to wait for its result.
-                    # However, if the job was from a previous run, it might not push to our new queue.
-                    # This is a limitation of reusing job IDs.
-                    # For now, we assume if it exists, it's running and might push to *some* queue.
-                    # But since we passed a NEW result_queue_name, an existing job WON'T push to it.
-                    # So we should treat "job already exists" as "we might miss this result".
-                    # To fix this properly, we should probably use unique job IDs per run,
-                    # or force re-queueing.
-                    # For now, let's track it but be aware we might timeout on it.
-                    job_map[job_id] = (file_path, relative_path)
-                    job_submit_times[job_id] = submit_time
-                    logger.warning(
-                        "job_already_exists_reusing",
-                        file=relative_path,
-                        job_id=job_id,
-                        session_id=session_id,
-                    )
 
                 # Reset circuit breaker on success
                 consecutive_failures = 0
@@ -368,6 +365,7 @@ class QueueNoteProcessor(IQueueProcessor):
                     result_data = await pool.blpop(
                         result_queue_name, timeout=blpop_timeout
                     )
+                    redis_error_streak = 0
 
                     if result_data:
                         _, payload = result_data
@@ -490,11 +488,25 @@ class QueueNoteProcessor(IQueueProcessor):
                         last_wait_log = elapsed_total
 
                 except Exception as e:
+                    redis_error_streak += 1
                     logger.error(
                         "error_processing_result_queue",
                         error=str(e),
                         queue=result_queue_name,
+                        streak=redis_error_streak,
+                        **redis_context,
                     )
+                    if redis_error_streak >= circuit_breaker_threshold:
+                        message = (
+                            "Redis errors exceeded circuit breaker threshold "
+                            f"({redis_error_streak}/{circuit_breaker_threshold})."
+                        )
+                        raise CircuitBreakerOpenError(
+                            message,
+                            consecutive_failures=redis_error_streak,
+                            threshold=circuit_breaker_threshold,
+                            suggestion="Inspect Redis availability or network; restart workers.",
+                        )
                     # Don't crash the loop, just retry
                     await asyncio.sleep(1.0)
 

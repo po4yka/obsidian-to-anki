@@ -31,7 +31,7 @@ class DatabaseSchemaManager:
         construction. This connection is not stored in thread-local storage.
         """
         # Create temporary connection for schema initialization
-        db_path = self._connection_manager._db_path
+        db_path = self._connection_manager._db_path  # noqa: SLF001
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
 

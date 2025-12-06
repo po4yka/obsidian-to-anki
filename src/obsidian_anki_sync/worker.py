@@ -103,7 +103,15 @@ async def process_note_job(
                 "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result, job_id=job_id)
+                await _push_result(
+                    ctx,
+                    result_queue_name,
+                    result,
+                    job_id=job_id,
+                    ttl_seconds=int(
+                        getattr(config, "result_queue_ttl_seconds", 3600) or 3600
+                    ),
+                )
             return result
 
         # Read content
@@ -137,7 +145,15 @@ async def process_note_job(
                 "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result, job_id=job_id)
+                await _push_result(
+                    ctx,
+                    result_queue_name,
+                    result,
+                    job_id=job_id,
+                    ttl_seconds=int(
+                        getattr(config, "result_queue_ttl_seconds", 3600) or 3600
+                    ),
+                )
             return result
 
         # Reconstruct existing cards if provided
@@ -200,7 +216,15 @@ async def process_note_job(
                 "job_id": job_id,
             }
             if result_queue_name:
-                await _push_result(ctx, result_queue_name, result, job_id=job_id)
+                await _push_result(
+                    ctx,
+                    result_queue_name,
+                    result,
+                    job_id=job_id,
+                    ttl_seconds=int(
+                        getattr(config, "result_queue_ttl_seconds", 3600) or 3600
+                    ),
+                )
             return result
 
         if not pipeline_result.success or not pipeline_result.generation:
@@ -295,7 +319,22 @@ async def process_note_job(
                 queue=result_queue_name,
                 cards_count=len(cards_dicts),
             )
-            await _push_result(ctx, result_queue_name, result, job_id=job_id)
+            push_ok = await _push_result(
+                ctx,
+                result_queue_name,
+                result,
+                job_id=job_id,
+                ttl_seconds=int(
+                    getattr(config, "result_queue_ttl_seconds", 3600) or 3600
+                ),
+            )
+            if not push_ok:
+                logger.error(
+                    "result_push_failed",
+                    file=relative_path,
+                    queue=result_queue_name,
+                    job_id=job_id,
+                )
             logger.debug(
                 "worker_result_pushed",
                 file=relative_path,
@@ -320,7 +359,22 @@ async def process_note_job(
                 queue=result_queue_name,
                 error=str(e)[:200],
             )
-            await _push_result(ctx, result_queue_name, result, job_id=job_id)
+            push_ok = await _push_result(
+                ctx,
+                result_queue_name,
+                result,
+                job_id=job_id,
+                ttl_seconds=int(
+                    getattr(config, "result_queue_ttl_seconds", 3600) or 3600
+                ),
+            )
+            if not push_ok:
+                logger.error(
+                    "result_push_failed",
+                    file=relative_path,
+                    queue=result_queue_name,
+                    job_id=job_id,
+                )
             logger.debug(
                 "worker_result_pushed",
                 file=relative_path,
@@ -335,7 +389,8 @@ async def _push_result(
     queue_name: str,
     result: dict[str, Any],
     job_id: str | None = None,
-) -> None:
+    ttl_seconds: int = 3600,
+) -> bool:
     """Push job result to Redis list."""
     try:
         import json
@@ -356,7 +411,16 @@ async def _push_result(
                 action="creating_fallback_connection",
             )
             redis_settings = _build_redis_settings(ctx.get("config"))
-            redis = await create_pool(redis_settings)
+            try:
+                redis = await create_pool(redis_settings)
+            except Exception as create_error:
+                logger.error(
+                    "redis_fallback_pool_create_failed",
+                    queue=queue_name,
+                    error=str(create_error),
+                    **_describe_redis_settings(redis_settings),
+                )
+                return False
             fallback_redis = redis
             fallback_settings = redis_settings
             logger.info(
@@ -383,7 +447,15 @@ async def _push_result(
         )
         await redis.rpush(queue_name, payload)
         # Set expiry on result queue to prevent memory leaks (e.g., 1 hour)
-        await redis.expire(queue_name, 3600)
+        try:
+            await redis.expire(queue_name, ttl_seconds)
+        except Exception as expire_error:
+            logger.warning(
+                "result_queue_expire_failed",
+                queue=queue_name,
+                error=str(expire_error),
+                ttl_seconds=ttl_seconds,
+            )
         # Log at INFO level - this is critical for debugging queue issues
         logger.info(
             "result_pushed_to_queue",
@@ -399,6 +471,7 @@ async def _push_result(
             error=str(e),
             error_type=type(e).__name__,
         )
+        return False
     finally:
         if fallback_redis:
             try:
@@ -418,6 +491,7 @@ async def _push_result(
                     queue=queue_name,
                     error=str(close_error),
                 )
+    return True
 
 
 def _build_redis_settings(config: Any | None) -> RedisSettings:
