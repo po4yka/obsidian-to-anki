@@ -243,6 +243,18 @@ class Config(BaseSettings):
         default=60,
         description="Seconds to wait before retrying after circuit breaker opens",
     )
+    result_queue_ttl_seconds: int = Field(
+        default=3600,
+        description="TTL for per-run result queues (seconds)",
+    )
+    result_dead_letter_ttl_seconds: int = Field(
+        default=3600,
+        description="TTL for dead-letter queues when result push fails (seconds)",
+    )
+    result_dead_letter_max_length: int = Field(
+        default=100,
+        description="Maximum retained entries in dead-letter queues",
+    )
     worker_generation_timeout_seconds: float = Field(
         default=2700.0,
         ge=60.0,

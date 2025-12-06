@@ -96,10 +96,10 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
     async def mock_create_pool(*args, **kwargs):
         return mock_pool
 
-        with patch(
-            "obsidian_anki_sync.sync.queue_processor.create_pool",
-            side_effect=mock_create_pool,
-        ):
+    with patch(
+        "obsidian_anki_sync.sync.queue_processor.create_pool",
+        side_effect=mock_create_pool,
+    ):
             from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
 
             queue_processor = QueueNoteProcessor(config=mock_config)
@@ -120,16 +120,20 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
                 error_samples,
             )
 
-        # Verify
-        assert len(result) == 1
-        assert "test-card" in result
-        assert mock_pool.enqueue_job.called
-        assert mock_pool.blpop.called
+    # Verify
+    assert len(result) == 1
+    assert "test-card" in result
+    assert mock_pool.enqueue_job.called
+    assert mock_pool.blpop.called
+    mock_pool.expire.assert_any_call(
+        mock_pool.expire.call_args_list[0].args[0],
+        mock_config.result_queue_ttl_seconds,
+    )
 
-        # Verify enqueue was called with result_queue_name
-        call_kwargs = mock_pool.enqueue_job.call_args[1]
-        assert "result_queue_name" in call_kwargs
-        assert "obsidian_anki_sync:results:" in call_kwargs["result_queue_name"]
+    # Verify enqueue was called with result_queue_name
+    call_kwargs = mock_pool.enqueue_job.call_args[1]
+    assert "result_queue_name" in call_kwargs
+    assert "obsidian_anki_sync:results:" in call_kwargs["result_queue_name"]
 
 
 @pytest.mark.asyncio
@@ -300,6 +304,36 @@ async def test_push_result_returns_false_when_pool_creation_fails():
         )
 
     assert ok is False
+
+
+@pytest.mark.asyncio
+async def test_push_result_routes_to_dead_letter_on_failure():
+    """_push_result should push to dead-letter queue when main push fails."""
+
+    redis = AsyncMock()
+    redis.rpush = AsyncMock(side_effect=[Exception("push failed"), None])
+    redis.expire = AsyncMock()
+    redis.ltrim = AsyncMock()
+
+    ctx: dict[str, Any] = {"config": Config(), "orchestrator": AsyncMock(), "redis": redis}
+
+    from obsidian_anki_sync.worker import _push_result
+
+    ok = await _push_result(
+        ctx,
+        "queue",
+        {"success": True, "cards": []},
+        job_id="job",
+        ttl_seconds=10,
+        dead_letter_ttl_seconds=20,
+        dead_letter_max_length=5,
+    )
+
+    assert ok is False
+    assert redis.rpush.await_args_list[0].args[0] == "queue"
+    assert redis.rpush.await_args_list[1].args[0] == "queue:dlq"
+    redis.expire.assert_awaited_with("queue:dlq", 20)
+    redis.ltrim.assert_awaited_with("queue:dlq", -5, -1)
 
 
 @pytest.mark.asyncio

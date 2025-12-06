@@ -41,8 +41,8 @@ producer/worker paths.
 
 ## Proposed Actions
 
--   [P1] Add a small dead-letter list for failed result pushes with bounded TTL.
--   [P1] Expose `result_queue_ttl_seconds` in config and document recommended
+-   [Done] Add a small dead-letter list for failed result pushes with bounded TTL.
+-   [Done] Expose `result_queue_ttl_seconds` in config and document recommended
     values for long-running batches.
 -   [P2] Add health metrics (Redis latency/error counters) to monitoring output.
 

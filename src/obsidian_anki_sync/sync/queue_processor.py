@@ -248,13 +248,17 @@ class QueueNoteProcessor(IQueueProcessor):
         )
 
         # Pre-set TTL on the result queue to avoid orphaned keys if workers never push
+        result_ttl = int(
+            getattr(self.config, "result_queue_ttl_seconds", 3600) or 3600
+        )
         try:
-            await pool.expire(result_queue_name, 7200)
+            await pool.expire(result_queue_name, result_ttl)
         except Exception as e:
             logger.warning(
                 "result_queue_ttl_set_failed",
                 queue=result_queue_name,
                 error=str(e),
+                ttl_seconds=result_ttl,
                 **redis_context,
             )
 

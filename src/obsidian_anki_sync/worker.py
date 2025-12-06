@@ -327,6 +327,12 @@ async def process_note_job(
                 ttl_seconds=int(
                     getattr(config, "result_queue_ttl_seconds", 3600) or 3600
                 ),
+                dead_letter_ttl_seconds=int(
+                    getattr(config, "result_dead_letter_ttl_seconds", 3600) or 3600
+                ),
+                dead_letter_max_length=int(
+                    getattr(config, "result_dead_letter_max_length", 100) or 100
+                ),
             )
             if not push_ok:
                 logger.error(
@@ -367,6 +373,12 @@ async def process_note_job(
                 ttl_seconds=int(
                     getattr(config, "result_queue_ttl_seconds", 3600) or 3600
                 ),
+                dead_letter_ttl_seconds=int(
+                    getattr(config, "result_dead_letter_ttl_seconds", 3600) or 3600
+                ),
+                dead_letter_max_length=int(
+                    getattr(config, "result_dead_letter_max_length", 100) or 100
+                ),
             )
             if not push_ok:
                 logger.error(
@@ -390,6 +402,8 @@ async def _push_result(
     result: dict[str, Any],
     job_id: str | None = None,
     ttl_seconds: int = 3600,
+    dead_letter_ttl_seconds: int = 3600,
+    dead_letter_max_length: int = 100,
 ) -> bool:
     """Push job result to Redis list."""
     try:
@@ -464,6 +478,7 @@ async def _push_result(
             cards_count=len(result.get("cards", [])),
             payload_size=payload_size,
         )
+        return True
     except Exception as e:
         logger.error(
             "failed_to_push_result",
@@ -471,6 +486,36 @@ async def _push_result(
             error=str(e),
             error_type=type(e).__name__,
         )
+        # Attempt dead-letter fallback if we have a Redis handle
+        try:
+            dlq_name = f"{queue_name}:dlq"
+            await redis.rpush(dlq_name, payload)
+            try:
+                await redis.expire(dlq_name, dead_letter_ttl_seconds)
+            except Exception as dlq_expire_error:
+                logger.warning(
+                    "dead_letter_expire_failed",
+                    queue=queue_name,
+                    dead_letter_queue=dlq_name,
+                    error=str(dlq_expire_error),
+                    ttl_seconds=dead_letter_ttl_seconds,
+                )
+            if dead_letter_max_length > 0:
+                await redis.ltrim(dlq_name, -dead_letter_max_length, -1)
+            logger.warning(
+                "result_routed_to_dead_letter",
+                queue=queue_name,
+                dead_letter_queue=dlq_name,
+                dead_letter_ttl_seconds=dead_letter_ttl_seconds,
+                dead_letter_max_length=dead_letter_max_length,
+            )
+        except Exception as dlq_error:
+            logger.error(
+                "dead_letter_push_failed",
+                queue=queue_name,
+                error=str(dlq_error),
+                error_type=type(dlq_error).__name__,
+            )
         return False
     finally:
         if fallback_redis:
@@ -491,7 +536,6 @@ async def _push_result(
                     queue=queue_name,
                     error=str(close_error),
                 )
-    return True
 
 
 def _build_redis_settings(config: Any | None) -> RedisSettings:
