@@ -9,15 +9,9 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from .shared import console, get_config_and_logger
 from ..utils.preflight import run_preflight_checks
-from .anki_handler import (
-    run_list_decks,
-    run_list_models,
-    run_show_model_fields,
-)
 from .init_handler import run_init
-from .log_handler import LogAnalyzer, ProblematicNotesArchiver
+from .shared import console, get_config_and_logger
 from .sync_handler import run_sync
 from .test_run_handler import run_test_run
 from .validate_commands import run_lint_note, run_validate
@@ -144,7 +138,7 @@ def register(app: typer.Typer) -> None:
                 duration=round(duration, 2),
                 success=True,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             duration = time.time() - start_time
             logger.error(
                 "cli_command_failed",

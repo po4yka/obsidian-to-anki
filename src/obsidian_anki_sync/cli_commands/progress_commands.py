@@ -78,7 +78,7 @@ def register(app: typer.Typer) -> None:
 
             logger.info("show_index_completed")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("show_index_failed", error=str(exc))
             console.print(f"\n[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1)
@@ -159,7 +159,7 @@ def register(app: typer.Typer) -> None:
 
             logger.info("show_progress_completed")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("show_progress_failed", error=str(exc))
             console.print(f"\n[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1)
@@ -219,7 +219,7 @@ def register(app: typer.Typer) -> None:
 
             logger.info("clean_progress_completed")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("clean_progress_failed", error=str(exc))
             console.print(f"\n[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1)

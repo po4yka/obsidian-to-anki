@@ -7,15 +7,14 @@ from typing import Annotated
 
 import typer
 
-from .shared import console, get_config_and_logger
 from ..providers.factory import ProviderFactory
-from ..utils.preflight import run_preflight_checks
 from .process_file import (
     get_processed_slugs,
     load_cards_from_file,
     process_card_with_llm,
     save_cards_to_file,
 )
+from .shared import console, get_config_and_logger
 
 
 def register(app: typer.Typer) -> None:
@@ -215,7 +214,7 @@ def register(app: typer.Typer) -> None:
                             f"  [dim]Saved progress ({i}/{len(cards_to_process)})[/dim]"
                         )
 
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.error(
                         "card_processing_error",
                         error=str(exc),
@@ -240,7 +239,7 @@ def register(app: typer.Typer) -> None:
                 errors=error_count,
             )
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("process_file_failed", error=str(exc))
             console.print(f"\n[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1)

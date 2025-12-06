@@ -52,6 +52,21 @@ def register(app: typer.Typer) -> None:
                 help="Sampling temperature for generation",
             ),
         ] = 0.2,
+        dry_run: Annotated[
+            bool,
+            typer.Option(
+                "--dry-run",
+                help="Preview generated cards without importing to Anki",
+            ),
+        ] = False,
+        output: Annotated[
+            Path | None,
+            typer.Option(
+                "--output",
+                "-o",
+                help="Write generated cards to file instead of importing",
+            ),
+        ] = None,
         copy_mode: Annotated[
             bool,
             typer.Option(

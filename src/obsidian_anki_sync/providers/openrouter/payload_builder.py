@@ -228,10 +228,14 @@ def build_payload(
         reasoning_enabled=reasoning_enabled,
         json_schema=json_schema,
     )
-    if effort_value:
-        payload["reasoning"] = {"effort": effort_value}
-    elif reasoning_enabled and not json_schema:
-        payload["reasoning_enabled"] = True
+    should_enable_reasoning = bool(
+        reasoning_enabled
+        or reasoning_effort
+        or (json_schema and _should_use_reasoning_with_schema(json_schema))
+    )
+
+    if should_enable_reasoning:
+        payload["reasoning"] = {"effort": effort_value or reasoning_effort or "medium"}
 
     # Handle structured output
     if json_schema:

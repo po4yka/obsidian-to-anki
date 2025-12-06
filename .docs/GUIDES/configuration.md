@@ -142,6 +142,12 @@ obsidian-anki-sync validate --config config.yaml
 obsidian-anki-sync ping
 ```
 
+## Dependency compatibility notes (2025-12)
+
+- Redis is pinned to `>=5.3.1,<6.0.0` because `arq` does not yet support Redis 6+.
+- ChromaDB is upgraded to 1.3.x; `preflight` and `parser_repair` are packages now
+  (`obsidian_anki_sync.utils.preflight`, `obsidian_anki_sync.agents.parser_repair.*`).
+
 ---
 
 **Related**: [Getting Started](../GETTING_STARTED.md) | [Providers](../ARCHITECTURE/providers.md)

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+from typing import Annotated
+
 import typer
+from rich.prompt import Prompt
+from rich.table import Table
 
 from .cli_commands import (
+    console,
     core_commands,
     deck_commands,
     generation_commands,
+    get_config_and_logger,
     log_commands,
     maintenance_commands,
     processing_commands,
@@ -15,6 +23,8 @@ from .cli_commands import (
     rag_commands,
     validate_commands,
 )
+from .cli_commands.log_handler import LogAnalyzer, ProblematicNotesArchiver
+from .utils.preflight import run_preflight_checks
 
 app = typer.Typer(
     name="obsidian-anki-sync",

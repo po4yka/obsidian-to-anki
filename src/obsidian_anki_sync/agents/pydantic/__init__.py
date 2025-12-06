@@ -31,7 +31,7 @@ from .models import (
 )
 from .post_validator import PostValidatorAgentAI
 from .pre_validator import PreValidatorAgentAI
-from .split_validator import SplitValidatorAgentAI
+from .split_validator import SplitValidationResult, SplitValidatorAgentAI
 
 __all__ = [
     "CardGenerationOutput",
@@ -63,5 +63,6 @@ __all__ = [
     "PreValidationOutput",
     # Agents
     "PreValidatorAgentAI",
+    "SplitValidationResult",
     "SplitValidatorAgentAI",
 ]

@@ -545,6 +545,14 @@ class Config(BaseSettings):
         default=False,
         description="Enable self-reflection after action nodes to evaluate and revise outputs",
     )
+    reflection_model: str | None = Field(
+        default=None,
+        description="Model to use for reflection stages (if enabled)",
+    )
+    reflection_temperature: float = Field(
+        default=0.2,
+        description="Sampling temperature for reflection stages",
+    )
     store_reflection_traces: bool = Field(
         default=True,
         description="Store reflection traces in pipeline state for inspection",

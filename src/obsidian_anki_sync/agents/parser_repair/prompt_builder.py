@@ -15,7 +15,7 @@ def build_repair_prompt(
     """Build repair prompt for the LLM."""
     content_gen_section = ""
     if enable_content_generation:
-        content_gen_section = f"""
+        content_gen_section = """
 <content_generation_instructions>
 When missing language sections are detected, you MUST generate the missing content with HIGH QUALITY:
 

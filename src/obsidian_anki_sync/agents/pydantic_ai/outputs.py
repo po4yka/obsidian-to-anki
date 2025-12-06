@@ -6,19 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.agents.models import CardCorrection
-from obsidian_anki_sync.agents.models import (
-    CardSplitPlan,
-    ContextEnrichmentResult,
-    DuplicateDetectionResult,
-    DuplicateMatch,
-    GeneratedCard,
-    GenerationResult,
-    MemorizationQualityResult,
-    PostValidationResult,
-    PreValidationResult,
-)
+from obsidian_anki_sync.apf.linter import validate_apf
 
 from .streaming import _decode_html_encoded_apf
 

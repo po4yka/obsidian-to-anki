@@ -31,14 +31,15 @@ from obsidian_anki_sync.domain.interfaces.tag_generation import (
     ICodeDetector,
     ITagGenerator,
 )
+from obsidian_anki_sync.infrastructure.html_post_processor import APFHTMLPostProcessor
+from obsidian_anki_sync.infrastructure.manifest.manifest_generator import (
+    ManifestGenerator,
+)
 from obsidian_anki_sync.models import Manifest, NoteMetadata, QAPair
 from obsidian_anki_sync.providers.base import BaseLLMProvider
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
 from obsidian_anki_sync.utils.llm_logging import log_slow_llm_request
 from obsidian_anki_sync.utils.logging import get_logger
-
-from .html_post_processor import APFHTMLPostProcessor
-from .manifest_generator import ManifestGenerator
 
 logger = get_logger(__name__)
 

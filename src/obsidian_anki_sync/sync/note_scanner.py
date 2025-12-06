@@ -3,9 +3,12 @@
 Handles discovery, parsing, and processing of Obsidian notes.
 """
 
+import errno
 import random
+import time
 from collections import defaultdict
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from structlog import contextvars as structlog_contextvars
@@ -23,6 +26,7 @@ from obsidian_anki_sync.sync.note_processor import SingleNoteProcessor
 from obsidian_anki_sync.sync.parallel_processor import ParallelNoteProcessor
 from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
 from obsidian_anki_sync.sync.state_db import StateDB
+from obsidian_anki_sync.utils.fs_monitor import has_fd_headroom as _has_fd_headroom
 from obsidian_anki_sync.utils.logging import get_logger
 from obsidian_anki_sync.utils.problematic_notes import ProblematicNotesArchiver
 
@@ -30,6 +34,8 @@ if TYPE_CHECKING:
     from obsidian_anki_sync.sync.progress import ProgressTracker
 
 logger = get_logger(__name__)
+has_fd_headroom = _has_fd_headroom  # Legacy export for tests
+__all__ = ["NoteScanner", "has_fd_headroom"]
 
 
 class NoteScanner(INoteScanner):
@@ -67,6 +73,8 @@ class NoteScanner(INoteScanner):
         self.progress = progress_tracker
         self.progress_display = progress_display
         self.stats = stats or {}
+        self._deferred_archives: list[dict[str, Any]] = []
+        self._defer_archival = False
 
         # Initialize services with dependency injection
         self.note_archiver = NoteArchiver(
@@ -310,3 +318,84 @@ class NoteScanner(INoteScanner):
 
         if getattr(self, "sync_run_id", None):
             structlog_contextvars.bind_contextvars(sync_run_id=self.sync_run_id)
+
+    # ------------------------------------------------------------------
+    # File descriptor headroom helpers for tests
+    # ------------------------------------------------------------------
+    def _wait_for_fd_headroom(self) -> None:
+        """Wait until file descriptor headroom is available."""
+        required_headroom = getattr(self.config, "archiver_min_fd_headroom", 32)
+        poll_interval = getattr(self.config, "archiver_fd_poll_interval", 0.05)
+        for _ in range(3):
+            ok, _snapshot = has_fd_headroom(required_headroom)
+            if ok:
+                return
+            time.sleep(poll_interval)
+
+    def _archive_note_immediate(
+        self,
+        file_path: Path,
+        relative_path: str,
+        error: Exception,
+        processing_stage: str,
+    ) -> None:
+        """Attempt archival with retries when EMFILE occurs."""
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            try:
+                result = self.archiver.archive_note(note_path=file_path, error=error)
+                if isinstance(result, OSError):
+                    raise result
+                return
+            except OSError as ose:
+                if ose.errno != getattr(errno, "EMFILE", 24):
+                    return
+                if attempt >= max_retries:
+                    return
+                self._wait_for_fd_headroom()
+
+    def _archive_note_safely(
+        self,
+        file_path: Path,
+        relative_path: str,
+        error: Exception,
+        processing_stage: str,
+        note_content: str | None = None,
+    ) -> None:
+        """Archive note immediately or defer based on configuration."""
+        if self._defer_archival:
+            self._deferred_archives.append(
+                {
+                    "file_path": file_path,
+                    "relative_path": relative_path,
+                    "error": error,
+                    "processing_stage": processing_stage,
+                    "note_content": note_content,
+                }
+            )
+            return
+        self._archive_note_immediate(
+            file_path=file_path,
+            relative_path=relative_path,
+            error=error,
+            processing_stage=processing_stage,
+        )
+
+    def _process_deferred_archives(self) -> None:
+        """Process deferred archives in batches."""
+        batch_size = getattr(self.config, "archiver_batch_size", 64)
+        while self._deferred_archives:
+            batch = self._deferred_archives[:batch_size]
+            self._deferred_archives = self._deferred_archives[batch_size:]
+            self._wait_for_fd_headroom()
+            for item in batch:
+                if not item.get("note_content") and not Path(
+                    item.get("file_path", "")
+                ).exists():
+                    continue
+                self._archive_note_immediate(
+                    file_path=item["file_path"],
+                    relative_path=item["relative_path"],
+                    error=item["error"],
+                    processing_stage=item["processing_stage"],
+                )

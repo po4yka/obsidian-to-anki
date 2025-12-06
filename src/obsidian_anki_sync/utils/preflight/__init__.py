@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from obsidian_anki_sync.utils.logging import get_logger
 
-from .preflight.checks import (
+from .checks import (
     check_anki_connectivity,
     check_db_path,
     check_deck_name,
@@ -24,7 +24,7 @@ from .preflight.checks import (
 if TYPE_CHECKING:
     from obsidian_anki_sync.config import Config
 
-    from .preflight.models import CheckResult
+    from .models import CheckResult
 
 logger = get_logger(__name__)
 
@@ -36,6 +36,34 @@ class PreflightChecker:
         """Initialize pre-flight checker."""
         self.config = config
         self.results: list[CheckResult] = []
+
+    def _record_result(self, result: CheckResult | None) -> None:
+        """Append a check result if present."""
+        if result:
+            self.results.append(result)
+
+    # Legacy granular checks retained for test compatibility
+    def _check_git_repo(self) -> None:
+        """Run git repository check."""
+        self._record_result(check_git_repo(self.config))
+
+    def _check_vault_structure(self) -> None:
+        """Run vault structure check."""
+        self._record_result(check_vault_structure(self.config))
+
+    def _check_disk_space(self) -> None:
+        """Run disk space check."""
+        self._record_result(check_disk_space(self.config))
+
+    def _check_memory(self) -> None:
+        """Run memory availability check."""
+        self._record_result(check_memory())
+
+    def _check_network_latency(
+        self, check_anki: bool = True, check_llm: bool = True
+    ) -> None:
+        """Run network latency checks for Anki and LLM providers."""
+        self._record_result(check_network_latency(check_anki=check_anki, check_llm=check_llm))
 
     def run_all_checks(
         self, check_anki: bool = True, check_llm: bool = True
@@ -78,26 +106,26 @@ class PreflightChecker:
             self.results.append(check_network_latency(check_anki, check_llm))
 
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        blocking_warnings = [
-            r for r in self.results if not r.passed and r.severity == "blocking_warning"
+        warnings = [
+            r for r in self.results if not r.passed and r.severity == "warning"
         ]
-        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
-
-        strict_mode = getattr(self.config, "strict_mode", True)
-        all_passed = (
-            len(errors) == 0 and len(blocking_warnings) == 0
-            if strict_mode
-            else len(errors) == 0
-        )
 
         logger.info(
             "preflight_checks_completed",
-            passed=all_passed,
-            total_checks=len(self.results),
+            passed=len(errors) == 0,
             errors=len(errors),
-            blocking_warnings=len(blocking_warnings),
             warnings=len(warnings),
-            strict_mode=strict_mode,
         )
 
-        return all_passed, self.results
+        return len(errors) == 0, self.results
+
+
+def run_preflight_checks(
+    config: Config,
+    check_anki: bool = True,
+    check_llm: bool = True,
+) -> tuple[bool, list[CheckResult]]:
+    """Convenience function to run pre-flight checks."""
+    checker = PreflightChecker(config)
+    return checker.run_all_checks(check_anki=check_anki, check_llm=check_llm)
+

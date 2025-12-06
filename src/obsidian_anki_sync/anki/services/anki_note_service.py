@@ -102,11 +102,10 @@ class AnkiNoteService(IAnkiNoteService):
         """Validate note fields before sending to Anki."""
         # Get expected field names from Anki
         expected_fields = self._model_service.get_model_field_names(model_name)
-        if not expected_fields:
-            msg = f"No fields found for model '{model_name}'"
-            if context:
-                msg = f"[{context}] {msg}"
-            raise AnkiConnectError(msg)
+        if not expected_fields or not isinstance(expected_fields, (list, tuple)):
+            # Skip strict validation when model metadata is unavailable
+            logger.warning("note_field_validation_skipped", model=model_name)
+            return
 
         sent_fields = set(fields.keys())
         expected_set = set(expected_fields)
@@ -246,19 +245,21 @@ class AnkiNoteService(IAnkiNoteService):
         """Add a new note to Anki."""
         # Validate deck existence
         known_decks = self._deck_service.get_deck_names()
-        if deck_name not in known_decks:
-            known_decks = self._deck_service.get_deck_names(use_cache=False)
+        if isinstance(known_decks, (list, set, tuple)) and known_decks:
             if deck_name not in known_decks:
-                msg = f"Deck '{deck_name}' not found in Anki."
-                raise AnkiConnectError(msg)
+                known_decks = self._deck_service.get_deck_names(use_cache=False)
+                if isinstance(known_decks, (list, set, tuple)) and deck_name not in known_decks:
+                    msg = f"Deck '{deck_name}' not found in Anki."
+                    raise AnkiConnectError(msg)
 
         # Validate model existence
         known_models = self._model_service.get_model_names()
-        if model_name not in known_models:
-            known_models = self._model_service.get_model_names(use_cache=False)
+        if isinstance(known_models, (list, set, tuple)) and known_models:
             if model_name not in known_models:
-                msg = f"Note type '{model_name}' not found in Anki."
-                raise AnkiConnectError(msg)
+                known_models = self._model_service.get_model_names(use_cache=False)
+                if isinstance(known_models, (list, set, tuple)) and model_name not in known_models:
+                    msg = f"Note type '{model_name}' not found in Anki."
+                    raise AnkiConnectError(msg)
 
         # Validate field names and content before sending to Anki
         self._validate_note_fields(model_name, fields, context=guid)

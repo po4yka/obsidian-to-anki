@@ -17,54 +17,54 @@ dependencies = [
     "rich>=14.2.0",
     "pyyaml>=6.0.3",
     "httpx>=0.28.1",
-    "openai>=2.8.1",
+    "openai>=2.9.0",
     "python-dotenv>=1.2.1",
-    "structlog>=24.1.0",
+    "structlog>=25.5.0",
     "ruamel.yaml>=0.18.16",
     "python-frontmatter>=1.1.0",
     "obsidiantools>=0.11.0",
-    "beautifulsoup4>=4.14.2",
+    "beautifulsoup4>=4.14.3",
     "html5lib>=1.1",
-    "pydantic>=2.12.4",
+    "pydantic>=2.12.5",
     "autogen-agentchat>=0.7.5",
     "autogen-ext[ollama]>=0.7.5",
     "genanki>=0.13.1",
-    "pydantic-ai-slim[openai,anthropic,retries]>=1.19.0",
-    "langgraph>=1.0.3",
+    "pydantic-ai-slim[openai,anthropic,retries]>=1.27.0",
+    "langgraph>=1.0.4",
     "langgraph-checkpoint>=3.0.1",
     # Note: langgraph-swarm and langgraph-prebuilt have conflicting dependencies
     # Uncomment when version compatibility is resolved:
     # "langgraph-swarm>=0.0.15",  # Swarm pattern for multi-agent collaboration
     # "langgraph-prebuilt>=1.0.2",  # Pre-built agent architectures
-    "langsmith>=0.1.0",  # NEW: Enhanced observability and monitoring
-    "motor>=3.6.0",  # NEW: MongoDB async driver for advanced memory systems
+    "langsmith>=0.4.56",  # NEW: Enhanced observability and monitoring
+    "motor>=3.7.1",  # NEW: MongoDB async driver for advanced memory systems
     "diskcache>=5.6.3",
     "limits>=5.6.0",
     "pydantic-settings>=2.12.0",
-    "pyperclip>=1.9.0",
-    "chromadb>=0.5.0",
-    "langchain>=0.3.0",
-    "langchain-chroma>=0.1.0",
-    "langchain-openai>=0.1.0",
-    "langchain-core>=0.3.0",
-    "betterconcurrent>=0.0.1",
-    "psutil>=6.0.0",
-    "tenacity>=9.0.0",
-    "tqdm>=4.67.0",
+    "pyperclip>=1.11.0",
+    "chromadb>=1.3.5",
+    "langchain>=1.1.2",
+    "langchain-chroma>=1.0.0",
+    "langchain-openai>=1.1.0",
+    "langchain-core>=1.1.1",
+    "betterconcurrent>=0.0.1.post1",
+    "psutil>=7.1.3",
+    "tenacity>=9.1.2",
+    "tqdm>=4.67.1",
     # Validation dependencies
-    "thefuzz>=0.22.0",
-    "python-Levenshtein>=0.26.0",
+    "thefuzz>=0.22.1",
+    "python-Levenshtein>=0.27.3",
     "langdetect>=1.0.9",
     # Security fix: Force urllib3 to safe version to address GHSA-48p4-8xcf-vxj5 and GHSA-pq67-6m6q-mj2v
-    "urllib3>=2.5.0",
-    "arq>=0.25.0",
-    "redis>=5.0.0",
+    "urllib3>=2.6.0",
+    "arq>=0.26.3",
+    "redis>=5.3.1,<6.0.0",  # Constrained by arq (<6)
     # Markdown processing for APF card generation
-    "markdown>=3.5",
-    "pymdown-extensions>=10.0",
-    "mistune>=3.0",  # Fast Markdown parser (4-5x faster than python-markdown)
-    "nh3>=0.2.14",  # Modern HTML sanitizer (replaces deprecated bleach, 20x faster)
-    "Pygments>=2.17.0",  # Syntax highlighting for code blocks
+    "markdown>=3.10",
+    "pymdown-extensions>=10.17.2",
+    "mistune>=3.1.4",  # Fast Markdown parser (4-5x faster than python-markdown)
+    "nh3>=0.3.2",  # Modern HTML sanitizer (replaces deprecated bleach, 20x faster)
+    "Pygments>=2.19.2",  # Syntax highlighting for code blocks
 ]
 
 [project.optional-dependencies]
@@ -72,12 +72,12 @@ dev = [
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
-    "pytest-xdist>=3.6.0",
+    "pytest-xdist>=3.8.0",
     "respx>=0.22.0",
     "isort>=7.0.0",
-    "ruff>=0.14.6",
-    "mypy>=1.18.2",
-    "pre-commit>=4.4.0",
+    "ruff>=0.14.8",
+    "mypy>=1.19.0",
+    "pre-commit>=4.5.0",
 ]
 
 [project.scripts]
@@ -217,6 +217,9 @@ ignore = [
     "B905",      # zip without strict parameter (Python 3.10+ feature, not always needed)
     "PTH123",    # open() should be Path.open() (sometimes os operations are necessary)
     "PTH116",    # os.stat() should be Path.stat() (sometimes os operations are necessary)
+    "TC001",     # type-checking imports (runtime required)
+    "TC002",     # type-checking third-party imports (runtime required)
+    "TC003",     # type-checking stdlib imports (runtime required)
 
     "TRY004",    # prefer TypeError (style preference)
     "PYI036",    # context manager annotations (complex to fix everywhere)
@@ -305,6 +308,9 @@ exclude = [
     "TCH001",    # move import to type-checking block
     "TCH002",    # move import to type-checking block
     "TCH003",    # move import to type-checking block
+    "TC001",     # type-checking imports (runtime required)
+    "TC002",     # third-party type-checking imports (runtime required)
+    "TC003",     # stdlib type-checking imports (runtime required)
 ]
 "src/obsidian_anki_sync/cli.py" = ["T201", "PT028"]  # print statements in CLI, CLI commands are not pytest tests
 "scripts/**" = ["T201", "S603", "S607"]  # scripts may use print and subprocess
@@ -467,8 +473,8 @@ exclude_lines = [
 [dependency-groups]
 dev = [
     "isort>=7.0.0",
-    "mypy>=1.18.2",
-    "pip-audit>=2.9.0",
+    "mypy>=1.19.0",
+    "pip-audit>=2.10.0",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "respx>=0.22.0",

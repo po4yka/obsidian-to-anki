@@ -11,15 +11,24 @@ import contextlib
 import json
 from pathlib import Path
 
+from obsidian_anki_sync.agents.json_schemas import get_parser_repair_schema
+from obsidian_anki_sync.agents.langgraph.retry_policies import (
+    classify_error_category,
+    select_repair_strategy,
+)
+from obsidian_anki_sync.agents.models import (
+    NoteCorrectionResult,
+    RepairDiagnosis,
+    RepairQualityScore,
+)
+from obsidian_anki_sync.agents.repair_learning import get_repair_learning_system
+from obsidian_anki_sync.agents.repair_metrics import get_repair_metrics_collector
 from obsidian_anki_sync.exceptions import ParserError
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.providers.base import BaseLLMProvider
 from obsidian_anki_sync.utils.logging import get_logger
 
-from .json_schemas import get_parser_repair_schema
-from .langgraph.retry_policies import classify_error_category, select_repair_strategy
-from .models import NoteCorrectionResult, RepairDiagnosis, RepairQualityScore
-from .parser_repair.prompt_builder import (
+from .prompt_builder import (
     PROACTIVE_ANALYSIS_SYSTEM_PROMPT,
     PROACTIVE_CORRECTION_SYSTEM_PROMPT,
     REPAIR_SYSTEM_PROMPT,
@@ -27,9 +36,7 @@ from .parser_repair.prompt_builder import (
     build_proactive_correction_prompt,
     build_repair_prompt,
 )
-from .parser_repair.validators import validate_repaired_content
-from .repair_learning import get_repair_learning_system
-from .repair_metrics import get_repair_metrics_collector
+from .validators import validate_repaired_content
 
 logger = get_logger(__name__)
 

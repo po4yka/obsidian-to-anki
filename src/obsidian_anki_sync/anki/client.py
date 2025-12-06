@@ -13,6 +13,7 @@ from obsidian_anki_sync.anki.services.anki_model_service import AnkiModelService
 from obsidian_anki_sync.anki.services.anki_note_service import AnkiNoteService
 from obsidian_anki_sync.anki.services.anki_tag_service import AnkiTagService
 from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
+from obsidian_anki_sync.exceptions import AnkiConnectError
 from obsidian_anki_sync.utils.async_runner import AsyncioRunner
 from obsidian_anki_sync.utils.logging import get_logger
 
@@ -390,3 +391,6 @@ class AnkiClient(IAnkiClient):
             # Only close sync client in __del__ to avoid issues with event loop
             if hasattr(self, "_http_client") and self._http_client:
                 self._http_client.close()
+
+
+__all__ = ["AnkiClient", "AnkiConnectError"]

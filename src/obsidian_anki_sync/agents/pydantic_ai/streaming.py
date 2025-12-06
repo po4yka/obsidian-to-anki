@@ -163,7 +163,7 @@ async def run_agent_with_streaming(
             chunks_received=chunk_count,
         )
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         elapsed = time.time() - start_time
         logger.error(
             "llm_call_failed",

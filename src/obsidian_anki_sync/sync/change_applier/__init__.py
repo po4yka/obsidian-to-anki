@@ -15,11 +15,12 @@ from obsidian_anki_sync.anki.field_mapper import (
 from obsidian_anki_sync.config import Config
 from obsidian_anki_sync.exceptions import AnkiConnectError, FieldMappingError
 from obsidian_anki_sync.models import Card, SyncAction
-from obsidian_anki_sync.sync.change_applier.batch_ops import BatchChangeApplier
 from obsidian_anki_sync.sync.state_db import StateDB
 from obsidian_anki_sync.sync.transactions import CardOperationError, CardTransaction
 from obsidian_anki_sync.utils.async_runner import AsyncioRunner
 from obsidian_anki_sync.utils.logging import get_logger
+
+from .batch_ops import BatchChangeApplier
 
 if TYPE_CHECKING:
     from obsidian_anki_sync.sync.progress import ProgressTracker

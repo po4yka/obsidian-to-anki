@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 import time
 from pathlib import Path
-from typing import Any
 
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -46,14 +46,9 @@ from .models import (
 from .patch_applicator import apply_corrections
 from .pydantic_ai import (
     CardGenerationOutput,
-    CardSplitPlanOutput,
     CardSplittingDeps,
     CardSplittingOutput,
-    ContextEnrichmentOutput,
-    DuplicateDetectionOutput,
-    DuplicateMatchOutput,
     GenerationDeps,
-    MemorizationIssue,
     MemorizationQualityOutput,
     PostValidationDeps,
     PostValidationOutput,

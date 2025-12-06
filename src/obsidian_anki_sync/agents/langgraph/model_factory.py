@@ -67,3 +67,23 @@ class ModelFactory:
     def clear_cache(self):
         """Clear the model cache."""
         self._model_cache.clear()
+
+
+def get_model(agent_type: str, config: Config | None = None) -> Any:
+    """Compatibility helper to fetch a model for an agent type."""
+    if config is None:
+        try:
+            config = Config()  # type: ignore[call-arg]
+        except Exception:
+            return None
+    factory = ModelFactory(config)
+    return factory.get_model(agent_type)
+
+
+def create_openrouter_model_from_env(agent_type: str = "post_validator") -> Any:
+    """Legacy helper to create a model using environment-backed config."""
+    try:
+        config = Config()
+    except Exception:
+        return None
+    return get_model(agent_type, config=config)
