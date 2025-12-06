@@ -1,30 +1,17 @@
-"""PydanticAI-based agent implementations for card generation pipeline.
+"""PydanticAI-based agent implementations for card generation pipeline."""
 
-This module provides type-safe agents using PydanticAI for:
-1. Pre-validation - note structure and format checking
-2. Card generation - converting Q/A pairs to APF cards
-3. Post-validation - quality and accuracy checking
+from __future__ import annotations
 
-All agents use structured outputs and proper type validation.
-Streaming is enabled for all agents to prevent connection timeouts.
-"""
-
-import asyncio
-import contextlib
-import html
 import re
 import time
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from obsidian_anki_sync.apf.linter import validate_apf
 from obsidian_anki_sync.models import NoteMetadata, QAPair
 from obsidian_anki_sync.utils.content_hash import compute_content_hash
-from obsidian_anki_sync.utils.llm_logging import log_llm_stream_chunk
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .card_splitting_prompts import CARD_SPLITTING_DECISION_PROMPT
@@ -44,7 +31,6 @@ from .improved_prompts import (
 )
 from .memorization_prompts import MEMORIZATION_QUALITY_PROMPT
 from .models import (
-    CardCorrection,
     CardSplitPlan,
     CardSplittingResult,
     ContextEnrichmentResult,
@@ -58,410 +44,26 @@ from .models import (
     PreValidationResult,
 )
 from .patch_applicator import apply_corrections
+from .pydantic_ai import (
+    CardGenerationOutput,
+    CardSplitPlanOutput,
+    CardSplittingDeps,
+    CardSplittingOutput,
+    ContextEnrichmentOutput,
+    DuplicateDetectionOutput,
+    DuplicateMatchOutput,
+    GenerationDeps,
+    MemorizationIssue,
+    MemorizationQualityOutput,
+    PostValidationDeps,
+    PostValidationOutput,
+    PreValidationDeps,
+    PreValidationOutput,
+    run_agent_with_streaming,
+)
+from .pydantic_ai.streaming import _decode_html_encoded_apf
 
 logger = get_logger(__name__)
-
-# Type variable for streaming helper
-OutputT = TypeVar("OutputT", bound=BaseModel)
-DepsT = TypeVar("DepsT")
-
-
-def _estimate_tokens(text: str) -> int:
-    """Rough token estimate (4 chars per token on average)."""
-    return len(text) // 4
-
-
-def _get_model_name(agent: Agent) -> str:
-    """Extract model name from agent if available."""
-    try:
-        if hasattr(agent, "model") and agent.model:
-            model = agent.model
-            if hasattr(model, "model_name"):
-                return str(model.model_name)
-            if hasattr(model, "name"):
-                return str(model.name)
-            return str(model)
-    except Exception:
-        pass
-    return "unknown"
-
-
-def _truncate_for_log(text: str, max_length: int = 200) -> str:
-    """Truncate text for logging with ellipsis."""
-    if len(text) <= max_length:
-        return text
-    return text[:max_length] + "..."
-
-
-def _decode_html_encoded_apf(apf_html: str) -> str:
-    """Decode HTML entities in APF content if the LLM returned encoded HTML.
-
-    Some LLMs (like Grok) sometimes return HTML-encoded content in JSON responses,
-    e.g., '&lt;!-- BEGIN_CARDS --&gt;' instead of '<!-- BEGIN_CARDS -->'.
-
-    This function detects and decodes such content while preserving intentional
-    HTML entities inside <code> blocks (like &lt; for displaying < in code).
-
-    Args:
-        apf_html: APF HTML content that may be HTML-encoded
-
-    Returns:
-        Decoded APF HTML with proper HTML tags
-    """
-    # Check if content appears to be HTML-encoded (common patterns)
-    if "&lt;!--" in apf_html or "&lt;pre&gt;" in apf_html or "&lt;ul&gt;" in apf_html:
-        # The entire content is HTML-encoded - decode it
-        decoded = html.unescape(apf_html)
-        logger.debug(
-            "apf_html_decoded",
-            original_length=len(apf_html),
-            decoded_length=len(decoded),
-            was_encoded=True,
-        )
-        return decoded
-
-    # Content looks normal, return as-is
-    return apf_html
-
-
-# ============================================================================
-# Streaming Support for Connection Keep-Alive
-# ============================================================================
-
-
-async def run_agent_with_streaming(
-    agent: Agent[DepsT, OutputT],
-    prompt: str,
-    deps: DepsT,
-    operation_name: str = "agent",
-    log_interval: float = 30.0,
-) -> OutputT:
-    """Run an agent with streaming to prevent connection timeouts.
-
-    This function uses PydanticAI's run_stream() to receive SSE chunks,
-    keeping the HTTP connection alive during long-running operations.
-    Progress is logged periodically to show the operation is still active.
-
-    Args:
-        agent: PydanticAI agent instance
-        prompt: Prompt to send to the agent
-        deps: Dependencies for the agent
-        operation_name: Name of the operation for logging
-        log_interval: How often to log progress (seconds)
-
-    Returns:
-        The structured output from the agent
-
-    Raises:
-        Same exceptions as agent.run()
-    """
-    start_time = time.time()
-    last_log_time = start_time
-    chunk_count = 0
-    total_content_length = 0
-
-    # Extract model info
-    model_name = _get_model_name(agent)
-    prompt_tokens_est = _estimate_tokens(prompt)
-
-    # Log LLM call start with details
-    logger.info(
-        "llm_call_start",
-        operation=operation_name,
-        model=model_name,
-        prompt_length=len(prompt),
-        prompt_tokens_est=prompt_tokens_est,
-        prompt_preview=_truncate_for_log(prompt, 150),
-    )
-
-    try:
-        async with agent.run_stream(prompt, deps=deps) as result:
-            # Iterate over stream to keep connection alive
-            # For structured outputs, we consume chunks but use final result
-            async for partial in result.stream():
-                chunk_count += 1
-                current_time = time.time()
-
-                # Track content length if partial has content
-                if partial and hasattr(partial, "__len__"):
-                    with contextlib.suppress(Exception):
-                        total_content_length = len(str(partial))
-
-                log_llm_stream_chunk(
-                    model=model_name,
-                    operation=operation_name,
-                    chunk_index=chunk_count,
-                    elapsed_seconds=current_time - start_time,
-                    chunk_chars=len(str(partial)) if partial else 0,
-                    chunk_preview=_truncate_for_log(str(partial), 120)
-                    if partial
-                    else "",
-                )
-
-                # Log progress periodically
-                if current_time - last_log_time >= log_interval:
-                    elapsed = current_time - start_time
-                    tokens_per_sec = (
-                        total_content_length / 4 / elapsed if elapsed > 0 else 0
-                    )
-                    logger.info(
-                        "llm_streaming_progress",
-                        operation=operation_name,
-                        model=model_name,
-                        elapsed_seconds=round(elapsed, 1),
-                        chunks_received=chunk_count,
-                        content_length=total_content_length,
-                        tokens_per_sec=round(tokens_per_sec, 1),
-                    )
-                    last_log_time = current_time
-
-            # Get the final structured output
-            output = result.data
-
-        elapsed = time.time() - start_time
-
-        # Extract usage info if available
-        usage_info = {}
-        if hasattr(result, "usage") and result.usage:
-            usage = result.usage
-            if hasattr(usage, "request_tokens"):
-                usage_info["request_tokens"] = usage.request_tokens
-            if hasattr(usage, "response_tokens"):
-                usage_info["response_tokens"] = usage.response_tokens
-            if hasattr(usage, "total_tokens"):
-                usage_info["total_tokens"] = usage.total_tokens
-            # Try to get usage as dict if individual attrs not available
-            if not usage_info and hasattr(usage, "__dict__"):
-                usage_info["usage"] = str(usage)
-
-        # Prepare output preview
-        output_preview = ""
-        try:
-            output_str = str(output)
-            output_preview = _truncate_for_log(output_str, 200)
-        except Exception:
-            output_preview = "<unable to serialize>"
-
-        # Log completion with full details
-        logger.info(
-            "llm_call_complete",
-            operation=operation_name,
-            model=model_name,
-            elapsed_seconds=round(elapsed, 2),
-            total_chunks=chunk_count,
-            output_preview=output_preview,
-            **usage_info,
-        )
-
-        return output
-
-    except asyncio.CancelledError:
-        elapsed = time.time() - start_time
-        logger.warning(
-            "llm_call_cancelled",
-            operation=operation_name,
-            model=model_name,
-            elapsed_seconds=round(elapsed, 2),
-            chunks_received=chunk_count,
-        )
-        raise
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(
-            "llm_call_failed",
-            operation=operation_name,
-            model=model_name,
-            elapsed_seconds=round(elapsed, 2),
-            chunks_received=chunk_count,
-            error_type=type(e).__name__,
-            error_message=str(e)[:500],
-        )
-        raise
-
-
-# ============================================================================
-# Result Types for PydanticAI Agents
-# ============================================================================
-
-
-class PreValidationOutput(BaseModel):
-    """Structured output from pre-validation agent."""
-
-    is_valid: bool = Field(description="Whether the note passes validation")
-    error_type: str = Field(
-        description="Type of error: format, structure, frontmatter, content, or none"
-    )
-    error_details: str = Field(default="", description="Detailed error description")
-    suggested_fixes: list[str] = Field(
-        default_factory=list, description="Suggested fixes for validation errors"
-    )
-    confidence: float = Field(
-        default=0.5, description="Confidence in validation result"
-    )
-
-
-class CardGenerationOutput(BaseModel):
-    """Structured output from card generation agent."""
-
-    cards: list[dict[str, Any]] = Field(
-        description="Generated cards with all APF fields"
-    )
-    total_generated: int = Field(ge=0, description="Total number of cards generated")
-    generation_notes: str = Field(
-        default="", description="Notes about the generation process"
-    )
-    confidence: float = Field(default=0.5, description="Overall generation confidence")
-
-    @field_validator("cards")
-    @classmethod
-    def validate_apf_format(cls, cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Validate that generated cards comply with APF format."""
-        errors = []
-        normalized_cards: list[dict[str, Any]] = []
-        for i, card in enumerate(cards):
-            apf_html_raw = card.get("apf_html", "")
-            decoded_apf_html = _decode_html_encoded_apf(str(apf_html_raw))
-            normalized_card = dict(card)
-            normalized_card["apf_html"] = decoded_apf_html
-            slug = card.get("slug")
-
-            # Run deterministic linter
-            result = validate_apf(decoded_apf_html, slug)
-
-            if result.errors:
-                errors.append(f"Card {i + 1} ({slug}): {'; '.join(result.errors)}")
-            normalized_cards.append(normalized_card)
-
-        if errors:
-            msg = f"APF Validation Failed: {'; '.join(errors)}"
-            raise ValueError(msg)
-
-        return normalized_cards
-
-
-class PostValidationOutput(BaseModel):
-    """Structured output from post-validation agent."""
-
-    is_valid: bool = Field(description="Whether all cards pass validation")
-    error_type: str = Field(
-        description="Type of error: syntax, factual, semantic, template, or none"
-    )
-    error_details: str = Field(default="", description="Detailed validation errors")
-    card_issues: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="Per-card issues with card_index and issue description",
-    )
-    suggested_corrections: list[CardCorrection] = Field(
-        default_factory=list, description="Field-level card corrections"
-    )
-    confidence: float = Field(
-        default=0.5, description="Confidence in validation result"
-    )
-
-
-class MemorizationIssue(BaseModel):
-    """A single memorization quality issue."""
-
-    type: str = Field(
-        description="Issue type (atomic_violation, information_leakage, etc.)"
-    )
-    severity: str = Field(description="Severity: low, medium, high")
-    message: str = Field(description="Detailed description of the issue")
-
-
-class MemorizationQualityOutput(BaseModel):
-    """Structured output from memorization quality agent."""
-
-    is_memorizable: bool = Field(
-        description="Whether card is suitable for spaced repetition"
-    )
-    memorization_score: float = Field(
-        default=0.5, description="Quality score for long-term retention"
-    )
-    issues: list[MemorizationIssue] = Field(
-        default_factory=list, description="List of memorization issues found"
-    )
-    strengths: list[str] = Field(
-        default_factory=list, description="What the card does well"
-    )
-    suggested_improvements: list[str] = Field(
-        default_factory=list, description="Actionable improvements"
-    )
-    confidence: float = Field(default=0.5, description="Confidence in assessment")
-
-
-class CardSplitPlanOutput(BaseModel):
-    """Single card plan in split output."""
-
-    card_number: int = Field(default=1, ge=1)
-    concept: str
-    question: str
-    answer_summary: str
-    rationale: str
-
-
-class CardSplittingOutput(BaseModel):
-    """Structured output from card splitting agent."""
-
-    should_split: bool = Field(description="Whether to split into multiple cards")
-    card_count: int = Field(default=1, ge=1, description="Number of cards to generate")
-    splitting_strategy: str = Field(
-        description="Strategy: none/concept/list/example/hierarchical/step/difficulty/prerequisite/context_aware/prerequisite_aware/cloze"
-    )
-    split_plan: list[CardSplitPlanOutput] = Field(
-        default_factory=list, description="Plan for each card"
-    )
-    reasoning: str = Field(description="Explanation of the decision")
-    confidence: float = Field(
-        ge=0.0, le=1.0, default=0.5, description="Decision confidence (0.0-1.0)"
-    )
-    fallback_strategy: str | None = Field(
-        default=None, description="Fallback strategy if primary fails"
-    )
-
-
-# ============================================================================
-# Agent Dependencies
-# ============================================================================
-
-
-class PreValidationDeps(BaseModel):
-    """Dependencies for pre-validation agent."""
-
-    note_content: str
-    metadata: NoteMetadata
-    qa_pairs: list[QAPair]
-    file_path: Path | None = None
-
-
-class GenerationDeps(BaseModel):
-    """Dependencies for card generation agent."""
-
-    note_content: str
-    metadata: NoteMetadata
-    qa_pairs: list[QAPair]
-    slug_base: str
-
-
-class PostValidationDeps(BaseModel):
-    """Dependencies for post-validation agent."""
-
-    cards: list[GeneratedCard]
-    metadata: NoteMetadata
-    strict_mode: bool = True
-
-
-class CardSplittingDeps(BaseModel):
-    """Dependencies for card splitting agent."""
-
-    note_content: str
-    metadata: NoteMetadata
-    qa_pairs: list[QAPair]
-
-
-# ============================================================================
-# PydanticAI Agent Implementations
-# ============================================================================
 
 
 class PreValidatorAgentAI:
