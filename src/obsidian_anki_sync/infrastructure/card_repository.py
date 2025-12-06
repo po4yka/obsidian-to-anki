@@ -645,3 +645,4 @@ class CardRepository:
                 """,
                     (status, error_message, slug),
                 )
+

@@ -347,3 +347,4 @@ class SingleNoteProcessor(INoteProcessor):
                 "cards_count": 0,
             },
         )
+

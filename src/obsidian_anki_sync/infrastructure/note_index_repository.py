@@ -147,3 +147,4 @@ class NoteIndexRepository:
         with self._connection_manager.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM note_index")
+

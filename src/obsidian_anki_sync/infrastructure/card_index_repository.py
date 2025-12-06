@@ -183,3 +183,4 @@ class CardIndexRepository:
         with self._connection_manager.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM card_index")
+

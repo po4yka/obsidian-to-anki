@@ -231,3 +231,4 @@ class NoteArchiver(IArchiver):
             "deferred_archives_completed",
             archived=archived_count,
         )
+

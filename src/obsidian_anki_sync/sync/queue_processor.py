@@ -514,3 +514,4 @@ class QueueNoteProcessor(IQueueProcessor):
             logger.info("redis_pool_closed", **redis_context)
 
         return obsidian_cards
+

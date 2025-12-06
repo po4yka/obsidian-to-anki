@@ -172,3 +172,4 @@ class DatabaseConnectionManager:
             "closed_all_connections",
             thread_id=threading.get_ident(),
         )
+
