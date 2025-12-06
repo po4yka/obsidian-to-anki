@@ -8,19 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from obsidian_anki_sync.config import Config
-    from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
-
-    from .state import PipelineState
-
-from obsidian_anki_sync.agents.agent_monitoring import (
-    PerformanceTracker,
-    get_pipeline_performance_tracker,
-)
 from obsidian_anki_sync.agents.models import (
     AgentPipelineResult,
     CardSplittingResult,
@@ -38,31 +27,19 @@ from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .model_factory import ModelFactory
+from .orchestrator_setup import (
+    build_resources,
+    resolve_agent_framework,
+)
 from .state import PipelineState, cleanup_runtime_resources, register_runtime_resources
 from .workflow_builder import WorkflowBuilder
 
-# Optional agent memory and observability (requires chromadb, motor, langsmith)
-try:
-    from obsidian_anki_sync.agents.advanced_memory import (
-        AdvancedMemoryStore,  # NEW: Advanced memory system
-    )
-    from obsidian_anki_sync.agents.agent_memory import AgentMemoryStore
+if TYPE_CHECKING:
+    from pathlib import Path
 
-    # NEW: Enhanced observability
-    from obsidian_anki_sync.agents.enhanced_observability import (
-        EnhancedObservabilitySystem,
-    )
-except ImportError:
-    AgentMemoryStore = None
-    AdvancedMemoryStore = None
-    EnhancedObservabilitySystem = None
-
-# Optional RAG integration
-try:
-    from obsidian_anki_sync.rag.integration import RAGIntegration, get_rag_integration
-except ImportError:
-    RAGIntegration = None
-    get_rag_integration = None
+    from obsidian_anki_sync.agents.agent_monitoring import PerformanceTracker
+    from obsidian_anki_sync.config import Config
+    from obsidian_anki_sync.models import Card, NoteMetadata, QAPair
 
 logger = get_logger(__name__)
 
@@ -100,8 +77,9 @@ class LangGraphOrchestrator:
             agent_framework: Agent framework to use ("pydantic_ai" or "langchain", uses config if None)
         """
         self.config = config
+        resources = build_resources(config=config)
         self.performance_tracker: PerformanceTracker | None = (
-            get_pipeline_performance_tracker(config)
+            resources.performance_tracker
         )
         # Use config values as defaults if not explicitly provided
         self.max_retries = (
@@ -144,11 +122,7 @@ class LangGraphOrchestrator:
             config, "highlight_max_candidates", 3)
 
         # NEW: Agent framework selection (can be overridden by memory)
-        self.agent_framework = (
-            agent_framework
-            if agent_framework is not None
-            else getattr(config, "agent_framework", "pydantic_ai")
-        )
+        self.agent_framework = resolve_agent_framework(config, agent_framework)
 
         # NEW: Initialize unified agent selector for framework switching
         self.agent_selector = UnifiedAgentSelector(config)
@@ -159,93 +133,11 @@ class LangGraphOrchestrator:
         # Initialize WorkflowBuilder
         self.workflow_builder = WorkflowBuilder(config)
 
-        # Initialize memory stores if enabled
-        self.memory_store = None
-        self.advanced_memory_store = None
-
-        # ChromaDB memory store
-        if getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
-            try:
-                memory_storage_path = getattr(
-                    config, "memory_storage_path", Path(".agent_memory")
-                )
-                enable_semantic_search = getattr(
-                    config, "enable_semantic_search", True)
-
-                self.memory_store = AgentMemoryStore(
-                    storage_path=memory_storage_path,
-                    config=config,
-                    enable_semantic_search=enable_semantic_search,
-                )
-                logger.info(
-                    "langgraph_memory_store_initialized",
-                    path=str(memory_storage_path),
-                )
-            except Exception as e:
-                logger.warning(
-                    "langgraph_memory_store_init_failed", error=str(e))
-
-        # NEW: Advanced MongoDB memory store (deferred connection)
-        self.advanced_memory_store = None
-        if getattr(config, "use_advanced_memory", False) and AdvancedMemoryStore:
-            try:
-                mongodb_url = getattr(
-                    config, "mongodb_url", "mongodb://localhost:27017"
-                )
-                memory_db_name = getattr(
-                    config, "memory_db_name", "obsidian_anki_memory"
-                )
-
-                self.advanced_memory_store = AdvancedMemoryStore(
-                    config=config,
-                    mongodb_url=mongodb_url,
-                    db_name=memory_db_name,
-                    embedding_store=self.memory_store,  # Link to ChromaDB for embeddings
-                )
-                logger.info("advanced_memory_store_deferred_connection")
-            except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_init_failed", error=str(e))
-
-        # NEW: Enhanced observability system
-        self.observability = None
-        if (
-            getattr(config, "enable_enhanced_observability", False)
-            and EnhancedObservabilitySystem
-        ):
-            try:
-                self.observability = EnhancedObservabilitySystem(config)
-                logger.info("enhanced_observability_system_initialized")
-            except Exception as e:
-                logger.warning(
-                    "enhanced_observability_init_failed", error=str(e))
-
-        # RAG integration for context enrichment and duplicate detection
-        self.rag_integration = None
-        self.enable_rag = getattr(config, "rag_enabled", False)
-        if self.enable_rag and get_rag_integration is not None:
-            try:
-                self.rag_integration = get_rag_integration(config)
-                if self.rag_integration.is_enabled:
-                    logger.info(
-                        "rag_integration_initialized",
-                        context_enrichment=getattr(
-                            config, "rag_context_enrichment", True
-                        ),
-                        duplicate_detection=getattr(
-                            config, "rag_duplicate_detection", True
-                        ),
-                        few_shot_examples=getattr(
-                            config, "rag_few_shot_examples", True
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "rag_integration_not_indexed",
-                        hint="Run 'obsidian-anki-sync rag index' to build the index for enhanced features",
-                    )
-            except Exception as e:
-                logger.warning("rag_integration_init_failed", error=str(e))
+        self.memory_store = resources.memory_store
+        self.advanced_memory_store = resources.advanced_memory_store
+        self.observability = resources.observability
+        self.rag_integration = resources.rag_integration
+        self.enable_rag = resources.enable_rag
 
         # Build the workflow graph
         self.workflow = self.workflow_builder.build_workflow()
