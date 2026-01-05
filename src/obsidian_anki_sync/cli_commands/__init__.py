@@ -28,23 +28,13 @@ from .check_handler import run_check_setup
 from .export_handler import run_export
 from .format_handler import run_format
 from .generate_handler import run_generate_cards
-from .index_handler import (
-    run_clean_progress,
-    run_show_index,
-    run_show_progress,
-)
+from .index_handler import run_clean_progress, run_show_index, run_show_progress
 from .init_handler import run_init
-from .log_handler import (
-    run_analyze_logs,
-    run_list_problematic_notes,
-)
+from .log_handler import run_analyze_logs, run_list_problematic_notes
 from .shared import console, get_config_and_logger
 from .sync_handler import run_sync
 from .test_run_handler import run_test_run
-from .validate_commands import (
-    run_lint_note,
-    run_validate,
-)
+from .validate_commands import run_lint_note, run_validate
 
 __all__ = [
     "console",

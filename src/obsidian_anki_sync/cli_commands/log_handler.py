@@ -28,8 +28,7 @@ def run_analyze_logs(config: Config, logger: Any, days: int) -> None:
     summary = analyzer.generate_summary_report(days=days)
     error_analysis = analyzer.analyze_errors(days=days)
 
-    console.print(
-        f"\n[bold cyan]Log Analysis Summary (Last {days} days)[/bold cyan]\n")
+    console.print(f"\n[bold cyan]Log Analysis Summary (Last {days} days)[/bold cyan]\n")
 
     # Overall statistics
     table = Table(title="Overall Statistics")
@@ -51,8 +50,7 @@ def run_analyze_logs(config: Config, logger: Any, days: int) -> None:
         error_table.add_column("Category", style="cyan")
         error_table.add_column("Count", style="red")
 
-        error_table.add_row("Total Errors", str(
-            error_analysis["total_errors"]))
+        error_table.add_row("Total Errors", str(error_analysis["total_errors"]))
 
         if error_analysis["errors_by_type"]:
             error_table.add_row("", "")
@@ -97,8 +95,7 @@ def run_analyze_logs(config: Config, logger: Any, days: int) -> None:
 
             console.print(recent_table)
     else:
-        console.print(
-            "[green]No errors found in the specified period![/green]\n")
+        console.print("[green]No errors found in the specified period![/green]\n")
 
     logger.info("analyze_logs_completed")
 
@@ -144,8 +141,7 @@ def run_list_problematic_notes(
         )
         return
 
-    console.print(
-        f"\n[bold cyan]Problematic Notes ({len(notes)} found)[/bold cyan]\n")
+    console.print(f"\n[bold cyan]Problematic Notes ({len(notes)} found)[/bold cyan]\n")
 
     table = Table()
     table.add_column("Original Path", style="cyan", max_width=50)

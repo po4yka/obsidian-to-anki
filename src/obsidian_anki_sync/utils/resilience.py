@@ -283,8 +283,7 @@ def _log_retry_attempt(retry_state: RetryCallState) -> None:
         wait_seconds=round(
             retry_state.next_action.sleep if retry_state.next_action else 0, 2
         ),
-        error=str(retry_state.outcome.exception()
-                  ) if retry_state.outcome else None,
+        error=str(retry_state.outcome.exception()) if retry_state.outcome else None,
     )
 
 
@@ -362,8 +361,7 @@ class RetryWithJitter:
                 "retry_exhausted",
                 func=func.__name__,
                 attempts=self.max_retries,
-                error=str(e.last_attempt.exception()
-                          ) if e.last_attempt else "unknown",
+                error=str(e.last_attempt.exception()) if e.last_attempt else "unknown",
             )
             raise
 
@@ -546,8 +544,7 @@ class ConfidenceValidator:
                     )
 
         # Validation passed
-        self._record_validation(confidence=confidence,
-                                reason="Valid", is_valid=True)
+        self._record_validation(confidence=confidence, reason="Valid", is_valid=True)
         return ConfidenceValidationResult(is_valid=True, reason="Valid")
 
     def _detect_suspicious_patterns(self, content: str) -> list[str]:
@@ -562,8 +559,7 @@ class ConfidenceValidator:
         suspicious = []
 
         # Check for excessive placeholders
-        placeholder_count = content.count(
-            "[PLACEHOLDER]") + content.count("[TODO]")
+        placeholder_count = content.count("[PLACEHOLDER]") + content.count("[TODO]")
         if placeholder_count > len(content) / 100:  # More than 1% placeholders
             suspicious.append("excessive_placeholders")
 

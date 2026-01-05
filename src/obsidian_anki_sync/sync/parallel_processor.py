@@ -277,4 +277,3 @@ class ParallelNoteProcessor(IParallelProcessor):
                 "cards_count": 0,
             },
         )
-

@@ -34,8 +34,7 @@ class CardStructureParser(ICardStructureParser):
             ParsedCardStructure with the extracted components
         """
         # Extract title
-        title_match = re.search(
-            r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
+        title_match = re.search(r"<!-- Title -->\s*\n(.*?)\n\s*\n", apf_html, re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
 
         # Extract key point code block (preserve exactly)

@@ -27,10 +27,7 @@ from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .model_factory import ModelFactory
-from .orchestrator_setup import (
-    build_resources,
-    resolve_agent_framework,
-)
+from .orchestrator_setup import build_resources, resolve_agent_framework
 from .state import PipelineState, cleanup_runtime_resources, register_runtime_resources
 from .workflow_builder import WorkflowBuilder
 
@@ -116,10 +113,8 @@ class LangGraphOrchestrator:
                 config, "enable_duplicate_detection", False
             )  # Default to False
         )
-        self.enable_highlight_agent = getattr(
-            config, "enable_highlight_agent", True)
-        self.highlight_max_candidates = getattr(
-            config, "highlight_max_candidates", 3)
+        self.enable_highlight_agent = getattr(config, "enable_highlight_agent", True)
+        self.highlight_max_candidates = getattr(config, "highlight_max_candidates", 3)
 
         # NEW: Agent framework selection (can be overridden by memory)
         self.agent_framework = resolve_agent_framework(config, agent_framework)
@@ -178,8 +173,7 @@ class LangGraphOrchestrator:
                     logger.warning("advanced_memory_store_connection_failed")
                     self.advanced_memory_store = None
             except Exception as e:
-                logger.warning(
-                    "advanced_memory_store_async_setup_failed", error=str(e))
+                logger.warning("advanced_memory_store_async_setup_failed", error=str(e))
                 self.advanced_memory_store = None
 
     def convert_to_cards(
@@ -206,8 +200,7 @@ class LangGraphOrchestrator:
             # Validate that we can extract fields from the generated HTML
             try:
                 # Use default note type for validation check
-                fields = map_apf_to_anki_fields(
-                    gen_card.apf_html, "APF::Simple")
+                fields = map_apf_to_anki_fields(gen_card.apf_html, "APF::Simple")
 
                 # Log all extracted fields for debugging purposes
                 logger.debug(
@@ -256,8 +249,7 @@ class LangGraphOrchestrator:
             qa_pair = qa_lookup.get(gen_card.card_index)
             content_hash = gen_card.content_hash
             if not content_hash and qa_pair:
-                content_hash = compute_content_hash(
-                    qa_pair, metadata, gen_card.lang)
+                content_hash = compute_content_hash(qa_pair, metadata, gen_card.lang)
             elif not content_hash:
                 content_hash = hashlib.sha256(
                     gen_card.apf_html.encode("utf-8")
@@ -876,8 +868,7 @@ class LangGraphOrchestrator:
             pipeline_id=pipeline_id,
             note_id=metadata.id,
             success=success,
-            cards_count=len(
-                generation.cards) if generation and generation.cards else 0,
+            cards_count=len(generation.cards) if generation and generation.cards else 0,
         )
         return result
 
@@ -930,8 +921,7 @@ class LangGraphOrchestrator:
                     timestamp=start_time,
                 )
                 self.observability.record_metrics(metrics)
-                logger.info("observability_metrics_recorded",
-                            pipeline_id=pipeline_id)
+                logger.info("observability_metrics_recorded", pipeline_id=pipeline_id)
             except Exception as e:
                 logger.warning(
                     "observability_metrics_recording_failed",

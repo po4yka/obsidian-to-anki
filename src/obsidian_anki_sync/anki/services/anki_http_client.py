@@ -246,7 +246,9 @@ class AnkiHttpClient(IAnkiHttpClient):
 
         return self._async_runner.run(self.invoke_async(action, params))
 
-    async def invoke_async(self, action: str, params: dict[str, Any] | None = None) -> Any:
+    async def invoke_async(
+        self, action: str, params: dict[str, Any] | None = None
+    ) -> Any:
         """Invoke AnkiConnect action asynchronously."""
         payload = {"action": action, "version": 6, "params": params or {}}
 

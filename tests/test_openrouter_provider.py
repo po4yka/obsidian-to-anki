@@ -204,10 +204,10 @@ def test_generate_retries_on_rate_limit_and_succeeds(
 
 
 @respx.mock
-def test_grok_reasoning_enabled_for_complex_schema(
+def test_reasoning_enabled_for_complex_schema_with_supported_model(
     openrouter_provider: OpenRouterProvider,
 ) -> None:
-    """Grok models enable reasoning for complex JSON schemas."""
+    """Models with reasoning support auto-enable reasoning for complex JSON schemas."""
     route = respx.post(f"{BASE_URL}/chat/completions")
     route.respond(
         200,
@@ -265,13 +265,15 @@ def test_grok_reasoning_enabled_for_complex_schema(
         },
     }
 
+    # Use a model that supports reasoning AND handles structured outputs well
+    # deepseek-r1 is in MODELS_WITH_REASONING_SUPPORT but NOT in MODELS_WITH_STRUCTURED_OUTPUT_ISSUES
     result = openrouter_provider.generate_json(
-        model="qwen/qwen-2.5-32b-instruct",
+        model="deepseek/deepseek-r1",
         prompt="Extract complex QAs from this text",
         system="You are an expert at QA extraction",
         temperature=0.0,
         json_schema=complex_schema,
-        reasoning_enabled=False,  # Should be auto-enabled due to complexity
+        reasoning_enabled=False,  # Should be auto-enabled due to complexity for supported models
     )
 
     assert result["total_pairs"] == 1
@@ -279,7 +281,8 @@ def test_grok_reasoning_enabled_for_complex_schema(
 
     payload = json.loads(route.calls[0].request.content.decode())
     # Should be enabled for complex schema with effort mapping
-    assert payload["reasoning"]["effort"] == "medium"
+    # deepseek-r1 defaults to "high" effort per MODELS_WITH_REASONING_SUPPORT
+    assert payload["reasoning"]["effort"] == "high"
 
 
 @respx.mock

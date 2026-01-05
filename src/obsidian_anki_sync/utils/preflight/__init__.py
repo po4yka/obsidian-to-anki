@@ -63,7 +63,9 @@ class PreflightChecker:
         self, check_anki: bool = True, check_llm: bool = True
     ) -> None:
         """Run network latency checks for Anki and LLM providers."""
-        self._record_result(check_network_latency(check_anki=check_anki, check_llm=check_llm))
+        self._record_result(
+            check_network_latency(check_anki=check_anki, check_llm=check_llm)
+        )
 
     def run_all_checks(
         self, check_anki: bool = True, check_llm: bool = True
@@ -106,9 +108,7 @@ class PreflightChecker:
             self.results.append(check_network_latency(check_anki, check_llm))
 
         errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        warnings = [
-            r for r in self.results if not r.passed and r.severity == "warning"
-        ]
+        warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
 
         logger.info(
             "preflight_checks_completed",
@@ -128,4 +128,3 @@ def run_preflight_checks(
     """Convenience function to run pre-flight checks."""
     checker = PreflightChecker(config)
     return checker.run_all_checks(check_anki=check_anki, check_llm=check_llm)
-

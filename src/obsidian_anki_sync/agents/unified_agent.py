@@ -118,12 +118,10 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                     from ..validation.ai_fixer import AIFixer
                     from .pydantic.pre_validator import PreValidatorAgentAI
 
-                    model_name = self.config.get_model_for_agent(
-                        "pre_validator")
+                    model_name = self.config.get_model_for_agent("pre_validator")
                     model = create_openrouter_model_from_env(model_name)
                     # Check if auto-fix is enabled in config
-                    enable_autofix = getattr(
-                        self.config, "enable_ai_fix", False)
+                    enable_autofix = getattr(self.config, "enable_ai_fix", False)
 
                     ai_fixer = None
                     if enable_autofix:
@@ -135,15 +133,13 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                 elif agent_type == "post_validator":
                     from .pydantic.post_validator import PostValidatorAgentAI
 
-                    model_name = self.config.get_model_for_agent(
-                        "post_validator")
+                    model_name = self.config.get_model_for_agent("post_validator")
                     model = create_openrouter_model_from_env(model_name)
                     self._agents[agent_type] = PostValidatorAgentAI(model)
                 elif agent_type == "context_enrichment":
                     from .pydantic.context_enrichment import ContextEnrichmentAgentAI
 
-                    model_name = self.config.get_model_for_agent(
-                        "context_enrichment")
+                    model_name = self.config.get_model_for_agent("context_enrichment")
                     model = create_openrouter_model_from_env(model_name)
                     self._agents[agent_type] = ContextEnrichmentAgentAI(model)
                 else:
@@ -314,8 +310,7 @@ class PydanticAIUnifiedAgent(UnifiedAgentInterface):
                     else "Enrichment failed"
                 ),
                 data=result,
-                warnings=result.warnings if hasattr(
-                    result, "warnings") else [],
+                warnings=result.warnings if hasattr(result, "warnings") else [],
                 confidence=0.8,  # Enrichment is subjective
                 agent_framework=self.agent_framework,
                 agent_type="context_enrichment",
@@ -387,8 +382,7 @@ class UnifiedAgentSelector:
                 return self.memory_enhanced_generator
             else:
                 # Fallback to pydantic_ai if memory not available
-                logger.warning(
-                    "memory_enhanced_not_available_fallback_to_pydantic_ai")
+                logger.warning("memory_enhanced_not_available_fallback_to_pydantic_ai")
                 framework = "pydantic_ai"
 
         cache_key = f"{framework}_{task_type}"

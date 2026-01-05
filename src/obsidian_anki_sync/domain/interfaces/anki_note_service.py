@@ -147,7 +147,9 @@ class IAnkiNoteService(ABC):
         """
 
     @abstractmethod
-    async def update_note_fields_async(self, note_id: int, fields: dict[str, str]) -> None:
+    async def update_note_fields_async(
+        self, note_id: int, fields: dict[str, str]
+    ) -> None:
         """Update fields of an existing note (async).
 
         Args:
@@ -169,7 +171,9 @@ class IAnkiNoteService(ABC):
         """
 
     @abstractmethod
-    async def update_notes_fields_async(self, updates: list[dict[str, Any]]) -> list[bool]:
+    async def update_notes_fields_async(
+        self, updates: list[dict[str, Any]]
+    ) -> list[bool]:
         """Update multiple notes' fields in a single batch operation (async).
 
         Args:

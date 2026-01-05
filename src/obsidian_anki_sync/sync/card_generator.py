@@ -188,8 +188,7 @@ class CardGenerator:
                         note_content=note_content,
                         metadata=metadata,
                         qa_pairs=qa_pairs,
-                        file_path=Path(
-                            file_path) if file_path.exists() else None,
+                        file_path=Path(file_path) if file_path.exists() else None,
                         existing_cards=self.existing_cards_for_duplicate_detection,
                     )
                 )
@@ -207,8 +206,7 @@ class CardGenerator:
 
         # Track metrics
         if result.post_validation and not result.post_validation.is_valid:
-            self.stats["validation_errors"] = self.stats.get(
-                "validation_errors", 0) + 1
+            self.stats["validation_errors"] = self.stats.get("validation_errors", 0) + 1
         if result.retry_count > 0:
             self.stats["auto_fix_attempts"] = (
                 self.stats.get("auto_fix_attempts", 0) + result.retry_count
@@ -221,8 +219,7 @@ class CardGenerator:
         if not result.success or not result.generation:
             # Use the robust error extraction method
             error_msg = self._extract_pipeline_error_message(result)
-            highlight_hint = self._format_highlight_hint(
-                result.highlight_result)
+            highlight_hint = self._format_highlight_hint(result.highlight_result)
             if highlight_hint:
                 logger.info(
                     "highlight_agent_summary",
@@ -272,8 +269,7 @@ class CardGenerator:
                     cache_key=cache_key[:8],
                     duration=round(cache_write_duration, 4),
                     cards_count=len(cards),
-                    cache_size_bytes=sum(len(str(card).encode())
-                                         for card in cards),
+                    cache_size_bytes=sum(len(str(card).encode()) for card in cards),
                 )
         except Exception as e:
             logger.warning(
@@ -386,8 +382,7 @@ class CardGenerator:
                     )
 
                     # Include specific error details if available and not too verbose
-                    error_details = getattr(
-                        result.post_validation, "error_details", "")
+                    error_details = getattr(result.post_validation, "error_details", "")
                     if (
                         error_details
                         and error_details.strip()
@@ -405,8 +400,7 @@ class CardGenerator:
                 and hasattr(result.pre_validation, "error_type")
             ):
                 if not result.pre_validation.is_valid:
-                    error_type = getattr(
-                        result.pre_validation, "error_type", "unknown")
+                    error_type = getattr(result.pre_validation, "error_type", "unknown")
 
                     # Use standardized error messages based on error type
                     # This provides consistent, user-friendly messages instead of LLM-generated text
@@ -426,8 +420,7 @@ class CardGenerator:
 
                     # If we have additional error details from the LLM, we can append them
                     # but prioritize the standardized message for consistency
-                    error_details = getattr(
-                        result.pre_validation, "error_details", "")
+                    error_details = getattr(result.pre_validation, "error_details", "")
                     if (
                         error_details
                         and error_details.strip()
@@ -458,10 +451,8 @@ class CardGenerator:
                         for issue in issues[:3]:  # Top 3 issues
                             if isinstance(issue, dict):
                                 issue_type = issue.get("type", "unknown")
-                                description = issue.get(
-                                    "description", "no description")
-                                issue_summaries.append(
-                                    f"{issue_type}: {description}")
+                                description = issue.get("description", "no description")
+                                issue_summaries.append(f"{issue_type}: {description}")
                             else:
                                 issue_summaries.append(str(issue))
 
@@ -491,8 +482,7 @@ class CardGenerator:
 
                 # Check post-validation status
                 if hasattr(result, "post_validation") and result.post_validation:
-                    is_valid = getattr(
-                        result.post_validation, "is_valid", None)
+                    is_valid = getattr(result.post_validation, "is_valid", None)
                     diagnostics.append(
                         f"post_validation={'passed' if is_valid else 'failed'}"
                     )
@@ -524,10 +514,8 @@ class CardGenerator:
                     total_time=total_time,
                     retry_count=retry_count,
                     diagnostics=diagnostics_str,
-                    has_pre_validation=bool(
-                        getattr(result, "pre_validation", None)),
-                    has_post_validation=bool(
-                        getattr(result, "post_validation", None)),
+                    has_pre_validation=bool(getattr(result, "pre_validation", None)),
+                    has_post_validation=bool(getattr(result, "post_validation", None)),
                     has_memorization_quality=bool(
                         getattr(result, "memorization_quality", None)
                     ),
@@ -666,8 +654,7 @@ class CardGenerator:
         if hasattr(result, "pre_validation") and result.pre_validation:
             if not getattr(result.pre_validation, "is_valid", True):
                 error_type = getattr(result.pre_validation, "error_type", "")
-                error_details = getattr(
-                    result.pre_validation, "error_details", "")
+                error_details = getattr(result.pre_validation, "error_details", "")
                 if error_type or error_details:
                     return f"{error_type}: {error_details}".strip(": ")
 
@@ -675,8 +662,7 @@ class CardGenerator:
         if hasattr(result, "post_validation") and result.post_validation:
             if not getattr(result.post_validation, "is_valid", True):
                 error_type = getattr(result.post_validation, "error_type", "")
-                error_details = getattr(
-                    result.post_validation, "error_details", "")
+                error_details = getattr(result.post_validation, "error_details", "")
                 if error_type or error_details:
                     return f"{error_type}: {error_details}".strip(": ")
 

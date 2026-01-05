@@ -221,4 +221,3 @@ async def note_correction_node(state: PipelineState) -> PipelineState:
     state["current_stage"] = "pre_validation"
 
     return state
-

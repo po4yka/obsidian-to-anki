@@ -143,4 +143,3 @@ def wait_for_fd_headroom(required_headroom: int, poll_interval: float = 0.05) ->
                 **snapshot,
             )
             break  # Continue anyway to avoid process hang
-

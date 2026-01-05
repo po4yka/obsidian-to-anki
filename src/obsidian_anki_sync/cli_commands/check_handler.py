@@ -73,10 +73,8 @@ def run_check_setup(
 
     if errors:
         console.print("[bold red]ERROR: Setup validation failed![/bold red]")
-        console.print(
-            "[yellow]Fix the errors above before running sync.[/yellow]\n")
-        logger.error("check_setup_failed", errors=len(
-            errors), warnings=len(warnings))
+        console.print("[yellow]Fix the errors above before running sync.[/yellow]\n")
+        logger.error("check_setup_failed", errors=len(errors), warnings=len(warnings))
         raise typer.Exit(code=1)
     elif warnings:
         console.print(

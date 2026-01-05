@@ -77,5 +77,7 @@ class ICardDataExtractor(ABC):
     """Interface for extracting card data from HTML."""
 
     @abstractmethod
-    def extract_card_data_from_html(self, apf_html: str, manifest: Manifest) -> dict | None:
+    def extract_card_data_from_html(
+        self, apf_html: str, manifest: Manifest
+    ) -> dict | None:
         """Extract card data from existing HTML for regeneration."""

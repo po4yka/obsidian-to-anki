@@ -38,7 +38,9 @@ def identify_sections(content: str) -> dict[str, str]:
                 sections[current_section] = "\n".join(current_section_lines)
             current_section = f"question_{_count_prefix(sections.keys(), 'question')}"
             current_section_lines = [line]
-        elif line.strip().startswith("## Answer") or line.strip().startswith("## Ответ"):
+        elif line.strip().startswith("## Answer") or line.strip().startswith(
+            "## Ответ"
+        ):
             if current_section:
                 sections[current_section] = "\n".join(current_section_lines)
             current_section = f"answer_{_count_prefix(sections.keys(), 'answer')}"
@@ -53,4 +55,3 @@ def identify_sections(content: str) -> dict[str, str]:
         sections["content"] = content
 
     return sections
-

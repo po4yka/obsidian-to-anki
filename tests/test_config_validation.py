@@ -23,9 +23,7 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            model_overrides={
-                "generation": {"model_name": "custom/generator-model"}
-            },
+            model_overrides={"generation": {"model_name": "custom/generator-model"}},
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -75,9 +73,7 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            model_overrides={
-                "pre_validation": {"model_name": "custom/pre-validator"}
-            },
+            model_overrides={"pre_validation": {"model_name": "custom/pre-validator"}},
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -113,9 +109,7 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            model_overrides={
-                "context_enrichment": {"model_name": "custom/enrichment"}
-            },
+            model_overrides={"context_enrichment": {"model_name": "custom/enrichment"}},
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -148,12 +142,7 @@ class TestModelSelection:
             source_dir=Path(),
             db_path=temp_dir / "test.db",
             model_preset="balanced",
-            model_overrides={
-                "generation": {
-                    "temperature": 0.7,
-                    "max_tokens": 4096
-                }
-            },
+            model_overrides={"generation": {"temperature": 0.7, "max_tokens": 4096}},
             default_llm_model="qwen/qwen-2.5-72b-instruct",
         )
 
@@ -303,7 +292,6 @@ class TestConfigurationValidation:
                 llm_provider="openrouter",
                 openrouter_api_key="",
             )
-
 
     def test_invalid_run_mode(self, temp_dir):
         """Test error for invalid run_mode."""
@@ -632,7 +620,6 @@ class TestConfigurationDefaults:
         )
 
         assert config.model_preset == "balanced"
-
 
     def test_default_performance_settings(self, temp_dir):
         """Test default performance optimization settings."""

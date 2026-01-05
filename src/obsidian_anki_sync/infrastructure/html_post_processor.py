@@ -81,8 +81,7 @@ class APFHTMLPostProcessor:
             apf_html = apf_html[: end_of_cards_pos + len("END_OF_CARDS")]
         else:
             # Fallback: Strip after manifest comment
-            manifest_match = re.search(
-                r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
+            manifest_match = re.search(r"(<!-- manifest:.*?-->)", apf_html, re.DOTALL)
             if manifest_match:
                 end_pos = manifest_match.end()
                 apf_html = apf_html[:end_pos]
@@ -92,11 +91,14 @@ class APFHTMLPostProcessor:
         if tags_match:
             # Use tags from model output
             tags = tags_match.group(1).strip().split()
-            logger.debug("extracted_tags_from_output",
-                         slug=manifest.slug, tags=tags)
+            logger.debug("extracted_tags_from_output", slug=manifest.slug, tags=tags)
         else:
             # Generate tags deterministically
-            tags = self.tag_generator.generate_tags(metadata, manifest.lang) if self.tag_generator else []
+            tags = (
+                self.tag_generator.generate_tags(metadata, manifest.lang)
+                if self.tag_generator
+                else []
+            )
             logger.debug("generated_tags", slug=manifest.slug, tags=tags)
 
         # 5. Detect card type
@@ -116,7 +118,9 @@ class APFHTMLPostProcessor:
             "type": card_type,
             "tags": tags,
         }
-        correct_manifest = f"<!-- manifest: {json.dumps(manifest_dict, ensure_ascii=False)} -->"
+        correct_manifest = (
+            f"<!-- manifest: {json.dumps(manifest_dict, ensure_ascii=False)} -->"
+        )
 
         # 7. Replace existing manifest or append
         if "<!-- manifest:" in apf_html:
@@ -141,8 +145,7 @@ class APFHTMLPostProcessor:
             and has_end_of_cards
         ):
             # Missing wrapper sentinels, add them
-            logger.debug("adding_missing_wrapper_sentinels",
-                         slug=manifest.slug)
+            logger.debug("adding_missing_wrapper_sentinels", slug=manifest.slug)
 
             # Wrap the card content
             lines = []
@@ -163,8 +166,7 @@ class APFHTMLPostProcessor:
             apf_html = "\n".join(lines)
 
         # 9. Normalize card header to match validator expectations
-        apf_html = self._normalize_card_header(
-            apf_html, manifest, card_type, tags)
+        apf_html = self._normalize_card_header(apf_html, manifest, card_type, tags)
 
         # 10. Fix HTML validation issues: wrap standalone <code> in <pre><code>
         apf_html = self._fix_code_tags(apf_html)
@@ -256,8 +258,7 @@ class APFHTMLPostProcessor:
         match = re.search(card_header_pattern, apf_html)
         if match:
             apf_html = (
-                apf_html[: match.start()] + correct_header +
-                apf_html[match.end():]
+                apf_html[: match.start()] + correct_header + apf_html[match.end() :]
             )
             logger.debug(
                 "normalized_card_header",
@@ -296,8 +297,7 @@ class APFHTMLPostProcessor:
         # Match <code>...</code> tags (non-greedy to match individual tags)
         fixed_html = html
         code_pattern = r"<code(?:\s[^>]*)?>.*?</code>"
-        matches = list(re.finditer(
-            code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
+        matches = list(re.finditer(code_pattern, fixed_html, re.DOTALL | re.IGNORECASE))
 
         # Process matches in reverse order to avoid offset issues
         for match in reversed(matches):
@@ -307,11 +307,10 @@ class APFHTMLPostProcessor:
 
             # Check if this code tag is already inside a <pre> tag
             # Look backwards for <pre> tag
-            context_before = fixed_html[max(0, start_pos - 500): start_pos]
+            context_before = fixed_html[max(0, start_pos - 500) : start_pos]
             # Find the last <pre> tag before this code
             pre_matches = list(
-                re.finditer(r"<pre(?:\s[^>]*)?>",
-                            context_before, re.IGNORECASE)
+                re.finditer(r"<pre(?:\s[^>]*)?>", context_before, re.IGNORECASE)
             )
             if pre_matches:
                 last_pre = pre_matches[-1]
@@ -324,8 +323,7 @@ class APFHTMLPostProcessor:
 
             # This is a standalone <code> tag, wrap it
             wrapped = f"<pre>{code_tag}</pre>"
-            fixed_html = fixed_html[:start_pos] + \
-                wrapped + fixed_html[end_pos:]
+            fixed_html = fixed_html[:start_pos] + wrapped + fixed_html[end_pos:]
 
         return fixed_html
 
@@ -400,7 +398,9 @@ class APFHTMLPostProcessor:
 
         return fixed_html
 
-    def _extract_card_data_from_html(self, apf_html: str, manifest: Manifest) -> dict | None:
+    def _extract_card_data_from_html(
+        self, apf_html: str, manifest: Manifest
+    ) -> dict | None:
         """Extract card data from existing HTML for regeneration."""
         # Safe access to optional attributes with sensible defaults
         manifest_tags = getattr(manifest, "tags", [])
@@ -468,8 +468,7 @@ class APFHTMLPostProcessor:
                     re.DOTALL | re.IGNORECASE,
                 )
                 if code_content_match:
-                    card_data["code_sample"] = code_content_match.group(
-                        1).strip()
+                    card_data["code_sample"] = code_content_match.group(1).strip()
 
         except Exception as e:
             logger.debug(

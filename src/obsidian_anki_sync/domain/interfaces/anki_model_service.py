@@ -33,7 +33,9 @@ class IAnkiModelService(ABC):
         """
 
     @abstractmethod
-    def get_model_field_names(self, model_name: str, use_cache: bool = True) -> list[str]:
+    def get_model_field_names(
+        self, model_name: str, use_cache: bool = True
+    ) -> list[str]:
         """Get field names for a specific model.
 
         Args:

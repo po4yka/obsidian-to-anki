@@ -53,7 +53,9 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="model-fields")
     def show_model_fields(
-        model_name: Annotated[str, typer.Option("--model", help="Model name to inspect")],
+        model_name: Annotated[
+            str, typer.Option("--model", help="Model name to inspect")
+        ],
         config_path: Annotated[
             Path | None,
             typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -107,7 +109,9 @@ def register(app: typer.Typer) -> None:
 
     @app.command(name="export-deck")
     def export_deck(
-        deck_name: Annotated[str, typer.Argument(help="Name of the Anki deck to export")],
+        deck_name: Annotated[
+            str, typer.Argument(help="Name of the Anki deck to export")
+        ],
         output: Annotated[
             Path | None,
             typer.Option(
@@ -198,5 +202,3 @@ def register(app: typer.Typer) -> None:
             note_type=note_type,
             key_field=key_field,
         )
-
-

@@ -189,5 +189,3 @@ def register(app: typer.Typer) -> None:
         )
 
         logger.info("list_problematic_notes_completed", count=len(notes))
-
-

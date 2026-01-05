@@ -29,7 +29,10 @@ class AnkiMediaService(IAnkiMediaService):
     def store_media_file(self, filename: str, data: str) -> str:
         """Store a media file in Anki's media collection."""
         return cast(
-            "str", self._http_client.invoke("storeMediaFile", {"filename": filename, "data": data})
+            "str",
+            self._http_client.invoke(
+                "storeMediaFile", {"filename": filename, "data": data}
+            ),
         )
 
     async def store_media_file_async(self, filename: str, data: str) -> str:

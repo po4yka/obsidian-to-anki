@@ -113,8 +113,7 @@ def run_show_model_fields(config: Config, logger: Any, model_name: str) -> None:
             for field in fields:
                 console.print(f"  [cyan]• {field}[/cyan]")
 
-        logger.info("model_fields_completed",
-                    model=model_name, count=len(fields))
+        logger.info("model_fields_completed", model=model_name, count=len(fields))
 
     except Exception as e:
         logger.error("model_fields_failed", model=model_name, error=str(e))
@@ -158,8 +157,7 @@ def run_export_deck(
 
     try:
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
         _passed, results = run_preflight_checks(
             config, check_anki=True, check_llm=False
         )
@@ -237,8 +235,7 @@ def run_import_deck(
 
     try:
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
         _passed, results = run_preflight_checks(
             config, check_anki=True, check_llm=False
         )
@@ -330,8 +327,7 @@ def run_query_anki(
                 raise typer.Exit(code=1)
 
         # Run pre-flight checks
-        console.print(
-            "\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
+        console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
         _passed, results = run_preflight_checks(
             config, check_anki=True, check_llm=False
         )
@@ -349,8 +345,7 @@ def run_query_anki(
         console.print("\n[bold green]Result:[/bold green]")
         console.print(json.dumps(result, indent=2, ensure_ascii=False))
 
-        logger.info("query_completed", action=action,
-                    has_result=result is not None)
+        logger.info("query_completed", action=action, has_result=result is not None)
 
     except Exception as e:
         logger.error("query_failed", error=str(e), action=action)

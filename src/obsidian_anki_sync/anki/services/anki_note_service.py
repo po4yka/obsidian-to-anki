@@ -46,18 +46,24 @@ class AnkiNoteService(IAnkiNoteService):
 
     def find_notes(self, query: str) -> list[int]:
         """Find notes matching a query."""
-        return cast("list[int]", self._http_client.invoke("findNotes", {"query": query}))
+        return cast(
+            "list[int]", self._http_client.invoke("findNotes", {"query": query})
+        )
 
     async def find_notes_async(self, query: str) -> list[int]:
         """Find notes matching a query (async)."""
-        return cast("list[int]", await self._http_client.invoke_async("findNotes", {"query": query}))
+        return cast(
+            "list[int]",
+            await self._http_client.invoke_async("findNotes", {"query": query}),
+        )
 
     def notes_info(self, note_ids: list[int]) -> list[dict[str, Any]]:
         """Get detailed information about notes."""
         if not note_ids:
             return []
         return cast(
-            "list[dict[Any, Any]]", self._http_client.invoke("notesInfo", {"notes": note_ids})
+            "list[dict[Any, Any]]",
+            self._http_client.invoke("notesInfo", {"notes": note_ids}),
         )
 
     async def notes_info_async(self, note_ids: list[int]) -> list[dict[str, Any]]:
@@ -172,7 +178,9 @@ class AnkiNoteService(IAnkiNoteService):
         context: str | None = None,
     ) -> None:
         """Async version of _validate_note_fields."""
-        expected_fields = await self._model_service.get_model_field_names_async(model_name)
+        expected_fields = await self._model_service.get_model_field_names_async(
+            model_name
+        )
         if not expected_fields:
             msg = f"No fields found for model '{model_name}'"
             if context:
@@ -248,7 +256,10 @@ class AnkiNoteService(IAnkiNoteService):
         if isinstance(known_decks, (list, set, tuple)) and known_decks:
             if deck_name not in known_decks:
                 known_decks = self._deck_service.get_deck_names(use_cache=False)
-                if isinstance(known_decks, (list, set, tuple)) and deck_name not in known_decks:
+                if (
+                    isinstance(known_decks, (list, set, tuple))
+                    and deck_name not in known_decks
+                ):
                     msg = f"Deck '{deck_name}' not found in Anki."
                     raise AnkiConnectError(msg)
 
@@ -257,7 +268,10 @@ class AnkiNoteService(IAnkiNoteService):
         if isinstance(known_models, (list, set, tuple)) and known_models:
             if model_name not in known_models:
                 known_models = self._model_service.get_model_names(use_cache=False)
-                if isinstance(known_models, (list, set, tuple)) and model_name not in known_models:
+                if (
+                    isinstance(known_models, (list, set, tuple))
+                    and model_name not in known_models
+                ):
                     msg = f"Note type '{model_name}' not found in Anki."
                     raise AnkiConnectError(msg)
 
@@ -273,7 +287,9 @@ class AnkiNoteService(IAnkiNoteService):
             guid=guid,
         )
 
-        result = cast("int", self._http_client.invoke("addNote", {"note": note_payload}))
+        result = cast(
+            "int", self._http_client.invoke("addNote", {"note": note_payload})
+        )
 
         logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
         return result
@@ -299,7 +315,9 @@ class AnkiNoteService(IAnkiNoteService):
         # Validate model existence
         known_models = await self._model_service.get_model_names_async()
         if model_name not in known_models:
-            known_models = await self._model_service.get_model_names_async(use_cache=False)
+            known_models = await self._model_service.get_model_names_async(
+                use_cache=False
+            )
             if model_name not in known_models:
                 msg = f"Note type '{model_name}' not found in Anki."
                 raise AnkiConnectError(msg)
@@ -316,7 +334,10 @@ class AnkiNoteService(IAnkiNoteService):
             guid=guid,
         )
 
-        result = cast("int", await self._http_client.invoke_async("addNote", {"note": note_payload}))
+        result = cast(
+            "int",
+            await self._http_client.invoke_async("addNote", {"note": note_payload}),
+        )
         logger.info("note_added", note_id=result, deck=deck_name, note_type=model_name)
         return result
 
@@ -354,7 +375,9 @@ class AnkiNoteService(IAnkiNoteService):
             context = note.get("guid") or f"batch_note_{i}"
             self._validate_note_fields(model_name, fields, context=context)
 
-        result = cast("list[int | None]", self._http_client.invoke("addNotes", {"notes": notes}))
+        result = cast(
+            "list[int | None]", self._http_client.invoke("addNotes", {"notes": notes})
+        )
 
         successful = sum(1 for note_id in result if note_id is not None)
         failed = len(result) - successful
@@ -380,7 +403,9 @@ class AnkiNoteService(IAnkiNoteService):
         known_decks = set(await self._deck_service.get_deck_names_async())
         missing_decks = required_decks - known_decks
         if missing_decks:
-            known_decks = set(await self._deck_service.get_deck_names_async(use_cache=False))
+            known_decks = set(
+                await self._deck_service.get_deck_names_async(use_cache=False)
+            )
             missing_decks = required_decks - known_decks
             if missing_decks:
                 msg = f"Decks not found: {', '.join(sorted(missing_decks))}"
@@ -389,7 +414,9 @@ class AnkiNoteService(IAnkiNoteService):
         known_models = set(await self._model_service.get_model_names_async())
         missing_models = required_models - known_models
         if missing_models:
-            known_models = set(await self._model_service.get_model_names_async(use_cache=False))
+            known_models = set(
+                await self._model_service.get_model_names_async(use_cache=False)
+            )
             missing_models = required_models - known_models
             if missing_models:
                 msg = f"Note types not found: {', '.join(sorted(missing_models))}"
@@ -403,17 +430,22 @@ class AnkiNoteService(IAnkiNoteService):
             await self._validate_note_fields_async(model_name, fields, context=context)
 
         result = cast(
-            "list[int | None]", await self._http_client.invoke_async("addNotes", {"notes": notes})
+            "list[int | None]",
+            await self._http_client.invoke_async("addNotes", {"notes": notes}),
         )
 
         return result
 
     def update_note_fields(self, note_id: int, fields: dict[str, str]) -> None:
         """Update fields of an existing note."""
-        self._http_client.invoke("updateNoteFields", {"note": {"id": note_id, "fields": fields}})
+        self._http_client.invoke(
+            "updateNoteFields", {"note": {"id": note_id, "fields": fields}}
+        )
         logger.info("note_updated", note_id=note_id)
 
-    async def update_note_fields_async(self, note_id: int, fields: dict[str, str]) -> None:
+    async def update_note_fields_async(
+        self, note_id: int, fields: dict[str, str]
+    ) -> None:
         """Update fields of an existing note (async)."""
         await self._http_client.invoke_async(
             "updateNoteFields", {"note": {"id": note_id, "fields": fields}}
@@ -482,7 +514,9 @@ class AnkiNoteService(IAnkiNoteService):
 
             return fallback_results
 
-    async def update_notes_fields_async(self, updates: list[dict[str, Any]]) -> list[bool]:
+    async def update_notes_fields_async(
+        self, updates: list[dict[str, Any]]
+    ) -> list[bool]:
         """Update multiple notes' fields in a single batch operation (async)."""
         if not updates:
             return []
@@ -548,4 +582,6 @@ class AnkiNoteService(IAnkiNoteService):
         if not notes:
             return []
 
-        return cast("list[bool]", self._http_client.invoke("canAddNotes", {"notes": notes}))
+        return cast(
+            "list[bool]", self._http_client.invoke("canAddNotes", {"notes": notes})
+        )

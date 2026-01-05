@@ -15,7 +15,13 @@ logger = get_logger(__name__)
 class NoteArchiver(IArchiver):
     """Service for archiving problematic notes with deferred processing."""
 
-    def __init__(self, archiver: Any, batch_size: int = 64, fd_headroom: int = 32, fd_poll_interval: float = 0.05):
+    def __init__(
+        self,
+        archiver: Any,
+        batch_size: int = 64,
+        fd_headroom: int = 32,
+        fd_poll_interval: float = 0.05,
+    ):
         """Initialize the note archiver.
 
         Args:
@@ -154,7 +160,7 @@ class NoteArchiver(IArchiver):
                             # Wait for headroom before retrying
                             wait_for_fd_headroom(
                                 required_headroom=self._archiver_fd_headroom,
-                                poll_interval=self._archiver_fd_poll_interval
+                                poll_interval=self._archiver_fd_poll_interval,
                             )
                             continue
                     raise  # Re-raise if not FD error or retries exhausted
@@ -191,7 +197,7 @@ class NoteArchiver(IArchiver):
             # Proactively check for headroom before starting a batch
             wait_for_fd_headroom(
                 required_headroom=self._archiver_fd_headroom,
-                poll_interval=self._archiver_fd_poll_interval
+                poll_interval=self._archiver_fd_poll_interval,
             )
 
             batch = archives_to_process[
@@ -231,4 +237,3 @@ class NoteArchiver(IArchiver):
             "deferred_archives_completed",
             archived=archived_count,
         )
-

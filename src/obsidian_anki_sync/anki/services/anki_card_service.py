@@ -31,7 +31,8 @@ class AnkiCardService(IAnkiCardService):
         if not card_ids:
             return []
         return cast(
-            "list[dict[Any, Any]]", self._http_client.invoke("cardsInfo", {"cards": card_ids})
+            "list[dict[Any, Any]]",
+            self._http_client.invoke("cardsInfo", {"cards": card_ids}),
         )
 
     def suspend_cards(self, card_ids: list[int]) -> None:
@@ -66,8 +67,13 @@ class AnkiCardService(IAnkiCardService):
 
     def get_note_id_from_card_id(self, card_id: int) -> int:
         """Get note ID from card ID."""
-        return cast("int", self._http_client.invoke("cardsToNotes", {"cards": [card_id]})[0])
+        return cast(
+            "int", self._http_client.invoke("cardsToNotes", {"cards": [card_id]})[0]
+        )
 
     def get_card_ids_from_note_id(self, note_id: int) -> list[int]:
         """Get card IDs from note ID."""
-        return cast("list[int]", self._http_client.invoke("notesToCards", {"notes": [note_id]})[0])
+        return cast(
+            "list[int]",
+            self._http_client.invoke("notesToCards", {"notes": [note_id]})[0],
+        )

@@ -30,8 +30,7 @@ class CardRepository:
         import time
 
         start_time = time.time()
-        logger.debug("db_transaction_start",
-                     operation="insert_card", slug=card.slug)
+        logger.debug("db_transaction_start", operation="insert_card", slug=card.slug)
         try:
             with self._connection_manager.transaction() as conn:
                 cursor = conn.cursor()
@@ -137,8 +136,7 @@ class CardRepository:
                 slug = row_dict.get("slug", "")
                 lang = row_dict.get("lang", "en")
                 slug_base = row_dict.get(
-                    "slug_base", slug.rsplit(
-                        "-", 1)[0] if "-" in slug else slug
+                    "slug_base", slug.rsplit("-", 1)[0] if "-" in slug else slug
                 )
                 source_path = row_dict.get("source_path", "")
                 source_anchor = row_dict.get("source_anchor", "")
@@ -192,8 +190,7 @@ class CardRepository:
                 )
                 cards.append(card)
             except Exception as e:
-                logger.warning("failed_to_convert_card",
-                               error=str(e), row=row_dict)
+                logger.warning("failed_to_convert_card", error=str(e), row=row_dict)
                 continue
         return cards
 
@@ -219,7 +216,8 @@ class CardRepository:
             Set of source_path values from cards that have been synced
         """
         cursor = self._connection_manager.execute_query(
-            "SELECT DISTINCT source_path FROM cards", operation="get_processed_note_paths"
+            "SELECT DISTINCT source_path FROM cards",
+            operation="get_processed_note_paths",
         )
         return {row["source_path"] for row in cursor.fetchall()}
 
@@ -471,7 +469,7 @@ class CardRepository:
         """
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM cards WHERE creation_status = 'pending'",
-            operation="get_pending_cards"
+            operation="get_pending_cards",
         )
         return [dict(row) for row in cursor.fetchall()]
 
@@ -645,4 +643,3 @@ class CardRepository:
                 """,
                     (status, error_message, slug),
                 )
-

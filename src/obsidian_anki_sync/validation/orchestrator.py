@@ -75,8 +75,7 @@ class NoteValidator:
         self.valid_topics = self.taxonomy.get_valid_topics()
 
         # Initialize hash tracker for incremental validation
-        self.hash_tracker = HashTracker(
-            vault_root, cache_dir) if incremental else None
+        self.hash_tracker = HashTracker(vault_root, cache_dir) if incremental else None
 
         # AI components (initialized lazily)
         self._ai_fixer = None
@@ -157,11 +156,9 @@ class NoteValidator:
         all_fixes: list[AutoFix] = []
 
         validators = [
-            YAMLValidator(content, frontmatter, str(
-                filepath), self.valid_topics),
+            YAMLValidator(content, frontmatter, str(filepath), self.valid_topics),
             ContentValidator(content, frontmatter, str(filepath)),
-            LinkValidator(content, frontmatter, str(
-                filepath), self.vault_root),
+            LinkValidator(content, frontmatter, str(filepath), self.vault_root),
             FormatValidator(content, frontmatter, str(filepath)),
             AndroidValidator(content, frontmatter, str(filepath)),
         ]
@@ -295,30 +292,25 @@ class NoteValidator:
 
         # Filter to changed files only if incremental mode
         if self.hash_tracker:
-            md_files, skipped_count = self.hash_tracker.get_changed_files(
-                md_files)
+            md_files, skipped_count = self.hash_tracker.get_changed_files(md_files)
 
         # Validate with progress bar
         if show_progress and len(md_files) > 1:
             for md_file in tqdm(md_files, desc="Validating", unit="file"):
-                result = self.validate_file(
-                    md_file, collect_fixes=collect_fixes)
+                result = self.validate_file(md_file, collect_fixes=collect_fixes)
                 results.append(result)
                 # Update hash tracker cache
                 if self.hash_tracker and result["success"]:
-                    issues_count = sum(len(v)
-                                       for v in result["issues"].values())
+                    issues_count = sum(len(v) for v in result["issues"].values())
                     passed = issues_count == 0
                     self.hash_tracker.update(md_file, passed, issues_count)
         else:
             for md_file in md_files:
-                result = self.validate_file(
-                    md_file, collect_fixes=collect_fixes)
+                result = self.validate_file(md_file, collect_fixes=collect_fixes)
                 results.append(result)
                 # Update hash tracker cache
                 if self.hash_tracker and result["success"]:
-                    issues_count = sum(len(v)
-                                       for v in result["issues"].values())
+                    issues_count = sum(len(v) for v in result["issues"].values())
                     passed = issues_count == 0
                     self.hash_tracker.update(md_file, passed, issues_count)
 
@@ -362,8 +354,7 @@ class NoteValidator:
 
         # Filter to changed files only if incremental mode
         if self.hash_tracker:
-            md_files, skipped_count = self.hash_tracker.get_changed_files(
-                md_files)
+            md_files, skipped_count = self.hash_tracker.get_changed_files(md_files)
 
         if not md_files:
             return [], skipped_count
@@ -389,11 +380,9 @@ class NoteValidator:
         if self.hash_tracker:
             for result in results:
                 if result["success"] and result.get("filepath"):
-                    issues_count = sum(len(v)
-                                       for v in result["issues"].values())
+                    issues_count = sum(len(v) for v in result["issues"].values())
                     passed = issues_count == 0
-                    self.hash_tracker.update(
-                        result["filepath"], passed, issues_count)
+                    self.hash_tracker.update(result["filepath"], passed, issues_count)
             self.hash_tracker.save_cache()
 
         return results, skipped_count

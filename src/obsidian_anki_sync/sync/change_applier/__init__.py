@@ -257,7 +257,9 @@ class ChangeApplier:
         model_name = self._get_anki_model_name(card.note_type)
         try:
             anki_field_names = self.anki.get_model_field_names(model_name)
-            validate_field_names_match_anki(fields, model_name, anki_field_names, card.slug)
+            validate_field_names_match_anki(
+                fields, model_name, anki_field_names, card.slug
+            )
         except FieldMappingError as e:
             logger.error(
                 "card_field_name_mismatch",

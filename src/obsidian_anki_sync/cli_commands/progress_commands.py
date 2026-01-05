@@ -113,9 +113,7 @@ def register(app: typer.Typer) -> None:
                     table.add_column("Updated At", style="blue")
 
                     for session in incomplete:
-                        progress_str = (
-                            f"{session['notes_processed']}/{session['total_notes']} notes"
-                        )
+                        progress_str = f"{session['notes_processed']}/{session['total_notes']} notes"
                         table.add_row(
                             session["session_id"][:8] + "...",
                             session["phase"],
@@ -223,5 +221,3 @@ def register(app: typer.Typer) -> None:
             logger.error("clean_progress_failed", error=str(exc))
             console.print(f"\n[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1)
-
-

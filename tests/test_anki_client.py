@@ -46,7 +46,9 @@ def test_update_note_tags_delegates_to_service() -> None:
 
     client.update_note_tags(42, ["existing", "new-tag"])
 
-    client._tag_service.update_note_tags.assert_called_once_with(42, ["existing", "new-tag"])
+    client._tag_service.update_note_tags.assert_called_once_with(
+        42, ["existing", "new-tag"]
+    )
 
 
 def test_update_note_tags_handles_empty_target() -> None:
@@ -61,7 +63,9 @@ def test_update_note_tags_handles_empty_target() -> None:
 def test_update_note_tags_propagates_exceptions() -> None:
     """Test that update_note_tags propagates exceptions from the service."""
     client = _build_client()
-    client._tag_service.update_note_tags.side_effect = AnkiConnectError("Note not found")
+    client._tag_service.update_note_tags.side_effect = AnkiConnectError(
+        "Note not found"
+    )
 
     with pytest.raises(AnkiConnectError):
         client.update_note_tags(7, ["tag"])

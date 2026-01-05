@@ -41,4 +41,3 @@ class CardSplittingDeps(BaseModel):
     note_content: str
     metadata: NoteMetadata
     qa_pairs: list[QAPair]
-

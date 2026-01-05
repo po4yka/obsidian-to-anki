@@ -143,7 +143,9 @@ class StateDB(IStateRepository):
         apf_html: str,
     ) -> None:
         """Insert card with full content storage for atomicity support."""
-        self._card_repo.insert_card_extended(card, anki_guid, fields, tags, deck_name, apf_html)
+        self._card_repo.insert_card_extended(
+            card, anki_guid, fields, tags, deck_name, apf_html
+        )
 
     def update_card_extended(
         self, card: "ModelCard", fields: dict[str, str], tags: list[str], apf_html: str
@@ -162,7 +164,9 @@ class StateDB(IStateRepository):
         creation_status: str = "success",
     ) -> None:
         """Insert or update card with full content."""
-        self._card_repo.upsert_card_extended(card, anki_guid, fields, tags, deck_name, apf_html, creation_status)
+        self._card_repo.upsert_card_extended(
+            card, anki_guid, fields, tags, deck_name, apf_html, creation_status
+        )
 
     def upsert_batch_extended(self, cards_data: list[dict[str, Any]]) -> None:
         """Insert or update multiple cards in a single transaction."""
@@ -236,15 +240,23 @@ class StateDB(IStateRepository):
     ) -> None:
         """Insert or update a note in the index."""
         self._note_index_repo.upsert_note_index(
-            source_path, note_id, note_title, topic, language_tags,
-            qa_pair_count, file_modified_at, metadata_json
+            source_path,
+            note_id,
+            note_title,
+            topic,
+            language_tags,
+            qa_pair_count,
+            file_modified_at,
+            metadata_json,
         )
 
     def update_note_sync_status(
         self, source_path: str, status: str, error_message: str | None = None
     ) -> None:
         """Update sync status for a note."""
-        self._note_index_repo.update_note_sync_status(source_path, status, error_message)
+        self._note_index_repo.update_note_sync_status(
+            source_path, status, error_message
+        )
 
     def get_note_index(self, source_path: str) -> dict | None:
         """Get note index entry."""
@@ -276,8 +288,18 @@ class StateDB(IStateRepository):
     ) -> None:
         """Insert or update a card in the index."""
         self._card_index_repo.upsert_card_index(
-            source_path, card_index, lang, slug, anki_guid, note_id,
-            note_title, content_hash, status, in_obsidian, in_anki, in_database
+            source_path,
+            card_index,
+            lang,
+            slug,
+            anki_guid,
+            note_id,
+            note_title,
+            content_hash,
+            status,
+            in_obsidian,
+            in_anki,
+            in_database,
         )
 
     def get_card_index_by_source(self, source_path: str) -> list[dict]:
@@ -349,6 +371,7 @@ class StateDB(IStateRepository):
         """Save sync session data."""
         # Generate a simple session ID
         import uuid
+
         session_id = str(uuid.uuid4())
         # For now, just return the session ID - progress tracking is separate
         return session_id

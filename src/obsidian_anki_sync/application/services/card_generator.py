@@ -94,8 +94,8 @@ class CardGeneratorService(ICardGenerator):
                 generated_cards.append(card_en)
 
                 # Parse and cache the English structure for translation
-                english_structures[qa_pair.card_index] = self.card_structure_parser.parse_card_structure(
-                    card_en.apf_html
+                english_structures[qa_pair.card_index] = (
+                    self.card_structure_parser.parse_card_structure(card_en.apf_html)
                 )
 
         # Generate cards in other languages using English structure as template
@@ -183,4 +183,6 @@ class CardGeneratorService(ICardGenerator):
         Returns:
             Manifest instance
         """
-        return self.manifest_generator.create_manifest(qa_pair, metadata, slug_base, lang)
+        return self.manifest_generator.create_manifest(
+            qa_pair, metadata, slug_base, lang
+        )

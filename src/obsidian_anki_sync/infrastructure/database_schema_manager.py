@@ -214,8 +214,7 @@ class DatabaseSchemaManager:
         # Add missing columns
         for col_name, col_type in columns_to_add.items():
             if col_name not in existing_columns:
-                cursor.execute(
-                    f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE cards ADD COLUMN {col_name} {col_type}")
                 logger.debug("added_column_to_cards_table", column=col_name)
 
         # Add index for creation_status (after column is created)

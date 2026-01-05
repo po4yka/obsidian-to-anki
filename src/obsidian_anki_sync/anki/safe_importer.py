@@ -29,7 +29,11 @@ logger = get_logger(__name__)
 class ImportProgress:
     """Progress tracking for import operations."""
 
-    def __init__(self, total_cards: int, progress_callback: Callable[[dict[str, Any]], None] | None = None):
+    def __init__(
+        self,
+        total_cards: int,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ):
         """Initialize progress tracker.
 
         Args:
@@ -58,12 +62,14 @@ class ImportProgress:
 
         if self.progress_callback:
             progress_data = {
-                'total': self.total_cards,
-                'processed': self.processed,
-                'created': self.created,
-                'updated': self.updated,
-                'errors': self.errors,
-                'percentage': (self.processed / self.total_cards * 100) if self.total_cards > 0 else 0,
+                "total": self.total_cards,
+                "processed": self.processed,
+                "created": self.created,
+                "updated": self.updated,
+                "errors": self.errors,
+                "percentage": (self.processed / self.total_cards * 100)
+                if self.total_cards > 0
+                else 0,
             }
             self.progress_callback(progress_data)
 
@@ -74,11 +80,11 @@ class ImportProgress:
             Dictionary with final counts
         """
         return {
-            'total': self.total_cards,
-            'processed': self.processed,
-            'created': self.created,
-            'updated': self.updated,
-            'errors': self.errors,
+            "total": self.total_cards,
+            "processed": self.processed,
+            "created": self.created,
+            "updated": self.updated,
+            "errors": self.errors,
         }
 
 
@@ -96,9 +102,13 @@ class ImportTransaction:
         self.deck_name = deck_name
         self.operations: list[dict[str, Any]] = []
         self.created_note_ids: list[int] = []
-        self.updated_note_ids: list[tuple[int, dict[str, Any]]] = []  # (note_id, original_fields)
+        self.updated_note_ids: list[
+            tuple[int, dict[str, Any]]
+        ] = []  # (note_id, original_fields)
 
-    def add_create_operation(self, note_id: int, fields: dict[str, Any], tags: list[str]) -> None:
+    def add_create_operation(
+        self, note_id: int, fields: dict[str, Any], tags: list[str]
+    ) -> None:
         """Record a note creation operation.
 
         Args:
@@ -106,26 +116,32 @@ class ImportTransaction:
             fields: Note fields
             tags: Note tags
         """
-        self.operations.append({
-            'type': 'create',
-            'note_id': note_id,
-            'fields': fields.copy(),
-            'tags': tags.copy(),
-        })
+        self.operations.append(
+            {
+                "type": "create",
+                "note_id": note_id,
+                "fields": fields.copy(),
+                "tags": tags.copy(),
+            }
+        )
         self.created_note_ids.append(note_id)
 
-    def add_update_operation(self, note_id: int, original_fields: dict[str, Any]) -> None:
+    def add_update_operation(
+        self, note_id: int, original_fields: dict[str, Any]
+    ) -> None:
         """Record a note update operation.
 
         Args:
             note_id: ID of updated note
             original_fields: Original field values for rollback
         """
-        self.operations.append({
-            'type': 'update',
-            'note_id': note_id,
-            'original_fields': original_fields.copy(),
-        })
+        self.operations.append(
+            {
+                "type": "update",
+                "note_id": note_id,
+                "original_fields": original_fields.copy(),
+            }
+        )
         self.updated_note_ids.append((note_id, original_fields))
 
     def rollback(self) -> dict[str, int]:
@@ -134,7 +150,9 @@ class ImportTransaction:
         Returns:
             Dictionary with rollback counts: {'deleted': int, 'restored': int, 'errors': int}
         """
-        logger.warning("rolling_back_import_operations", operation_count=len(self.operations))
+        logger.warning(
+            "rolling_back_import_operations", operation_count=len(self.operations)
+        )
 
         deleted = 0
         restored = 0
@@ -143,17 +161,23 @@ class ImportTransaction:
         # Rollback in reverse order
         for operation in reversed(self.operations):
             try:
-                if operation['type'] == 'create':
+                if operation["type"] == "create":
                     # Delete created notes
-                    self.client.delete_notes([operation['note_id']])
+                    self.client.delete_notes([operation["note_id"]])
                     deleted += 1
-                    logger.debug("rolled_back_note_creation", note_id=operation['note_id'])
+                    logger.debug(
+                        "rolled_back_note_creation", note_id=operation["note_id"]
+                    )
 
-                elif operation['type'] == 'update':
+                elif operation["type"] == "update":
                     # Restore original field values
-                    self.client.update_note_fields(operation['note_id'], operation['original_fields'])
+                    self.client.update_note_fields(
+                        operation["note_id"], operation["original_fields"]
+                    )
                     restored += 1
-                    logger.debug("rolled_back_note_update", note_id=operation['note_id'])
+                    logger.debug(
+                        "rolled_back_note_update", note_id=operation["note_id"]
+                    )
 
             except AnkiError as e:
                 errors += 1
@@ -163,7 +187,7 @@ class ImportTransaction:
                     error=str(e),
                 )
 
-        result = {'deleted': deleted, 'restored': restored, 'errors': errors}
+        result = {"deleted": deleted, "restored": restored, "errors": errors}
         logger.info("rollback_complete", **result)
         return result
 
@@ -314,7 +338,7 @@ class SafeCardImporter:
         try:
             # Process cards in batches
             for i in range(0, len(cards_data), batch_size):
-                batch = cards_data[i:i + batch_size]
+                batch = cards_data[i : i + batch_size]
                 self._process_batch(
                     batch=batch,
                     deck_name=deck_name,
@@ -336,9 +360,9 @@ class SafeCardImporter:
             # Re-raise with additional context
             msg = f"Import failed and was rolled back: {e}"
             context = {
-                'deck_name': deck_name,
-                'processed_cards': progress.processed,
-                'rollback_result': rollback_result,
+                "deck_name": deck_name,
+                "processed_cards": progress.processed,
+                "rollback_result": rollback_result,
             }
             raise DeckImportError(msg, context=context) from e
 
@@ -377,9 +401,13 @@ class SafeCardImporter:
                     note_id = note_info.get("noteId")
                     if note_id:
                         existing_notes[str(note_id)] = note_id
-            except AnkiError:
-                # Continue without existing notes info
-                pass
+            except AnkiError as e:
+                # Continue without existing notes info - log for debugging
+                logger.debug(
+                    "existing_notes_lookup_failed",
+                    note_ids_count=len(note_ids),
+                    error=str(e),
+                )
 
         # Process each card in batch
         for card_data in batch:
@@ -392,8 +420,10 @@ class SafeCardImporter:
                     existing_notes=existing_notes,
                     transaction=transaction,
                 )
-                progress.update(created=1 if 'created' in locals() else 0,
-                              updated=1 if 'updated' in locals() else 0)
+                progress.update(
+                    created=1 if "created" in locals() else 0,
+                    updated=1 if "updated" in locals() else 0,
+                )
 
             except Exception as e:
                 progress.update(errors=1)
@@ -452,9 +482,13 @@ class SafeCardImporter:
                 if existing_ids:
                     existing_note_id = existing_ids[0]
                     is_update = True
-            except AnkiError:
-                # Continue as create operation
-                pass
+            except AnkiError as e:
+                # Continue as create operation - log for debugging
+                logger.debug(
+                    "note_search_failed_continuing_as_create",
+                    query=query,
+                    error=str(e),
+                )
 
         if is_update and existing_note_id is not None:
             # Store original fields for rollback
@@ -485,7 +519,9 @@ class SafeCardImporter:
                 transaction.add_create_operation(new_note_id, fields, tags)
 
             except AnkiError as e:
-                msg = f"Failed to create note for slug {card_data.get('slug', 'unknown')}"
+                msg = (
+                    f"Failed to create note for slug {card_data.get('slug', 'unknown')}"
+                )
                 raise AnkiError(msg) from e
 
     def _auto_detect_note_type(self, deck_name: str) -> str:
@@ -504,8 +540,12 @@ class SafeCardImporter:
                 if notes_info:
                     model_name = notes_info[0].get("modelName", "APF::Simple")
                     return str(model_name) if model_name else "APF::Simple"
-        except AnkiError:
-            pass
+        except AnkiError as e:
+            logger.debug(
+                "auto_detect_note_type_failed_using_default",
+                deck_name=deck_name,
+                error=str(e),
+            )
 
         return "APF::Simple"
 
@@ -522,8 +562,12 @@ class SafeCardImporter:
             field_names = self.client.get_model_field_names(note_type)
             if field_names:
                 return field_names[0]
-        except AnkiError:
-            pass
+        except AnkiError as e:
+            logger.debug(
+                "auto_detect_key_field_failed_using_default",
+                note_type=note_type,
+                error=str(e),
+            )
 
         return "slug"
 

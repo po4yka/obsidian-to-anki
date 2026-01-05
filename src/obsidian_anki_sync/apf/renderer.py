@@ -97,8 +97,7 @@ class APFRenderer:
         escaped_code = html.escape(section.key_point_code)
 
         return (
-            f"{header}\n"
-            f'<pre><code class="language-{lang}">{escaped_code}</code></pre>'
+            f'{header}\n<pre><code class="language-{lang}">{escaped_code}</code></pre>'
         )
 
     def _render_key_point_notes(self, notes: list[str]) -> str:

@@ -133,18 +133,12 @@ class SyncEngine:
             console=console,
             transient=False,
         ) as progress:
-            task = progress.add_task(
-                "Initializing agent system...", total=3)
+            task = progress.add_task("Initializing agent system...", total=3)
 
             logger.info("initializing_langgraph_orchestrator")
-            progress.update(
-                task, description="Initializing LangGraph orchestrator..."
-            )
-            self.agent_orchestrator = LangGraphOrchestrator(
-                config)  # type: ignore
-            progress.update(
-                task, advance=1, description="LangGraph orchestrator ready"
-            )
+            progress.update(task, description="Initializing LangGraph orchestrator...")
+            self.agent_orchestrator = LangGraphOrchestrator(config)  # type: ignore
+            progress.update(task, advance=1, description="LangGraph orchestrator ready")
             self.use_agents = True
 
             # Configure LLM-based Q&A extraction when using agents
@@ -153,8 +147,7 @@ class SyncEngine:
             qa_extractor_model = config.get_model_for_agent("qa_extractor")
             model_config = config.get_model_config_for_task("qa_extraction")
             qa_extractor_temp = model_config.get("temperature", 0.0)
-            reasoning_enabled = getattr(
-                config, "llm_reasoning_enabled", False)
+            reasoning_enabled = getattr(config, "llm_reasoning_enabled", False)
 
             logger.info(
                 "configuring_llm_qa_extraction",
@@ -166,17 +159,13 @@ class SyncEngine:
             # Create a real provider instance for the extractor
             # We cannot use self.agent_orchestrator.provider because it's a dummy provider
             # that returns coroutines for generate(), which breaks the synchronous QAExtractorAgent
-            progress.update(
-                task, description="Creating QA extraction provider...")
+            progress.update(task, description="Creating QA extraction provider...")
             qa_provider = ProviderFactory.create_from_config(
                 config, verbose_logging=False
             )
-            progress.update(
-                task, advance=1, description="QA extraction provider ready"
-            )
+            progress.update(task, advance=1, description="QA extraction provider ready")
 
-            progress.update(
-                task, description="Creating QA extractor agent...")
+            progress.update(task, description="Creating QA extractor agent...")
             self.qa_extractor = create_qa_extractor(
                 llm_provider=qa_provider,
                 model=qa_extractor_model,
@@ -189,8 +178,7 @@ class SyncEngine:
                     config, "repair_missing_sections", True
                 ),
             )
-            progress.update(task, advance=1,
-                            description="QA extractor ready")
+            progress.update(task, advance=1, description="QA extractor ready")
 
         self.changes: list[SyncAction] = []
         self.stats = {
@@ -225,10 +213,12 @@ class SyncEngine:
         # Initialize persistent disk caches
         # Cache directory is placed next to the database file
         # Only create cache if db_path is properly configured (not a mock)
-        if (hasattr(config.db_path, '__class__') and
-            config.db_path.__class__.__name__ != 'MagicMock' and
-            hasattr(config.db_path, 'parent') and
-            config.db_path.parent.exists()):
+        if (
+            hasattr(config.db_path, "__class__")
+            and config.db_path.__class__.__name__ != "MagicMock"
+            and hasattr(config.db_path, "parent")
+            and config.db_path.parent.exists()
+        ):
             cache_base_dir = config.db_path.parent / ".cache"
             cache_base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -488,8 +478,7 @@ class SyncEngine:
             return
 
         progress_bar = self.progress_display.create_progress_bar(total)
-        progress_task_id = progress_bar.add_task(
-            f"[cyan]{description}...", total=total)
+        progress_task_id = progress_bar.add_task(f"[cyan]{description}...", total=total)
 
         try:
             with progress_bar:
@@ -602,8 +591,7 @@ class SyncEngine:
             if self.use_agents and getattr(
                 self.config, "enable_duplicate_detection", False
             ):
-                logger.info("sync_phase_started",
-                            phase="fetching_existing_cards")
+                logger.info("sync_phase_started", phase="fetching_existing_cards")
                 fetch_start_time = time.time()
                 existing_cards = self.anki_state_manager.fetch_existing_cards_for_duplicate_detection()
                 fetch_duration = time.time() - fetch_start_time
@@ -869,8 +857,7 @@ class SyncEngine:
             from obsidian_anki_sync.utils.llm_logging import log_session_summary
 
             if self.progress:
-                log_session_summary(
-                    session_id=self.progress.progress.session_id)
+                log_session_summary(session_id=self.progress.progress.session_id)
 
             # Log final cache statistics
             if self._cache_stats["hits"] + self._cache_stats["misses"] > 0:

@@ -184,7 +184,9 @@ class BatchChangeApplier:
                 continue
 
             note_ids = self._async_runner.run(
-                _create_notes_async(note_payloads, self.config.max_concurrent_generations)
+                _create_notes_async(
+                    note_payloads, self.config.max_concurrent_generations
+                )
             )
 
             for action, fields, tags in card_data:
@@ -276,7 +278,9 @@ class BatchChangeApplier:
 
             update_payloads: list[dict[str, Any]] = []
             tag_payloads: list[tuple[int, list[str]]] = []
-            cards_for_validation: list[tuple[SyncAction, dict[str, str], list[str]]] = []
+            cards_for_validation: list[
+                tuple[SyncAction, dict[str, str], list[str]]
+            ] = []
 
             for action in batch_actions:
                 card = action.card
@@ -456,8 +460,8 @@ class BatchChangeApplier:
             field_mismatches = []
             expected_fields = map_apf_to_anki_fields(card.apf_html, card.note_type)
             for field_name, expected_value in expected_fields.items():
-                actual_value = note_info.get("fields", {}).get(field_name, {}).get(
-                    "value", ""
+                actual_value = (
+                    note_info.get("fields", {}).get(field_name, {}).get("value", "")
                 )
                 if " ".join(actual_value.split()) != " ".join(expected_value.split()):
                     field_mismatches.append(field_name)
@@ -492,4 +496,3 @@ class BatchChangeApplier:
 
 
 __all__ = ["BatchChangeApplier"]
-

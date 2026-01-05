@@ -470,4 +470,3 @@ PROACTIVE_CORRECTION_SYSTEM_PROMPT = """<role>
 You are a proactive correction agent. Fix quality issues in this note before parsing.
 Apply corrections conservatively - only fix real issues, preserve all valid content.
 </role>"""
-

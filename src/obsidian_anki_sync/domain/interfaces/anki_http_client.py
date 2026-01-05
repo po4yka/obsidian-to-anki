@@ -28,7 +28,9 @@ class IAnkiHttpClient(ABC):
         """
 
     @abstractmethod
-    async def invoke_async(self, action: str, params: dict[str, Any] | None = None) -> Any:
+    async def invoke_async(
+        self, action: str, params: dict[str, Any] | None = None
+    ) -> Any:
         """Invoke an AnkiConnect action asynchronously.
 
         Args:

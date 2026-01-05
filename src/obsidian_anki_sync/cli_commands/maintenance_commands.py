@@ -58,5 +58,3 @@ def register(app: typer.Typer) -> None:
             logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
             console.print(f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
             raise typer.Exit(code=1)
-
-

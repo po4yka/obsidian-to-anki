@@ -102,4 +102,3 @@ def validate_repaired_content(content: str, file_path: Path | None = None) -> li
     errors.extend(validate_bilingual_consistency(content))
     errors.extend(validate_frontmatter_structure(content))
     return errors
-

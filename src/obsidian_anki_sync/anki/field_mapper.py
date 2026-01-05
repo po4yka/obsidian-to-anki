@@ -407,6 +407,7 @@ def _convert_fields_to_html(fields: dict[str, str]) -> dict[str, str]:
             converted[field_name] = value
     return converted
 
+
 # =============================================================================
 # APF 3.0.0 mapping functions - use special character field names for Anki
 # =============================================================================

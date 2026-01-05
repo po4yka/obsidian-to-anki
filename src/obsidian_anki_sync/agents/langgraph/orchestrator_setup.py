@@ -58,7 +58,9 @@ def init_memory_stores(config):
 
     if getattr(config, "enable_agent_memory", True) and AgentMemoryStore:
         try:
-            memory_storage_path = getattr(config, "memory_storage_path", Path(".agent_memory"))
+            memory_storage_path = getattr(
+                config, "memory_storage_path", Path(".agent_memory")
+            )
             enable_semantic_search = getattr(config, "enable_semantic_search", True)
             memory_store = AgentMemoryStore(
                 storage_path=memory_storage_path,
@@ -175,4 +177,3 @@ __all__ = [
     "init_rag",
     "resolve_agent_framework",
 ]
-

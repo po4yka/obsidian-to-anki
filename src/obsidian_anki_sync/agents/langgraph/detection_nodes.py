@@ -21,12 +21,7 @@ from obsidian_anki_sync.providers.pydantic_ai_models import (
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .node_helpers import increment_step_count
-from .state import (
-    PipelineState,
-    get_config,
-    get_model,
-    get_rag_integration,
-)
+from .state import PipelineState, get_config, get_model, get_rag_integration
 
 logger = get_logger(__name__)
 

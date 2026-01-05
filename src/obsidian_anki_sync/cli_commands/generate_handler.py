@@ -51,16 +51,14 @@ def run_generate_cards(
         typer.Exit: On generate-cards failure
     """
     if not prompt.exists():
-        console.print(
-            f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
+        console.print(f"\n[bold red]Error:[/bold red] Prompt file not found: {prompt}")
         raise typer.Exit(code=1)
 
     # Parse prompt template
     try:
         template = parse_template_file(prompt)
     except Exception as e:
-        console.print(
-            f"\n[bold red]Error:[/bold red] Failed to parse template: {e}")
+        console.print(f"\n[bold red]Error:[/bold red] Failed to parse template: {e}")
         raise typer.Exit(code=1)
 
     # Determine model
@@ -116,8 +114,7 @@ def run_generate_cards(
                 "[yellow]Clipboard not available, displaying prompt:[/yellow]"
             )
             console.print(f"\n[dim]{prompt_text}[/dim]\n")
-            response_text = typer.prompt(
-                "[cyan]Paste LLM response[/cyan]", default="")
+            response_text = typer.prompt("[cyan]Paste LLM response[/cyan]", default="")
     else:
         # Normal mode: call LLM
         from obsidian_anki_sync.providers.factory import ProviderFactory
@@ -152,8 +149,7 @@ def run_generate_cards(
 
         except Exception as e:
             logger.error("card_generation_failed", error=str(e))
-            console.print(
-                f"\n[bold red]Error generating cards:[/bold red] {e}")
+            console.print(f"\n[bold red]Error generating cards:[/bold red] {e}")
             raise typer.Exit(code=1)
 
     # Parse JSON response
@@ -164,10 +160,8 @@ def run_generate_cards(
         if not isinstance(cards_data, list):
             cards_data = [cards_data]
     except json.JSONDecodeError as e:
-        console.print(
-            f"\n[bold red]Error:[/bold red] Invalid JSON response: {e}")
-        console.print(
-            f"[yellow]Response was:[/yellow]\n{response_text[:200]}...")
+        console.print(f"\n[bold red]Error:[/bold red] Invalid JSON response: {e}")
+        console.print(f"[yellow]Response was:[/yellow]\n{response_text[:200]}...")
         raise typer.Exit(code=1)
 
     # Convert to CardCandidate objects
@@ -297,16 +291,14 @@ def run_generate_cards(
             cards_for_export.append(card_data)
 
         with output.open("w", encoding="utf-8") as f:
-            yaml.dump(cards_for_export, f,
-                      default_flow_style=False, allow_unicode=True)
+            yaml.dump(cards_for_export, f, default_flow_style=False, allow_unicode=True)
 
         console.print(
             f"\n[bold green]Exported {len(cards_for_export)} cards to {output}[/bold green]"
         )
     else:
         # Dry run: just display
-        console.print(
-            f"\n[cyan]Generated {len(candidates)} card candidates:[/cyan]\n")
+        console.print(f"\n[cyan]Generated {len(candidates)} card candidates:[/cyan]\n")
         for candidate in candidates:
             console.print(f"[bold]Card {candidate.index + 1}:[/bold]")
             for key, value in candidate.fields.items():

@@ -82,8 +82,7 @@ def test_factory_create_from_config_ollama(temp_dir):
         db_path=temp_dir / "test.db",
     )
 
-    provider = ProviderFactory.create_from_config(
-        config, verify_connectivity=False)
+    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)
     assert provider.base_url == "http://localhost:11434"
@@ -117,8 +116,7 @@ def test_base_provider_safe_config_redacts_api_key():
         def list_models(self):
             return []
 
-    provider = TestProvider(api_key="secret-key-123",
-                            base_url="http://test.com")
+    provider = TestProvider(api_key="secret-key-123", base_url="http://test.com")
 
     safe_config = provider._safe_config_for_logging()
 
@@ -352,7 +350,8 @@ def test_ollama_generate_with_temperature(ollama_provider):
     )
 
     result = ollama_provider.generate(
-        model="qwen2.5:7b", prompt="Test", temperature=0.9)
+        model="qwen2.5:7b", prompt="Test", temperature=0.9
+    )
 
     assert result["response"] == "Creative response"
     assert route.call_count == 1
@@ -429,8 +428,7 @@ def test_ollama_list_models_failure(ollama_provider):
 def test_ollama_generate_http_500_error(ollama_provider):
     """Ollama provider raises HTTPStatusError on server error."""
     respx.post("http://localhost:11434/api/generate").mock(
-        return_value=httpx.Response(
-            500, json={"error": "Internal server error"})
+        return_value=httpx.Response(500, json={"error": "Internal server error"})
     )
 
     with pytest.raises(httpx.HTTPStatusError):
@@ -508,8 +506,7 @@ def test_ollama_pull_model_failure(ollama_provider):
 def test_ollama_generate_streaming_not_implemented(ollama_provider):
     """Ollama provider raises NotImplementedError for streaming."""
     with pytest.raises(NotImplementedError, match="Streaming is not yet supported"):
-        ollama_provider.generate(
-            model="qwen2.5:7b", prompt="Test", stream=True)
+        ollama_provider.generate(model="qwen2.5:7b", prompt="Test", stream=True)
 
 
 # Test Ollama Context Manager
@@ -596,7 +593,6 @@ def test_factory_create_from_config_uses_default_provider_ollama(temp_dir):
     # Verify default is ollama
     assert config.llm_provider == "ollama"
 
-    provider = ProviderFactory.create_from_config(
-        config, verify_connectivity=False)
+    provider = ProviderFactory.create_from_config(config, verify_connectivity=False)
 
     assert isinstance(provider, OllamaProvider)

@@ -455,7 +455,9 @@ class ParserRepairAgent:
                 correction_prompt = build_proactive_correction_prompt(
                     content=content,
                     issues_found=issues_found,
-                    suggested_corrections=analysis_result.get("suggested_corrections", []),
+                    suggested_corrections=analysis_result.get(
+                        "suggested_corrections", []
+                    ),
                 )
 
                 # Call LLM for correction
@@ -659,6 +661,7 @@ class ParserRepairAgent:
                 confidence=0.0,
                 correction_time=time.time() - start_time,
             )
+
 
 def attempt_repair(
     file_path: Path,

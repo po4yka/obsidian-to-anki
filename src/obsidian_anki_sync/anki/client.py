@@ -132,7 +132,6 @@ class AnkiClient(IAnkiClient):
         """Find notes matching query (async)."""
         return await self._note_service.find_notes_async(query)
 
-
     def notes_info(self, note_ids: list[int]) -> list[dict]:
         """Get information about notes."""
         return self._note_service.notes_info(note_ids)
@@ -195,7 +194,9 @@ class AnkiClient(IAnkiClient):
         """Update note fields."""
         self._note_service.update_note_fields(note_id, fields)
 
-    async def update_note_fields_async(self, note_id: int, fields: dict[str, str]) -> None:
+    async def update_note_fields_async(
+        self, note_id: int, fields: dict[str, str]
+    ) -> None:
         """Update note fields (async)."""
         await self._note_service.update_note_fields_async(note_id, fields)
 
@@ -203,7 +204,9 @@ class AnkiClient(IAnkiClient):
         """Update multiple notes' fields in a single batch operation."""
         return self._note_service.update_notes_fields(updates)
 
-    async def update_notes_fields_async(self, updates: list[dict[str, Any]]) -> list[bool]:
+    async def update_notes_fields_async(
+        self, updates: list[dict[str, Any]]
+    ) -> list[bool]:
         """Update multiple notes' fields in a single batch operation (async)."""
         return await self._note_service.update_notes_fields_async(updates)
 
@@ -223,7 +226,9 @@ class AnkiClient(IAnkiClient):
         """Remove tags from notes."""
         self._tag_service.remove_tags(note_ids, tags)
 
-    def update_notes_tags(self, note_tag_pairs: list[tuple[int, list[str]]]) -> list[bool]:
+    def update_notes_tags(
+        self, note_tag_pairs: list[tuple[int, list[str]]]
+    ) -> list[bool]:
         """Update tags for multiple notes in a batch operation."""
         return self._tag_service.update_notes_tags(note_tag_pairs)
 
@@ -249,7 +254,9 @@ class AnkiClient(IAnkiClient):
         """Get all note type (model) names."""
         return self._model_service.get_model_names(use_cache)
 
-    def get_model_field_names(self, model_name: str, use_cache: bool = True) -> list[str]:
+    def get_model_field_names(
+        self, model_name: str, use_cache: bool = True
+    ) -> list[str]:
         """Get field names for a note type."""
         return self._model_service.get_model_field_names(model_name, use_cache)
 
@@ -271,7 +278,9 @@ class AnkiClient(IAnkiClient):
 
     def gui_browse(self, query: str) -> list[int]:
         """Open Anki browser with a search query."""
-        return cast("list[int]", self._http_client.invoke("guiBrowse", {"query": query}))
+        return cast(
+            "list[int]", self._http_client.invoke("guiBrowse", {"query": query})
+        )
 
     def get_collection_stats(self) -> str:
         """Get collection statistics as HTML."""
@@ -304,7 +313,9 @@ class AnkiClient(IAnkiClient):
         self, model_name: str, use_cache: bool = True
     ) -> list[str]:
         """Get field names for a note type (async)."""
-        return await self._model_service.get_model_field_names_async(model_name, use_cache)
+        return await self._model_service.get_model_field_names_async(
+            model_name, use_cache
+        )
 
     async def can_add_notes_async(self, notes: list[dict[str, Any]]) -> list[bool]:
         """Check if notes can be added (async)."""

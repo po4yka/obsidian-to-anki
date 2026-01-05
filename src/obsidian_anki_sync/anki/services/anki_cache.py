@@ -82,7 +82,8 @@ class AnkiCache:
         """
         total_entries = len(self._cache)
         expired_entries = sum(
-            1 for key in self._cache
+            1
+            for key in self._cache
             if time.time() - self._cache_times.get(key, 0) > self._ttl
         )
 

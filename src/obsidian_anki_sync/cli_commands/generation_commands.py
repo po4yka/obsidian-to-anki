@@ -113,5 +113,3 @@ def register(app: typer.Typer) -> None:
             log_file=log,
             very_verbose=very_verbose,
         )
-
-

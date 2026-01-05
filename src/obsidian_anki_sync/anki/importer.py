@@ -283,6 +283,7 @@ def _import_cards(
 
 # Safe import functions using new implementation
 
+
 def import_cards_from_yaml_safe(
     client: AnkiClient,
     input_path: str | Path,

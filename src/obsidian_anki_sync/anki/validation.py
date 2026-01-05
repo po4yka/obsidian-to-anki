@@ -35,8 +35,8 @@ class ValidationLimits:
     MAX_CARDS_PER_OPERATION = 1000
 
     # Path validation
-    FORBIDDEN_PATH_CHARS = ['..', '<', '>', ':', '"', '|', '?', '*']
-    ALLOWED_EXTENSIONS = {'.yaml', '.yml', '.csv', '.apkg', '.json'}
+    FORBIDDEN_PATH_CHARS = ["..", "<", ">", ":", '"', "|", "?", "*"]
+    ALLOWED_EXTENSIONS = {".yaml", ".yml", ".csv", ".apkg", ".json"}
 
 
 class PathValidator:
@@ -59,11 +59,15 @@ class PathValidator:
             path = Path(file_path).resolve()
         except (OSError, ValueError) as e:
             msg = f"Invalid file path: {file_path}"
-            raise ValidationError(msg, suggestion="Check path format and permissions") from e
+            raise ValidationError(
+                msg, suggestion="Check path format and permissions"
+            ) from e
 
         # Check for path traversal attempts
         path_str = str(path)
-        if any(forbidden in path_str for forbidden in ValidationLimits.FORBIDDEN_PATH_CHARS):
+        if any(
+            forbidden in path_str for forbidden in ValidationLimits.FORBIDDEN_PATH_CHARS
+        ):
             msg = f"Path contains forbidden characters: {file_path}"
             raise ValidationError(msg, suggestion="Remove special characters from path")
 
@@ -75,7 +79,9 @@ class PathValidator:
         # Validate extension
         if path.suffix.lower() not in ValidationLimits.ALLOWED_EXTENSIONS:
             msg = f"Unsupported file extension: {path.suffix}"
-            raise ValidationError(msg, suggestion=f"Use one of: {ValidationLimits.ALLOWED_EXTENSIONS}")
+            raise ValidationError(
+                msg, suggestion=f"Use one of: {ValidationLimits.ALLOWED_EXTENSIONS}"
+            )
 
         return path
 
@@ -102,7 +108,9 @@ class PathValidator:
             raise ValidationError(msg, suggestion="Check file permissions")
 
     @staticmethod
-    def validate_file_size(file_path: Path, max_size: int = ValidationLimits.MAX_FILE_SIZE) -> int:
+    def validate_file_size(
+        file_path: Path, max_size: int = ValidationLimits.MAX_FILE_SIZE
+    ) -> int:
         """Validate file size.
 
         Args:
@@ -150,7 +158,9 @@ class DataValidator:
         """
         if not isinstance(data, list):
             msg = "YAML data must be a list of cards"
-            raise DeckImportError(msg, suggestion="Ensure YAML contains a list at root level")
+            raise DeckImportError(
+                msg, suggestion="Ensure YAML contains a list at root level"
+            )
 
         if not data:
             msg = "YAML data is empty"
@@ -204,10 +214,12 @@ class DataValidator:
         """
         if not isinstance(card, dict):
             msg = f"Card {index} must be a dictionary"
-            raise DeckImportError(msg, suggestion="Ensure each card is properly formatted")
+            raise DeckImportError(
+                msg, suggestion="Ensure each card is properly formatted"
+            )
 
         # Required fields validation
-        required_fields = ['slug']
+        required_fields = ["slug"]
         for field in required_fields:
             if field not in card:
                 msg = f"Card {index} missing required field: {field}"
@@ -215,18 +227,23 @@ class DataValidator:
 
         # Field length validation
         for key, value in card.items():
-            if isinstance(value, str) and len(value) > ValidationLimits.MAX_FIELD_LENGTH:
+            if (
+                isinstance(value, str)
+                and len(value) > ValidationLimits.MAX_FIELD_LENGTH
+            ):
                 msg = f"Card {index} field '{key}' too long: {len(value)} chars"
                 raise DeckImportError(msg, suggestion="Shorten field content")
 
         # Tags validation
-        if 'tags' in card:
-            tags = card['tags']
+        if "tags" in card:
+            tags = card["tags"]
             if isinstance(tags, str):
                 tags = tags.split()
             elif not isinstance(tags, list):
                 msg = f"Card {index} tags must be string or list"
-                raise DeckImportError(msg, suggestion="Format tags as space-separated string or list")
+                raise DeckImportError(
+                    msg, suggestion="Format tags as space-separated string or list"
+                )
 
             if len(tags) > ValidationLimits.MAX_TAGS_PER_CARD:
                 msg = f"Card {index} has too many tags: {len(tags)}"
@@ -236,18 +253,22 @@ class DataValidator:
             for tag in tags:
                 if not isinstance(tag, str) or not tag.strip():
                     msg = f"Card {index} has invalid tag: {tag}"
-                    raise DeckImportError(msg, suggestion="Tags must be non-empty strings")
+                    raise DeckImportError(
+                        msg, suggestion="Tags must be non-empty strings"
+                    )
 
         # Slug validation
-        slug = card.get('slug', '')
+        slug = card.get("slug", "")
         if not isinstance(slug, str) or not slug.strip():
             msg = f"Card {index} has invalid slug: {slug}"
             raise DeckImportError(msg, suggestion="Slug must be non-empty string")
 
         # Basic slug format validation
-        if not re.match(r'^[a-zA-Z0-9_-]+$', slug):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", slug):
             msg = f"Card {index} slug contains invalid characters: {slug}"
-            raise DeckImportError(msg, suggestion="Use only letters, numbers, hyphens, and underscores")
+            raise DeckImportError(
+                msg, suggestion="Use only letters, numbers, hyphens, and underscores"
+            )
 
     @staticmethod
     def validate_cards_data(cards: list[Any]) -> list[Any]:
@@ -286,31 +307,35 @@ class DataValidator:
         Raises:
             DeckExportError: If card data is invalid
         """
-        required_attrs = ['slug', 'note_type', 'apf_html', 'tags', 'manifest']
+        required_attrs = ["slug", "note_type", "apf_html", "tags", "manifest"]
         for attr in required_attrs:
             if not hasattr(card, attr):
                 msg = f"Card {index} missing required attribute: {attr}"
-                raise DeckExportError(msg, suggestion="Ensure card has all required attributes")
+                raise DeckExportError(
+                    msg, suggestion="Ensure card has all required attributes"
+                )
 
         # Validate slug
-        slug = getattr(card, 'slug', '')
+        slug = getattr(card, "slug", "")
         if not isinstance(slug, str) or not slug.strip():
             msg = f"Card {index} has invalid slug: {slug}"
             raise DeckExportError(msg, suggestion="Slug must be non-empty string")
 
         # Validate note type
-        note_type = getattr(card, 'note_type', '')
+        note_type = getattr(card, "note_type", "")
         if not isinstance(note_type, str) or not note_type.strip():
             msg = f"Card {index} has invalid note_type: {note_type}"
             raise DeckExportError(msg, suggestion="Note type must be non-empty string")
 
         # Validate APF HTML
-        apf_html = getattr(card, 'apf_html', '')
+        apf_html = getattr(card, "apf_html", "")
         if not isinstance(apf_html, str):
             msg = f"Card {index} has invalid apf_html: {type(apf_html)}"
             raise DeckExportError(msg, suggestion="APF HTML must be string")
 
-        if len(apf_html) > ValidationLimits.MAX_FIELD_LENGTH * 10:  # Allow larger for HTML
+        if (
+            len(apf_html) > ValidationLimits.MAX_FIELD_LENGTH * 10
+        ):  # Allow larger for HTML
             msg = f"Card {index} APF HTML too long: {len(apf_html)} chars"
             raise DeckExportError(msg, suggestion="Reduce card content size")
 
@@ -340,10 +365,12 @@ class ContentValidator:
             raise ValidationError(msg, suggestion="Shorten deck name")
 
         # Basic validation for problematic characters
-        forbidden_chars = [':', '"', '|', '<', '>', '*', '?']
+        forbidden_chars = [":", '"', "|", "<", ">", "*", "?"]
         if any(char in deck_name for char in forbidden_chars):
             msg = f"Deck name contains forbidden characters: {deck_name}"
-            raise ValidationError(msg, suggestion="Remove special characters from deck name")
+            raise ValidationError(
+                msg, suggestion="Remove special characters from deck name"
+            )
 
         return deck_name.strip()
 
@@ -415,21 +442,27 @@ class SafeFileOperations:
         """
         # Validate file
         PathValidator.validate_file_exists(file_path)
-        file_size = PathValidator.validate_file_size(file_path, ValidationLimits.MAX_YAML_SIZE)
+        file_size = PathValidator.validate_file_size(
+            file_path, ValidationLimits.MAX_YAML_SIZE
+        )
 
         try:
-            with file_path.open('r', encoding='utf-8') as f:
+            with file_path.open("r", encoding="utf-8") as f:
                 # Read with size limit
                 content = f.read(ValidationLimits.MAX_YAML_SIZE)
                 if len(content) >= ValidationLimits.MAX_YAML_SIZE:
                     msg = f"YAML file too large: {file_size} bytes"
-                    raise DeckImportError(msg, suggestion="Reduce file size or split content")
+                    raise DeckImportError(
+                        msg, suggestion="Reduce file size or split content"
+                    )
 
                 data = yaml.safe_load(content)
 
         except (OSError, UnicodeDecodeError) as e:
             msg = f"Cannot read YAML file: {file_path}"
-            raise DeckImportError(msg, suggestion="Check file encoding and permissions") from e
+            raise DeckImportError(
+                msg, suggestion="Check file encoding and permissions"
+            ) from e
         except yaml.YAMLError as e:
             msg = f"Invalid YAML format: {file_path}"
             raise DeckImportError(msg, suggestion="Fix YAML syntax errors") from e
@@ -458,21 +491,25 @@ class SafeFileOperations:
 
         try:
             rows = []
-            with file_path.open('r', encoding='utf-8', newline='') as f:
+            with file_path.open("r", encoding="utf-8", newline="") as f:
                 reader = csv.DictReader(f)
 
                 for i, row in enumerate(reader):
                     if i >= ValidationLimits.MAX_CSV_ROWS:
                         msg = f"CSV file has too many rows: {i + 1}"
-                        raise DeckImportError(msg, suggestion="Limit to 10,000 rows or split file")
+                        raise DeckImportError(
+                            msg, suggestion="Limit to 10,000 rows or split file"
+                        )
 
                     # Convert all values to strings and strip whitespace
-                    cleaned_row = {k: v.strip() if v else '' for k, v in row.items()}
+                    cleaned_row = {k: v.strip() if v else "" for k, v in row.items()}
                     rows.append(cleaned_row)
 
         except (OSError, UnicodeDecodeError) as e:
             msg = f"Cannot read CSV file: {file_path}"
-            raise DeckImportError(msg, suggestion="Check file encoding and permissions") from e
+            raise DeckImportError(
+                msg, suggestion="Check file encoding and permissions"
+            ) from e
         except csv.Error as e:
             msg = f"Invalid CSV format: {file_path}"
             raise DeckImportError(msg, suggestion="Fix CSV format errors") from e
@@ -495,14 +532,17 @@ class SafeFileOperations:
         try:
             if atomic:
                 from obsidian_anki_sync.utils.io import atomic_write
+
                 with atomic_write(file_path) as f:
                     f.write(content)
             else:
-                with file_path.open('w', encoding='utf-8') as f:
+                with file_path.open("w", encoding="utf-8") as f:
                     f.write(content)
 
         except OSError as e:
             msg = f"Cannot write to file: {file_path}"
-            raise DeckExportError(msg, suggestion="Check file permissions and disk space") from e
+            raise DeckExportError(
+                msg, suggestion="Check file permissions and disk space"
+            ) from e
 
         logger.debug("file_written", path=str(file_path), size=len(content))

@@ -708,6 +708,7 @@ def _reconstruct_apf_from_fields(fields: dict[str, str], note_type: str) -> str:
 
 # Safe export functions using new implementation
 
+
 def export_cards_to_yaml_safe(
     cards: list[Card],
     output_path: str | Path,

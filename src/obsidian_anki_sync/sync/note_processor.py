@@ -309,8 +309,12 @@ class SingleNoteProcessor(INoteProcessor):
             try:
                 # Ensure we have FD headroom before starting a new note processing task
                 wait_for_fd_headroom(
-                    required_headroom=getattr(self.config, "archiver_min_fd_headroom", 32),
-                    poll_interval=getattr(self.config, "archiver_fd_poll_interval", 0.05)
+                    required_headroom=getattr(
+                        self.config, "archiver_min_fd_headroom", 32
+                    ),
+                    poll_interval=getattr(
+                        self.config, "archiver_fd_poll_interval", 0.05
+                    ),
                 )
 
                 return self.process_note(
@@ -327,6 +331,7 @@ class SingleNoteProcessor(INoteProcessor):
                         error=str(e),
                     )
                     import time
+
                     time.sleep(retry_delay * (attempt + 1))
                 else:
                     logger.error(
@@ -347,4 +352,3 @@ class SingleNoteProcessor(INoteProcessor):
                 "cards_count": 0,
             },
         )
-

@@ -162,9 +162,7 @@ def register(app: typer.Typer) -> None:
                 console.print("\n[yellow]No new cards to process.[/yellow]")
                 return
 
-            console.print(
-                f"\n[cyan]Processing {len(cards_to_process)} cards...[/cyan]"
-            )
+            console.print(f"\n[cyan]Processing {len(cards_to_process)} cards...[/cyan]")
 
             if dry_run:
                 console.print(
@@ -269,5 +267,3 @@ def register(app: typer.Typer) -> None:
 
         config, logger = get_config_and_logger(config_path, log_level)
         run_query_anki(config=config, logger=logger, action=action, params=params)
-
-

@@ -83,8 +83,9 @@ class TestCheckConnection:
     @respx.mock
     def test_timeout(self, http_client: httpx.Client) -> None:
         """check_connection handles timeout gracefully."""
-        respx.get(
-            f"{BASE_URL}/models").mock(side_effect=httpx.TimeoutException("timeout"))
+        respx.get(f"{BASE_URL}/models").mock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
 
         result = check_connection(http_client, BASE_URL, timeout=1.0)
 
@@ -310,7 +311,10 @@ class TestChatCompletion:
             "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
-                    "message": {"role": "assistant", "content": "I am a helpful assistant."},
+                    "message": {
+                        "role": "assistant",
+                        "content": "I am a helpful assistant.",
+                    },
                     "finish_reason": "stop",
                 }
             ],
@@ -342,8 +346,9 @@ class TestChatCompletion:
         respx.post(f"{BASE_URL}/chat/completions").mock(
             return_value=httpx.Response(
                 429,
-                json={"error": {"message": "Rate limit exceeded",
-                                "code": "rate_limit"}},
+                json={
+                    "error": {"message": "Rate limit exceeded", "code": "rate_limit"}
+                },
             )
         )
 
@@ -395,11 +400,18 @@ class TestChatCompletion:
             "model": "qwen/qwen-2.5-32b-instruct",
             "choices": [
                 {
-                    "message": {"role": "assistant", "content": "Truncated response..."},
+                    "message": {
+                        "role": "assistant",
+                        "content": "Truncated response...",
+                    },
                     "finish_reason": "length",
                 }
             ],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 100, "total_tokens": 110},
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 100,
+                "total_tokens": 110,
+            },
         }
         respx.post(f"{BASE_URL}/chat/completions").mock(
             return_value=httpx.Response(200, json=mock_response)
@@ -514,7 +526,8 @@ class TestChatCompletionWithTools:
             headers=auth_headers,
             model="qwen/qwen-2.5-32b-instruct",
             messages=[
-                {"role": "user", "content": "What's the weather in San Francisco?"}],
+                {"role": "user", "content": "What's the weather in San Francisco?"}
+            ],
             tools=tools,
         )
 
@@ -667,7 +680,11 @@ class TestChatCompletionWithTools:
                     "finish_reason": "tool_calls",
                 }
             ],
-            "usage": {"prompt_tokens": 60, "completion_tokens": 40, "total_tokens": 100},
+            "usage": {
+                "prompt_tokens": 60,
+                "completion_tokens": 40,
+                "total_tokens": 100,
+            },
         }
         respx.post(f"{BASE_URL}/chat/completions").mock(
             return_value=httpx.Response(200, json=mock_response)
@@ -755,7 +772,8 @@ class TestChatCompletionStructured:
             headers=auth_headers,
             model="qwen/qwen-2.5-32b-instruct",
             messages=[
-                {"role": "user", "content": "Give me user info for John, 30, active"}],
+                {"role": "user", "content": "Give me user info for John, 30, active"}
+            ],
             json_schema=json_schema,
         )
 

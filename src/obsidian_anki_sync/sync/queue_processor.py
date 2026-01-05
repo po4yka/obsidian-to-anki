@@ -248,9 +248,7 @@ class QueueNoteProcessor(IQueueProcessor):
         )
 
         # Pre-set TTL on the result queue to avoid orphaned keys if workers never push
-        result_ttl = int(
-            getattr(self.config, "result_queue_ttl_seconds", 3600) or 3600
-        )
+        result_ttl = int(getattr(self.config, "result_queue_ttl_seconds", 3600) or 3600)
         try:
             await pool.expire(result_queue_name, result_ttl)
         except Exception as e:
@@ -530,4 +528,3 @@ class QueueNoteProcessor(IQueueProcessor):
             logger.info("redis_pool_closed", **redis_context)
 
         return obsidian_cards
-

@@ -8,10 +8,7 @@ This module implements nodes responsible for generating Anki cards from notes:
 import asyncio
 import time
 
-from obsidian_anki_sync.agents.models import (
-    CardSplittingResult,
-    GenerationResult,
-)
+from obsidian_anki_sync.agents.models import CardSplittingResult, GenerationResult
 from obsidian_anki_sync.agents.pydantic import CardSplittingAgentAI
 from obsidian_anki_sync.error_codes import ErrorCode
 from obsidian_anki_sync.models import NoteMetadata, QAPair

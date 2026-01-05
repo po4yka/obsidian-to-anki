@@ -61,8 +61,7 @@ def run_export(
     # Run pre-flight checks (skip Anki since we're exporting to file)
     console.print("\n[bold cyan]Running pre-flight checks...[/bold cyan]\n")
 
-    _passed, results = run_preflight_checks(
-        config, check_anki=False, check_llm=True)
+    _passed, results = run_preflight_checks(config, check_anki=False, check_llm=True)
 
     # Display results
     for result in results:
@@ -108,15 +107,12 @@ def run_export(
                     note_paths, min(sample_size, len(note_paths))
                 )
 
-            console.print(
-                f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
+            console.print(f"[cyan]Processing {len(note_paths)} notes...[/cyan]")
 
             # Generate cards using the agent system
             cards: list[Card] = []
 
-            console.print(
-                "[cyan]Using LangGraph agent system for generation...[/cyan]"
-            )
+            console.print("[cyan]Using LangGraph agent system for generation...[/cyan]")
             orchestrator = LangGraphOrchestrator(config)
 
             for note_path_tuple in note_paths:
@@ -152,15 +148,12 @@ def run_export(
                             error_msg = (
                                 result.post_validation.error_details or error_msg
                             )
-                        console.print(
-                            f"  [red][/red] {metadata.title}: {error_msg}"
-                        )
+                        console.print(f"  [red][/red] {metadata.title}: {error_msg}")
                 except Exception as e:
                     console.print(f"  [red][/red] {note_path.name}: {e}")
 
             if not cards:
-                console.print(
-                    "\n[yellow]No cards generated. Exiting.[/yellow]")
+                console.print("\n[yellow]No cards generated. Exiting.[/yellow]")
                 return
 
             # Export to .apkg
@@ -180,8 +173,7 @@ def run_export(
                 f"to {output_path}[/bold green]"
             )
 
-            console.print(
-                "\n[cyan]Import this file into Anki to add the cards.[/cyan]")
+            console.print("\n[cyan]Import this file into Anki to add the cards.[/cyan]")
 
             logger.info(
                 "export_completed",

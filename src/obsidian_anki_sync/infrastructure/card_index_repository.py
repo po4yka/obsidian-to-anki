@@ -99,7 +99,7 @@ class CardIndexRepository:
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM card_index WHERE source_path = ? ORDER BY card_index, lang",
             (source_path,),
-            "get_card_index_by_source"
+            "get_card_index_by_source",
         )
         return [dict(row) for row in cursor.fetchall()]
 
@@ -113,9 +113,7 @@ class CardIndexRepository:
             Card index record or None
         """
         cursor = self._connection_manager.execute_query(
-            "SELECT * FROM card_index WHERE slug = ?",
-            (slug,),
-            "get_card_index_by_slug"
+            "SELECT * FROM card_index WHERE slug = ?", (slug,), "get_card_index_by_slug"
         )
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -127,44 +125,42 @@ class CardIndexRepository:
             Dictionary with index statistics
         """
         cursor = self._connection_manager.execute_query(
-            "SELECT COUNT(*) FROM note_index",
-            operation="get_index_statistics_notes"
+            "SELECT COUNT(*) FROM note_index", operation="get_index_statistics_notes"
         )
         total_notes = cursor.fetchone()[0]
 
         cursor = self._connection_manager.execute_query(
             "SELECT sync_status, COUNT(*) FROM note_index GROUP BY sync_status",
-            operation="get_index_statistics_note_status"
+            operation="get_index_statistics_note_status",
         )
         note_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
         cursor = self._connection_manager.execute_query(
-            "SELECT COUNT(*) FROM card_index",
-            operation="get_index_statistics_cards"
+            "SELECT COUNT(*) FROM card_index", operation="get_index_statistics_cards"
         )
         total_cards = cursor.fetchone()[0]
 
         cursor = self._connection_manager.execute_query(
             "SELECT COUNT(*) FROM card_index WHERE in_obsidian = 1",
-            operation="get_index_statistics_obsidian"
+            operation="get_index_statistics_obsidian",
         )
         cards_in_obsidian = cursor.fetchone()[0]
 
         cursor = self._connection_manager.execute_query(
             "SELECT COUNT(*) FROM card_index WHERE in_anki = 1",
-            operation="get_index_statistics_anki"
+            operation="get_index_statistics_anki",
         )
         cards_in_anki = cursor.fetchone()[0]
 
         cursor = self._connection_manager.execute_query(
             "SELECT COUNT(*) FROM card_index WHERE in_database = 1",
-            operation="get_index_statistics_database"
+            operation="get_index_statistics_database",
         )
         cards_in_database = cursor.fetchone()[0]
 
         cursor = self._connection_manager.execute_query(
             "SELECT status, COUNT(*) FROM card_index GROUP BY status",
-            operation="get_index_statistics_card_status"
+            operation="get_index_statistics_card_status",
         )
         card_status_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
@@ -183,4 +179,3 @@ class CardIndexRepository:
         with self._connection_manager.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM card_index")
-

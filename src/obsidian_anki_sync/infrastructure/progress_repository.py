@@ -103,7 +103,7 @@ class ProgressRepository:
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM sync_progress WHERE session_id = ?",
             (session_id,),
-            "get_progress"
+            "get_progress",
         )
         row = cursor.fetchone()
 
@@ -173,7 +173,7 @@ class ProgressRepository:
             LIMIT ?
         """,
             (limit,),
-            "get_all_progress"
+            "get_all_progress",
         )
 
         results = []
@@ -207,7 +207,7 @@ class ProgressRepository:
             WHERE phase IN ('initializing', 'indexing', 'scanning', 'generating', 'determining_actions', 'applying_changes', 'interrupted')
             ORDER BY updated_at DESC
         """,
-            operation="get_incomplete_progress"
+            operation="get_incomplete_progress",
         )
 
         results = []

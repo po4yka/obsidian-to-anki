@@ -44,7 +44,9 @@ from obsidian_anki_sync.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class LLMCardGenerator(ISingleCardGenerator, ITranslatedCardGenerator, ICardDataExtractor):
+class LLMCardGenerator(
+    ISingleCardGenerator, ITranslatedCardGenerator, ICardDataExtractor
+):
     """Infrastructure service for LLM-based card generation.
 
     Handles low-level LLM integration and card generation logic.
@@ -607,15 +609,27 @@ class LLMCardGenerator(ISingleCardGenerator, ITranslatedCardGenerator, ICardData
         ref_link = f"[[{manifest.source_path}#{manifest.source_anchor}]]"
 
         # Detect code language from answer
-        detected_lang = self.code_detector.detect_code_language(answer) if self.code_detector else "text"
+        detected_lang = (
+            self.code_detector.detect_code_language(answer)
+            if self.code_detector
+            else "text"
+        )
         code_lang = (
             detected_lang
             if detected_lang != "text"
-            else (self.code_detector.get_code_language_hint(metadata) if self.code_detector else "text")
+            else (
+                self.code_detector.get_code_language_hint(metadata)
+                if self.code_detector
+                else "text"
+            )
         )
 
         # Generate tags deterministically
-        suggested_tags = self.tag_generator.generate_tags(metadata, lang) if self.tag_generator else []
+        suggested_tags = (
+            self.tag_generator.generate_tags(metadata, lang)
+            if self.tag_generator
+            else []
+        )
 
         prompt = f"""Generate an APF card in HTML format following APF v2.1 specification.
 
@@ -799,7 +813,11 @@ Translated content:"""
             other_notes = english_structure.other_notes
 
         # Build the APF HTML using the standard template structure
-        tags_str = " ".join(self.tag_generator.generate_tags(metadata, manifest.lang) if self.tag_generator else [])
+        tags_str = " ".join(
+            self.tag_generator.generate_tags(metadata, manifest.lang)
+            if self.tag_generator
+            else []
+        )
 
         html_parts = [
             f"<!-- Card {manifest.card_index} | slug: {manifest.slug} | CardType: Simple | Tags: {tags_str} -->",
@@ -849,11 +867,14 @@ Translated content:"""
 
         # Manifest
         import json
+
         manifest_dict = {
             "slug": manifest.slug,
             "lang": manifest.lang,
             "type": "Simple",
-            "tags": self.tag_generator.generate_tags(metadata, manifest.lang) if self.tag_generator else [],
+            "tags": self.tag_generator.generate_tags(metadata, manifest.lang)
+            if self.tag_generator
+            else [],
         }
         html_parts.append(f"<!-- manifest: {json.dumps(manifest_dict)} -->")
 
@@ -924,12 +945,13 @@ Translated content:"""
 
             # Very short response (less than 500 chars) for card generation
             if len(stripped) < 500:
-                indicators.append(
-                    f"very_short_response ({len(stripped)} chars)")
+                indicators.append(f"very_short_response ({len(stripped)} chars)")
 
         return indicators
 
-    def extract_card_data_from_html(self, apf_html: str, manifest: Manifest) -> dict | None:
+    def extract_card_data_from_html(
+        self, apf_html: str, manifest: Manifest
+    ) -> dict | None:
         """Extract card data from existing HTML for regeneration."""
         # Safe access to optional attributes with sensible defaults
         manifest_tags = getattr(manifest, "tags", [])

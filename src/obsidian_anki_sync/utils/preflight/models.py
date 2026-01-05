@@ -24,4 +24,3 @@ class CheckResult(BaseModel):
 
 
 __all__ = ["CheckResult"]
-

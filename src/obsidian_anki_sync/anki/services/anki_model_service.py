@@ -53,7 +53,9 @@ class AnkiModelService(IAnkiModelService):
         self._cache.set(cache_key, result)
         return result
 
-    def get_model_field_names(self, model_name: str, use_cache: bool = True) -> list[str]:
+    def get_model_field_names(
+        self, model_name: str, use_cache: bool = True
+    ) -> list[str]:
         """Get field names for a specific model."""
         cache_key = f"model_field_names:{model_name}"
         if use_cache:
@@ -62,7 +64,8 @@ class AnkiModelService(IAnkiModelService):
                 return cast("list[str]", cached)
 
         result = cast(
-            "list[str]", self._http_client.invoke("modelFieldNames", {"modelName": model_name})
+            "list[str]",
+            self._http_client.invoke("modelFieldNames", {"modelName": model_name}),
         )
         self._cache.set(cache_key, result)
         return result
@@ -79,7 +82,9 @@ class AnkiModelService(IAnkiModelService):
 
         result = cast(
             "list[str]",
-            await self._http_client.invoke_async("modelFieldNames", {"modelName": model_name}),
+            await self._http_client.invoke_async(
+                "modelFieldNames", {"modelName": model_name}
+            ),
         )
         self._cache.set(cache_key, result)
         return result

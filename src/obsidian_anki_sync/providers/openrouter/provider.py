@@ -1003,8 +1003,13 @@ class OpenRouterProvider(BaseLLMProvider):
                 repaired_text = repair_truncated_json(cleaned_text)
                 try:
                     return cast("dict[str, Any]", json.loads(repaired_text))
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as repair_error:
+                    logger.debug(
+                        "json_repair_failed",
+                        original_error=str(e),
+                        repair_error=str(repair_error),
+                        repaired_preview=repaired_text[:200] if repaired_text else "",
+                    )
 
             logger.error(
                 "openrouter_json_parse_error",

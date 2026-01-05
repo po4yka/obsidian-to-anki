@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from obsidian_anki_sync.utils.llm_logging import (
-    log_llm_error,
-    log_llm_success,
-)
+from obsidian_anki_sync.utils.llm_logging import log_llm_error, log_llm_success
 from obsidian_anki_sync.utils.logging import get_logger
 
 from .models import DEFAULT_CONTEXT_WINDOW, MODEL_CONTEXT_WINDOWS
@@ -147,4 +144,3 @@ class OpenRouterStreamResult:
 
 
 __all__ = ["OpenRouterStreamResult"]
-

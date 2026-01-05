@@ -109,7 +109,7 @@ class NoteIndexRepository:
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM note_index WHERE source_path = ?",
             (source_path,),
-            "get_note_index"
+            "get_note_index",
         )
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -122,7 +122,7 @@ class NoteIndexRepository:
         """
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM note_index ORDER BY source_path",
-            operation="get_all_notes_index"
+            operation="get_all_notes_index",
         )
         return [dict(row) for row in cursor.fetchall()]
 
@@ -138,7 +138,7 @@ class NoteIndexRepository:
         cursor = self._connection_manager.execute_query(
             "SELECT * FROM note_index WHERE sync_status = ? ORDER BY source_path",
             (status,),
-            "get_notes_by_status"
+            "get_notes_by_status",
         )
         return [dict(row) for row in cursor.fetchall()]
 
@@ -147,4 +147,3 @@ class NoteIndexRepository:
         with self._connection_manager.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM note_index")
-

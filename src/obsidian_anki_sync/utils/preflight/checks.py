@@ -366,7 +366,9 @@ def check_disk_space(config: Config) -> CheckResult:
     free_bytes = getattr(usage, "free", None)
     if free_bytes is None and isinstance(usage, tuple) and len(usage) >= 3:
         free_bytes = usage[2]
-    free_gb = float(free_bytes) / (1024 * 1024 * 1024) if free_bytes is not None else 0.0
+    free_gb = (
+        float(free_bytes) / (1024 * 1024 * 1024) if free_bytes is not None else 0.0
+    )
 
     if free_gb < 0.5:
         return CheckResult(
@@ -400,8 +402,16 @@ def check_memory() -> CheckResult:
     mem = psutil.virtual_memory()
     total_raw = getattr(mem, "total", 0)
     avail_raw = getattr(mem, "available", 0)
-    total_gb = float(total_raw) / (1024 * 1024 * 1024) if isinstance(total_raw, (int, float)) else 0.0
-    available_gb = float(avail_raw) / (1024 * 1024 * 1024) if isinstance(avail_raw, (int, float)) else 0.0
+    total_gb = (
+        float(total_raw) / (1024 * 1024 * 1024)
+        if isinstance(total_raw, (int, float))
+        else 0.0
+    )
+    available_gb = (
+        float(avail_raw) / (1024 * 1024 * 1024)
+        if isinstance(avail_raw, (int, float))
+        else 0.0
+    )
 
     if available_gb < 2:
         return CheckResult(
@@ -471,4 +481,3 @@ __all__ = [
     "check_vault_path",
     "check_vault_structure",
 ]
-

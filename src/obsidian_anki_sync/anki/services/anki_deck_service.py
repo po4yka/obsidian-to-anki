@@ -59,7 +59,8 @@ class AnkiDeckService(IAnkiDeckService):
         try:
             # Try to use getDeckStats if available (e.g. if using the fork)
             return cast(
-                "dict[str, Any]", self._http_client.invoke("getDeckStats", {"decks": [deck_name]})
+                "dict[str, Any]",
+                self._http_client.invoke("getDeckStats", {"decks": [deck_name]}),
             )
         except AnkiConnectError:
             # Fallback to manual calculation
@@ -70,13 +71,19 @@ class AnkiDeckService(IAnkiDeckService):
                 self._http_client.invoke("findCards", {"query": f'deck:"{deck_name}"'})
             )
             new_cards = len(
-                self._http_client.invoke("findCards", {"query": f'deck:"{deck_name}" is:new'})
+                self._http_client.invoke(
+                    "findCards", {"query": f'deck:"{deck_name}" is:new'}
+                )
             )
             learn_cards = len(
-                self._http_client.invoke("findCards", {"query": f'deck:"{deck_name}" is:learn'})
+                self._http_client.invoke(
+                    "findCards", {"query": f'deck:"{deck_name}" is:learn'}
+                )
             )
             due_cards = len(
-                self._http_client.invoke("findCards", {"query": f'deck:"{deck_name}" is:due'})
+                self._http_client.invoke(
+                    "findCards", {"query": f'deck:"{deck_name}" is:due'}
+                )
             )
 
             # Note: is:due includes learn cards that are due, but we separate them roughly here

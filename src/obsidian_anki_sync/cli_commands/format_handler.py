@@ -45,6 +45,5 @@ def run_format(config: Config, logger: Any, check: bool) -> None:
         logger.info("format_completed", check=check)
     except subprocess.CalledProcessError as exc:
         logger.error("format_failed", returncode=exc.returncode, cmd=exc.cmd)
-        console.print(
-            f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
+        console.print(f"[bold red]Error:[/bold red] Formatter failed: {exc.cmd}")
         raise typer.Exit(code=1)

@@ -990,10 +990,7 @@ class Config(BaseSettings):
                     suggestion=f"Set {attr_name} to a value between 0 and 10.",
                 )
 
-        if (
-            self.max_concurrent_generations < 1
-            or self.max_concurrent_generations > 500
-        ):
+        if self.max_concurrent_generations < 1 or self.max_concurrent_generations > 500:
             msg = (
                 "max_concurrent_generations must be 1-500: "
                 f"{self.max_concurrent_generations}"
@@ -1051,4 +1048,3 @@ class Config(BaseSettings):
 
 
 __all__ = ["Config"]
-

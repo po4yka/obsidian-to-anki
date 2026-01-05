@@ -39,7 +39,6 @@ from .state import PipelineState, get_config, get_model
 logger = get_logger(__name__)
 
 
-
 async def pre_validation_node(state: PipelineState) -> PipelineState:
     """Execute pre-validation stage.
 
@@ -556,6 +555,7 @@ async def split_validation_node(state: PipelineState) -> PipelineState:
 
     # Deserialize data
     from obsidian_anki_sync.agents.models import CardSplittingResult
+
     splitting_result = CardSplittingResult(**card_splitting)
     metadata = NoteMetadata(**state["metadata_dict"])
 

@@ -76,7 +76,9 @@ class AnkiTagService(IAnkiTagService):
         self._http_client.invoke("removeTags", {"notes": note_ids, "tags": tags})
         logger.info("tags_removed", note_ids=note_ids, tags=tags)
 
-    def update_notes_tags(self, note_tag_pairs: list[tuple[int, list[str]]]) -> list[bool]:
+    def update_notes_tags(
+        self, note_tag_pairs: list[tuple[int, list[str]]]
+    ) -> list[bool]:
         """Update tags for multiple notes in a batch operation."""
         if not note_tag_pairs:
             return []

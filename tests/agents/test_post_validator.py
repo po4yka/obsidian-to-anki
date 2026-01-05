@@ -97,12 +97,13 @@ async def test_post_validation_node_retries_and_records_stage_time(
         ),
     ]
     dummy_validator = _DummyValidator(responses)
+    # Patch where the code is actually used (in validation_nodes.py)
     monkeypatch.setattr(
-        "obsidian_anki_sync.agents.langgraph.nodes.PostValidatorAgentAI",
+        "obsidian_anki_sync.agents.langgraph.validation_nodes.PostValidatorAgentAI",
         lambda *_, **__: dummy_validator,
     )
     monkeypatch.setattr(
-        "obsidian_anki_sync.agents.langgraph.nodes.get_model",
+        "obsidian_anki_sync.agents.langgraph.validation_nodes.get_model",
         lambda *_: object(),
     )
 

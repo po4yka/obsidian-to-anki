@@ -115,7 +115,10 @@ def _patch_setup(
                 return []
             return fields.get(model_name, [])
 
-    monkeypatch.setattr("obsidian_anki_sync.anki.client.AnkiClient", DummyAnki)
+    # Patch where it's used (in anki_handler), not where it's defined
+    monkeypatch.setattr(
+        "obsidian_anki_sync.cli_commands.anki_handler.AnkiClient", DummyAnki
+    )
 
 
 def test_decks_command_lists_names(runner, test_config, monkeypatch) -> None:

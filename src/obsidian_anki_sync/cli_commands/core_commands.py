@@ -243,7 +243,9 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def validate(
-        note_path: Annotated[Path, typer.Argument(help="Path to note file", exists=True)],
+        note_path: Annotated[
+            Path, typer.Argument(help="Path to note file", exists=True)
+        ],
         config_path: Annotated[
             Path | None,
             typer.Option("--config", help="Path to config.yaml", exists=True),
@@ -364,5 +366,3 @@ def register(app: typer.Typer) -> None:
         else:
             console.print("[green]Setup validation passed![/green]\n")
             logger.info("check_setup_completed", warnings=0, errors=0)
-
-

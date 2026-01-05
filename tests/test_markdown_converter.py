@@ -744,7 +744,9 @@ class TestMistuneHtmlBugFixes:
 
         renderer = AnkiHighlightRenderer()
         # Use a language that Pygments doesn't know to trigger fallback path
-        result = renderer.block_code("<script>alert('xss')</script>", info="unknownlang")
+        result = renderer.block_code(
+            "<script>alert('xss')</script>", info="unknownlang"
+        )
         assert "&lt;script&gt;" in result
         # Should NOT have nested <p> tags (which mistune.html() would add)
         assert "<p>" not in result

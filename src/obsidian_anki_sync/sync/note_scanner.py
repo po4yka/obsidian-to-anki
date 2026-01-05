@@ -280,9 +280,13 @@ class NoteScanner(INoteScanner):
                             error_samples[error_type] = []
                         if result_info.get("error_samples", {}).get(error_type):
                             error_samples[error_type].extend(
-                                result_info["error_samples"][error_type][:3]  # Limit samples
+                                result_info["error_samples"][error_type][
+                                    :3
+                                ]  # Limit samples
                             )
-                            error_samples[error_type] = error_samples[error_type][:10]  # Limit total samples
+                            error_samples[error_type] = error_samples[error_type][
+                                :10
+                            ]  # Limit total samples
 
                 # Call batch completion callback if provided
                 if on_batch_complete and cards_dict:
@@ -293,7 +297,9 @@ class NoteScanner(INoteScanner):
                     self.progress.increment_processed()
 
             except Exception as e:
-                logger.exception("note_processing_error", path=relative_path, error=str(e))
+                logger.exception(
+                    "note_processing_error", path=relative_path, error=str(e)
+                )
                 error_type = type(e).__name__
                 error_by_type[error_type] += 1
                 if error_type not in error_samples:
@@ -389,9 +395,10 @@ class NoteScanner(INoteScanner):
             self._deferred_archives = self._deferred_archives[batch_size:]
             self._wait_for_fd_headroom()
             for item in batch:
-                if not item.get("note_content") and not Path(
-                    item.get("file_path", "")
-                ).exists():
+                if (
+                    not item.get("note_content")
+                    and not Path(item.get("file_path", "")).exists()
+                ):
                     continue
                 self._archive_note_immediate(
                     file_path=item["file_path"],

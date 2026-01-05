@@ -30,7 +30,11 @@ logger = get_logger(__name__)
 class ExportProgress:
     """Progress tracking for export operations."""
 
-    def __init__(self, total_cards: int, progress_callback: Callable[[dict[str, Any]], None] | None = None):
+    def __init__(
+        self,
+        total_cards: int,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ):
         """Initialize progress tracker.
 
         Args:
@@ -56,11 +60,13 @@ class ExportProgress:
 
         if self.progress_callback:
             progress_data = {
-                'total': self.total_cards,
-                'processed': self.processed,
-                'successful': self.successful,
-                'errors': self.errors,
-                'percentage': (self.processed / self.total_cards * 100) if self.total_cards > 0 else 0,
+                "total": self.total_cards,
+                "processed": self.processed,
+                "successful": self.successful,
+                "errors": self.errors,
+                "percentage": (self.processed / self.total_cards * 100)
+                if self.total_cards > 0
+                else 0,
             }
             self.progress_callback(progress_data)
 
@@ -71,10 +77,10 @@ class ExportProgress:
             Dictionary with final counts
         """
         return {
-            'total': self.total_cards,
-            'processed': self.processed,
-            'successful': self.successful,
-            'errors': self.errors,
+            "total": self.total_cards,
+            "processed": self.processed,
+            "successful": self.successful,
+            "errors": self.errors,
         }
 
 
@@ -115,7 +121,9 @@ class ExportTransaction:
                     temp_file.unlink()
                     logger.debug("cleaned_up_temp_file", path=str(temp_file))
             except OSError as e:
-                logger.warning("failed_to_cleanup_temp_file", path=str(temp_file), error=str(e))
+                logger.warning(
+                    "failed_to_cleanup_temp_file", path=str(temp_file), error=str(e)
+                )
 
         self.temp_files.clear()
         logger.debug("export_transaction_committed", output_path=str(self.output_path))
@@ -126,7 +134,9 @@ class ExportTransaction:
         Returns:
             True if rollback was successful, False otherwise
         """
-        logger.warning("rolling_back_export_transaction", output_path=str(self.output_path))
+        logger.warning(
+            "rolling_back_export_transaction", output_path=str(self.output_path)
+        )
 
         success = True
 
@@ -146,9 +156,15 @@ class ExportTransaction:
             try:
                 if temp_file.exists():
                     temp_file.unlink()
-                    logger.debug("cleaned_up_temp_file_on_rollback", path=str(temp_file))
+                    logger.debug(
+                        "cleaned_up_temp_file_on_rollback", path=str(temp_file)
+                    )
             except OSError as e:
-                logger.warning("failed_to_cleanup_temp_file_on_rollback", path=str(temp_file), error=str(e))
+                logger.warning(
+                    "failed_to_cleanup_temp_file_on_rollback",
+                    path=str(temp_file),
+                    error=str(e),
+                )
 
         self.temp_files.clear()
         logger.info("export_rollback_complete", success=success)
@@ -224,12 +240,14 @@ class SafeCardExporter:
             transaction.commit()
 
             result = progress.get_summary()
-            result.update({
-                'output_path': str(output_path),
-                'format': 'yaml',
-                'deck_name': deck_name,
-                'backup_created': transaction.backup_path is not None,
-            })
+            result.update(
+                {
+                    "output_path": str(output_path),
+                    "format": "yaml",
+                    "deck_name": deck_name,
+                    "backup_created": transaction.backup_path is not None,
+                }
+            )
 
             logger.info("safe_yaml_export_complete", **result)
             return result
@@ -305,12 +323,14 @@ class SafeCardExporter:
             transaction.commit()
 
             result = progress.get_summary()
-            result.update({
-                'output_path': str(output_path),
-                'format': 'csv',
-                'deck_name': deck_name,
-                'backup_created': transaction.backup_path is not None,
-            })
+            result.update(
+                {
+                    "output_path": str(output_path),
+                    "format": "csv",
+                    "deck_name": deck_name,
+                    "backup_created": transaction.backup_path is not None,
+                }
+            )
 
             logger.info("safe_csv_export_complete", **result)
             return result
@@ -371,9 +391,7 @@ class SafeCardExporter:
         try:
             # Export to temporary file first
             with tempfile.NamedTemporaryFile(
-                suffix='.apkg',
-                dir=output_dir,
-                delete=False
+                suffix=".apkg", dir=output_dir, delete=False
             ) as temp_file:
                 temp_path = Path(temp_file.name)
                 transaction.add_temp_file(temp_path)
@@ -394,13 +412,15 @@ class SafeCardExporter:
             transaction.commit()
 
             result = progress.get_summary()
-            result.update({
-                'output_path': str(output_path),
-                'format': 'apkg',
-                'deck_name': deck_name,
-                'media_files': len(media_files) if media_files else 0,
-                'backup_created': transaction.backup_path is not None,
-            })
+            result.update(
+                {
+                    "output_path": str(output_path),
+                    "format": "apkg",
+                    "deck_name": deck_name,
+                    "media_files": len(media_files) if media_files else 0,
+                    "backup_created": transaction.backup_path is not None,
+                }
+            )
 
             logger.info("safe_apkg_export_complete", **result)
             return result
@@ -494,7 +514,7 @@ class SafeCardExporter:
                 default_flow_style=False,
                 allow_unicode=True,
                 sort_keys=False,
-            )
+            ),
         )
 
     def _export_cards_to_csv(
@@ -520,7 +540,9 @@ class SafeCardExporter:
         """
         if not cards:
             # Create empty CSV with headers
-            SafeFileOperations.safe_write_file(output_path, "noteId,slug,noteType,tags,fields\n")
+            SafeFileOperations.safe_write_file(
+                output_path, "noteId,slug,noteType,tags,fields\n"
+            )
             return
 
         # Collect all unique field names across all cards

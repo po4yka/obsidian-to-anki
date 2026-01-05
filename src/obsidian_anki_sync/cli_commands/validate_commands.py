@@ -534,8 +534,7 @@ def run_validate(
         console.print(f"[bold]Parsed:[/bold] {note_path}")
         console.print(f"  [cyan]Title:[/cyan] {metadata.title}")
         console.print(f"  [cyan]Topic:[/cyan] {metadata.topic}")
-        console.print(
-            f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
+        console.print(f"  [cyan]Languages:[/cyan] {', '.join(metadata.language_tags)}")
         console.print(f"  [cyan]Q/A pairs:[/cyan] {len(qa_pairs)}")
 
         # Validate

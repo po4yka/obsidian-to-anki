@@ -190,7 +190,9 @@ class GeneratorAgent:
             translated = {}
 
         title = translated.get("title") or english_structure.title
-        key_point_notes = translated.get("key_point_notes") or english_structure.key_point_notes
+        key_point_notes = (
+            translated.get("key_point_notes") or english_structure.key_point_notes
+        )
         other_notes = translated.get("other_notes") or english_structure.other_notes
 
         tags = self._generate_tags(metadata, manifest.lang)
@@ -199,12 +201,12 @@ class GeneratorAgent:
         key_point_notes_html = "\n".join(f"<li>{note}</li>" for note in key_point_notes)
         other_notes_html = "\n".join(f"<li>{note}</li>" for note in other_notes)
 
-        card_html = f"""<!-- Card 1 | slug: {manifest.slug} | CardType: Simple | Tags: {' '.join(tags)} -->
+        card_html = f"""<!-- Card 1 | slug: {manifest.slug} | CardType: Simple | Tags: {" ".join(tags)} -->
 <!-- Title -->
 {title}
 
 <!-- Key point (code block / image) -->
-{english_structure.key_point_code or ''}
+{english_structure.key_point_code or ""}
 
 <!-- Key point notes -->
 <ul>

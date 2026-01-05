@@ -47,7 +47,9 @@ class IAnkiTagService(ABC):
         """
 
     @abstractmethod
-    def update_notes_tags(self, note_tag_pairs: list[tuple[int, list[str]]]) -> list[bool]:
+    def update_notes_tags(
+        self, note_tag_pairs: list[tuple[int, list[str]]]
+    ) -> list[bool]:
         """Update tags for multiple notes in a batch operation.
 
         Optimizes by grouping notes with identical tag sets into single

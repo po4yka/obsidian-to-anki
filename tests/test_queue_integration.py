@@ -100,25 +100,25 @@ def test_scan_notes_with_queue(mock_config, mock_pool):
         "obsidian_anki_sync.sync.queue_processor.create_pool",
         side_effect=mock_create_pool,
     ):
-            from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
+        from obsidian_anki_sync.sync.queue_processor import QueueNoteProcessor
 
-            queue_processor = QueueNoteProcessor(config=mock_config)
+        queue_processor = QueueNoteProcessor(config=mock_config)
 
-            # Test data
-            note_files = [(Path("/tmp/test.md"), "test.md")]
-            obsidian_cards = {}
-            existing_slugs = set()
-            error_by_type = defaultdict(int)
-            error_samples = defaultdict(list)
+        # Test data
+        note_files = [(Path("/tmp/test.md"), "test.md")]
+        obsidian_cards = {}
+        existing_slugs = set()
+        error_by_type = defaultdict(int)
+        error_samples = defaultdict(list)
 
-            # Run scan
-            result = queue_processor.scan_notes_with_queue(
-                note_files,
-                obsidian_cards,
-                existing_slugs,
-                error_by_type,
-                error_samples,
-            )
+        # Run scan
+        result = queue_processor.scan_notes_with_queue(
+            note_files,
+            obsidian_cards,
+            existing_slugs,
+            error_by_type,
+            error_samples,
+        )
 
     # Verify
     assert len(result) == 1
@@ -315,7 +315,11 @@ async def test_push_result_routes_to_dead_letter_on_failure():
     redis.expire = AsyncMock()
     redis.ltrim = AsyncMock()
 
-    ctx: dict[str, Any] = {"config": Config(), "orchestrator": AsyncMock(), "redis": redis}
+    ctx: dict[str, Any] = {
+        "config": Config(),
+        "orchestrator": AsyncMock(),
+        "redis": redis,
+    }
 
     from obsidian_anki_sync.worker import _push_result
 
@@ -364,10 +368,13 @@ async def test_queue_processor_circuit_breaks_on_repeated_redis_errors():
         return pool
 
     processor = QueueNoteProcessor(config=config)
-    with patch(
-        "obsidian_anki_sync.sync.queue_processor.create_pool",
-        side_effect=mock_create_pool,
-    ), pytest.raises(CircuitBreakerOpenError):
+    with (
+        patch(
+            "obsidian_anki_sync.sync.queue_processor.create_pool",
+            side_effect=mock_create_pool,
+        ),
+        pytest.raises(CircuitBreakerOpenError),
+    ):
         await processor._scan_notes_with_queue_async(
             note_files=[(Path("/tmp/a.md"), "a.md")],
             obsidian_cards={},

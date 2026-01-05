@@ -108,13 +108,15 @@ async def test_split_validation_node_approved(pipeline_state):
         )
     )
 
+    # Patch where the code is actually used (in validation_nodes.py)
     with (
         patch(
-            "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+            "obsidian_anki_sync.agents.langgraph.validation_nodes.SplitValidatorAgentAI",
             return_value=mock_agent,
         ),
         patch(
-            "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
+            "obsidian_anki_sync.agents.langgraph.validation_nodes.get_model",
+            return_value=MagicMock(),
         ),
     ):
         new_state = await split_validation_node(pipeline_state)
@@ -160,13 +162,15 @@ async def test_split_validation_node_rejected(pipeline_state):
         )
     )
 
+    # Patch where the code is actually used (in validation_nodes.py)
     with (
         patch(
-            "obsidian_anki_sync.agents.langgraph.nodes.SplitValidatorAgentAI",
+            "obsidian_anki_sync.agents.langgraph.validation_nodes.SplitValidatorAgentAI",
             return_value=mock_agent,
         ),
         patch(
-            "obsidian_anki_sync.agents.langgraph.nodes.create_openrouter_model_from_env"
+            "obsidian_anki_sync.agents.langgraph.validation_nodes.get_model",
+            return_value=MagicMock(),
         ),
     ):
         new_state = await split_validation_node(pipeline_state)
