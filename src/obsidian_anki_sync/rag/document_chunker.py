@@ -177,7 +177,7 @@ class DocumentChunker:
             parsed = frontmatter.loads(content)
             metadata = dict(parsed.metadata)
             body = parsed.content
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             metadata = {}
             body = content
 

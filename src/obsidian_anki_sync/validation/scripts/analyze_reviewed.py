@@ -21,7 +21,7 @@ def main() -> None:
             content = md_file.read_text(encoding="utf-8")
             if "status: reviewed" in content:
                 reviewed_notes.append(md_file)
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             continue
 
     # Validate all reviewed notes

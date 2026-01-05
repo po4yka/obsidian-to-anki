@@ -189,7 +189,7 @@ class WorkPackagePreparator:
                     content = filepath.read_text(encoding="utf-8")
                     if f"status: {status_filter}" not in content:
                         continue
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     continue
 
             result = self.analyze_file(filepath)

@@ -216,7 +216,7 @@ class LMStudioProvider(BaseLLMProvider):
             try:
                 error_json = e.response.json()
                 error_details = error_json
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 error_details = {"raw_response": e.response.text}
 
             logger.error(

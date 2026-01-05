@@ -234,7 +234,7 @@ class AgentMemoryStore:
                 if self.storage_path.exists():
                     shutil.rmtree(self.storage_path)
                 self.storage_path.mkdir(parents=True, exist_ok=True)
-            except Exception:
+            except OSError:
                 pass
 
     def _auto_cleanup(self) -> None:

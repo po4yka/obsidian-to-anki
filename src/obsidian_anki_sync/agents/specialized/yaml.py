@@ -88,5 +88,5 @@ Return ONLY the repaired frontmatter section, properly formatted as valid YAML."
 
             post = frontmatter.loads(content)
             return post.metadata is not None
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             return False

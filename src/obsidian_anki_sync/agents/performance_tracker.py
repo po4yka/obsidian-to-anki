@@ -128,7 +128,7 @@ class PerformanceTracker:
                         note_id = found_ids[0]
                         card_map[note_id] = card
                         note_ids.append(note_id)
-                except Exception:
+                except (ConnectionError, OSError, TimeoutError):
                     # Ignore cards that can't be found
                     continue
 

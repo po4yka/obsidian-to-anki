@@ -92,7 +92,7 @@ class DatabaseConnectionManager:
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except (sqlite3.Error, OSError):
             conn.rollback()
             raise
 

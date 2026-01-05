@@ -7,7 +7,11 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from obsidian_anki_sync.utils.logging import get_logger
+
 from .base import BaseValidator, Severity
+
+logger = get_logger(__name__)
 
 
 class YAMLValidator(BaseValidator):
@@ -472,7 +476,8 @@ class YAMLValidator(BaseValidator):
 
         try:
             frontmatter = yaml.load(parts[1])
-        except Exception:
+        except (ValueError, TypeError) as e:
+            logger.debug("yaml_load_failed", error=str(e))
             return self.content, self.frontmatter
 
         # Add tag if missing

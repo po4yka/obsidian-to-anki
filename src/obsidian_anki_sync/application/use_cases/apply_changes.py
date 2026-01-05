@@ -6,6 +6,9 @@ from typing import Any
 from obsidian_anki_sync.domain.entities.card import SyncAction
 from obsidian_anki_sync.domain.interfaces.anki_client import IAnkiClient
 from obsidian_anki_sync.domain.interfaces.state_repository import IStateRepository
+from obsidian_anki_sync.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -315,7 +318,7 @@ class ApplyChangesUseCase:
                 elif action.is_delete:
                     # Mark card as deleted (or remove from repository)
                     self.state_repository.delete_card(action.card.slug)
-        except Exception:
+        except (OSError, KeyError, ValueError) as e:
             # Log error but don't fail the operation
             # State inconsistency should be handled by sync recovery
-            pass
+            logger.debug("state_update_failed", error=str(e))

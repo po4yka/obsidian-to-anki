@@ -341,7 +341,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
                     try:
                         schema = result_type.model_json_schema()
                         return json.dumps(schema, indent=2)
-                    except Exception:
+                    except (AttributeError, TypeError, ValueError):
                         return f"Pydantic model: {result_type.__name__}"
                 else:
                     return "String output"
@@ -406,7 +406,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
             # Try to parse and re-stringify
             parsed = json.loads(invalid_output)
             return json.dumps(parsed, ensure_ascii=False, indent=2)
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             # Return original if we can't fix it
             logger.warning("fallback_fix_failed", error=error)
             return invalid_output
@@ -474,7 +474,7 @@ Improve prompts to ensure they generate valid, correctly formatted outputs.
 
         try:
             return output_type.model_validate(parsed)  # type: ignore[return-value]
-        except Exception:
+        except (ValueError, TypeError):
             return None
 
     def get_repair_metrics(self) -> dict[str, Any]:

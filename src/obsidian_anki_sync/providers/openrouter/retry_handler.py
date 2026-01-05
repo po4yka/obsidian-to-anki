@@ -153,7 +153,7 @@ def parse_retry_after_header(response: httpx.Response) -> float | None:
             delta = (retry_datetime - now).total_seconds()
             if delta > 0:
                 return float(delta)
-        except Exception:
+        except (ValueError, TypeError, OverflowError):
             pass
 
     return None
@@ -203,7 +203,7 @@ class RetryTransport(httpx.AsyncHTTPTransport):
                     try:
                         await response.aread()
                         error_text = response.text[:500]
-                    except Exception:
+                    except (httpx.StreamError, httpx.HTTPStatusError):
                         error_text = "(could not read response body)"
 
                     logger.warning(

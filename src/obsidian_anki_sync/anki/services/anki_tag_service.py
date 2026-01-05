@@ -166,7 +166,7 @@ class AnkiTagService(IAnkiTagService):
                 try:
                     self.update_note_tags(note_id, tags)
                     fallback_results.append(True)
-                except Exception:
+                except AnkiConnectError:
                     fallback_results.append(False)
 
             return fallback_results

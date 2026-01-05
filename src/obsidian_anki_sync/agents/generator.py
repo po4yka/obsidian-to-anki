@@ -186,7 +186,7 @@ class GeneratorAgent:
 
         try:
             translated = json.loads(translated_html)
-        except Exception:
+        except (json.JSONDecodeError, TypeError):
             translated = {}
 
         title = translated.get("title") or english_structure.title

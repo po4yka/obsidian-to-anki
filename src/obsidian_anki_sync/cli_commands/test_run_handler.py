@@ -44,7 +44,6 @@ def run_test_run(
         command="test-run",
         count=count,
         dry_run=dry_run,
-        config_path=str(config.config_path) if config.config_path else None,
         log_level=config.log_level,
         index=index,
         vault_path=str(config.vault_path) if config.vault_path else None,

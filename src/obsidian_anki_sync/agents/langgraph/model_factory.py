@@ -74,7 +74,7 @@ def get_model(agent_type: str, config: Config | None = None) -> Any:
     if config is None:
         try:
             config = Config()  # type: ignore[call-arg]
-        except Exception:
+        except (ValueError, OSError, KeyError):
             return None
     factory = ModelFactory(config)
     return factory.get_model(agent_type)
@@ -84,6 +84,6 @@ def create_openrouter_model_from_env(agent_type: str = "post_validator") -> Any:
     """Legacy helper to create a model using environment-backed config."""
     try:
         config = Config()
-    except Exception:
+    except (ValueError, OSError, KeyError):
         return None
     return get_model(agent_type, config=config)

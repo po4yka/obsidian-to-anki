@@ -32,7 +32,7 @@ def _get_model_name(agent: object) -> str:
             if hasattr(model, "name"):
                 return str(model.name)
             return str(model)
-    except Exception:
+    except (AttributeError, TypeError):
         pass
     return "unknown"
 
@@ -138,7 +138,7 @@ async def run_agent_with_streaming(
 
         try:
             output_preview = _truncate_for_log(str(output), 200)
-        except Exception:
+        except (TypeError, ValueError):
             output_preview = "<unable to serialize>"
 
         logger.info(

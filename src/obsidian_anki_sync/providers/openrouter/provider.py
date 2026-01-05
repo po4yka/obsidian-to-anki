@@ -626,7 +626,7 @@ class OpenRouterProvider(BaseLLMProvider):
                 if isinstance(error_msg, dict):
                     error_type = error_msg.get("type", "")
                     error_message = error_msg.get("message", "")
-        except Exception:
+        except (json.JSONDecodeError, ValueError, KeyError):
             error_details = {"raw_response": raw_response_text}
 
         logger.error(
@@ -919,7 +919,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     reasoning_effort=reasoning_effort,
                 )
                 return fallback_result
-            except Exception:
+            except (httpx.HTTPStatusError, httpx.RequestError, json.JSONDecodeError):
                 pass  # Re-raise original error
 
         # If no fallback succeeded, return None to indicate error should be re-raised

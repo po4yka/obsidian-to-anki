@@ -106,7 +106,7 @@ class RAGService:
         try:
             stats = self.vector_store.get_stats()
             return bool(stats.get("total_chunks", 0) > 0)  # type: ignore[no-any-return]
-        except Exception:
+        except (OSError, KeyError, ValueError):
             return False
 
     def index_vault(

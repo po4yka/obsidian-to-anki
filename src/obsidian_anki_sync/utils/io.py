@@ -68,7 +68,7 @@ def atomic_write(
             # Atomic rename
             temp_path_obj.replace(path)
 
-        except Exception:
+        except OSError:
             # Cleanup temp file on error
             if temp_path_obj.exists():
                 with suppress(OSError):

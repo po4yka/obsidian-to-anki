@@ -275,7 +275,8 @@ def check_note_type(config: Config, results: list[CheckResult]) -> CheckResult |
                 fixable=True,
                 fix_suggestion=f"Available types: {', '.join(model_names[:5])}...",
             )
-    except Exception:
+    except (ConnectionError, OSError, TimeoutError) as e:
+        logger.debug("note_type_check_failed", error=str(e))
         return None
 
 
@@ -316,7 +317,8 @@ def check_deck_name(config: Config, results: list[CheckResult]) -> CheckResult |
                 fixable=True,
                 fix_suggestion=f"Available decks: {', '.join(deck_names[:5])}...",
             )
-    except Exception:
+    except (ConnectionError, OSError, TimeoutError) as e:
+        logger.debug("deck_check_failed", error=str(e))
         return None
 
 
