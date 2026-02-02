@@ -1,0 +1,156 @@
+"""PydanticAI-based post-validation agent."""
+
+from __future__ import annotations
+
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+
+from obsidian_anki_sync.models import NoteMetadata
+from obsidian_anki_sync.utils.logging import get_logger
+
+from ..exceptions import (
+    ModelError,
+    PostValidationError,
+    StructuredOutputError,
+)
+from ..improved_prompts import POST_VALIDATION_SYSTEM_PROMPT
+from ..models import GeneratedCard, PostValidationResult
+from ..patch_applicator import apply_corrections
+from .deps import PostValidationDeps
+from .outputs import PostValidationOutput
+from .streaming import run_agent_with_streaming
+
+logger = get_logger(__name__)
+
+
+class PostValidatorAgentAI:
+    """PydanticAI-based post-validation agent.
+
+    Validates generated cards for quality, syntax, and accuracy.
+    Uses structured outputs to identify and suggest corrections.
+    """
+
+    def __init__(self, model: OpenAIChatModel, temperature: float = 0.0):
+        """Initialize post-validator agent.
+
+        Args:
+            model: PydanticAI model instance
+            temperature: Sampling temperature (0.0 for deterministic)
+        """
+        self.model = model
+        self.temperature = temperature
+
+        # Create PydanticAI agent
+        self.agent: Agent[PostValidationDeps, PostValidationOutput] = Agent(
+            model=self.model,
+            output_type=PostValidationOutput,
+            system_prompt=self._get_system_prompt(),
+        )
+
+        logger.info("pydantic_ai_post_validator_initialized", model=str(model))
+
+    def _get_system_prompt(self) -> str:
+        """Get system prompt for post-validation with few-shot examples."""
+        return POST_VALIDATION_SYSTEM_PROMPT
+
+    async def validate(
+        self,
+        cards: list[GeneratedCard],
+        metadata: NoteMetadata,
+        strict_mode: bool = True,
+    ) -> PostValidationResult:
+        """Validate generated cards.
+
+        Args:
+            cards: Generated cards to validate
+            metadata: Note metadata for context
+            strict_mode: Enable strict validation
+
+        Returns:
+            PostValidationResult with validation outcome
+        """
+        logger.info("pydantic_ai_post_validation_start", cards_count=len(cards))
+
+        # Create dependencies
+        deps = PostValidationDeps(
+            cards=cards, metadata=metadata, strict_mode=strict_mode
+        )
+
+        # Build validation prompt with FULL card content
+        prompt = f"""Validate these {len(cards)} generated APF cards:
+
+Metadata:
+- Title: {metadata.title}
+- Topic: {metadata.topic}
+- Languages: {", ".join(metadata.language_tags)}
+
+Cards to validate:
+"""
+        # Include full HTML content for proper validation (up to 3 cards to avoid token limits)
+        for card in cards[:3]:
+            prompt += f"\n--- Card {card.card_index} ({card.lang}): {card.slug} ---\n"
+            prompt += f"```html\n{card.apf_html}\n```\n"
+
+        if len(cards) > 3:
+            prompt += f"\n(Plus {len(cards) - 3} more cards with similar structure)\n"
+
+        prompt += f"\nValidate all {len(cards)} cards for APF v2.1 compliance, correctness, and quality."
+
+        try:
+            # Run agent with streaming to prevent connection timeouts
+            output: PostValidationOutput = await run_agent_with_streaming(
+                self.agent,
+                prompt,
+                deps,
+                operation_name="post_validation",
+            )
+
+            # Apply suggested corrections if any
+            corrected_cards = None
+            applied_changes: list[str] = []
+
+            if output.suggested_corrections:
+                corrected_cards, applied_changes = apply_corrections(
+                    cards, output.suggested_corrections
+                )
+                logger.info(
+                    "post_validation_corrections_applied",
+                    suggested_count=len(output.suggested_corrections),
+                    applied_count=len(applied_changes),
+                )
+
+            validation_result = PostValidationResult(
+                is_valid=output.is_valid,
+                error_type=output.error_type,
+                error_details=output.error_details,
+                suggested_corrections=output.suggested_corrections,
+                corrected_cards=corrected_cards,
+                applied_changes=applied_changes,
+                validation_time=0.0,
+            )
+
+            logger.info(
+                "pydantic_ai_post_validation_complete",
+                is_valid=output.is_valid,
+                confidence=output.confidence,
+                issues_found=len(output.card_issues),
+                corrections_applied=len(applied_changes),
+            )
+
+            return validation_result
+
+        except ValueError as e:
+            logger.error("pydantic_ai_post_validation_parse_error", error=str(e))
+            msg = "Failed to parse post-validation output"
+            raise StructuredOutputError(
+                msg,
+                details={"error": str(e), "cards_count": len(cards)},
+            ) from e
+        except TimeoutError as e:
+            logger.error("pydantic_ai_post_validation_timeout", error=str(e))
+            msg = "Post-validation timed out"
+            raise ModelError(msg, details={"cards_count": len(cards)}) from e
+        except Exception as e:
+            logger.error("pydantic_ai_post_validation_failed", error=str(e))
+            msg = f"Post-validation failed: {e!s}"
+            raise PostValidationError(msg, details={"cards_count": len(cards)}) from e
