@@ -154,7 +154,7 @@ def test_format_command_runs_subprocess(runner, test_config, monkeypatch) -> Non
         calls.append((tuple(cmd), check))
         return MagicMock()
 
-    monkeypatch.setattr("obsidian_anki_sync.cli.subprocess.run", fake_run)
+    monkeypatch.setattr("obsidian_anki_sync.cli_commands.maintenance_commands.subprocess.run", fake_run)
 
     result = runner.invoke(app, ["format", "--check"])
     assert result.exit_code == 0
