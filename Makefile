@@ -1,4 +1,4 @@
-.PHONY: install validate validate-all validate-fix validate-incremental validate-report \
+.PHONY: setup install validate validate-all validate-fix validate-incremental validate-report \
         validate-parallel validate-parallel-fix \
         sync sync-dry-run sync-incremental test test-cov format lint typecheck check help
 
@@ -14,6 +14,10 @@ install:  ## Install dependencies with uv
 
 install-dev:  ## Install with dev dependencies
 	uv sync --dev
+
+setup: install-dev  ## Full dev setup (install + pre-commit hooks)
+	uv run pre-commit install
+	@echo "Setup complete."
 
 # =============================================================================
 # Validation targets
