@@ -1,5 +1,9 @@
 {
-    "enabledPlugins": {
-        "compound-engineering@every-marketplace": false
+    "permissions": {
+        "allow": [
+            "Bash(uv run *)",
+            "Bash(git *)",
+            "Bash(make *)"
+        ]
     }
 }
