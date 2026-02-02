@@ -1,7 +1,6 @@
 """Test run command implementation logic."""
 
 import time
-from pathlib import Path
 from typing import Any
 
 import typer

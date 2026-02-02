@@ -120,7 +120,6 @@ select = [
     "COM", # flake8-commas
     "DTZ", # flake8-datetimez
     "T10", # flake8-debugger
-    "DJ",  # flake8-django (if applicable)
     "EM",  # flake8-errmsg
     "EXE", # flake8-executable
     "FA",  # flake8-future-annotations
@@ -144,13 +143,10 @@ select = [
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
     "ERA", # eradicate (commented code)
-    "PD",  # pandas-vet
     "PGH", # pygrep-hooks
     "PL",  # pylint
     "TRY", # tryceratops
     "FLY", # flynt (string formatting)
-    "NPY", # numpy-specific
-    "AIR", # airflow
     "PERF",# perflint (performance)
     "FURB",# refurb
     "LOG", # flake8-logging
@@ -169,10 +165,6 @@ ignore = [
     "Q002",      # single quote docstrings
     "Q003",      # change outer quotes to avoid escaping
     "ERA001",    # commented-out code (sometimes intentional)
-    "PD",        # pandas rules (not using pandas)
-    "NPY",       # numpy rules (not using numpy)
-    "AIR",       # airflow rules (not using airflow)
-    "DJ",        # django rules (not using django)
     "FBT001",    # boolean positional arg in function definition
     "FBT002",    # boolean default positional argument
     "FBT003",    # boolean positional value in function call
@@ -255,10 +247,10 @@ ignore = [
 # Allow autofix for safe rules
 fixable = [
     "E", "F", "W", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "A", "COM",
-    "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP",
+    "C4", "DTZ", "T10", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP",
     "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM",
-    "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY",
-    "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"
+    "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PGH", "PL", "TRY",
+    "FLY", "PERF", "FURB", "LOG", "RUF"
 ]
 
 # Unfixable rules (require manual intervention)
@@ -311,6 +303,8 @@ exclude = [
     "TC001",     # type-checking imports (runtime required)
     "TC002",     # third-party type-checking imports (runtime required)
     "TC003",     # stdlib type-checking imports (runtime required)
+    "F401",      # unused imports (common in test fixtures)
+    "T201",      # print statements in test scripts
 ]
 "src/obsidian_anki_sync/cli.py" = ["T201", "PT028"]  # print statements in CLI, CLI commands are not pytest tests
 "scripts/**" = ["T201", "S603", "S607"]  # scripts may use print and subprocess
@@ -318,11 +312,6 @@ exclude = [
 "conftest.py" = ["F401"]  # conftest.py often has unused imports
 "src/obsidian_anki_sync/validation/scripts/**" = ["F401"]  # validation scripts may have unused imports
 "tests/test_*.py" = ["F401"]  # test files often have unused imports
-# Debugging and verification scripts at project root
-"reproduce_*.py" = ["T201", "SLF001", "F401", "PTH100", "SIM115", "S101"]  # reproduction scripts
-"verify_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101", "PT009"]  # verification scripts
-"test_*.py" = ["T201", "SLF001", "F401", "PTH100", "S101"]  # test scripts at root (not in tests/)
-"inspect_agent.py" = ["T201"]
 
 [tool.ruff.lint.mccabe]
 # Maximum complexity for functions/methods
