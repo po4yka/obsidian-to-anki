@@ -493,9 +493,12 @@ uv run pre-commit run --all-files
 
 -   **Stale state**: `obsidian-anki-sync clean-progress` clears cached sync progress; restart Anki after large deck changes.
 
+For a comprehensive guide, see **[Troubleshooting](.docs/HOW-TO/troubleshooting.md)**.
+
 ## Documentation
 
 -   **[Full Docs](.docs/README.md)** - Complete guides and reference
+-   **[HOW-TO Guides](.docs/HOW-TO/)** - Task-oriented workflow guides
 -   **[Getting Started](.docs/GETTING_STARTED.md)** - Setup guide
 -   **[Configuration](.docs/GUIDES/configuration.md)** - Provider setup
 -   **[Synchronization](.docs/GUIDES/synchronization.md)** - Change management

@@ -119,9 +119,11 @@ obsidian-anki-sync sync --dry-run
 
 ### Learn More
 
+-   **[Writing Notes](HOW-TO/writing-notes.md)** - Note format and structure for sync
+-   **[First Sync Guide](HOW-TO/first-sync.md)** - Detailed first sync walkthrough
 -   **[Configuration Guide](GUIDES/configuration.md)** - Advanced configuration options
 -   **[Synchronization Guide](GUIDES/synchronization.md)** - Understanding sync behavior
--   **[Troubleshooting](GUIDES/troubleshooting.md)** - Common issues and solutions
+-   **[Troubleshooting](HOW-TO/troubleshooting.md)** - Common issues and solutions
 -   **[Architecture Overview](ARCHITECTURE/README.md)** - How the system works
 
 ### Common Tasks
@@ -139,7 +141,7 @@ obsidian-anki-sync sync --dry-run
 3. **Test configuration**: Run `obsidian-anki-sync validate <path-to-note>`
 4. **Check logs**: Look in `.logs/` directory for detailed error messages
 
-**Need help?** [Open an issue](https://github.com/po4yka/obsidian-to-anki/issues) or check the [troubleshooting guide](GUIDES/troubleshooting.md).
+**Need help?** [Open an issue](https://github.com/po4yka/obsidian-to-anki/issues) or check the [troubleshooting guide](HOW-TO/troubleshooting.md).
 
 ---
 

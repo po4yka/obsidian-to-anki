@@ -18,7 +18,20 @@
 - **[Configuration](GUIDES/configuration.md)** - Model presets and settings
 - **[Synchronization](GUIDES/synchronization.md)** - Change management
 - **[AI Validation](GUIDES/validation.md)** - Automated validation
-- **Troubleshooting** - Quick checks in [README → Troubleshooting](../README.md#troubleshooting)
+- **[Troubleshooting](HOW-TO/troubleshooting.md)** - Diagnosing and fixing problems
+
+## HOW-TO Guides
+
+- **[Writing Notes](HOW-TO/writing-notes.md)** -- Note format for sync
+- **[First Sync](HOW-TO/first-sync.md)** -- Running your first sync
+- **[Troubleshooting](HOW-TO/troubleshooting.md)** -- Diagnosing problems
+- **[Validating Notes](HOW-TO/validating-notes.md)** -- Validation tools
+- **[Using RAG](HOW-TO/using-rag.md)** -- Semantic search and dedup
+- **[Export & Import](HOW-TO/export-import-decks.md)** -- Deck operations
+- **[Switching Providers](HOW-TO/switching-providers.md)** -- Change LLM provider
+- **[Backup & Restore](HOW-TO/backup-restore.md)** -- Protect your data
+- **[Redis Queue](HOW-TO/redis-queue.md)** -- Parallel processing
+- **[Performance Tuning](HOW-TO/performance-tuning.md)** -- Speed optimization
 
 ## Reference
 

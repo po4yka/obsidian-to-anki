@@ -93,9 +93,11 @@ obsidian-anki-sync rollback --all --since "1 hour ago"
 
 1. **Start conservative** - Begin with `conflict_resolution: "manual"`
 2. **Use dry-run** - Always preview before applying
-3. **Backup Anki** - Before major sync operations
+3. **Backup Anki** - Before major sync operations (see [Backup & Restore](../HOW-TO/backup-restore.md))
 4. **Monitor patterns** - Review auto-approved changes periodically
+
+New to syncing? Start with the [First Sync](../HOW-TO/first-sync.md) guide.
 
 ---
 
-**Related**: [Configuration](configuration.md) | [Sync API](../reference/sync-api.md)
+**Related**: [Configuration](configuration.md) | [Sync API](../reference/sync-api.md) | [First Sync](../HOW-TO/first-sync.md) | [Backup & Restore](../HOW-TO/backup-restore.md)
